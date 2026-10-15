@@ -39,7 +39,8 @@ export default function TeamManagement({ user, membership }) {
     finally { setSubmitting(false); }
   };
 
-  if (!allowed) return;
+  useEffect(() => {
+    if (!allowed) return;
     const ref = query(collection(db, 'units', membership.unitId, 'invitations'), limit(50));
     return onSnapshot(ref, snapshot => {
       setInvitations(snapshot.docs.map(item => ({ id: item.id, ...item.data() })));
