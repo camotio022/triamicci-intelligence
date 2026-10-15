@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function membership() { return get(/databases/$(database)/documents/memberships/$(request.auth.uid)); }
+    function active() { return signedIn() && exists(/databases/$(database)/documents/memberships/$(request.auth.uid)) && membership().data.status == 'active'; }
+    function sameUnit(unitId) { return active() && membership().data.unitId == unitId; }
+    function manager(unitId) { return sameUnit(unitId) && membership().data.role in ['admin', 'manager']; }
+    match /memberships/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false; // Somente backend privilegiado (Admin SDK)
+    }
+    match /units/{unitId}/invitations/{inviteId} {
+      allow read: if manager(unitId);
+      allow write: if false; // Somente backend privilegiado
+    }
+    match /units/{unitId}/receipts/{receiptId} {
+      allow read: if sameUnit(unitId);
+      allow write: if false; // Habilitar somente após validação server-side e auditoria
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
