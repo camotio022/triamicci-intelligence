@@ -15,7 +15,8 @@
     "react-dom": "latest",
     "recharts": "latest",
     "lucide-react": "latest",
-    "firebase": "^12.4.0"
+    "firebase": "^12.4.0",
+    "firebase-admin": "^13.5.0"
   },
   "devDependencies": {}
 }
