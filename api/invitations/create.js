@@ -5,7 +5,8 @@ export default async function handler(req,res) {
     const actor = await authenticate(req);
     const member = await membership(actor.uid);
     if (!member || !['admin','manager'].includes(member.role)) return send(res,403,'Sem permissão para convidar.');
-    const { unitId, role } = req.body || {};
+    const { unitId, role, deliveryMethod = 'email' } = req.body || {};
+    if (!['email','link'].includes(deliveryMethod)) return send(res,400,'Modo de convite inválido.');
     const email = normalizeEmail(req.body?.email);
     if (!emailPattern.test(email) || email.length > 254 || !roles.includes(role) || unitId !== member.unitId)
       return send(res,400,'E-mail, função ou unidade inválidos.');
@@ -25,8 +26,17 @@ export default async function handler(req,res) {
       if (existingMembership.exists)
         return send(res,409,'Este e-mail já está associado a um colaborador. Utilize a gestão de acessos.');
     }
-    if (!process.env.RESEND_API_KEY || !process.env.INVITE_FROM_EMAIL || !process.env.PUBLIC_APP_URL)
+    if (!process.env.PUBLIC_APP_URL) return send(res,503,'PUBLIC_APP_URL não configurada.');
+    if (deliveryMethod === 'email' && (!process.env.RESEND_API_KEY || !process.env.INVITE_FROM_EMAIL))
       return send(res,503,'Serviço de e-mail ainda não configurado.');
+    let appOrigin;
+    try {
+      const appUrl = new URL(process.env.PUBLIC_APP_URL.trim());
+      if (appUrl.protocol !== 'https:' || appUrl.username || appUrl.password) throw new Error('Invalid URL');
+      appOrigin = appUrl.origin;
+    } catch {
+      return send(res,503,'PUBLIC_APP_URL inválida.');
+    }
     const db = getDb();
     // Limite persistente: cinco tentativas por hora por emissor.
     const quotaRef = db.collection('invitationRateLimits').doc(actor.uid);
@@ -49,11 +59,19 @@ export default async function handler(req,res) {
     const invitation = db.collection('units').doc(unitId).collection('invitations').doc();
     const now = Date.now();
     await invitation.set({
-      email,role,unitId,status:'sending',tokenHash:hashToken(token),
+      email,role,unitId,deliveryMethod,status:deliveryMethod === 'link' ? 'pending' : 'sending',tokenHash:hashToken(token),
       createdBy:actor.uid,createdAt:adminTimestamp(),expiresAt: new Date(now + 7*24*60*60*1000),
       updatedAt:adminTimestamp()
     });
-    const url = process.env.PUBLIC_APP_URL.replace(/\/$/,'') + '/#invite=' + encodeURIComponent(unitId+'.'+invitation.id+'.'+token);
+    const url = appOrigin + '/#invite=' + encodeURIComponent(unitId+'.'+invitation.id+'.'+token);
+    if (deliveryMethod === 'link') {
+      await db.collection('auditLogs').add({
+        event:'invitation.link_created',unitId,invitationId:invitation.id,actorUid:actor.uid,at:adminTimestamp()
+      });
+      // Link de uso único: só retorna nesta resposta autenticada, nunca grava token em texto no Firestore.
+      res.setHeader('Cache-Control','no-store');
+      return send(res,201,'Link criado. Envie-o somente ao colaborador correto.',{inviteUrl:url});
+    }
     try {
       await deliverInvite({to:email,url,unitId,role});
     } catch (error) {
