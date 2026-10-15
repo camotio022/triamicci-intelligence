@@ -153,3 +153,14 @@ html,body,#root{max-width:100%;min-width:320px}
 .team-share-actions .team-secondary{background:white;color:#9a2424;border:1px solid #e5c7c7}
 .team-invite .team-revoke{align-self:flex-start;margin-top:6px;padding:8px 12px;background:#fff0ef;color:#a62a2a;border:1px solid #f0c7c7;font-size:12px}
 @media(max-width:480px){.team-share-actions{flex-direction:column}.team-share-actions button{width:100%}}
+
+/* Perfil: o avatar abre informações e só o botão explícito encerra a sessão. */
+.profile-menu-wrap{position:relative;display:flex;align-items:center;flex-shrink:0}
+.profile-menu-wrap .top-avatar{border:0;cursor:pointer;min-width:36px;min-height:36px}
+.profile-popover{position:absolute;z-index:45;right:0;top:calc(100% + 12px);width:min(300px,calc(100vw - 30px));background:#fff;border:1px solid #e5e9f0;border-radius:13px;box-shadow:0 14px 36px #17203324;padding:18px;display:flex;flex-direction:column;gap:9px;text-align:left;overflow-wrap:anywhere}
+.profile-popover>strong{font-size:15px;color:#172033}
+.profile-email{font-size:12px;color:#697386}
+.profile-meta{display:flex;justify-content:space-between;gap:12px;padding-top:9px;border-top:1px solid #eef0f4;font-size:12px}
+.profile-meta span{color:#697386}
+.profile-meta b{color:#172033}
+.profile-logout{border:1px solid #f0c7c7;background:#fff0ef;color:#a52b2b;border-radius:9px;padding:11px 12px;margin-top:8px;font-weight:700;min-height:44px;text-align:center}
