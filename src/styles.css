@@ -62,3 +62,12 @@ thead th{font-size:12px}tbody td{font-size:13px;padding:14px 10px}
 .receiving-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:20px}.receiving-actions button{background:#C62828;color:white;border:0;border-radius:9px;padding:12px 18px;font-weight:700}.receiving-actions span{font-size:13px;color:#475467}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:760px){.receiving-page{padding-top:20px}.receiving-card{padding:15px}.receiving-title h1{font-size:22px}.sidebar{display:none}}
+
+
+/* Navegação móvel: o menu lateral fica oculto abaixo de 760px */
+.mobile-page-tabs{display:none}
+@media(max-width:760px){
+.mobile-page-tabs{display:flex;gap:8px;padding-top:14px}
+.mobile-page-tabs button{border:1px solid #e1e6ee;background:#fff;color:#475467;border-radius:9px;padding:11px 13px;font-weight:600;font-size:13px;min-height:44px}
+.mobile-page-tabs button.selected{background:#642222;color:#fff;border-color:#642222}
+}

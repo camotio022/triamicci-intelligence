@@ -44,6 +44,7 @@ export default function App() {
   </aside>
   <main className="main-content">
     <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu"><Menu size={21}/></button><div className="breadcrumb">Painel <span>/</span> <b>{page === "receiving" ? "Recebimento" : "Visão geral"}</b></div><div className="top-actions"><label className="search-box"><Search size={16}/><input placeholder="Buscar insumos..." /></label><button className="icon-button notification" aria-label="Notificações"><Bell size={19}/><i/></button><div className="top-avatar">TL</div></div></header>
+    <div className="mobile-page-tabs" aria-label="Navegação operacional"><button type="button" className={page === "dashboard" ? "selected" : ""} onClick={() => setPage("dashboard")}>Visão geral</button><button type="button" className={page === "receiving" ? "selected" : ""} onClick={() => setPage("receiving")}>Recebimento</button></div>
     {page === "receiving" ? <Receiving /> : <><section className="page-heading"><div><p className="eyebrow">QUINTA-FEIRA, 15 DE OUTUBRO</p><h1>Visão geral <span>👋</span></h1><p className="subheading">Aqui está o resumo da sua operação hoje.</p></div><button className="period-button"><Clock3 size={16}/> Últimos 7 dias <ChevronDown size={15}/></button></section>
     <section className="metric-grid">
       <Metric icon={CircleDollarSign} label="Valor em estoque" value={money(18450)} change="+8,2%" positive detail="vs. período anterior"/>
