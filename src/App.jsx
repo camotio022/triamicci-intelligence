@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import Receiving from './Receiving.jsx';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { LayoutDashboard, Package, TrendingUp, Wallet, Bell, Search, ChevronDown, ArrowUpRight, ArrowDownRight, AlertTriangle, Clock3, Boxes, CircleDollarSign, Menu } from 'lucide-react';
 
@@ -26,13 +27,15 @@ function Metric({icon:Icon,label,value,change,positive=true,detail}) {
 }
 
 export default function App() {
+ const [page, setPage] = useState('dashboard');
  return <div className="app-shell">
   <aside className="sidebar">
     <div className="brand-mark"><div className="brand-symbol">T</div><div><b>TRIAMICCI</b><span>INTELLIGENCE</span></div></div>
     <div className="workspace"><span className="workspace-dot"/> <span>Operação Barigui</span><ChevronDown size={15}/></div>
     <p className="nav-caption">MENU PRINCIPAL</p>
     <nav>
-      <a className="nav-item active"><LayoutDashboard size={18}/> Visão geral</a>
+      <button type="button" className={page === "dashboard" ? "nav-item active" : "nav-item"} onClick={() => setPage("dashboard")}><LayoutDashboard size={18}/> Visão geral</button>
+      <button type="button" className={page === "receiving" ? "nav-item active" : "nav-item"} onClick={() => setPage("receiving")}><Package size={18}/> Recebimento</button>
       <a className="nav-item"><Package size={18}/> Estoque <span className="nav-count">5</span></a>
       <a className="nav-item"><TrendingUp size={18}/> Consumo</a>
       <a className="nav-item"><Wallet size={18}/> Financeiro</a>
@@ -40,8 +43,8 @@ export default function App() {
     <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><Boxes size={18}/></div><b>Controle inteligente</b><p>Acompanhe os insumos e evite desperdícios na operação.</p></div><div className="user-row"><div className="avatar">TL</div><div className="user-info"><b>Equipe Triamicci</b><span>Administrador</span></div><ChevronDown size={15}/></div></div>
   </aside>
   <main className="main-content">
-    <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu"><Menu size={21}/></button><div className="breadcrumb">Painel <span>/</span> <b>Visão geral</b></div><div className="top-actions"><label className="search-box"><Search size={16}/><input placeholder="Buscar insumos..." /></label><button className="icon-button notification" aria-label="Notificações"><Bell size={19}/><i/></button><div className="top-avatar">TL</div></div></header>
-    <section className="page-heading"><div><p className="eyebrow">QUINTA-FEIRA, 15 DE OUTUBRO</p><h1>Visão geral <span>👋</span></h1><p className="subheading">Aqui está o resumo da sua operação hoje.</p></div><button className="period-button"><Clock3 size={16}/> Últimos 7 dias <ChevronDown size={15}/></button></section>
+    <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu"><Menu size={21}/></button><div className="breadcrumb">Painel <span>/</span> <b>{page === "receiving" ? "Recebimento" : "Visão geral"}</b></div><div className="top-actions"><label className="search-box"><Search size={16}/><input placeholder="Buscar insumos..." /></label><button className="icon-button notification" aria-label="Notificações"><Bell size={19}/><i/></button><div className="top-avatar">TL</div></div></header>
+    {page === "receiving" ? <Receiving /> : <><section className="page-heading"><div><p className="eyebrow">QUINTA-FEIRA, 15 DE OUTUBRO</p><h1>Visão geral <span>👋</span></h1><p className="subheading">Aqui está o resumo da sua operação hoje.</p></div><button className="period-button"><Clock3 size={16}/> Últimos 7 dias <ChevronDown size={15}/></button></section>
     <section className="metric-grid">
       <Metric icon={CircleDollarSign} label="Valor em estoque" value={money(18450)} change="+8,2%" positive detail="vs. período anterior"/>
       <Metric icon={Package} label="Insumos cadastrados" value="128" change="+12" positive detail="itens no catálogo"/>
@@ -53,6 +56,7 @@ export default function App() {
       <article className="panel category-panel"><div className="panel-heading"><div><h2>Consumo por categoria</h2><p>Distribuição dos insumos</p></div><button className="more-button" aria-label="Mais opções">•••</button></div><div className="donut-wrap"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={categories} dataKey="value" nameKey="name" innerRadius={65} outerRadius={88} paddingAngle={4} stroke="none"><Cell fill="#2563eb"/><Cell fill="#13b8a6"/><Cell fill="#f5a524"/><Cell fill="#c5cbd6"/></Pie><Tooltip formatter={(v)=>[v+'%','Consumo']}/></PieChart></ResponsiveContainer><div className="donut-center"><strong>100%</strong><span>do consumo</span></div></div><div className="category-legend">{categories.map((c,i)=><div className="category-row" key={c.name}><span><i style={{background:['#2563eb','#13b8a6','#f5a524','#c5cbd6'][i]}}/>{c.name}</span><b>{c.value}%</b></div>)}</div></article>
     </section>
     <section className="panel stock-panel"><div className="panel-heading stock-heading"><div><h2>Estoque que precisa de atenção</h2><p>Confira os itens com nível baixo ou crítico.</p></div><button className="link-button">Ver todo o estoque <ArrowUpRight size={15}/></button></div><div className="table-wrap"><table><thead><tr><th>INSUMO</th><th>CATEGORIA</th><th>QUANTIDADE ATUAL</th><th>STATUS</th><th></th></tr></thead><tbody>{items.map((item,i)=><tr key={item.name}><td><span className="product-icon">{item.name.slice(0,1)}</span><b>{item.name}</b></td><td className="muted-cell">{item.category}</td><td>{item.stock}</td><td><span className={'status-pill '+item.tone}><i/>{item.status}</span></td><td><button className="row-action" aria-label={'Ver '+item.name}>•••</button></td></tr>)}</tbody></table></div><div className="table-footer"><span>Mostrando <b>5</b> de <b>128</b> insumos</span><button>Ver todos os itens <ArrowUpRight size={14}/></button></div></section>
+    </>}
     <footer className="footer"><span>© 2026 Triamicci Intelligence</span><span>Dados demonstrativos · Atualizado agora</span></footer>
   </main>
  </div>;
