@@ -10,3 +10,41 @@
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--triamicci-red);outline-offset:3px}
 .nav-item:hover{background:#493035;color:#fff}
 .link-button:hover,.table-footer button:hover{color:var(--triamicci-red-dark)}
+
+/* Legibilidade: tipografia e alvos de toque, sem alterar a estrutura do dashboard */
+:root{font-size:16px}
+.nav-item{font-size:14px;min-height:44px}
+.brand-mark b{font-size:15px}.brand-mark span,.nav-caption{font-size:11px}
+.workspace,.help-card b,.help-card p,.user-info b,.user-info span{font-size:12px}
+.breadcrumb,.subheading,.search-box input{font-size:14px}
+.eyebrow,.metric-detail,.panel-heading p,.chart-legend,.category-row,.category-row b,.table-footer,.footer{font-size:12px}
+.page-heading h1{font-size:30px}
+.metric-label{font-size:14px}.metric-value{font-size:28px}.change{font-size:12px}
+.panel-heading h2{font-size:17px}
+.period-button,.subtle-button,.link-button,.table-footer button{font-size:13px;min-height:40px}
+.metric-card{padding:20px}
+thead th{font-size:12px}tbody td{font-size:13px;padding:14px 10px}
+.status-pill{font-size:12px;padding:7px 10px}
+.category-row{gap:8px}
+.icon-button,.mobile-menu{min-width:44px;min-height:44px}
+@media(max-width:760px){
+ .page-heading h1{font-size:26px}
+ .metric-label{font-size:13px}.metric-value{font-size:24px}
+ .metric-detail,.change{font-size:11px}
+ .metric-card{padding:16px 13px}
+ .panel-heading h2,.stock-heading h2{font-size:16px}
+ .panel-heading p,.category-row,.category-row b,.chart-legend{font-size:12px}
+ .subheading,.breadcrumb{font-size:13px}
+ .period-button{font-size:12px;min-height:44px}
+ .link-button,.table-footer button{font-size:12px;min-width:44px;min-height:44px}
+ thead th{font-size:11px;padding:12px 9px}
+ tbody td{font-size:12px;padding:13px 9px}
+ .status-pill{font-size:11px}
+ .footer{font-size:11px}
+}
+@media(max-width:390px){
+ .page-heading h1{font-size:24px}
+ .metric-value{font-size:22px}
+ .metric-card{padding:14px 11px}
+ .metric-label{font-size:12px}
+}
