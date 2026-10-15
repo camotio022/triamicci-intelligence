@@ -19,7 +19,18 @@ export default function AuthGate({ children }) {
   const login = async () => {
     setError('');
     try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-    catch (e) { setError(e.code === 'auth/popup-closed-by-user' ? 'Login cancelado.' : 'Falha ao entrar. Confira se Google está habilitado no Firebase Authentication.'); }
+    catch (e) {
+      const explanations = {
+        'auth/popup-closed-by-user': 'Login cancelado: a janela foi fechada.',
+        'auth/popup-blocked': 'O navegador bloqueou a janela de login. Permita pop-ups para este site.',
+        'auth/operation-not-allowed': 'Login com Google desativado no Firebase Authentication.',
+        'auth/unauthorized-domain': 'Este domínio não está autorizado no Firebase Authentication.',
+        'auth/network-request-failed': 'Falha de rede ao comunicar com o Firebase.',
+        'auth/cancelled-popup-request': 'Já existe outra tentativa de login em andamento.'
+      };
+      setError(explanations[e.code] || `Não foi possível entrar (${e.code || 'erro desconhecido'}).`);
+      console.error('Firebase login:', e.code, e.message);
+    }
   };
   if (user === undefined || (user && membership === undefined)) return <main className="auth-screen"><section className="auth-card">Verificando acesso...</section></main>;
   if (!user) return <main className="auth-screen"><section className="auth-card"><h1>Triamicci Intelligence</h1><p>Entre com sua conta Google. O acesso às unidades depende de convite aprovado.</p><button onClick={login}>Entrar com Google</button>{error && <p role="alert">{error}</p>}</section></main>;
