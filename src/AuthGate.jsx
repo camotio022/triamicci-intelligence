@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDocFromServer } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 
 export default function AuthGate({ children }) {
@@ -12,20 +12,32 @@ export default function AuthGate({ children }) {
   useEffect(() => onAuthStateChanged(auth, setUser), []);
   useEffect(() => {
     if (!user) { setMembership(null); setAccessError(''); setAccessReason(''); return; }
+    let cancelled = false;
     setMembership(undefined);
     setAccessError('');
     setAccessReason('');
-    return onSnapshot(doc(db, 'memberships', user.uid), snap => {
-      const value = snap.exists() ? snap.data() : null;
-      if (!snap.exists()) { setMembership(null); setAccessReason('Não existe um vínculo para esta conta.'); return; }
-      if (value?.status !== 'active' || !value?.unitId) { setMembership(null); setAccessReason('O vínculo existe, mas está inativo ou sem unidade.'); return; }
-      setAccessReason('');
+    // Busca autoritativa no servidor: não confundir cache desatualizado com ausência de vínculo.
+    getDocFromServer(doc(db, 'memberships', user.uid)).then(snap => {
+      if (cancelled) return;
+      if (!snap.exists()) {
+        setMembership(null);
+        setAccessReason('O servidor não encontrou o vínculo desta conta. Confira o UID e o caminho memberships/{uid}.');
+        return;
+      }
+      const value = snap.data();
+      if (value?.status !== 'active' || !value?.unitId) {
+        setMembership(null);
+        setAccessReason('O vínculo existe, mas está inativo ou sem unidade.');
+        return;
+      }
       setMembership(value);
-    }, (e) => {
-      console.error('Erro ao consultar vínculo no Firestore:', e.code, e.message);
+    }).catch(e => {
+      if (cancelled) return;
+      console.error('Erro na leitura do vínculo no servidor:', e.code, e.message);
       setMembership(null);
-      setAccessError(`Falha ao consultar autorização (${e.code || 'erro desconhecido'}). Confira as regras publicadas do Firestore.`);
+      setAccessError(`Falha na leitura do servidor (${e.code || 'erro desconhecido'}). Verifique as regras publicadas e a conexão.`);
     });
+    return () => { cancelled = true; };
   }, [user]);
   const login = async () => {
     setError('');
