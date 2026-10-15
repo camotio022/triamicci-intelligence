@@ -48,3 +48,17 @@ thead th{font-size:12px}tbody td{font-size:13px;padding:14px 10px}
  .metric-card{padding:14px 11px}
  .metric-label{font-size:12px}
 }
+
+
+/* Recebimento MVP — fluxo demonstrativo */
+.sidebar nav button.nav-item{border:0;background:transparent;text-align:left;width:100%;font:inherit;cursor:pointer}
+.sidebar nav button.nav-item.active{background:#642222;color:#fff;font-weight:600}
+.receiving-page{padding:30px 0 10px}.receiving-title h1{font:800 26px Manrope,sans-serif;margin:6px 0 10px}.receiving-title p:not(.eyebrow){color:#667085;font-size:14px;line-height:1.6}
+.receiving-notice{padding:13px 16px;background:#fff6e6;border:1px solid #f0d9a5;border-radius:10px;margin:18px 0;color:#79551a;font-size:13px}
+.receiving-card{background:white;border:1px solid #e9edf3;border-radius:13px;padding:20px;margin-bottom:18px}.receiving-card h2{font:700 18px Manrope,sans-serif;margin:0 0 10px}.receiving-card p{color:#687385;font-size:13px}
+.receiving-scroll{overflow-x:auto}.receiving-table{min-width:790px}.receiving-table td:first-child{display:table-cell}.receiving-table td small{display:block;color:#9098a8;margin-top:5px}
+.receiving-table input{width:100%;min-width:105px;max-width:220px;padding:10px;border:1px solid #d9dee7;border-radius:7px;background:#fff}
+.receiving-table input[type=number]{max-width:130px}.receiving-ok{color:#16754b;font-weight:700}.receiving-warning{color:#b45309;font-weight:700}
+.receiving-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:20px}.receiving-actions button{background:#C62828;color:white;border:0;border-radius:9px;padding:12px 18px;font-weight:700}.receiving-actions span{font-size:13px;color:#475467}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:760px){.receiving-page{padding-top:20px}.receiving-card{padding:15px}.receiving-title h1{font-size:22px}.sidebar{display:none}}
