@@ -71,3 +71,11 @@ thead th{font-size:12px}tbody td{font-size:13px;padding:14px 10px}
 .mobile-page-tabs button{border:1px solid #e1e6ee;background:#fff;color:#475467;border-radius:9px;padding:11px 13px;font-weight:600;font-size:13px;min-height:44px}
 .mobile-page-tabs button.selected{background:#642222;color:#fff;border-color:#642222}
 }
+
+/* Login e acesso pendente */
+.auth-screen{min-height:100vh;display:grid;place-items:center;padding:20px;background:#f7f8fb}
+.auth-card{background:#fff;border:1px solid #e9edf3;border-radius:16px;padding:32px;width:min(100%,440px);box-shadow:0 12px 35px #19243a12}
+.auth-card h1{font:800 24px Manrope,sans-serif;margin:0 0 12px}
+.auth-card p{font-size:14px;color:#667085;line-height:1.6}
+.auth-card button{background:#C62828;border:0;border-radius:9px;padding:12px 18px;color:white;font-weight:700;min-height:44px}
+.logout-button{border:1px solid #64464a;border-radius:8px;background:transparent;color:#fff;padding:8px;font-size:11px}
