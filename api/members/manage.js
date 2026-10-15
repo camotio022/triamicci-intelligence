@@ -65,11 +65,12 @@ export default async function handler(req,res) {
       // Nunca deixar a unidade sem um administrador ativo.
       if (target.role === 'admin' && target.status === 'active' &&
           (role !== 'admin' || status !== 'active')) {
-        const activeAdmins = await tx.get(db.collection('memberships')
-          .where('unitId','==',currentActor.unitId)
-          .where('role','==','admin')
-          .where('status','==','active'));
-        if (activeAdmins.size <= 1) throw new Error('LAST_ADMIN');
+        const unitMembers = await tx.get(db.collection('memberships')
+          .where('unitId','==',currentActor.unitId).limit(201));
+        if (unitMembers.size > 200) throw new Error('TOO_MANY_MEMBERS');
+        const adminCount = unitMembers.docs.filter(doc =>
+          doc.data().role === 'admin' && doc.data().status === 'active').length;
+        if (adminCount <= 1) throw new Error('LAST_ADMIN');
       }
 
       const now = new Date();
@@ -84,6 +85,7 @@ export default async function handler(req,res) {
     if (error.message === 'UNAUTHENTICATED') return send(res,401,'Faça login.');
     if (error.message === 'FORBIDDEN') return send(res,403,'Sem permissão para esta alteração.');
     if (error.message === 'NOT_FOUND') return send(res,404,'Colaborador não encontrado nesta unidade.');
+    if (error.message === 'TOO_MANY_MEMBERS') return send(res,409,'Unidade grande demais para esta operação; contacte o suporte.');
     if (error.message === 'LAST_ADMIN') return send(res,409,'Não é possível remover o último administrador ativo da unidade.');
     if (error.message === 'NO_CHANGES') return send(res,409,'Nenhuma alteração foi feita.');
     if (error.message === 'INVALID_STATE') return send(res,409,'O vínculo atual está inconsistente.');
