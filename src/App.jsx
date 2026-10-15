@@ -3,7 +3,7 @@ import Receiving from './Receiving.jsx';
 import AuthGate from './AuthGate.jsx';
 import TeamManagement from './TeamManagement.jsx';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { LayoutDashboard, Package, TrendingUp, Wallet, Bell, Search, ChevronDown, ArrowUpRight, ArrowDownRight, AlertTriangle, Clock3, Boxes, CircleDollarSign, Menu, Users } from 'lucide-react';
+import { LayoutDashboard, Package, TrendingUp, Wallet, Bell, Search, ChevronDown, ArrowUpRight, ArrowDownRight, AlertTriangle, Clock3, Boxes, CircleDollarSign, Menu, Users, X } from 'lucide-react';
 
 const consumption = [
   { day: 'Seg', saida: 420, entrada: 260 }, { day: 'Ter', saida: 360, entrada: 310 },
@@ -34,24 +34,27 @@ export default function App() {
 
 function Workspace({ user, membership, logout }) {
  const [page, setPage] = useState('dashboard');
+ const [menuOpen, setMenuOpen] = useState(false);
+ const navigate = nextPage => { setPage(nextPage); setMenuOpen(false); };
  return <div className="app-shell">
-  <aside className="sidebar">
-    <div className="brand-mark"><div className="brand-symbol">T</div><div><b>TRIAMICCI</b><span>INTELLIGENCE</span></div></div>
+  {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
+  <aside className={menuOpen ? "sidebar sidebar-open" : "sidebar"} id="primary-sidebar" aria-label="Menu principal">
+    <div className="brand-mark"><div className="brand-symbol">T</div><div><b>TRIAMICCI</b><span>INTELLIGENCE</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setMenuOpen(false)}><X size={20}/></button></div>
     <div className="workspace"><span className="workspace-dot"/> <span>Unidade: {membership.unitId}</span><ChevronDown size={15}/></div>
     <p className="nav-caption">MENU PRINCIPAL</p>
     <nav>
-      <button type="button" className={page === "dashboard" ? "nav-item active" : "nav-item"} onClick={() => setPage("dashboard")}><LayoutDashboard size={18}/> Visão geral</button>
-      <button type="button" className={page === "receiving" ? "nav-item active" : "nav-item"} onClick={() => setPage("receiving")}><Package size={18}/> Recebimento</button>
+      <button type="button" className={page === "dashboard" ? "nav-item active" : "nav-item"} onClick={() => navigate("dashboard")}><LayoutDashboard size={18}/> Visão geral</button>
+      <button type="button" className={page === "receiving" ? "nav-item active" : "nav-item"} onClick={() => navigate("receiving")}><Package size={18}/> Recebimento</button>
       <a className="nav-item"><Package size={18}/> Estoque <span className="nav-count">5</span></a>
       <a className="nav-item"><TrendingUp size={18}/> Consumo</a>
       <a className="nav-item"><Wallet size={18}/> Financeiro</a>
-      {["admin", "manager"].includes(membership.role) && <button type="button" className={page === "team" ? "nav-item active" : "nav-item"} onClick={() => setPage("team")}><Users size={18}/> Colaboradores</button>}
+      {["admin", "manager"].includes(membership.role) && <button type="button" className={page === "team" ? "nav-item active" : "nav-item"} onClick={() => navigate("team")}><Users size={18}/> Colaboradores</button>}
     </nav>
     <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><Boxes size={18}/></div><b>Controle inteligente</b><p>Acompanhe os insumos e evite desperdícios na operação.</p></div><div className="user-row"><div className="avatar">TL</div><div className="user-info"><b>{user.displayName || user.email}</b><span>{membership.role}</span></div><button type="button" onClick={logout} className="logout-button">Sair da conta</button></div></div>
   </aside>
   <main className="main-content">
-    <header className="topbar"><button className="mobile-menu" aria-label="Abrir menu"><Menu size={21}/></button><div className="breadcrumb">Painel <span>/</span> <b>{page === "receiving" ? "Recebimento" : page === "team" ? "Colaboradores" : "Visão geral"}</b></div><div className="top-actions"><label className="search-box"><Search size={16}/><input placeholder="Buscar insumos..." /></label><button className="icon-button notification" aria-label="Notificações"><Bell size={19}/><i/></button><button type="button" className="top-avatar" onClick={logout} title="Sair da conta" aria-label="Sair da conta">{(user.displayName || user.email || 'U').slice(0,2).toUpperCase()}</button></div></header>
-    <div className="mobile-page-tabs" aria-label="Navegação operacional"><button type="button" className={page === "dashboard" ? "selected" : ""} onClick={() => setPage("dashboard")}>Visão geral</button><button type="button" className={page === "receiving" ? "selected" : ""} onClick={() => setPage("receiving")}>Recebimento</button>{["admin", "manager"].includes(membership.role) && <button type="button" className={page === "team" ? "selected" : ""} onClick={() => setPage("team")}>Colaboradores</button>}</div>
+    <header className="topbar"><button type="button" className="mobile-menu" aria-label="Abrir menu" aria-controls="primary-sidebar" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={21}/></button><div className="breadcrumb">Painel <span>/</span> <b>{page === "receiving" ? "Recebimento" : page === "team" ? "Colaboradores" : "Visão geral"}</b></div><div className="top-actions"><label className="search-box"><Search size={16}/><input placeholder="Buscar insumos..." /></label><button className="icon-button notification" aria-label="Notificações"><Bell size={19}/><i/></button><button type="button" className="top-avatar" onClick={logout} title="Sair da conta" aria-label="Sair da conta">{(user.displayName || user.email || 'U').slice(0,2).toUpperCase()}</button></div></header>
+    <div className="mobile-page-tabs" aria-label="Navegação operacional"><button type="button" className={page === "dashboard" ? "selected" : ""} onClick={() => navigate("dashboard")}>Visão geral</button><button type="button" className={page === "receiving" ? "selected" : ""} onClick={() => navigate("receiving")}>Recebimento</button>{["admin", "manager"].includes(membership.role) && <button type="button" className={page === "team" ? "selected" : ""} onClick={() => navigate("team")}>Colaboradores</button>}</div>
     {page === "receiving" ? <Receiving /> : page === "team" ? <TeamManagement user={user} membership={membership} /> : <><section className="page-heading"><div><p className="eyebrow">QUINTA-FEIRA, 15 DE OUTUBRO</p><h1>Visão geral <span>👋</span></h1><p className="subheading">Aqui está o resumo da sua operação hoje.</p></div><button className="period-button"><Clock3 size={16}/> Últimos 7 dias <ChevronDown size={15}/></button></section>
     <section className="metric-grid">
       <Metric icon={CircleDollarSign} label="Valor em estoque" value={money(18450)} change="+8,2%" positive detail="vs. período anterior"/>
