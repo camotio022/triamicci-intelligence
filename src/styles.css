@@ -82,3 +82,61 @@ thead th{font-size:12px}tbody td{font-size:13px;padding:14px 10px}
 
 /* Gestão de colaboradores */
 .team-page{padding:24px 0;max-width:1200px}.team-page h1{font:800 27px Manrope,sans-serif;margin:7px 0}.team-page>p{color:#68748a}.team-warning{background:#fff8ec;border:1px solid #efd5a5;border-radius:12px;padding:14px 18px;margin:22px 0;color:#6e5225;line-height:1.5}.team-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.team-panel{background:white;border:1px solid #e5e9f0;border-radius:14px;padding:24px}.team-panel h2{font:800 18px Manrope,sans-serif;margin:0 0 10px}.team-panel p{color:#68748a;line-height:1.55;font-size:14px}.team-panel form{display:flex;flex-direction:column;gap:10px;margin-top:22px}.team-panel label{font-size:13px;font-weight:700}.team-panel input,.team-panel select{width:100%;min-height:43px;border:1px solid #dce2eb;border-radius:9px;padding:10px;background:#fff;color:#172033}.team-panel button{border:0;border-radius:9px;padding:13px;background:#bd2525;color:white;font-weight:700}.team-panel button:disabled{opacity:.5;cursor:not-allowed}.team-invite-list{display:flex;flex-direction:column;gap:10px}.team-invite{border-bottom:1px solid #e5e9f0;padding:10px 0;display:flex;flex-direction:column;gap:4px}.team-invite span,.team-note{font-size:12px;color:#7a8598}.team-unit{margin:0}@media(max-width:800px){.team-grid{grid-template-columns:1fr}.team-page{padding:18px 0}}
+
+/* Layout responsivo: navegação funcional e conteúdo sem overflow */
+html,body,#root{max-width:100%;min-width:320px}
+.app-shell{width:100%;min-width:0}
+.main-content{min-width:0;width:auto;max-width:none}
+.sidebar{height:100dvh;overflow-y:auto;overscroll-behavior:contain}
+.sidebar nav{flex:0 0 auto}
+.sidebar-bottom{padding-top:24px}
+.sidebar .user-info{min-width:0}
+.sidebar .user-info b{overflow-wrap:anywhere}
+.sidebar .user-row{flex-wrap:wrap}
+.sidebar .logout-button{flex-shrink:0}
+.sidebar-close{display:none}
+.sidebar-backdrop{display:none}
+.team-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.team-panel,.team-page,.team-warning,.team-invite{min-width:0;overflow-wrap:anywhere}
+.team-panel input,.team-panel select{max-width:100%;font-size:16px}
+.topbar,.top-actions,.breadcrumb{min-width:0}
+@media(max-width:1200px){
+ .main-content{padding-left:24px;padding-right:24px}
+ .team-grid{grid-template-columns:1fr}
+ .sidebar .help-card{display:none}
+}
+@media(max-width:900px){
+ .sidebar{display:flex;width:min(300px,85vw);max-width:85vw;transform:translateX(-105%);transition:transform .22s ease;z-index:31;box-shadow:12px 0 28px #0002}
+ .sidebar.sidebar-open{transform:translateX(0)}
+ .sidebar-backdrop{display:block;position:fixed;inset:0;z-index:30;border:0;background:rgba(15,23,42,.52);cursor:pointer}
+ .sidebar-close{display:grid;place-items:center;margin-left:auto;background:transparent;border:0;color:white;width:44px;height:44px}
+ .main-content{margin-left:0;padding:0 20px 24px}
+ .mobile-menu{display:grid;place-items:center;border:0;background:transparent;color:#475166;padding:6px}
+ .mobile-page-tabs{display:flex;gap:8px;padding-top:14px;overflow-x:auto;scrollbar-width:thin}
+ .mobile-page-tabs button{flex:0 0 auto;border:1px solid #e1e6ee;background:#fff;color:#475467;border-radius:9px;padding:11px 13px;font-weight:600;font-size:13px;min-height:44px}
+ .mobile-page-tabs button.selected{background:#642222;color:#fff;border-color:#642222}
+ .charts-grid{grid-template-columns:1fr}
+ .team-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+ .main-content{padding:0 14px 20px}
+ .topbar{gap:8px}
+ .top-actions{gap:4px}
+ .breadcrumb{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .search-box{width:38px;border:0;background:transparent;padding:0;justify-content:center}
+ .search-box input{display:none}
+ .metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .team-page{padding-top:20px}
+ .team-page h1{font-size:23px;line-height:1.25}
+ .team-warning{padding:12px 14px;margin:16px 0}
+ .team-panel{padding:17px}
+ .team-grid{gap:12px}
+ .page-heading{flex-wrap:wrap}
+ .footer{flex-wrap:wrap}
+}
+@media(max-width:370px){
+ .metric-grid{grid-template-columns:1fr}
+ .top-actions{gap:0}
+ .main-content{padding-left:10px;padding-right:10px}
+}
+@media(prefers-reduced-motion:reduce){.sidebar{transition:none}}
