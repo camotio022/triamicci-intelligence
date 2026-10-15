@@ -1,4 +1,4 @@
-import { getDb, authenticate, membership, roles, checkRequest, send } from '../_lib.js';
+import { getDb, getAuth, authenticate, membership, roles, checkRequest, send } from '../_lib.js';
 
 const statuses = ['active','inactive'];
 const cleanMember = (doc) => {
@@ -28,8 +28,21 @@ export default async function handler(req,res) {
     if (action === 'list') {
       const snap = await db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get();
       if (snap.size > 200) return send(res,409,'A unidade excede o limite da listagem. Paginação necessária.');
+      const members = snap.docs.map(cleanMember);
+      // Nome vem do perfil Google/Firebase quando ainda não está gravado no vínculo.
+      const profiles = new Map();
+      for (let index = 0; index < members.length; index += 100) {
+        const batch = members.slice(index,index+100);
+        const result = await getAuth().getUsers(batch.map(item => ({uid:item.uid})));
+        for (const profile of result.users) profiles.set(profile.uid,profile);
+      }
+      for (const item of members) {
+        const profile = profiles.get(item.uid);
+        if (!item.name) item.name = profile?.displayName || '';
+        if (!item.email) item.email = profile?.email || '';
+      }
       return send(res,200,'Colaboradores carregados.',{
-        members:snap.docs.map(cleanMember).sort((a,b) => (a.name || a.email).localeCompare(b.name || b.email,'pt-BR'))
+        members:members.sort((a,b) => (a.name || a.email).localeCompare(b.name || b.email,'pt-BR'))
       });
     }
 
