@@ -1,4 +1,4 @@
-import { getDb, authenticate, membership, normalizeEmail, emailPattern, roles, newToken, hashToken, deliverInvite, checkRequest, send } from '../_lib.js';
+import { getDb, getAuth, authenticate, membership, normalizeEmail, emailPattern, roles, newToken, hashToken, deliverInvite, checkRequest, send } from '../_lib.js';
 export default async function handler(req,res) {
   if (!checkRequest(req,res)) return;
   try {
@@ -10,6 +10,21 @@ export default async function handler(req,res) {
     if (!emailPattern.test(email) || email.length > 254 || !roles.includes(role) || unitId !== member.unitId)
       return send(res,400,'E-mail, função ou unidade inválidos.');
     if (member.role === 'manager' && !['cook','auxiliar'].includes(role)) return send(res,403,'Gerente não pode atribuir essa função.');
+    // Convites não podem alterar o cargo de quem já possui vínculo.
+    if (email === normalizeEmail(actor.email) || email === normalizeEmail(member.email))
+      return send(res,409,'Não é possível convidar a própria conta.');
+    let existingUser = null;
+    try {
+      existingUser = await getAuth().getUserByEmail(email);
+    } catch (error) {
+      if (error.code !== 'auth/user-not-found') throw error;
+    }
+    if (existingUser) {
+      if (existingUser.uid === actor.uid) return send(res,409,'Não é possível convidar a própria conta.');
+      const existingMembership = await getDb().doc('memberships/' + existingUser.uid).get();
+      if (existingMembership.exists)
+        return send(res,409,'Este e-mail já está associado a um colaborador. Utilize a gestão de acessos.');
+    }
     if (!process.env.RESEND_API_KEY || !process.env.INVITE_FROM_EMAIL || !process.env.PUBLIC_APP_URL)
       return send(res,503,'Serviço de e-mail ainda não configurado.');
     const db = getDb();

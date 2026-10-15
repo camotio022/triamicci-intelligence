@@ -20,10 +20,24 @@ export function send(res, status, message, extra = {}) { return res.status(statu
 export function checkRequest(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow','POST'); send(res,405,'Método não permitido.'); return false; }
   if (!req.headers['content-type']?.startsWith('application/json')) { send(res,415,'Use JSON.'); return false; }
-  const allowedOrigin = process.env.PUBLIC_APP_URL;
-  if (!allowedOrigin) { send(res,503,'PUBLIC_APP_URL não configurada.'); return false; }
+  const configuredUrl = process.env.PUBLIC_APP_URL?.trim();
+  if (!configuredUrl) { send(res,503,'PUBLIC_APP_URL não configurada.'); return false; }
+  let allowedOrigin;
+  try {
+    const parsed = new URL(configuredUrl);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error('Invalid app URL');
+    allowedOrigin = parsed.origin;
+  } catch {
+    send(res,503,'PUBLIC_APP_URL inválida. Configure uma URL HTTPS completa.');
+    return false;
+  }
+  // O cabeçalho Origin é gerado pelo navegador. Exigir correspondência exata,
+  // mas ignorar barras finais e caminhos na URL configurada.
   const origin = req.headers.origin;
-  if (origin !== allowedOrigin.replace(/\/$/,'')) { send(res,403,'Origem não autorizada.'); return false; }
+  if (typeof origin !== 'string' || origin !== allowedOrigin) {
+    send(res,403,'Origem não autorizada. Confirme o domínio e PUBLIC_APP_URL.');
+    return false;
+  }
   return true;
 }
 export async function authenticate(req) {
