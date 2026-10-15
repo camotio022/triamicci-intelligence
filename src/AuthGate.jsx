@@ -9,6 +9,12 @@ export default function AuthGate({ children }) {
   const [error, setError] = useState('');
   const [accessError, setAccessError] = useState('');
   const [accessReason, setAccessReason] = useState('');
+  const [invite, setInvite] = useState(() => {
+    const fragment = window.location.hash;
+    return fragment.startsWith('#invite=') ? decodeURIComponent(fragment.slice(8)) : '';
+  });
+  const [accepting, setAccepting] = useState(false);
+  const [inviteFeedback, setInviteFeedback] = useState('');
   useEffect(() => onAuthStateChanged(auth, setUser), []);
   useEffect(() => {
     if (!user) { setMembership(null); setAccessError(''); setAccessReason(''); return; }
@@ -39,6 +45,24 @@ export default function AuthGate({ children }) {
     });
     return () => { cancelled = true; };
   }, [user]);
+  const acceptInvite = async () => {
+    if (!user || !invite || accepting) return;
+    setAccepting(true); setInviteFeedback('');
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch('/api/invitations/accept', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({invite})
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Falha ao aceitar convite.');
+      window.history.replaceState(null,'',window.location.pathname + window.location.search);
+      setInvite('');
+      window.location.reload();
+    } catch(error) { setInviteFeedback(error.message || 'Não foi possível aceitar.'); }
+    finally { setAccepting(false); }
+  };
   const login = async () => {
     setError('');
     try { await signInWithPopup(auth, new GoogleAuthProvider()); }
@@ -57,6 +81,6 @@ export default function AuthGate({ children }) {
   };
   if (user === undefined || (user && membership === undefined)) return <main className="auth-screen"><section className="auth-card">Verificando acesso...</section></main>;
   if (!user) return <main className="auth-screen"><section className="auth-card"><h1>Triamicci Intelligence</h1><p>Entre com sua conta Google. O acesso às unidades depende de convite aprovado.</p><button onClick={login}>Entrar com Google</button>{error && <p role="alert">{error}</p>}</section></main>;
-  if (!membership) return <main className="auth-screen"><section className="auth-card"><h1>{accessError ? 'Erro ao verificar acesso' : 'Acesso pendente'}</h1><p>{user.email}</p><p>{accessError || accessReason || 'Esta conta ainda não tem vínculo ativo com uma unidade. Solicite um convite ao gerente ou administrador.'}</p>{error && <p role="alert">{error}</p>}<button onClick={() => signOut(auth)}>Sair</button></section></main>;
+  if (!membership) return <main className="auth-screen"><section className="auth-card"><h1>{accessError ? 'Erro ao verificar acesso' : 'Acesso pendente'}</h1><p>{user.email}</p><p>{accessError || accessReason || 'Esta conta ainda não tem vínculo ativo com uma unidade. Solicite um convite ao gerente ou administrador.'}</p>{invite && <><p>Existe um convite neste link. Confirme que entrou com o mesmo e-mail que recebeu o convite.</p><button type="button" onClick={acceptInvite} disabled={accepting}>{accepting ? 'Validando...' : 'Aceitar convite'}</button>{inviteFeedback && <p role="alert">{inviteFeedback}</p>}</>}{error && <p role="alert">{error}</p>}<button onClick={() => signOut(auth)}>Sair</button></section></main>;
   return children({ user, membership, logout: () => signOut(auth) });
 }
