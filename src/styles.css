@@ -140,3 +140,16 @@ html,body,#root{max-width:100%;min-width:320px}
  .main-content{padding-left:10px;padding-right:10px}
 }
 @media(prefers-reduced-motion:reduce){.sidebar{transition:none}}
+
+/* Convites por link: ações legíveis no desktop e no celular */
+.team-delivery{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.team-delivery button{background:#f3f5f9;color:#475467;border:1px solid #e0e5ed;flex:1;min-width:140px}
+.team-delivery button.selected{background:#642222;color:#fff;border-color:#642222}
+.team-share{margin-top:14px;border:1px solid #b7e3c9;background:#f1fbf5;border-radius:11px;padding:15px;overflow-wrap:anywhere}
+.team-share strong{color:#176345;font-size:14px}
+.team-share p{margin:8px 0 12px}
+.team-share-actions{display:flex;flex-wrap:wrap;gap:8px}
+.team-share-actions button{flex:1;min-width:150px;min-height:44px}
+.team-share-actions .team-secondary{background:white;color:#9a2424;border:1px solid #e5c7c7}
+.team-invite .team-revoke{align-self:flex-start;margin-top:6px;padding:8px 12px;background:#fff0ef;color:#a62a2a;border:1px solid #f0c7c7;font-size:12px}
+@media(max-width:480px){.team-share-actions{flex-direction:column}.team-share-actions button{width:100%}}
