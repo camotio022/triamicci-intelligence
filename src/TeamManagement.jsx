@@ -24,6 +24,10 @@ export default function TeamManagement({ user, membership }) {
   const sendInvitation = async event => {
     event.preventDefault();
     if (!email.trim() || submitting) return;
+    if (email.trim().toLowerCase() === user.email?.trim().toLowerCase()) {
+      setFeedback('Não podes convidar a tua própria conta. Usa o e-mail de outro colaborador.');
+      return;
+    }
     setSubmitting(true); setFeedback('');
     try {
       const token = await auth.currentUser.getIdToken();
@@ -60,7 +64,7 @@ export default function TeamManagement({ user, membership }) {
     <p className="eyebrow">ADMINISTRAÇÃO · UNIDADE {membership.unitId.toUpperCase()}</p>
     <h1>Gestão de colaboradores</h1>
     <p>Prepare os convites e acompanhe os registos da sua unidade.</p>
-    <div className="team-warning"><strong>Convites por e-mail:</strong> para ativar o envio, configure as variáveis de ambiente da API no Vercel. A API verificará as permissões antes de enviar.</div>
+    <div className="team-warning"><strong>Convites por e-mail:</strong> convida apenas novos colaboradores. Contas que já têm acesso devem ser administradas pela gestão de permissões.</div>
     <div className="team-grid">
       <section className="team-panel">
         <h2>Novo convite</h2>
@@ -71,7 +75,7 @@ export default function TeamManagement({ user, membership }) {
           <label htmlFor="invite-role">Função na unidade</label>
           <select id="invite-role" value={role} onChange={event => setRole(event.target.value)}>{roles.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
           <p className="team-unit">Unidade de destino: <strong>{membership.unitId}</strong></p>
-          <button type="submit" disabled={submitting || !email.trim()}>{submitting ? "Enviando..." : "Enviar convite"}</button>{feedback && <p role="status">{feedback}</p>}
+          <button type="submit" disabled={submitting || !email.trim() || email.trim().toLowerCase() === user.email?.trim().toLowerCase()}>{submitting ? "Enviando..." : "Enviar convite"}</button>{feedback && <p role="status">{feedback}</p>}
         </form>
       </section>
       <section className="team-panel">
