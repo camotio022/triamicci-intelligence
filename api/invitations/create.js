@@ -13,6 +13,20 @@ export default async function handler(req,res) {
     if (!process.env.RESEND_API_KEY || !process.env.INVITE_FROM_EMAIL || !process.env.PUBLIC_APP_URL)
       return send(res,503,'Serviço de e-mail ainda não configurado.');
     const db = getDb();
+    // Limite persistente: cinco tentativas por hora por emissor.
+    const quotaRef = db.collection('invitationRateLimits').doc(actor.uid);
+    const permitted = await db.runTransaction(async tx => {
+      const snap = await tx.get(quotaRef);
+      const now = Date.now();
+      const current = snap.data();
+      const start = current?.windowStart?.toMillis?.() || 0;
+      const count = now - start < 3600000 ? (current?.count || 0) : 0;
+      if (count >= 5) return false;
+      tx.set(quotaRef, { windowStart: new Date(count ? start : now), count: count + 1, updatedAt: new Date(now) });
+      return true;
+    });
+    if (!permitted) return send(res,429,'Limite de cinco tentativas por hora atingido.');
+
     const existing = await db.collection('units').doc(unitId).collection('invitations')
       .where('email','==',email).where('status','==','pending').limit(10).get();
     if (!existing.empty) return send(res,409,'Já existe um convite pendente para este e-mail.');
