@@ -21,8 +21,7 @@ export default function TeamManagement({ user, membership }) {
   const allowed = membership.role === 'admin' || membership.role === 'manager';
   const roles = membership.role === 'admin' ? roleOptions : roleOptions.filter(item => ['auxiliar', 'cook'].includes(item.value));
 
-  useEffect(() => {
-    const sendInvitation = async event => {
+  const sendInvitation = async event => {
     event.preventDefault();
     if (!email.trim() || submitting) return;
     setSubmitting(true); setFeedback('');
