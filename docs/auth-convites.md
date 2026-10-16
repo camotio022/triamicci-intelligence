@@ -67,3 +67,15 @@ O primeiro vínculo deve ser criado por operação privilegiada após comprovaç
 - Tela Estoque ligada ao Firebase; dashboard e Recebimento ainda contêm dados demonstrativos, explicitamente separados.
 - **Não** inserir lotes, movimentações, entradas ou saídas diretamente no Firestore até termos APIs transacionais com auditoria e validação de saldo.
 - Testes: criar insumo como admin; verificar listagem como auxiliar; tentar criar como auxiliar (403); tentar duplicar nome (409); tentar alterar quantidade via payload (ignorada); verificar isolamento entre unidades e auditoria.
+
+## Etapa 3.2 — Entradas e saídas auditadas
+- `POST /api/stock/movements` com `action:"list"` retorna até 50 movimentações recentes da unidade autenticada.
+- `action:"create"` recebe `productId`, `type:"entry"|"exit"`, `amount` (positivo, até 3 casas), `note` (3–240 caracteres) e `requestId` (UUID gerado no cliente).
+- Entrada somente para admin/manager; saída para qualquer membro ativo. O backend revalida papel e unidade na transação.
+- Transação Firestore lê membership, produto e idempotência; verifica status do produto, saldo e lote; grava saldo atualizado, movimento em `units/{unitId}/movements/{requestId}` e auditoria em `auditLogs/{requestId}` atomicamente.
+- Quantidades calculadas em milésimos para reduzir problemas de ponto flutuante. Saídas não permitem saldo negativo.
+- O mesmo requestId com o mesmo payload não duplica o lançamento; reutilização com payload divergente falha. O cliente preserva o requestId após falha e só o renova quando os campos mudam ou o registro é confirmado.
+- **Limitação de segurança**: insumos com `trackExpiry:true` não podem ser movimentados antes da implementação de lotes e validade. Também não é permitido ativar esse controle em produto com saldo positivo.
+- O recebimento demonstrativo não grava neste endpoint. Dashboard continua com números fictícios.
+- Validar: entrada 10 unidades; saída 3; saldo 7; recusar saída 8; confirmar histórico, auditoria, duas contas simultâneas, idempotência, permissão de auxiliar para saída e negação de entrada, isolamento de unidades e bloqueio de produto perecível.
+- Ainda é necessária verificação do build da Vercel e testes reais com duas contas antes de publicar a funcionalidade como concluída.
