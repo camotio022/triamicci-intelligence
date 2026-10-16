@@ -235,3 +235,11 @@ html,body,#root{max-width:100%;min-width:320px}
 .inventory-stock-preview{margin:0;color:#344054;font-size:13px}
 .inventory-lot-warning{color:#b42318;font-weight:600}
 .inventory-movements .inventory-table-wrap>p{padding:16px;font-size:13px;color:#667085}
+
+/* Dashboard real: mensagens de estado e conferência */
+.real-dashboard{padding-bottom:20px}
+.dashboard-error{border:1px solid #f3c0c0;border-radius:10px;background:#fff3f2;color:#a52b2b;padding:14px;margin:16px 0}
+.dashboard-empty{padding:20px;color:#667085;font-size:13px}
+.dashboard-updated{font-size:11px;color:#667085;margin:18px 0}
+.real-dashboard .category-legend{padding-bottom:14px}
+.real-dashboard .stock-panel .table-wrap{overflow-x:auto}
