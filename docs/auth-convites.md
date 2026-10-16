@@ -56,3 +56,14 @@ O primeiro vínculo deve ser criado por operação privilegiada após comprovaç
 - A checagem de UID impede renderização do vínculo anterior ao trocar de conta.
 - Validar manualmente com duas contas: funcionário com dashboard aberto; admin desativa; conferir bloqueio e recusa das novas chamadas API; admin reativa; conferir retorno. Repetir sem conexão.
 - Atenção: isto é bloqueio de interface e novas operações protegidas, não revogação global do token Google. Dados já baixados para memória/cache ou abas fora do aplicativo não são apagados retroativamente. Exige regras Firestore publicadas e backend com validação de vínculo ativo.
+
+## Etapa 3.1 — Catálogo de insumos
+- Endpoint `POST /api/products/manage`: `action:list` para qualquer membro ativo da unidade; `action:create` ou `action:update` somente admin/manager.
+- Escopo de unidade derivado do vínculo verificado no servidor, nunca do payload. Revalidação do papel na transação e auditoria `product.created`/`product.updated`.
+- Documentos em `units/{unitId}/products/{id}`. ID determinístico do nome normalizado (SHA-256 truncado), impedindo duplicatas de nome idêntico na mesma unidade em criação concorrente.
+- Campos: `name`, `category`, `unit`, `minStock`, `trackExpiry`, `quantity:0`, `status`, timestamps e autores. Quantidade **não é editável** por esta API.
+- Renomear está desabilitado nesta versão porque o ID deriva do nome. Troca de unidade só é permitida com saldo zero.
+- Limite inicial: 200 produtos/unidade, sem paginação. Categorias iniciais no formulário. Sem importação de dados fictícios.
+- Tela Estoque ligada ao Firebase; dashboard e Recebimento ainda contêm dados demonstrativos, explicitamente separados.
+- **Não** inserir lotes, movimentações, entradas ou saídas diretamente no Firestore até termos APIs transacionais com auditoria e validação de saldo.
+- Testes: criar insumo como admin; verificar listagem como auxiliar; tentar criar como auxiliar (403); tentar duplicar nome (409); tentar alterar quantidade via payload (ignorada); verificar isolamento entre unidades e auditoria.
