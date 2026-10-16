@@ -67,6 +67,8 @@ export default async function handler(req,res) {
       const previous = productSnap.data();
       if (previous.unit !== unit && (previous.quantity || 0) !== 0)
         throw new Error('UNIT_LOCKED');
+      if (trackExpiry && !previous.trackExpiry && (previous.quantity || 0) !== 0)
+        throw new Error('EXPIRY_LOCKED');
       if (createHash('sha256').update(safeName.toLocaleLowerCase('pt-BR')).digest('hex').slice(0,40) !== productId)
         throw new Error('RENAME_NOT_SUPPORTED');
       tx.update(ref,{...payload,status,updatedAt:now,updatedBy:actor.uid});
@@ -80,6 +82,7 @@ export default async function handler(req,res) {
     if (e.message === 'FORBIDDEN') return send(res,403,'Sem permissão.');
     if (e.message === 'DUPLICATE') return send(res,409,'Já existe um insumo com este nome na unidade.');
     if (e.message === 'NOT_FOUND') return send(res,404,'Insumo não encontrado.');
+    if (e.message === 'EXPIRY_LOCKED') return send(res,409,'Não ative o controle de validade com saldo existente. Regularize o saldo antes de migrar para lotes.');
     if (e.message === 'UNIT_LOCKED') return send(res,409,'Não altere a unidade de medida de um insumo com saldo.');
     if (e.message === 'RENAME_NOT_SUPPORTED') return send(res,409,'Renomeação ainda não disponível nesta versão; mantenha o nome original.');
     console.error('Catalog:',e.message);
