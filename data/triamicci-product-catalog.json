@@ -1,0 +1,270 @@
+{
+  "schemaVersion": 1,
+  "brand": "Triamicci",
+  "notes": "Catálogo inicial. Validar nomes, embalagens, fichas técnicas e rendimentos antes do uso operacional. Não contém saldos.",
+  "products": [
+    {
+      "id": "peito-frango",
+      "name": "Peito de frango",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "relatedProducts": [
+        "frango-cubos",
+        "frango-file-120g"
+      ]
+    },
+    {
+      "id": "frango-cubos",
+      "name": "Frango em cubos para strogonoff",
+      "category": "Proteínas",
+      "type": "intermediate",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "producedFrom": [
+        "peito-frango"
+      ],
+      "relatedProducts": [
+        "strogonoff-frango"
+      ]
+    },
+    {
+      "id": "frango-file-120g",
+      "name": "Filé de frango porcionado (120 g)",
+      "category": "Proteínas",
+      "type": "intermediate",
+      "stockUnit": "un",
+      "weightPerUnitKg": 0.12,
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "un"
+      ],
+      "notes": "Confirmar se é recebido pronto ou porcionado internamente; sem conversão automática de estoque.",
+      "relatedProducts": []
+    },
+    {
+      "id": "strogonoff-frango",
+      "name": "Strogonoff de frango",
+      "category": "Preparações",
+      "type": "prepared",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "ingredientsPending": true,
+      "relatedProducts": [
+        "frango-cubos"
+      ],
+      "notes": "Ficha técnica e rendimento ainda não confirmados; não baixar ingredientes automaticamente."
+    },
+    {
+      "id": "oleo-soja",
+      "name": "Óleo de soja",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "L",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "L",
+        "mL"
+      ],
+      "notes": "Embalagens dependem de cadastro posterior. Conversão exata mL→L."
+    },
+    {
+      "id": "alcatra",
+      "name": "Alcatra",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "file-mignon",
+      "name": "Filé mignon",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "contrafile-chorizo",
+      "name": "Contrafilé / chorizo",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "alcatra-cubos",
+      "name": "Cubos de alcatra",
+      "category": "Proteínas",
+      "type": "intermediate",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "notes": "Origem e transformação a confirmar."
+    },
+    {
+      "id": "noisettes",
+      "name": "Noisettes",
+      "category": "Proteínas",
+      "type": "intermediate",
+      "stockUnit": "un",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "un"
+      ],
+      "notes": "Peso por porção a confirmar."
+    },
+    {
+      "id": "tilapia",
+      "name": "Tilápia",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "almondegas",
+      "name": "Almôndegas",
+      "category": "Preparações",
+      "type": "prepared",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "ingredientsPending": true
+    },
+    {
+      "id": "arroz",
+      "name": "Arroz",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "feijao",
+      "name": "Feijão",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "ovos",
+      "name": "Ovos",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "un",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "un"
+      ]
+    },
+    {
+      "id": "margarina",
+      "name": "Margarina",
+      "category": "Laticínios",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "queijos",
+      "name": "Queijos (tipo a definir)",
+      "category": "Laticínios",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "notes": "Desdobrar em produtos específicos conforme tipos usados."
+    },
+    {
+      "id": "massas",
+      "name": "Massas (tipo a definir)",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "notes": "Desdobrar por tipo."
+    },
+    {
+      "id": "hortifruti",
+      "name": "Verduras e legumes (itens a definir)",
+      "category": "Hortifrúti",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "notes": "Categoria temporária; não usar como item movimentável."
+    },
+    {
+      "id": "temperos",
+      "name": "Temperos (itens a definir)",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "notes": "Categoria temporária; não usar como item movimentável."
+    }
+  ]
+}
