@@ -3,7 +3,7 @@ import {auth} from './firebase.js';
 import {AreaChart,Area,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell} from 'recharts';
 import {Package,ArrowDownRight,ArrowUpRight,AlertTriangle,RefreshCcw} from 'lucide-react';
 
-const colors=['#2563eb','#13b8a6','#f5a524','#c5cbd6','#8b5cf6','#ef4444'];
+const colors=['#A71916','#007934','#D88B20','#6B5555','#8C726A','#B5A5A0'];
 const format=n=>Number(n).toLocaleString('pt-BR',{maximumFractionDigits:3});
 function Kpi({icon:Icon,label,value,detail}){
   return <article className="metric-card"><div className="metric-top"><span className="metric-icon"><Icon size={19}/></span></div><p className="metric-label">{label}</p><strong className="metric-value">{value}</strong><p className="metric-detail">{detail}</p></article>;
@@ -39,10 +39,10 @@ export default function Dashboard({membership,onInventory}){
       <section className="charts-grid">
         <article className="panel consumption-panel"><div className="panel-heading"><div><h2>Movimentações nos últimos 7 dias</h2><p>Quantidade de operações, sem somar kg, litros e unidades.</p></div></div>
           <div className="chart-legend"><span><i className="legend-dot outgoing"/> Saídas</span><span><i className="legend-dot incoming"/> Entradas</span></div>
-          <div className="chart-area"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.days} margin={{top:8,right:8,left:-18,bottom:0}}>
+          {data.entries + data.exits === 0 ? <p className="dashboard-empty dashboard-chart-empty">Ainda não há movimentações registradas nos últimos 7 dias.</p> : <div className="chart-area"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.days} margin={{top:8,right:8,left:-18,bottom:0}}>
             <CartesianGrid stroke="#edf0f5" vertical={false}/><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill:'#9299a8',fontSize:12}}/><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{fill:'#9299a8',fontSize:11}}/>
-            <Tooltip formatter={v=>[v+' operações','']}/><Area type="monotone" dataKey="exit" name="Saídas" stroke="#2563eb" strokeWidth={2} fill="#2563eb" fillOpacity={0.1}/><Area type="monotone" dataKey="entry" name="Entradas" stroke="#13b8a6" strokeWidth={2} fill="transparent"/>
-          </AreaChart></ResponsiveContainer></div>
+            <Tooltip formatter={v=>[v+' operações','']}/><Area type="monotone" dataKey="exit" name="Saídas" stroke="#A71916" strokeWidth={2} fill="#A71916" fillOpacity={0.1}/><Area type="monotone" dataKey="entry" name="Entradas" stroke="#007934" strokeWidth={2} fill="transparent"/>
+          </AreaChart></ResponsiveContainer></div>}
         </article>
         <article className="panel category-panel"><div className="panel-heading"><div><h2>Insumos por categoria</h2><p>Participação dos produtos ativos no catálogo.</p></div></div>
           {data.categories.length?<><div className="donut-wrap"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data.categories} dataKey="value" nameKey="name" innerRadius={65} outerRadius={88} paddingAngle={3}>{data.categories.map((item,i)=><Cell key={item.name} fill={colors[i%colors.length]}/>)}</Pie><Tooltip formatter={v=>[v+' insumos','']}/></PieChart></ResponsiveContainer></div>
