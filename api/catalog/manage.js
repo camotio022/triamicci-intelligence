@@ -25,6 +25,28 @@ export default async function handler(req,res){
       }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
       return send(res,200,'Catálogo central carregado.',{catalog:items});
     }
+    if(req.body?.action==='approve'){
+      if(m.role!=='admin')return send(res,403,'Aprovação restrita ao administrador.');
+      const {catalogId}=req.body;
+      if(typeof catalogId!=='string'||!/^[a-z0-9-]{2,80}$/.test(catalogId))
+        return send(res,400,'Identificador inválido.');
+      if(genericIds.has(catalogId))return send(res,409,'Item genérico: defina o produto específico antes de aprovar.');
+      const catalogRef=catalog.doc(catalogId),actorRef=db.doc('memberships/'+actor.uid),auditRef=db.collection('auditLogs').doc();
+      const now=new Date();
+      await db.runTransaction(async tx=>{
+        const [memberSnap,catSnap]=await Promise.all([tx.get(actorRef),tx.get(catalogRef)]);
+        const current=memberSnap.data();
+        if(!current||current.status!=='active'||current.unitId!==m.unitId||current.role!=='admin')throw new Error('FORBIDDEN');
+        if(!catSnap.exists)throw new Error('NOT_FOUND');
+        const p=catSnap.data();
+        if(typeof p.name!=='string'||!allowedUnits.has(p.stockUnit)||typeof p.category!=='string'||
+          typeof p.trackExpiry!=='boolean')throw new Error('INVALID_CATALOG');
+        if(p.active===true)return;
+        tx.update(catalogRef,{active:true,approvedAt:now,approvedBy:actor.uid});
+        tx.create(auditRef,{event:'catalog.approved',unitId:m.unitId,catalogId,actorUid:actor.uid,at:now});
+      });
+      return send(res,200,'Produto aprovado no catálogo central.');
+    }
     if(req.body?.action!=='attach')return send(res,400,'Ação inválida.');
     if(!['admin','manager'].includes(m.role))return send(res,403,'Acesso restrito à administração.');
     const {catalogId,minStock}=req.body;
