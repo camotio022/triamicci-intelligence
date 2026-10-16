@@ -22,10 +22,12 @@ console.log(`${products.length} produtos definidos. Modo: ${apply ? 'GRAVAÇÃO'
 if (!apply) {
   console.log('Nenhuma escrita executada. Use --apply com credenciais e projeto corretos.');
 } else {
-  if (!process.env.GOOGLE_CLOUD_PROJECT && !process.env.GCLOUD_PROJECT && !process.env.FIREBASE_CONFIG) {
-    throw new Error('Defina GOOGLE_CLOUD_PROJECT para evitar escrita no projeto errado.');
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const confirmedId = process.env.CONFIRM_FIREBASE_PROJECT;
+  if (!projectId || confirmedId !== projectId) {
+    throw new Error('Defina GOOGLE_CLOUD_PROJECT e CONFIRM_FIREBASE_PROJECT com o mesmo ID do projeto Firebase de destino.');
   }
-  if (!getApps().length) initializeApp({ credential: applicationDefault() });
+  if (!getApps().length) initializeApp({ credential: applicationDefault(), projectId });
   const db = getFirestore();
   let created = 0, existing = 0;
   for (const product of products) {
