@@ -218,3 +218,11 @@ html,body,#root{max-width:100%;min-width:320px}
 .inventory-table button{border:1px solid #d4dbe5;background:#fff;border-radius:8px;padding:8px 12px;min-height:38px;color:#344054}
 .inventory-footnote{font-size:12px;margin-top:14px}
 @media(max-width:650px){.inventory-fields{grid-template-columns:1fr}.inventory-form{padding:15px}.inventory-summary>*{flex:1}.inventory-list-header{align-items:flex-start}}
+
+/* Identidade visual Triamicci: ícone verde + wordmark vermelho da referência. */
+.brand-mark-official{padding:0 0 23px;gap:6px;align-items:flex-start}
+.brand-logo-stack{display:flex;flex:1;flex-direction:column;gap:5px;min-width:0}
+.triamicci-logo{display:block;width:100%;height:auto;max-width:100%;aspect-ratio:445/90;overflow:visible}
+.brand-mark-official .brand-product-name{font:700 9px Manrope,sans-serif;letter-spacing:2.7px;color:#b4a9a9;margin:0;text-align:right;padding-right:3px}
+.brand-mark-official .sidebar-close{flex-shrink:0}
+@media(max-width:760px){.brand-mark-official .sidebar-close{margin-left:0}.brand-mark-official .brand-logo-stack{max-width:220px}}
