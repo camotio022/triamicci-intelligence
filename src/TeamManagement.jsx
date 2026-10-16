@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, limit } from 'firebase/firestore';
 import { db, auth } from './firebase.js';
+import MemberDirectory from './MemberDirectory.jsx';
 
 const roleLabels = { admin: 'Administrador', manager: 'Gerente', cook: 'Cozinheiro', auxiliar: 'Auxiliar' };
 const roleOptions = [
@@ -110,6 +111,7 @@ export default function TeamManagement({ user, membership }) {
     <h1>Gestão de colaboradores</h1>
     <p>Prepare os convites e acompanhe os registos da sua unidade.</p>
     <div className="team-warning"><strong>Convites por link:</strong> gera um link único e envia manualmente pelo WhatsApp, sem precisar de domínio próprio. O destinatário deve entrar com o e-mail Google informado. Nunca publiques o link em grupos ou capturas de tela.</div>
+    <MemberDirectory user={user} membership={membership} />
     <div className="team-grid">
       <section className="team-panel">
         <h2>Novo convite</h2>
@@ -148,6 +150,6 @@ export default function TeamManagement({ user, membership }) {
         <p className="team-note">Os convites devem ser criados exclusivamente pelo backend, com verificação de função e unidade.</p>
       </section>
     </div>
-    <p className="team-note">Sessão atual: {user.email} · {roleLabels[membership.role] || membership.role}. A listagem de todos os colaboradores será adicionada com consultas autorizadas por unidade.</p>
+    <p className="team-note">Sessão atual: {user.email} · {roleLabels[membership.role] || membership.role}. A listagem de colaboradores é consultada via API autenticada por unidade.</p>
   </section>;
 }

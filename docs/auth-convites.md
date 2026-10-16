@@ -36,3 +36,13 @@ Para produção, testar cenários de convite duplicado, e-mail divergente, conta
 
 ## Primeiro administrador
 O primeiro vínculo deve ser criado por operação privilegiada após comprovação de autorização; nunca permitir autoatribuição de administrador pelo browser.
+
+## Gestão de colaboradores
+- API `POST /api/members/manage` aceita `action:"list"` ou `action:"update"`, exige token Firebase válido, `Origin` autorizado e vínculo ativo de admin/gerente.
+- Lista até 200 vínculos da **unidade do solicitante** (nunca aceita unitId arbitrário do cliente). Nomes vêm do Firebase Auth quando disponíveis.
+- Atualizações exigem `uid`, `role`, `status`; validam a unidade e o papel atual **dentro de transação**.
+- Gerentes só alteram contas atualmente de cozinheiro/auxiliar, mantendo cargos de cozinheiro/auxiliar.
+- Ninguém altera a própria conta. Não é permitido desativar/rebaixar o último admin ativo da unidade.
+- Todas as mudanças gravam `auditLogs` com autor, alvo, papel/situação anterior e posterior.
+- Desativação é lógica (`status:inactive`); Auth não é excluído. O backend e as regras Firestore exigem vínculo ativo. Sessões com dados já carregados devem ser atualizadas para refletir mudanças.
+- Testar com contas separadas, sem alterar o administrador principal. Não publicar sem validar regras Firestore e endpoints.
