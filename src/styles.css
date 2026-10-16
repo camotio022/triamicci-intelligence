@@ -190,3 +190,31 @@ html,body,#root{max-width:100%;min-width:320px}
 .team-edit-actions button{flex:1;min-width:140px;min-height:44px}
 .team-edit-actions .team-secondary{background:#fff;color:#344054;border:1px solid #d8dee8}
 @media(max-width:560px){.team-member{flex-direction:column}.team-member .team-member-edit{width:100%}.team-directory{padding:16px}.team-directory-heading .team-refresh{width:100%}}
+
+/* Estoque: catálogo real */
+.inventory-page{padding:0 0 28px;max-width:100%;min-width:0}
+.inventory-page>h1{margin:8px 0}
+.inventory-page>p{color:#667085}
+.inventory-summary{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0}
+.inventory-summary>*{background:#f3f5f9;border:1px solid #e5e9f0;border-radius:9px;padding:10px 13px;font-size:13px}
+.inventory-form{border:1px solid #e5e9f0;border-radius:14px;background:#fff;padding:20px;margin:20px 0;display:flex;flex-direction:column;gap:14px}
+.inventory-form h2,.inventory-list-header h2{margin:0;font-size:19px}
+.inventory-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.inventory-fields label,.inventory-search{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:600;color:#344054}
+.inventory-fields input,.inventory-fields select,.inventory-search input{min-height:44px;width:100%;border:1px solid #d4dbe5;border-radius:9px;padding:10px 12px;background:#fff;color:#1d2939;font:inherit}
+.inventory-check{display:flex;align-items:center;gap:9px;font-size:13px;color:#344054}
+.inventory-check input{width:18px;height:18px}
+.inventory-actions{display:flex;gap:10px;flex-wrap:wrap}
+.inventory-actions button,.inventory-list-header button{border:1px solid #d4dbe5;border-radius:9px;padding:10px 16px;min-height:44px;cursor:pointer}
+.inventory-actions button[type=submit]{background:#b5262b;color:#fff;border-color:#b5262b}
+.inventory-actions .inventory-cancel{background:#fff;color:#344054}
+.inventory-list-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 12px}
+.inventory-list-header button{background:#fff;color:#344054}
+.inventory-search{max-width:480px;margin-bottom:14px}
+.inventory-table-wrap{overflow-x:auto;border:1px solid #e5e9f0;border-radius:12px;background:#fff}
+.inventory-table{width:100%;border-collapse:collapse;min-width:750px}
+.inventory-table th,.inventory-table td{padding:13px;text-align:left;border-bottom:1px solid #eef0f4;font-size:13px;white-space:nowrap}
+.inventory-table th{background:#f8f9fb;color:#667085;font-size:11px}
+.inventory-table button{border:1px solid #d4dbe5;background:#fff;border-radius:8px;padding:8px 12px;min-height:38px;color:#344054}
+.inventory-footnote{font-size:12px;margin-top:14px}
+@media(max-width:650px){.inventory-fields{grid-template-columns:1fr}.inventory-form{padding:15px}.inventory-summary>*{flex:1}.inventory-list-header{align-items:flex-start}}
