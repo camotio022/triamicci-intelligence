@@ -3,6 +3,7 @@ import Receiving from './Receiving.jsx';
 import AuthGate from './AuthGate.jsx';
 import TeamManagement from './TeamManagement.jsx';
 import Inventory from './Inventory.jsx';
+import TriamicciLogo from './TriamicciLogo.jsx';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { LayoutDashboard, Package, TrendingUp, Wallet, Bell, Search, ChevronDown, ArrowUpRight, ArrowDownRight, AlertTriangle, Clock3, Boxes, CircleDollarSign, Menu, Users, X } from 'lucide-react';
 
@@ -41,7 +42,7 @@ function Workspace({ user, membership, logout }) {
  return <div className="app-shell">
   {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
   <aside className={menuOpen ? "sidebar sidebar-open" : "sidebar"} id="primary-sidebar" aria-label="Menu principal">
-    <div className="brand-mark"><div className="brand-symbol">T</div><div><b>TRIAMICCI</b><span>INTELLIGENCE</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setMenuOpen(false)}><X size={20}/></button></div>
+    <div className="brand-mark brand-mark-official"><div className="brand-logo-stack"><TriamicciLogo className="triamicci-logo"/><span className="brand-product-name">INTELLIGENCE</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setMenuOpen(false)}><X size={20}/></button></div>
     <div className="workspace"><span className="workspace-dot"/> <span>Unidade: {membership.unitId}</span><ChevronDown size={15}/></div>
     <p className="nav-caption">MENU PRINCIPAL</p>
     <nav>
