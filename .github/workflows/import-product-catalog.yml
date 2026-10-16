@@ -36,6 +36,16 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_CATALOG_SERVICE_ACCOUNT }}
+      - name: Preparar ferramentas Google Cloud para diagnóstico
+        if: ${{ inputs.mode == 'check-access' }}
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Verificar conta ativa e banco sem expor credenciais
+        if: ${{ inputs.mode == 'check-access' }}
+        run: |
+          echo "Conta autenticada:"
+          gcloud auth list --filter='status:ACTIVE' --format='value(account)'
+          echo "Banco (default) do projeto triamicci-intelligence:"
+          gcloud firestore databases describe --database='(default)' --project=triamicci-intelligence --format='value(name)' || echo "Não foi possível consultar metadados do banco."
       - name: Verificar leitura do Firestore sem gravar
         if: ${{ inputs.mode == 'check-access' }}
         env:
