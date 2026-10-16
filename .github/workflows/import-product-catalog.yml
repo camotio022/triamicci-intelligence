@@ -18,7 +18,7 @@ permissions:
 jobs:
   import:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.mode == 'apply' && 'firebase-catalog-import' || 'catalog-dry-run' }}
+    environment: ${{ inputs.mode == 'apply' && 'catalog-import' || 'catalog-dry-run' }}
     steps:
       - name: Obter código
         uses: actions/checkout@v4
