@@ -35,7 +35,8 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_CATALOG_SERVICE_ACCOUNT }}
+          service_account: triamicci-catalog-import@triamicci-intelligence.iam.gserviceaccount.com
+          project_id: triamicci-intelligence
       - name: Preparar ferramentas Google Cloud para diagnóstico
         if: ${{ inputs.mode == 'check-access' }}
         uses: google-github-actions/setup-gcloud@v2
