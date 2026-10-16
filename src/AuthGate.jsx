@@ -6,6 +6,7 @@ import { auth, db } from './firebase.js';
 export default function AuthGate({ children }) {
   const [user, setUser] = useState(undefined);
   const [membership, setMembership] = useState(undefined);
+  const [membershipUid, setMembershipUid] = useState(null);
   const [error, setError] = useState('');
   const [accessError, setAccessError] = useState('');
   const [accessReason, setAccessReason] = useState('');
@@ -20,6 +21,7 @@ export default function AuthGate({ children }) {
   useEffect(() => {
     if (!user) {
       setMembership(null);
+      setMembershipUid(null);
       setAccessError('');
       setAccessReason('');
       setAccessStatus('');
@@ -28,6 +30,7 @@ export default function AuthGate({ children }) {
     // O vínculo é acompanhado em tempo real. Nunca liberar a interface
     // a partir de uma cópia local: exigir confirmação do servidor.
     setMembership(undefined);
+    setMembershipUid(user.uid);
     setAccessError('');
     setAccessReason('');
     setAccessStatus('checking');
@@ -109,7 +112,7 @@ export default function AuthGate({ children }) {
       console.error('Firebase login:', e.code, e.message);
     }
   };
-  if (user === undefined || (user && membership === undefined)) return <main className="auth-screen"><section className="auth-card">Verificando acesso...</section></main>;
+  if (user === undefined || (user && (membership === undefined || membershipUid !== user.uid))) return <main className="auth-screen"><section className="auth-card">Verificando acesso...</section></main>;
   if (!user) return <main className="auth-screen"><section className="auth-card"><h1>Triamicci Intelligence</h1><p>Entre com sua conta Google. O acesso às unidades depende de convite aprovado.</p><button onClick={login}>Entrar com Google</button>{error && <p role="alert">{error}</p>}</section></main>;
   if (!membership) return <main className="auth-screen"><section className="auth-card"><h1>{accessError ? 'Erro ao verificar acesso' : accessStatus === 'inactive' ? 'Acesso desativado' : accessStatus === 'offline' ? 'Verificação indisponível' : 'Acesso pendente'}</h1><p>{user.email}</p><p>{accessError || accessReason || 'Esta conta ainda não tem vínculo ativo com uma unidade. Solicite um convite ao gerente ou administrador.'}</p>{invite && accessStatus === 'missing' && <><p>Existe um convite neste link. Confirme que entrou com o mesmo e-mail que recebeu o convite.</p><button type="button" onClick={acceptInvite} disabled={accepting}>{accepting ? 'Validando...' : 'Aceitar convite'}</button>{inviteFeedback && <p role="alert">{inviteFeedback}</p>}</>}{error && <p role="alert">{error}</p>}<button onClick={() => signOut(auth)}>Sair</button></section></main>;
   return children({ user, membership, logout: () => signOut(auth) });
