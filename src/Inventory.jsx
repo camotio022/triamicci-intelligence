@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { auth } from './firebase.js';
+import StockMovements from './StockMovements.jsx';
 
 const categories = ['Proteínas','Hortifruti','Laticínios','Mercearia','Congelados','Bebidas','Limpeza','Descartáveis','Outros'];
 const units = ['kg','g','L','ml','un'];
@@ -54,7 +55,7 @@ export default function Inventory({membership}) {
   return <section className="inventory-page">
     <p className="eyebrow">OPERAÇÃO · UNIDADE {membership.unitId.toUpperCase()}</p>
     <h1>Estoque · Catálogo de insumos</h1>
-    <p>Cadastro real no Firebase. Os saldos começam em zero e só serão alterados por movimentações auditadas, na próxima etapa.</p>
+    <p>Cadastro real no Firebase. Os saldos são atualizados exclusivamente por movimentações auditadas.</p>
     <div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>
     {canEdit && <form className="inventory-form" onSubmit={save}>
       <h2>{editing?'Editar insumo':'Cadastrar insumo'}</h2>
@@ -75,6 +76,7 @@ export default function Inventory({membership}) {
     <div className="inventory-table-wrap"><table className="inventory-table"><thead><tr><th>INSUMO</th><th>CATEGORIA</th><th>SALDO</th><th>MÍNIMO</th><th>VALIDADE</th><th>SITUAÇÃO</th>{canEdit && <th>AÇÃO</th>}</tr></thead><tbody>
       {visible.map(p=><tr key={p.id}><td><strong>{p.name}</strong></td><td>{p.category}</td><td>{p.quantity} {p.unit}</td><td>{p.minStock} {p.unit}</td><td>{p.trackExpiry?'Controlada':'Não exigida'}</td><td>{p.status==='active'?'Ativo':'Inativo'}</td>{canEdit && <td><button type="button" onClick={()=>edit(p)}>Editar</button></td>}</tr>)}
     </tbody></table>{!loading && !error && visible.length===0 && <p>Nenhum insumo encontrado.</p>}</div>
-    <p className="inventory-footnote">Este módulo cadastra os produtos, mas ainda não registra recebimentos, saídas ou lotes. O recebimento demonstrativo permanece separado e não altera os saldos.</p>
+    <StockMovements products={products} membership={membership} onUpdated={load}/>
+    <p className="inventory-footnote">Entradas e saídas já atualizam o saldo real. Produtos com controle de validade permanecem bloqueados para movimentação até implementarmos lotes. A tela Recebimento continua demonstrativa e não altera os saldos.</p>
   </section>;
 }
