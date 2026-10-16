@@ -9,8 +9,6 @@ import { initializeApp, applicationDefault, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const apply = process.argv.includes('--apply');
-const checkAccess = process.argv.includes('--check-access');
-if (apply && checkAccess) throw new Error('Escolha apenas --apply ou --check-access.');
 const file = new URL('../data/triamicci-product-catalog.json', import.meta.url);
 const { products, schemaVersion } = JSON.parse(readFileSync(file, 'utf8'));
 const ids = new Set(products.map(product => product.id));
@@ -20,8 +18,8 @@ for (const product of products) {
   if (!['kg', 'L', 'un'].includes(product.stockUnit)) throw new Error('Unidade inválida: ' + product.id);
   if ((product.producedFrom || []).some(id => !ids.has(id))) throw new Error('Origem não cadastrada: ' + product.id);
 }
-console.log(`${products.length} produtos definidos. Modo: ${apply ? 'GRAVAÇÃO' : checkAccess ? 'TESTE DE ACESSO (SEM ESCRITA)' : 'SIMULAÇÃO'}.`);
-if (!apply && !checkAccess) {
+console.log(`${products.length} produtos definidos. Modo: ${apply ? 'GRAVAÇÃO' : 'SIMULAÇÃO'}.`);
+if (!apply) {
   console.log('Nenhuma escrita executada. Use --apply com credenciais e projeto corretos.');
 } else {
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
@@ -31,16 +29,6 @@ if (!apply && !checkAccess) {
   }
   if (!getApps().length) initializeApp({ credential: applicationDefault(), projectId });
   const db = getFirestore();
-  if (checkAccess) {
-    try {
-      const doc = await db.collection('productCatalog').doc('peito-frango').get();
-      console.log('Acesso de leitura ao Firestore confirmado. Produto existe:', doc.exists);
-    } catch (e) {
-      console.error('Falha ao ler o Firestore. Código:', e.code, 'Mensagem:', e.message);
-      throw e;
-    }
-    process.exit(0);
-  }
   let created = 0, existing = 0;
   for (const product of products) {
     const ref = db.collection('productCatalog').doc(product.id);

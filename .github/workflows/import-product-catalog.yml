@@ -3,13 +3,12 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'dry-run valida localmente; check-access testa Firebase sem escrita; apply importa'
+        description: 'dry-run não grava; apply importa produtos inativos'
         required: true
         default: dry-run
         type: choice
         options:
           - dry-run
-          - check-access
           - apply
 
 permissions:
@@ -19,40 +18,24 @@ permissions:
 jobs:
   import:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.mode != 'dry-run' && 'catalog-import' || 'catalog-dry-run' }}
+    environment: ${{ inputs.mode == 'apply' && 'catalog-import' || 'catalog-dry-run' }}
     steps:
       - name: Obter código
         uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
       - name: Instalar dependências
-        run: npm install --no-audit --no-fund
+        run: npm ci
       - name: Simular e validar catálogo (sem acesso ao Firebase)
         run: node scripts/seed-product-catalog.mjs
       - name: Autenticar no Google Cloud somente na importação
-        if: ${{ inputs.mode != 'dry-run' }}
+        if: ${{ inputs.mode == 'apply' }}
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: triamicci-catalog-import@triamicci-intelligence.iam.gserviceaccount.com
-          project_id: triamicci-intelligence
-      - name: Preparar ferramentas Google Cloud para diagnóstico
-        if: ${{ inputs.mode == 'check-access' }}
-        uses: google-github-actions/setup-gcloud@v2
-      - name: Verificar conta ativa e banco sem expor credenciais
-        if: ${{ inputs.mode == 'check-access' }}
-        run: |
-          echo "Conta autenticada:"
-          gcloud auth list --filter='status:ACTIVE' --format='value(account)'
-          echo "Banco (default) do projeto triamicci-intelligence:"
-          gcloud firestore databases describe --database='(default)' --project=triamicci-intelligence --format='value(name)' || echo "Não foi possível consultar metadados do banco."
-      - name: Verificar leitura do Firestore sem gravar
-        if: ${{ inputs.mode == 'check-access' }}
-        env:
-          GOOGLE_CLOUD_PROJECT: triamicci-intelligence
-          CONFIRM_FIREBASE_PROJECT: triamicci-intelligence
-        run: node scripts/seed-product-catalog.mjs --check-access
+          service_account: ${{ secrets.GCP_CATALOG_SERVICE_ACCOUNT }}
       - name: Importar catálogo inativo no Firestore
         if: ${{ inputs.mode == 'apply' }}
         env:

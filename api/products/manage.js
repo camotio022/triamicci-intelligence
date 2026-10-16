@@ -9,7 +9,7 @@ const validMin = value => typeof value === 'number' && Number.isFinite(value) &&
 const clean = snap => {
   const d = snap.data();
   return {id:snap.id,name:d.name,category:d.category,unit:d.unit,minStock:d.minStock,
-    trackExpiry:d.trackExpiry === true,status:d.status,quantity:d.quantity ?? 0,
+    trackExpiry:d.trackExpiry === true,status:d.status,quantity:d.quantity ?? 0,catalogId:d.catalogId||null,
     createdAt:d.createdAt?.toDate?.()?.toISOString?.() || null};
 };
 export default async function handler(req,res) {
@@ -65,6 +65,9 @@ export default async function handler(req,res) {
         throw new Error('FORBIDDEN');
       if (!productSnap.exists) throw new Error('NOT_FOUND');
       const previous = productSnap.data();
+      if (previous.catalogId && (safeName !== previous.name || safeCategory !== previous.category ||
+          unit !== previous.unit || trackExpiry !== previous.trackExpiry))
+        throw new Error('CATALOG_LOCKED');
       if (previous.unit !== unit && (previous.quantity || 0) !== 0)
         throw new Error('UNIT_LOCKED');
       if (trackExpiry && !previous.trackExpiry && (previous.quantity || 0) !== 0)
@@ -83,6 +86,7 @@ export default async function handler(req,res) {
     if (e.message === 'DUPLICATE') return send(res,409,'Já existe um insumo com este nome na unidade.');
     if (e.message === 'NOT_FOUND') return send(res,404,'Insumo não encontrado.');
     if (e.message === 'EXPIRY_LOCKED') return send(res,409,'Não ative o controle de validade com saldo existente. Regularize o saldo antes de migrar para lotes.');
+    if (e.message === 'CATALOG_LOCKED') return send(res,409,'Nome, categoria, unidade e validade pertencem ao catálogo central e não podem ser alterados na unidade.');
     if (e.message === 'UNIT_LOCKED') return send(res,409,'Não altere a unidade de medida de um insumo com saldo.');
     if (e.message === 'RENAME_NOT_SUPPORTED') return send(res,409,'Renomeação ainda não disponível nesta versão; mantenha o nome original.');
     console.error('Catalog:',e.message);
