@@ -58,7 +58,7 @@ export default function Inventory({membership}) {
     <h1>Estoque · Catálogo de insumos</h1>
     <p>Selecione produtos do catálogo central. Saldos só mudam por movimentações auditadas; o vínculo inicial começa com zero.</p>
     <div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>
-    {canEdit && <CatalogPicker onAttached={load} />}
+    {canEdit && <CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} />}
     {canEdit && editing && <form className="inventory-form" onSubmit={save}>
       <h2>{editing?'Editar insumo':'Cadastrar insumo'}</h2>
       <div className="inventory-fields">
