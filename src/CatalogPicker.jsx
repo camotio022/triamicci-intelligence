@@ -8,7 +8,7 @@ async function request(action,payload={}){
  if(!res.ok)throw new Error(data.message||'Falha ao consultar catálogo.');
  return data;
 }
-export default function CatalogPicker({onAttached}){
+export default function CatalogPicker({onAttached,isAdmin=false}){
  const [catalog,setCatalog]=useState([]);
  const [search,setSearch]=useState('');
  const [selected,setSelected]=useState('');
@@ -25,6 +25,12 @@ export default function CatalogPicker({onAttached}){
  useEffect(()=>{reload();},[reload]);
  const visible=useMemo(()=>catalog.filter(p=>(p.name+' '+p.category).toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR'))),[catalog,search]);
  const item=catalog.find(p=>p.id===selected);
+ const approve=async()=>{
+   if(!item||!isAdmin||busy||!window.confirm('Aprovar '+item.name+' com unidade '+item.stockUnit+' no catálogo central?'))return;
+   setBusy(true);setError('');setNotice('');
+   try{const data=await request('approve',{catalogId:item.id});setNotice(data.message);await reload();}
+   catch(e){setError(e.message);}finally{setBusy(false);}
+ };
  const submit=async e=>{
    e.preventDefault();
    if(!item||item.reviewRequired||busy)return;
@@ -51,6 +57,7 @@ export default function CatalogPicker({onAttached}){
    {item.relatedProducts.length>0&&<span>Produtos relacionados: {item.relatedProducts.join(', ')}</span>}
    {item.notes&&<span>{item.notes}</span>}
    {item.reviewRequired&&<strong className="inventory-lot-warning">Aguardando aprovação do catálogo central. Não é possível vincular este item ainda.</strong>}
+   {item.reviewRequired&&isAdmin&&!['queijos','massas','hortifruti','temperos'].includes(item.id)&&<button type="button" className="inventory-cancel" onClick={approve} disabled={busy}>Aprovar produto (admin)</button>}
   </div>}
   <div className="inventory-fields">
    <label>Estoque mínimo ({item?.stockUnit||'unidade automática'})<input type="number" min="0" max="100000000" step="any" value={minimum} onChange={e=>setMinimum(e.target.value)} disabled={!item||item.reviewRequired}/></label>
