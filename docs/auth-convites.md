@@ -46,3 +46,13 @@ O primeiro vínculo deve ser criado por operação privilegiada após comprovaç
 - Todas as mudanças gravam `auditLogs` com autor, alvo, papel/situação anterior e posterior.
 - Desativação é lógica (`status:inactive`); Auth não é excluído. O backend e as regras Firestore exigem vínculo ativo. Sessões com dados já carregados devem ser atualizadas para refletir mudanças.
 - Testar com contas separadas, sem alterar o administrador principal. Não publicar sem validar regras Firestore e endpoints.
+
+## Bloqueio em tempo real (AuthGate)
+- `onSnapshot` acompanha `memberships/{uid}` com `includeMetadataChanges:true`.
+- Somente uma confirmação do servidor (`metadata.fromCache === false`) autoriza renderizar o Workspace.
+- Alterar `status` para `inactive` remove o Workspace imediatamente após a entrega do evento, mostra `Acesso desativado` e mantém a conta Google (sem apagar histórico).
+- Reativar `status:active` e manter `unitId` válido permite voltar ao Workspace automaticamente, sem novo convite.
+- Sem conexão/erro de listener, a interface operacional fica bloqueada por precaução. A sessão Google continua autenticada.
+- A checagem de UID impede renderização do vínculo anterior ao trocar de conta.
+- Validar manualmente com duas contas: funcionário com dashboard aberto; admin desativa; conferir bloqueio e recusa das novas chamadas API; admin reativa; conferir retorno. Repetir sem conexão.
+- Atenção: isto é bloqueio de interface e novas operações protegidas, não revogação global do token Google. Dados já baixados para memória/cache ou abas fora do aplicativo não são apagados retroativamente. Exige regras Firestore publicadas e backend com validação de vínculo ativo.
