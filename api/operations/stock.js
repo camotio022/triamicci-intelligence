@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {countUnit,validQuantity,commercialDelivery} from './logic.js';
 
@@ -115,7 +116,7 @@ export default async function handler(req,res){
      countId:requestId,actorUid:actor.uid,at:now});
    }
    if(action==='receive'&&p.trackExpiry===true){
-    const lotKey=Buffer.from(payload.lot.trim()).toString('hex').slice(0,150)+'-'+payload.expiryDate;
+    const lotKey=createHash('sha256').update(payload.lot.trim()+'|'+payload.expiryDate).digest('hex');
     const batchRef=lotRef.doc(lotKey);
     const priorLot=await tx.get(batchRef);
     const oldAmount=priorLot.exists?priorLot.data().receivedQuantity:0;
