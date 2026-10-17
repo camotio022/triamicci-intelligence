@@ -1,12 +1,13 @@
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {countUnit,validQuantity,individualCatalogIds} from './logic.js';
 
 // Ledger físico independente dos saldos legados até conciliação e migração homologadas.
 const idPattern=/^[a-f0-9]{40}$/;
 const reqPattern=/^[a-f0-9-]{36}$/i;
-const nonnegative=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=100000&&Math.round(x*1000)===x*1000;
-const positive=x=>nonnegative(x)&&x>0;
-const pieces=new Set(['alcatra-bife','alcatra-cubos','frango-file-120g']);
-const physicalUnit=p=>pieces.has(p.catalogId)?'un':p.unit;
+const nonnegative=x=>validQuantity(x,{allowZero:true});
+const positive=x=>validQuantity(x);
+const pieces=individualCatalogIds;
+const physicalUnit=countUnit;
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
 const clean=(doc)=>({id:doc.id,...doc.data(),at:iso(doc.data().at)});
 const validText=(v,min=1,max=160)=>typeof v==='string'&&v.trim().length>=min&&v.trim().length<=max;
