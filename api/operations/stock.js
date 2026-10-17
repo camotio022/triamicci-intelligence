@@ -163,8 +163,12 @@ export default async function handler(req,res){
    if(action==='receive'&&p.trackExpiry===true){
     const oldAmount=lotSnap?.exists?lotSnap.data().receivedQuantity:0;
     if(!Number.isFinite(oldAmount)||oldAmount<0||oldAmount+payload.physicalQuantity>100000000)throw Error('INVALID');
+    const priorReserve=Number.isFinite(lotSnap?.data()?.reserva)?lotSnap.data().reserva:0;
+    const priorRotation=Number.isFinite(lotSnap?.data()?.giro)?lotSnap.data().giro:0;
     tx.set(batchRef,{lot:payload.lot.trim(),expiryDate:payload.expiryDate,productId,
       productName:p.name,unit:unitName,receivedQuantity:Math.round((oldAmount+payload.physicalQuantity)*1000)/1000,
+      reserva:Math.round((priorReserve+payload.physicalQuantity)*1000)/1000,giro:priorRotation,
+      availableQuantity:Math.round((priorReserve+priorRotation+payload.physicalQuantity)*1000)/1000,
       lastReceiptId:requestId,updatedAt:now},{merge:true});
    }
    tx.create(ref,record);
