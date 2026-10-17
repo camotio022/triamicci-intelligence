@@ -18,6 +18,7 @@ export default function PhysicalStock({membership,mode='receive'}){
  const [lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
  const [summary,setSummary]=useState(null);
+ const [lots,setLots]=useState([]);
  const canReceive=['admin','manager'].includes(membership.role);
  const load=useCallback(async()=>{
   try{
@@ -27,10 +28,13 @@ export default function PhysicalStock({membership,mode='receive'}){
  },[]);
  useEffect(()=>{load()},[load]);
  useEffect(()=>{
-  let active=true;setSummary(null);
+  let active=true;setSummary(null);setLots([]);
   if(!productId)return;
   api('/api/operations/stock','summary',{productId})
    .then(data=>{if(active)setSummary(data.summary)})
+   .catch(err=>{if(active)setStatus(err.message)});
+  api('/api/operations/stock','lots',{productId})
+   .then(data=>{if(active)setLots(data.lots||[])})
    .catch(err=>{if(active)setStatus(err.message)});
   return ()=>{active=false};
  },[productId,history]);
@@ -100,6 +104,13 @@ export default function PhysicalStock({membership,mode='receive'}){
    <button type="submit" disabled={busy||!productId}>{busy?'Salvando...':mode==='receive'?'Salvar recebimento':'Salvar contagem'}</button>
    {status&&<p role="status">{status}</p>}
   </form>}
+  {mode==='receive'&&p?.trackExpiry&&lots.length>0&&<section className="receiving-card">
+   <h2>Lotes recebidos — ordem de validade</h2>
+   <p>Quantidades de entrada acumuladas; não são saldos disponíveis e ainda não há baixa FEFO.</p>
+   <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>LOTE</th><th>VALIDADE</th><th>RECEBIDO</th></tr></thead><tbody>
+    {lots.map(x=><tr key={x.id}><td>{x.lot}</td><td>{x.expiryDate}</td><td>{qty(x.receivedQuantity)} {x.unit}</td></tr>)}
+   </tbody></table></div>
+  </section>}
   <section className="receiving-card"><div className="inventory-list-header"><h2>Histórico real</h2><button type="button" onClick={load}>Atualizar</button></div>
    {rows.length===0?<p>Nenhum registro salvo nesta unidade.</p>:
     <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>QUANDO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>RESPONSÁVEL</th></tr></thead><tbody>
