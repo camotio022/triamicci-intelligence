@@ -1,5 +1,6 @@
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {countUnit,validQuantity} from './logic.js';
+import {areaTotals,allocateFEFO} from './lot-logic.js';
 
 const idPattern=/^[a-f0-9]{40}$/;
 const requestPattern=/^[a-f0-9-]{36}$/i;
@@ -56,23 +57,17 @@ export default async function handler(req,res){
       .orderBy('expiryDate','asc').limit(101);
     const lots=await tx.get(query);
     if(lots.size>100)throw Error('HISTORY_LIMIT');
-    const countReserve=qtyRound(lots.docs.reduce((n,d)=>n+(Number.isFinite(d.data().reserva)?d.data().reserva:0),0));
-    const countRotation=qtyRound(lots.docs.reduce((n,d)=>n+(Number.isFinite(d.data().giro)?d.data().giro:0),0));
-    if(countReserve!==current.reserve||countRotation!==current.rotation)throw Error('LOTS_NOT_READY');
-    let remaining=quantity;
-    const dateToday=now.toISOString().slice(0,10);
-    for(const doc of lots.docs){
-     const lot=doc.data();lotsData.set(doc.id,lot);
-     if(!Number.isFinite(lot[location])||lot[location]<=0)continue;
-     if(reason==='consumption'&&lot.expiryDate<dateToday)continue;
-     const amount=Math.min(qtyRound(remaining),qtyRound(lot[location]));
-     if(amount<=0)continue;
-     lotAllocations.push({ref:doc.ref,id:doc.id,quantity:amount,lot:lot.lot,expiryDate:lot.expiryDate,
-       remaining:qtyRound(lot[location]-amount)});
-     remaining=qtyRound(remaining-amount);
-     if(remaining<=0)break;
+    const tracked=lots.docs.map(d=>({id:d.id,...d.data()}));
+    const totals=areaTotals(tracked);
+    if(!totals||totals.reserva!==current.reserve||totals.giro!==current.rotation)throw Error('LOTS_NOT_READY');
+    const parts=allocateFEFO(tracked,{area:location,quantity,
+      allowExpired:reason!=='consumption',today:now.toISOString().slice(0,10)});
+    if(!parts)throw Error('LOTS_NOT_READY');
+    for(const part of parts){
+     const lot=lotsData.get(part.id),ref=lots.docs.find(d=>d.id===part.id).ref;
+     lotAllocations.push({ref,id:part.id,quantity:part.quantity,lot:lot.lot,expiryDate:lot.expiryDate,
+       remaining:qtyRound(lot[location]-part.quantity)});
     }
-    if(remaining>0)throw Error('LOTS_NOT_READY');
    }
    const nextReserve=qtyRound(current.reserve-(location==='reserva'?quantity:0));
    const nextRotation=qtyRound(current.rotation-(location==='giro'?quantity:0));
