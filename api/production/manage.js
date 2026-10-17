@@ -32,11 +32,12 @@ export default async function handler(req,res){
    if(!idPattern.test(id||'')||typeof name!=='string'||name.trim().length<3||name.length>100||
     !Number.isInteger(yieldQuantity)||yieldQuantity<1||yieldQuantity>10000||
     !Array.isArray(lines)||lines.length<1||lines.length>12||!lines.every(validLine)||
-    new Set(lines.map(x=>x.productId)).size!==lines.length)return send(res,400,'Revise a ficha técnica.');
+    new Set(lines.map(x=>x.productId)).size!==lines.length||
+    lines.some(x=>x.substitutes?.includes(x.productId)))return send(res,400,'Revise a ficha técnica.');
    const ref=recipes.doc(id),actorRef=db.doc('memberships/'+actor.uid);
    await db.runTransaction(async tx=>{
     const [a,prev,...products]=await Promise.all([tx.get(actorRef),tx.get(ref),
-     ...lines.map(x=>tx.get(unit.collection('products').doc(x.productId)))]);
+     ...[...new Set(lines.flatMap(x=>[x.productId,...(x.substitutes||[])]))].map(id=>tx.get(unit.collection('products').doc(id)))]);
     if(!a.exists||a.data().status!=='active'||!['admin','manager'].includes(a.data().role)||a.data().unitId!==member.unitId)throw Error('FORBIDDEN');
     if(products.some(x=>!x.exists||x.data().status!=='active'))throw Error('PRODUCT_NOT_FOUND');
     const now=new Date();
@@ -74,8 +75,9 @@ export default async function handler(req,res){
    if(!recipe.exists||recipe.data().active!==true)throw Error('RECIPE_NOT_FOUND');
    const recipeData=recipe.data(),productDocs=docs.slice(0,items.length),balanceDocs=docs.slice(items.length);
    if(productDocs.some(p=>!p.exists||p.data().status!=='active')||balanceDocs.some(b=>!b.exists))throw Error('MISSING_STOCK');
-   const allowed=new Set(recipeData.lines.flatMap(l=>[l.productId,...(l.substitutes||[])]));
-   if(items.some(i=>!allowed.has(i.productId)))throw Error('UNAUTHORIZED_SUBSTITUTE');
+   if(items.length!==recipeData.lines.length||
+      items.some((i,index)=>![recipeData.lines[index].productId,...(recipeData.lines[index].substitutes||[])].includes(i.productId)))
+      throw Error('UNAUTHORIZED_SUBSTITUTE');
    // Fetch all lot snapshots and catalog definitions BEFORE any transaction writes.
    const centralDocs=await Promise.all(productDocs.map(p=>p.data().catalogId?
      tx.get(db.collection('productCatalog').doc(p.data().catalogId)):Promise.resolve(null)));
