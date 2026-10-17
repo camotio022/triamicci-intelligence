@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {countUnit,validQuantity,reconcile} from '../api/operations/logic.js';
+import {countUnit,validQuantity,reconcile,commercialDelivery} from '../api/operations/logic.js';
 
 test('alcatra e filé de frango 120g são contados individualmente',()=>{
  for(const catalogId of ['alcatra-bife','alcatra-cubos','frango-file-120g']){
@@ -29,4 +29,19 @@ test('não calcula quando unidades não batem ou histórico incompleto',()=>{
  assert.equal(reconcile({...base,allUnitsCompatible:false}),null);
  assert.equal(reconcile({...base,historyComplete:false}),null);
  assert.equal(reconcile({...base,previousTotal:null}),null);
+});
+
+test('pedido em kg com peças físicas compara apenas o peso comercial',()=>{
+ assert.deepEqual(commercialDelivery({orderedQuantity:12,physicalQuantity:83,
+   deliveredWeightKg:11.6,receivingUnit:'kg',operationalUnit:'un'}),
+   {orderedQuantity:12,deliveredQuantity:11.6,receivingUnit:'kg',difference:-0.4});
+ assert.equal(commercialDelivery({orderedQuantity:12,physicalQuantity:83,
+   deliveredWeightKg:null,receivingUnit:'kg',operationalUnit:'un'}),null);
+});
+test('pedido em peças não converte quantidade em peso',()=>{
+ const result=commercialDelivery({orderedQuantity:20,physicalQuantity:18,
+   deliveredWeightKg:null,receivingUnit:'un',operationalUnit:'un'});
+ assert.equal(result.difference,-2);
+ assert.equal(commercialDelivery({orderedQuantity:20.5,physicalQuantity:18,
+   deliveredWeightKg:null,receivingUnit:'un',operationalUnit:'un'}),null);
 });
