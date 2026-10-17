@@ -56,6 +56,9 @@ export default async function handler(req,res){
       .orderBy('expiryDate','asc').limit(101);
     const lots=await tx.get(query);
     if(lots.size>100)throw Error('HISTORY_LIMIT');
+    const countReserve=qtyRound(lots.docs.reduce((n,d)=>n+(Number.isFinite(d.data().reserva)?d.data().reserva:0),0));
+    const countRotation=qtyRound(lots.docs.reduce((n,d)=>n+(Number.isFinite(d.data().giro)?d.data().giro:0),0));
+    if(countReserve!==current.reserve||countRotation!==current.rotation)throw Error('LOTS_NOT_READY');
     let remaining=quantity;
     const dateToday=now.toISOString().slice(0,10);
     for(const doc of lots.docs){
