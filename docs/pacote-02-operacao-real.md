@@ -7,9 +7,10 @@
 1. `api/catalog/sync-v2.js`: prévia da sincronização do catálogo v2, migração aditiva condicionada à confirmação explícita por administrador; cria apenas produtos novos suficientemente definidos como **inativos**. Preserva nomes, unidades base, saldos e status dos produtos existentes. Registra auditoria. Não altera produtos com incompatibilidades.
 2. `api/catalog/manage.js` + `src/CatalogPicker.jsx`: aprovação individual/em lote para itens com metadados v2 suficientes; itens genéricos e incompletos permanecem bloqueados. Vinculação à unidade continua explícita, com saldo inicial zero para novos vínculos.
 3. `src/CatalogV2Review.jsx`: prévia administrativa conectada ao Firebase, com contagem de produtos aptos, pendentes ou divergentes e botão de aplicação controlada. O conteúdo detalhado da proposta ainda é estático para comparações.
-4. `api/operations/stock.js`: `receive`, `count`, `summary`, `list`; registros em `physicalReceipts` e `physicalCounts` por unidade, responsáveis e auditoria, com idempotência baseada em `requestId`; sem alteração de `products.quantity`.
-5. `src/PhysicalStock.jsx`: formulários operacionais ligados ao Firestore; quantidade solicitada na unidade comercial, conferência de peso de entrega e contagem individual quando necessário; reserva, giro, total, última entrega, entradas desde contagem anterior, diferença física estimada e histórico recente.
-6. `api/operations/logic.js` + `tests`: regras puras testadas para unidade, contagem, pedido-versus-entrega e diferenças físicas.
+4. `api/operations/stock.js`: `receive`, `count`, `summary`, `list`; registros em `physicalReceipts` e `physicalCounts` por unidade, responsáveis e auditoria, com idempotência baseada em `requestId`; sem alteração de `products.quantity`. Ao contar, materializa `physicalBalances/{productId}` com a última reserva/giro.
+5. `api/products/manage.js` + `src/Inventory.jsx`: exibem a última contagem física como referência operacional, quando houver, sem sobrescrever saldo legado.
+6. `src/PhysicalStock.jsx`: formulários operacionais ligados ao Firestore; quantidade solicitada na unidade comercial, conferência de peso de entrega e contagem individual quando necessário; reserva, giro, total, última entrega, entradas desde contagem anterior, diferença física estimada e histórico recente.
+7. `api/operations/logic.js` + `tests`: regras puras testadas para unidade, contagem, pedido-versus-entrega e diferenças físicas.
 
 ## Proteções e regras importantes
 
@@ -23,7 +24,7 @@
 
 ## Checklist antes de merge
 
-- [ ] CI: `node --check` das APIs, validação do catálogo, testes de regras, `npm run build`.
+- [ ] CI (obrigatório): `node --check` das APIs, validação do catálogo, testes de regras, `npm run build`.
 - [ ] Validar de fato com Firestore/emulador: migração v2 em prévia e aplicação autorizada, sem alterar saldos.
 - [ ] Executar aprovação em lote somente com dados elegíveis e conferir auditoria.
 - [ ] Vincular pelo menos um produto elegível à unidade de teste e confirmar que aparece no formulário.
