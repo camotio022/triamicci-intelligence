@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {ArrowLeft,PackagePlus,ClipboardCheck,History,RefreshCw} from 'lucide-react';
+import StockActions from './StockActions.jsx';
 const qty=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const date=x=>x?new Date(x).toLocaleString('pt-BR'):'Não registrada';
 async function request(action,productId){
@@ -9,7 +10,7 @@ async function request(action,productId){
  const response=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,productId})});
  const body=await response.json();if(!response.ok)throw Error(body.message||'Não foi possível consultar o produto.');return body;
 }
-export default function ProductDetails({product,onBack,onAction,membership}){
+export default function ProductDetails({product,onBack,onAction,membership,onRefresh}){
  const [activity,setActivity]=useState([]),[lots,setLots]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[limited,setLimited]=useState(false);
  const load=async()=>{
   setLoading(true);setError('');
@@ -37,8 +38,14 @@ export default function ProductDetails({product,onBack,onAction,membership}){
    <button type="button" onClick={()=>onAction('count',product.id)}><ClipboardCheck size={20}/> Fazer contagem</button>
    <button type="button" onClick={()=>onAction('history',product.id)}><History size={20}/> Histórico completo</button>
   </div>
+  <StockActions product={product} lots={lots} membership={membership} onUpdated={async()=>{await onRefresh?.();await load()}}/>
   <div className="product-detail-panel"><h2>Informações do produto</h2><dl><div><dt>Categoria</dt><dd>{product.category}</dd></div><div><dt>Unidade cadastrada</dt><dd>{product.unit}</dd></div><div><dt>Estoque mínimo</dt><dd>{qty(product.minStock)} {product.unit}</dd></div><div><dt>Validade</dt><dd>{product.trackExpiry?'Exigida':'Não exigida'}</dd></div><div><dt>Última contagem</dt><dd>{date(b?.at)}</dd></div></dl></div>
-  <div className="product-detail-panel"><h2>Lotes recebidos</h2><p>Valores de entrada acumulados, não saldos disponíveis. Baixa por lote/FEFO ainda não implementada.</p>{loading?<p>Consultando lotes...</p>:lots.length?<div className="product-detail-list">{lots.map(l=><div key={l.id}><strong>{l.lot}</strong><span>Validade: {l.expiryDate} · Recebido: {qty(l.receivedQuantity)} {l.unit}</span></div>)}</div>:<p>Nenhum lote registrado.</p>}</div>
-  <div className="product-detail-panel"><h2>Atividade recente do produto</h2>{error&&<p role="alert">{error}</p>}{loading?<p>Consultando histórico...</p>:activity.length?<div className="product-detail-list">{activity.map(x=><div key={x.id}><strong>{x.kind==='receive'?'Recebimento':'Contagem'} · {date(x.at)}</strong><span>{x.kind==='receive'?qty(x.physicalQuantity)+' '+x.unit+' recebidos':qty(x.reserve)+' reserva + '+qty(x.rotation)+' giro ('+x.unit+')'}</span><small>Responsável: {x.actorUid}</small></div>)}</div>:<p>Sem registros físicos para este produto.</p>}{limited&&<p>Histórico extenso: exibimos somente os registros recentes disponíveis nesta consulta.</p>}</div>
+  <div className="product-detail-panel"><h2>Lotes recebidos</h2><p>Recebimentos e disponibilidade conferida por área. Lotes antigos ou divergentes exigem conciliação antes de movimentações FEFO.</p>{loading?<p>Consultando lotes...</p>:lots.length?<div className="product-detail-list">{lots.map(l=><div key={l.id}><strong>{l.lot}</strong><span>Validade: {l.expiryDate} · Recebido: {qty(l.receivedQuantity)} {l.unit}</span><span>Reserva: {Number.isFinite(l.reserva)?qty(l.reserva):'A conferir'} · Giro: {Number.isFinite(l.giro)?qty(l.giro):'A conferir'}</span></div>)}</div>:<p>Nenhum lote registrado.</p>}</div>
+  <div className="product-detail-panel"><h2>Atividade recente do produto</h2>{error&&<p role="alert">{error}</p>}{loading?<p>Consultando histórico...</p>:activity.length?<div className="product-detail-list">{activity.map(x=><div key={x.id}><strong>{({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência'})[x.kind]||'Operação'} · {date(x.at)}</strong>
+    <span>{x.kind==='receive'?qty(x.physicalQuantity)+' '+x.unit+' recebidos':
+     x.kind==='count'?qty(x.reserve)+' reserva + '+qty(x.rotation)+' giro ('+x.unit+')':
+     x.kind==='transfer'?qty(x.quantity)+' '+x.unit+' · '+x.from+' → '+x.to:
+     qty(x.quantity)+' '+x.unit+' · '+x.location+' · '+x.reason}</span>
+    <small>Responsável: {x.actorName||x.actorUid}</small></div>)}</div>:<p>Sem registros físicos para este produto.</p>}{limited&&<p>Histórico extenso: exibimos somente os registros recentes disponíveis nesta consulta.</p>}</div>
  </section>;
 }
