@@ -49,7 +49,7 @@ export default function StockActions({product,lots,membership,onUpdated}){
      }))});
    }
    setPendingId(null);setQuantity('');setNotes('');setStatus(response.message||'Operação registrada.');
-   await onUpdated?.();
+   try{await onUpdated?.()}catch{setStatus('Operação salva. Atualize a página para recarregar os dados.')}
   }catch(e){setStatus(e.message)}finally{setSaving(false)}
  };
  if(!manager||!b)return null;
