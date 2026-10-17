@@ -15,3 +15,13 @@ export function reconcile({previousTotal,currentTotal,entries,allUnitsCompatible
   ![previousTotal,currentTotal,entries].every(x=>typeof x==='number'&&Number.isFinite(x)))return null;
  return Math.round((previousTotal+entries-currentTotal)*1000)/1000;
 }
+
+export function commercialDelivery({orderedQuantity,physicalQuantity,deliveredWeightKg,receivingUnit,operationalUnit}){
+ const expected=validQuantity(orderedQuantity,{unit:receivingUnit});
+ if(!expected)return null;
+ const actual=receivingUnit===operationalUnit?physicalQuantity:
+   receivingUnit==='kg'&&operationalUnit==='un'?deliveredWeightKg:null;
+ if(!validQuantity(actual,{unit:receivingUnit}))return null;
+ return {orderedQuantity,deliveredQuantity:actual,receivingUnit,
+  difference:Math.round((actual-orderedQuantity)*1000)/1000};
+}
