@@ -2,6 +2,8 @@ name: Pacote 02 — validação sem Vercel
 on:
   push:
     branches: [feat/pacote-02-operacao-real]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
