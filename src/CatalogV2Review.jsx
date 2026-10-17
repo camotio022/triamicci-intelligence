@@ -40,7 +40,7 @@ export default function CatalogV2Review(){
   </div>
   {notice&&<p role="status">{notice}</p>}
   {plan&&<div><strong>Resultado da conferência:</strong> {['ready','new','unchanged','conflict','missing','pending'].map(k=><span key={k}> {({ready:'Prontos',new:'Novos',unchanged:'Atualizados',conflict:'Conflitos',missing:'Ausentes',pending:'Pendentes'})[k]}: {plan.filter(x=>x.status===k).length} ·</span>)}
-  <p>Produtos novos suficientemente definidos podem ser criados inativos. Produtos divergentes ou incompletos permanecerão para revisão.</p></div>
+  <p>Produtos novos suficientemente definidos podem ser criados inativos. Produtos divergentes ou incompletos permanecerão para revisão.</p></div>}
   {show&&<>
    <div className="inventory-fields">
     <label>Pesquisar proposta<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Filé de alcatra, peito de frango..." /></label>
