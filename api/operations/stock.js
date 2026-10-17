@@ -27,6 +27,15 @@ export default async function handler(req,res){
   if(!m?.unitId)return send(res,403,'Vínculo ativo necessário.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId),actorRef=db.doc('memberships/'+actor.uid);
   const {action}=req.body||{};
+  if(action==='lots'){
+   const id=req.body?.productId;
+   if(!idPattern.test(id||''))throw Error('INVALID');
+   const product=await unit.collection('products').doc(id).get();
+   if(!product.exists)throw Error('NOT_FOUND');
+   const snap=await unit.collection('physicalLots').doc(id).collection('lots').orderBy('expiryDate').limit(100).get();
+   return send(res,200,'Lotes de recebimento consultados.',{lots:snap.docs.map(d=>({id:d.id,...d.data()})),
+    note:'Quantidades recebidas por lote. Não representam saldo disponível nem possuem baixa FEFO.'});
+  }
   if(action==='summary'){
    const id=req.body?.productId;
    if(!idPattern.test(id||''))throw Error('INVALID');
