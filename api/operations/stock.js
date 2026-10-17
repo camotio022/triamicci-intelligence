@@ -80,10 +80,19 @@ export default async function handler(req,res){
    }});
   }
   if(action==='list'){
-   const [receipts,counts]=await Promise.all([
-    unit.collection('physicalReceipts').orderBy('at','desc').limit(50).get(),
-    unit.collection('physicalCounts').orderBy('at','desc').limit(50).get()]);
-   return send(res,200,'Histórico físico carregado.',{receipts:receipts.docs.map(clean),counts:counts.docs.map(clean)});
+   const size=30;
+   const before=req.body?.before;
+   if(before!==undefined&&(typeof before!=='string'||!/^\\d{4}-\\d{2}-\\d{2}T/.test(before)||!Number.isFinite(Date.parse(before))))throw Error('INVALID');
+   const bound=before?new Date(before):null;
+   const getPage=async collection=>{
+    let q=unit.collection(collection).orderBy('at','desc');
+    if(bound)q=q.where('at','<',bound);
+    const snap=await q.limit(size+1).get();
+    return {items:snap.docs.slice(0,size).map(clean),hasMore:snap.size>size};
+   };
+   const [receipts,counts]=await Promise.all([getPage('physicalReceipts'),getPage('physicalCounts')]);
+   return send(res,200,'Histórico físico carregado.',{receipts:receipts.items,counts:counts.items,
+    hasMore:receipts.hasMore||counts.hasMore});
   }
   if(!['receive','count'].includes(action))return send(res,400,'Ação inválida.');
   const {productId,requestId}=req.body||{};
