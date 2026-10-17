@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { auth } from './firebase.js';
 import StockMovements from './StockMovements.jsx';
 import CatalogPicker from './CatalogPicker.jsx';
+import CatalogV2Review from './CatalogV2Review.jsx';
 
 const categories = ['Preparações','Proteínas','Hortifruti','Laticínios','Mercearia','Congelados','Bebidas','Limpeza','Descartáveis','Outros'];
 const units = ['kg','g','L','ml','un'];
@@ -58,6 +59,7 @@ export default function Inventory({membership}) {
     <h1>Estoque · Catálogo de insumos</h1>
     <p>Selecione produtos do catálogo central. Saldos só mudam por movimentações auditadas; o vínculo inicial começa com zero.</p>
     <div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>
+    {membership.role === 'admin' && <CatalogV2Review />}
     {canEdit && <CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} />}
     {canEdit && editing && <form className="inventory-form" onSubmit={save}>
       <h2>{editing?'Editar insumo':'Cadastrar insumo'}</h2>
