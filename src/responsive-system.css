@@ -215,3 +215,17 @@ button:disabled{cursor:not-allowed;opacity:.58}
  .stock-action-form>button,.stock-action-form .stock-action-save{width:100%;min-height:48px}
  .stock-lot-row{padding:12px}
 }
+
+/* Pacote 03 — formulários de produção responsivos */
+.production-page{max-width:1180px}
+.production-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0}
+.production-layout>.receiving-card{min-width:0;margin:0;align-self:start}
+.production-layout label{display:flex;flex-direction:column;gap:8px;min-width:0;font-weight:600}
+.production-layout :is(input,select,textarea){width:100%;min-width:0;min-height:48px;border:1px solid #ccd5e2;border-radius:11px;background:#fff;padding:10px 12px;color:#1a2638;font-size:16px}
+.production-layout .stock-lot-row{gap:14px}
+.production-layout button{min-height:44px;border-radius:11px;padding:10px 15px;cursor:pointer}
+.production-history{display:grid;gap:12px}
+.production-history article{display:flex;flex-direction:column;gap:7px;border:1px solid #e1e6ee;border-radius:12px;padding:15px;background:#fff;overflow-wrap:anywhere}
+.production-history :is(span,small){color:#657085}
+@media(max-width:800px){.production-layout{grid-template-columns:1fr;gap:16px}}
+@media(max-width:640px){.production-page{padding-top:16px}.production-layout{margin:16px 0}.production-layout>.receiving-card{padding:16px}.production-layout .stock-action-form{gap:16px}}
