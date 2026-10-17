@@ -26,8 +26,7 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
  const visible=useMemo(()=>catalog.filter(p=>(p.name+' '+p.category).toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR'))),[catalog,search]);
  const item=catalog.find(p=>p.id===selected);
  const approveBatch=async()=>{
-   const candidates=catalog.filter(p=>!p.active&&!['queijos','massas','hortifruti','temperos'].includes(p.id)&&
-    !p.ingredientsPending&&!p.explicitReviewRequired);
+   const candidates=catalog.filter(p=>!p.active&&p.approvalEligible);
    if(!isAdmin||busy||!candidates.length)return;
    if(!window.confirm('Solicitar aprovação dos '+candidates.length+' produtos candidatos? Produtos com revisão pendente serão recusados pelo servidor.'))return;
    setBusy(true);setError('');setNotice('');
@@ -69,8 +68,9 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
    {item.producedFrom.length>0&&<span>Origem cadastrada: {item.producedFrom.join(', ')}</span>}
    {item.relatedProducts.length>0&&<span>Produtos relacionados: {item.relatedProducts.join(', ')}</span>}
    {item.notes&&<span>{item.notes}</span>}
+   {item.reviewRequired&&!item.approvalEligible&&<p>Cadastro ainda precisa de dados operacionais validados no Firebase antes da aprovação.</p>}
    {item.reviewRequired&&<strong className="inventory-lot-warning">Aguardando aprovação do catálogo central. Não é possível vincular este item ainda.</strong>}
-   {item.reviewRequired&&isAdmin&&!['queijos','massas','hortifruti','temperos'].includes(item.id)&&<button type="button" className="inventory-cancel" onClick={approve} disabled={busy}>Aprovar produto (admin)</button>}
+   {item.reviewRequired&&item.approvalEligible&&isAdmin&&<button type="button" className="inventory-cancel" onClick={approve} disabled={busy}>Aprovar produto (admin)</button>}
   </div>}
   <div className="inventory-fields">
    <label>Estoque mínimo ({item?.stockUnit||'unidade automática'})<input type="number" min="0" max="100000000" step="any" value={minimum} onChange={e=>setMinimum(e.target.value)} disabled={!item||item.reviewRequired}/></label>
