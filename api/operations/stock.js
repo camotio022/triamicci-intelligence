@@ -152,7 +152,7 @@ export default async function handler(req,res){
    const unitName=physicalUnit(p,central?.data());
    if(unitName==='un'&&(action==='receive'? !Number.isInteger(payload.physicalQuantity):
     !Number.isInteger(payload.reserve)||!Number.isInteger(payload.rotation)))throw Error('INVALID');
-   const receivingUnit=central?.data()?.receivingUnit||p.receivingUnit||p.unit;
+   const receivingUnit=p.receivingUnitOverride||central?.data()?.receivingUnit||p.receivingUnit||p.unit;
    const commercial=action==='receive'?commercialDelivery({orderedQuantity:payload.orderedQuantity,
     physicalQuantity:payload.physicalQuantity,deliveredWeightKg:payload.deliveredWeightKg,
     receivingUnit,operationalUnit:unitName}):null;
