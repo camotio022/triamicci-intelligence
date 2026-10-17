@@ -136,7 +136,16 @@
       "allowedInputUnits": [
         "kg",
         "g"
-      ]
+      ],
+      "source": "supplier",
+      "receivingUnit": "kg",
+      "operationalUnit": "un",
+      "countLocations": [
+        "reserva",
+        "giro"
+      ],
+      "countingMethod": "individual",
+      "notes": "Contrafilé/Chorizo é conferido por peso comercial em kg e cada peça é contada individualmente na reserva e giro. Não converter kg→peças automaticamente."
     },
     {
       "id": "alcatra-cubos",
