@@ -19,8 +19,8 @@ export default async function handler(req,res){
   const snapshots=await Promise.all(proposed.map(p=>catalog.doc(p.id).get()));
   const plan=proposed.map((p,i)=>{
    const old=snapshots[i].data();
-   if(!old)return {id:p.id,status:'missing',reason:'Produto ainda não existe no catálogo central'};
-   if(old.name!==p.name||old.stockUnit!==p.stockUnit||old.trackExpiry!==p.trackExpiry||
+   if(!old)return {id:p.id,status:p.reviewRequired===true||p.ingredientsPending===true||!p.source||!p.operationalUnit?'missing':'new',reason:'Produto ainda não existe no catálogo central'};
+   if(old.stockUnit!==p.stockUnit||old.trackExpiry!==p.trackExpiry||
       old.category!==p.category)return {id:p.id,status:'conflict',reason:'Cadastro central divergente; revisão manual obrigatória'};
    if(p.reviewRequired===true||p.ingredientsPending===true)return {id:p.id,status:'pending',reason:'Revisão ou ficha técnica pendente'};
    const updates=Object.fromEntries(fields.filter(f=>Object.hasOwn(p,f)).map(f=>[f,p[f]]));
@@ -29,7 +29,7 @@ export default async function handler(req,res){
   const summary=plan.map(x=>({id:x.id,status:x.status,reason:x.reason||null}));
   if(action==='preview')return send(res,200,'Prévia sem alterações.',{plan:summary,schemaVersion:2});
   if(req.body?.confirm!=='APLICAR_CATALOGO_V2')return send(res,400,'Confirmação explícita necessária.');
-  const ready=plan.filter(x=>x.status==='ready');
+  const ready=plan.filter(x=>x.status==='ready'||x.status==='new');
   if(ready.length===0)return send(res,200,'Nenhuma atualização aditiva necessária.',{plan:summary,applied:0});
   const now=new Date();let applied=0;
   await db.runTransaction(async tx=>{
@@ -38,7 +38,15 @@ export default async function handler(req,res){
    if(!current||current.status!=='active'||current.role!=='admin'||current.unitId!==m.unitId)throw Error('FORBIDDEN');
    for(let i=0;i<ready.length;i++){
     const target=ready[i],p=proposed.find(x=>x.id===target.id),doc=docs[i],old=doc.data();
-    if(!old||old.name!==p.name||old.stockUnit!==p.stockUnit||old.trackExpiry!==p.trackExpiry||
+    if(target.status==='new'){
+      if(doc.exists)throw Error('CONFLICT');
+      tx.create(catalog.doc(target.id),{...p,brandId:'triamicci',schemaVersion:2,
+        active:false,createdAt:now,createdBy:actor.uid});
+      tx.create(db.collection('auditLogs').doc(),{event:'catalog.v2_product_created',
+        unitId:m.unitId,catalogId:target.id,actorUid:actor.uid,at:now});
+      applied++;continue;
+    }
+    if(!old||old.stockUnit!==p.stockUnit||old.trackExpiry!==p.trackExpiry||
       old.category!==p.category)throw Error('CONFLICT');
     if(old.active===true&&old.schemaVersion===2&&!same(target.updates,Object.fromEntries(fields.filter(f=>Object.hasOwn(p,f)).map(f=>[f,old[f]]))))
       throw Error('CONFLICT');
@@ -50,7 +58,7 @@ export default async function handler(req,res){
     applied++;
    }
   });
-  return send(res,200,'Metadados v2 aplicados sem alterar saldos.',{applied,plan:summary});
+  return send(res,200,'Catálogo v2 atualizado sem alterar saldos.',{applied,plan:summary});
  }catch(e){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
