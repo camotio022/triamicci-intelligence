@@ -57,7 +57,8 @@ export default function PhysicalStock({membership,mode='receive'}){
     await api('/api/operations/stock','count',{productId,requestId,reserve:Number(reserve),rotation:Number(rotation),notes:notes.trim()});
     setReserve('');setRotation('');setNotes('');
    }
-   setPendingId(null);setStatus('Registro salvo no Firebase.');await load();
+   setPendingId(null);setStatus('Registro salvo no Firebase.');
+   try{await load()}catch{ /* gravação já confirmada; atualização pode ser repetida */ }
   }catch(e){setStatus(e.message)}finally{setBusy(false)}
  };
  const rows=mode==='receive'?history.receipts:history.counts;
