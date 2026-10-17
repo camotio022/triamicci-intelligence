@@ -14,7 +14,7 @@ const numeric=(s)=>s===''?null:Number(s);
 export default function PhysicalStock({membership,mode='receive'}){
  const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[]});
  const [productId,setProductId]=useState(''),[supplier,setSupplier]=useState(''),[weight,setWeight]=useState('');
- const [amount,setAmount]=useState(''),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
+ const [amount,setAmount]=useState(''),[orderedWeight,setOrderedWeight]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
  const [lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
  const canReceive=['admin','manager'].includes(membership.role);
@@ -33,18 +33,19 @@ export default function PhysicalStock({membership,mode='receive'}){
   e.preventDefault();if(busy||!p)return;
   setBusy(true);setStatus('');
   try{
-   const requestId=crypto.randomUUID();
+   const requestId=pendingId||crypto.randomUUID();
+   if(!pendingId)setPendingId(requestId);
    if(mode==='receive'){
     if(!canReceive)throw Error('Só administrador ou gerente registra recebimentos.');
     await api('/api/operations/stock','receive',{productId,requestId,supplier:supplier.trim(),
-     deliveredWeightKg:weight===''?null:Number(weight),physicalQuantity:Number(amount),
+     orderedWeightKg:orderedWeight===''?null:Number(orderedWeight),deliveredWeightKg:weight===''?null:Number(weight),physicalQuantity:Number(amount),
      lot:lot.trim(),expiryDate:expiry,notes:notes.trim()});
-    setAmount('');setWeight('');setNotes('');setLot('');setExpiry('');
+    setAmount('');setWeight('');setOrderedWeight('');setNotes('');setLot('');setExpiry('');
    }else{
     await api('/api/operations/stock','count',{productId,requestId,reserve:Number(reserve),rotation:Number(rotation),notes:notes.trim()});
     setReserve('');setRotation('');setNotes('');
    }
-   setStatus('Registro salvo no Firebase.');await load();
+   setPendingId(null);setStatus('Registro salvo no Firebase.');await load();
   }catch(e){setStatus(e.message)}finally{setBusy(false)}
  };
  const rows=mode==='receive'?history.receipts:history.counts;
@@ -58,23 +59,25 @@ export default function PhysicalStock({membership,mode='receive'}){
   <form className="receiving-card" onSubmit={submit}>
    <h2>{mode==='receive'?'Conferir entrega':'Registrar contagem'}</h2>
    <div className="inventory-fields">
-    <label>Produto<select required value={productId} onChange={e=>{setProductId(e.target.value);setStatus('')}}>
+    <label>Produto<select required value={productId} onChange={e=>{setProductId(e.target.value);setPendingId(null);setStatus('')}}>
      <option value="">Selecione o produto da unidade</option>{products.filter(x=>x.status==='active').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
     </select></label>
     {mode==='receive'?<>
-     <label>Fornecedor<input required minLength={1} maxLength={160} value={supplier} onChange={e=>setSupplier(e.target.value)} /></label>
-     <label>Quantidade física recebida ({physicalUnit})<input required type="number" min="0.001" step={physicalUnit==='un'?'1':'0.001'} value={amount} onChange={e=>setAmount(e.target.value)}/></label>
-     <label>Peso entregue (kg), quando houver<input type="number" min="0.001" step="0.001" value={weight} onChange={e=>setWeight(e.target.value)}/></label>
+     <label>Fornecedor<input required minLength={1} maxLength={160} value={supplier} onChange={e=>{setSupplier(e.target.value);setPendingId(null)}} /></label>
+     <label>Quantidade física recebida ({physicalUnit})<input required type="number" min="0.001" step={physicalUnit==='un'?'1':'0.001'} value={amount} onChange={e=>{setAmount(e.target.value);setPendingId(null)}}/></label>
+     <label>Peso solicitado (kg){physicalUnit==='un'&&p?.catalogId!=='frango-file-120g'?' (obrigatório para carnes em peças)':''}<input type="number" min="0.001" step="0.001" value={orderedWeight} onChange={e=>{setOrderedWeight(e.target.value);setPendingId(null)}}/></label>
+     <label>Peso entregue (kg), quando houver<input type="number" min="0.001" step="0.001" value={weight} onChange={e=>{setWeight(e.target.value);setPendingId(null)}}/></label>
      {p?.trackExpiry&&<>
-      <label>Lote<input required maxLength={80} value={lot} onChange={e=>setLot(e.target.value)}/></label>
-      <label>Validade<input required type="date" value={expiry} onChange={e=>setExpiry(e.target.value)}/></label>
+      <label>Lote<input required maxLength={80} value={lot} onChange={e=>{setLot(e.target.value);setPendingId(null)}}/></label>
+      <label>Validade<input required type="date" value={expiry} onChange={e=>{setExpiry(e.target.value);setPendingId(null)}}/></label>
      </>}
     </>:<>
-     <label>Reserva ({physicalUnit})<input required type="number" min="0" step={physicalUnit==='un'?'1':'0.001'} value={reserve} onChange={e=>setReserve(e.target.value)}/></label>
-     <label>Giro ({physicalUnit})<input required type="number" min="0" step={physicalUnit==='un'?'1':'0.001'} value={rotation} onChange={e=>setRotation(e.target.value)}/></label>
+     <label>Reserva ({physicalUnit})<input required type="number" min="0" step={physicalUnit==='un'?'1':'0.001'} value={reserve} onChange={e=>{setReserve(e.target.value);setPendingId(null)}}/></label>
+     <label>Giro ({physicalUnit})<input required type="number" min="0" step={physicalUnit==='un'?'1':'0.001'} value={rotation} onChange={e=>{setRotation(e.target.value);setPendingId(null)}}/></label>
     </>}
-    <label>Observação<input maxLength={240} value={notes} onChange={e=>setNotes(e.target.value)}/></label>
+    <label>Observação<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setPendingId(null)}}/></label>
    </div>
+   {mode==='receive'&&orderedWeight!==''&&weight!==''&&<p><strong>Diferença do pedido:</strong> {qty(Number(weight)-Number(orderedWeight))} kg.</p>}
    {mode==='count'&&<p><strong>Total agora:</strong> {total===null?'—':qty(total)+' '+physicalUnit}. <strong>Última contagem:</strong> {previous?qty(previous.reserve+previous.rotation)+' '+previous.unit+' em '+fmt(previous.at):'Não registrada'}</p>}
    <button type="submit" disabled={busy||!productId}>{busy?'Salvando...':mode==='receive'?'Salvar recebimento':'Salvar contagem'}</button>
    {status&&<p role="status">{status}</p>}
