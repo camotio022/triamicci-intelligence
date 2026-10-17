@@ -10,6 +10,7 @@ const clean = snap => {
   const d = snap.data();
   return {id:snap.id,name:d.name,category:d.category,unit:d.unit,minStock:d.minStock,
     trackExpiry:d.trackExpiry === true,status:d.status,quantity:d.quantity ?? 0,catalogId:d.catalogId||null,
+    operationalUnitOverride:d.operationalUnitOverride||null,receivingUnitOverride:d.receivingUnitOverride||null,
     createdAt:d.createdAt?.toDate?.()?.toISOString?.() || null};
 };
 export default async function handler(req,res) {
@@ -31,6 +32,32 @@ export default async function handler(req,res) {
        return {...p,physicalBalance:b?{reserve:b.reserve,rotation:b.rotation,total:b.total,
         unit:b.unit,at:b.at?.toDate?.()?.toISOString?.()||null}:null};
       }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))});
+    }
+    if(action==='correctUnits'){
+      if(m.role!=='admin')return send(res,403,'Somente administrador pode corrigir unidades.');
+      const {productId,operationalUnit,receivingUnit,reason,confirm}=req.body||{};
+      if(confirm!=='RECONTAR_UNIDADE'||typeof productId!=='string'||!/^[a-f0-9]{40}$/.test(productId)||
+         !units.includes(operationalUnit)||!units.includes(receivingUnit)||
+         typeof reason!=='string'||reason.trim().length<8||reason.trim().length>240)
+       return send(res,400,'Informe as unidades, justificativa e confirme a necessidade de nova contagem.');
+      const productRef=products.doc(productId),memberRef=db.doc('memberships/'+actor.uid);
+      const now=new Date();
+      await db.runTransaction(async tx=>{
+       const [member,product]=await Promise.all([tx.get(memberRef),tx.get(productRef)]);
+       const current=member.data();
+       if(!current||current.status!=='active'||current.role!=='admin'||current.unitId!==m.unitId)throw Error('FORBIDDEN');
+       if(!product.exists)throw Error('NOT_FOUND');
+       const old=product.data();
+       tx.update(productRef,{operationalUnitOverride:operationalUnit,receivingUnitOverride:receivingUnit,
+        unitCorrectionAt:now,unitCorrectionBy:actor.uid,updatedAt:now});
+       tx.create(db.collection('auditLogs').doc(),{event:'product.units_corrected',
+        unitId:m.unitId,productId,actorUid:actor.uid,at:now,
+        before:{stockUnit:old.unit,operationalUnitOverride:old.operationalUnitOverride||null,
+         receivingUnitOverride:old.receivingUnitOverride||null},
+        after:{operationalUnitOverride:operationalUnit,receivingUnitOverride:receivingUnit},
+        reason:reason.trim(),requiresNewCount:true});
+      });
+      return send(res,200,'Unidade operacional corrigida. Registre nova contagem física antes de movimentar.');
     }
     if (!['admin','manager'].includes(m.role)) return send(res,403,'Somente administração pode alterar o catálogo.');
     if (action !== 'create' && action !== 'update') return send(res,400,'Ação inválida.');

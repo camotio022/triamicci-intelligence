@@ -193,3 +193,25 @@ button:disabled{cursor:not-allowed;opacity:.58}
  .inventory-summary>*{padding:12px 6px;min-height:76px}
  .mobile-page-tabs{gap:8px}
 }
+
+/* Pacote 02 — ações físicas responsivas na ficha do produto */
+.stock-actions-panel{display:flex;flex-direction:column;gap:16px}
+.stock-actions-panel>h2,.stock-actions-panel>p{margin:0}
+.stock-action-switch{display:flex;flex-wrap:wrap;gap:10px}
+.stock-action-switch button,.stock-action-form>button{border:1px solid #d2dae5;border-radius:11px;background:#fff;color:#344054;padding:10px 16px;min-height:44px;font-weight:600}
+.stock-action-switch button.selected{background:var(--ui-brand);color:#fff;border-color:var(--ui-brand)}
+.stock-action-form{display:flex;flex-direction:column;gap:18px}
+.stock-action-form p{margin:0;color:var(--ui-muted);line-height:1.55}
+.stock-action-form .inventory-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stock-action-form .stock-action-save{background:var(--ui-brand);color:white;border-color:var(--ui-brand);font-weight:700}
+.stock-lot-row{border:1px solid var(--ui-line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.stock-lot-row strong{overflow-wrap:anywhere}
+.stock-action-form label{min-width:0}
+.stock-action-form :is(input,select){min-width:0;max-width:100%;font-size:16px}
+@media(max-width:640px){
+ .stock-action-switch{display:grid;grid-template-columns:1fr;gap:8px}
+ .stock-action-switch button{text-align:left;width:100%}
+ .stock-action-form .inventory-fields{grid-template-columns:1fr}
+ .stock-action-form>button,.stock-action-form .stock-action-save{width:100%;min-height:48px}
+ .stock-lot-row{padding:12px}
+}

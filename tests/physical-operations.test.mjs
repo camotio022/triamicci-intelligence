@@ -45,3 +45,8 @@ test('pedido em peças não converte quantidade em peso',()=>{
  assert.equal(commercialDelivery({orderedQuantity:20.5,physicalQuantity:18,
    deliveredWeightKg:null,receivingUnit:'un',operationalUnit:'un'}),null);
 });
+
+test('unidade operacional revisada pela administração tem precedência sem converter saldo',()=>{
+ assert.equal(countUnit({unit:'ml',catalogId:'coca-latinha',operationalUnitOverride:'un'}, {operationalUnit:'ml'}),'un');
+ assert.equal(countUnit({unit:'kg',catalogId:'alcatra-bife'}, {operationalUnit:'un'}),'un');
+});
