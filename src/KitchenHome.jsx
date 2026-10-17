@@ -1,6 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
-import {PackageCheck,ClipboardCheck,Boxes,History,RefreshCw,AlertCircle} from 'lucide-react';
+import {PackageCheck,ClipboardCheck,Boxes,History,RefreshCw,AlertCircle,CookingPot} from 'lucide-react';
 
 export default function KitchenHome({membership,navigate}){
  const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[]}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
@@ -17,7 +17,7 @@ export default function KitchenHome({membership,navigate}){
  const counted=products.filter(p=>p.physicalBalance);
  const latest=[...history.receipts.map(x=>({...x,label:'Recebimento'})),...history.counts.map(x=>({...x,label:'Contagem'})),...history.outflows.map(x=>({...x,label:'Saída'})),...history.transfers.map(x=>({...x,label:'Transferência'}))]
    .sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,5);
- const actions=[{name:'Receber mercadoria',description:'Conferir fornecedor e entrega',page:'receiving',Icon:PackageCheck},
+ const actions=[{name:'Registrar produção',description:'Finalizar e descontar insumos do giro',page:'production',Icon:CookingPot},{name:'Receber mercadoria',description:'Conferir fornecedor e entrega',page:'receiving',Icon:PackageCheck},
   {name:'Contagem diária',description:'Registrar reserva e giro',page:'count',Icon:ClipboardCheck},
   {name:'Estoque físico',description:'Consultar produtos da cozinha',page:'inventory',Icon:Boxes},
   {name:'Histórico',description:'Consultar operações registradas',page:'history',Icon:History}];
