@@ -12,19 +12,20 @@ const fmt=at=>at?new Date(at).toLocaleString('pt-BR'):'—';
 const qty=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const numeric=(s)=>s===''?null:Number(s);
 export default function PhysicalStock({membership,mode='receive',initialProductId=null}){
- const [products,setProducts]=useState([]),[catalog,setCatalog]=useState([]),[history,setHistory]=useState({receipts:[],counts:[]});
+ const [products,setProducts]=useState([]),[catalog,setCatalog]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[]});
  const [productId,setProductId]=useState(initialProductId||''),[supplier,setSupplier]=useState(''),[weight,setWeight]=useState('');
  const [amount,setAmount]=useState(''),[orderedQuantity,setOrderedQuantity]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
  const [lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
  const [summary,setSummary]=useState(null);
  const [lots,setLots]=useState([]);
- const [more,setMore]=useState({receipts:false,counts:false}),[loadingMore,setLoadingMore]=useState(false);
+ const [more,setMore]=useState({receipts:false,counts:false,outflows:false,transfers:false}),[loadingMore,setLoadingMore]=useState(false);
  const canReceive=['admin','manager'].includes(membership.role);
  const load=useCallback(async()=>{
   try{
    const [p,h,c]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list'),api('/api/catalog/manage','list')]);
-   setProducts(p.products||[]);setCatalog(c.catalog||[]);setHistory({receipts:h.receipts||[],counts:h.counts||[]});setMore({receipts:!!h.hasMoreReceipts,counts:!!h.hasMoreCounts});
+   setProducts(p.products||[]);setCatalog(c.catalog||[]);setHistory({receipts:h.receipts||[],counts:h.counts||[],outflows:h.outflows||[],transfers:h.transfers||[]});
+   setMore({receipts:!!h.hasMore_receipts,counts:!!h.hasMore_counts,outflows:!!h.hasMore_outflows,transfers:!!h.hasMore_transfers});
   }catch(e){setStatus(e.message)}
  },[]);
  useEffect(()=>{load()},[load]);
@@ -41,19 +42,18 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   return ()=>{active=false};
  },[productId,history]);
  const loadMore=async()=>{
-  if(loadingMore||!more.receipts&&!more.counts)return;
+  const types=['receipts','counts','outflows','transfers'];
+  if(loadingMore||!types.some(k=>more[k]))return;
   setLoadingMore(true);
   try{
-   const h=await api('/api/operations/stock','list',{
-    beforeReceipts:more.receipts?history.receipts.at(-1)?.at:undefined,
-    beforeCounts:more.counts?history.counts.at(-1)?.at:undefined,
-    skipReceipts:!more.receipts,skipCounts:!more.counts
-   });
-   setHistory(old=>({
-    receipts:[...old.receipts,...(h.receipts||[])],
-    counts:[...old.counts,...(h.counts||[])]
-   }));
-   setMore({receipts:!!h.hasMoreReceipts,counts:!!h.hasMoreCounts});
+   const args={};
+   for(const key of types){
+    if(more[key])args['before_'+key]=history[key].at(-1)?.at;
+    else args['skip'+key]=true;
+   }
+   const h=await api('/api/operations/stock','list',args);
+   setHistory(old=>Object.fromEntries(types.map(key=>[key,[...old[key],...(h[key]||[])]])));
+   setMore(Object.fromEntries(types.map(key=>[key,!!h['hasMore_'+key]])));
   }catch(e){setStatus(e.message)}finally{setLoadingMore(false)}
  };
  const p=products.find(x=>x.id===productId);
@@ -83,13 +83,19 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
    try{await load()}catch{ /* gravação já confirmada; atualização pode ser repetida */ }
   }catch(e){setStatus(e.message)}finally{setBusy(false)}
  };
- const rows=(mode==='history'?[...history.receipts.map(x=>({...x,kind:'receive'})),...history.counts.map(x=>({...x,kind:'count'}))].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)):mode==='receive'?history.receipts:history.counts).filter(x=>!initialProductId||x.productId===initialProductId);
+ const rows=(mode==='history'?[
+  ...history.receipts.map(x=>({...x,kind:'receive'})),
+  ...history.counts.map(x=>({...x,kind:'count'})),
+  ...history.outflows.map(x=>({...x,kind:'dispatch'})),
+  ...history.transfers.map(x=>({...x,kind:'transfer'}))
+ ].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)):mode==='receive'?history.receipts:history.counts)
+ .filter(x=>!initialProductId||x.productId===initialProductId);
  return <section className="receiving-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId}</p>
   <h1>{mode==='history'?'Histórico da operação':mode==='receive'?'Recebimento de mercadorias':'Contagem diária — reserva e giro'}</h1>
   <p>{mode==='history'?'Registros físicos de recebimento e contagem, com data e responsável.':mode==='receive'?'Registre a mercadoria conferida com a quantidade física efetivamente recebida.':
     'Informe o estoque físico encontrado em cada área; confira o histórico antes de salvar.'}</p>
-  <div className="receiving-notice">Estes registros são reais e auditados no Firestore. O saldo legado do catálogo ainda não é alterado automaticamente: a conciliação e o controle de lotes serão homologados separadamente.</div>
+  <div className="receiving-notice">Operações auditadas no Firebase. Após a primeira contagem, entregas e saídas atualizam o saldo físico; o saldo legado permanece separado. Para lotes antigos, a conciliação é necessária antes da baixa.</div>
   {mode==='history'?null:mode==='receive'&&!canReceive?<p>Somente administrador ou gerente pode registrar recebimentos.</p>:
   <form className="receiving-card" onSubmit={submit}>
    <h2>{mode==='receive'?'Conferir entrega':'Registrar contagem'}</h2>
@@ -114,8 +120,8 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
    </div>
    {mode==='receive'&&orderedQuantity!==''&&amount!==''&&deliveredCommercial!==null&&(receivingUnit===physicalUnit||weight!=='')&&<p><strong>Diferença do pedido:</strong> {qty(deliveredCommercial-Number(orderedQuantity))} {receivingUnit}.</p>}
    {mode==='count'&&summary&&<p><strong>Última entrega:</strong> {summary.lastDelivery?qty(summary.lastDelivery.physicalQuantity)+' '+summary.lastDelivery.unit+' · '+fmt(summary.lastDelivery.at):'Nenhuma registrada'}.
-   <strong> Entradas desde a contagem anterior:</strong> {summary.entriesSincePrevious===null?'Indisponível':qty(summary.entriesSincePrevious)+' '+summary.unit}.</p>}
-   {mode==='count'&&summary?.complete&&previous&&total!==null&&<p><strong>Diferença física estimada:</strong> {qty(previous.total+summary.entriesSincePrevious-total)} {summary.unit}.
+   <strong> Entradas desde a contagem anterior:</strong> {summary.entriesSincePrevious===null?'Indisponível':qty(summary.entriesSincePrevious)+' '+summary.unit}. <strong>Saídas registradas:</strong> {summary.exitsSincePrevious===null?'Indisponível':qty(summary.exitsSincePrevious)+' '+summary.unit}.</p>}
+   {mode==='count'&&summary?.complete&&previous&&total!==null&&<p><strong>Diferença física estimada:</strong> {qty(previous.total+summary.entriesSincePrevious-(summary.exitsSincePrevious||0)-total)} {summary.unit}.
    Diferença entre contagens; não significa necessariamente venda ou consumo.</p>}
    {mode==='count'&&summary&&!summary.complete&&<p role="alert">{summary.reason}</p>}
    {mode==='count'&&<p><strong>Total agora:</strong> {total===null?'—':qty(total)+' '+physicalUnit}. <strong>Última contagem:</strong> {previous?qty(previous.total)+' '+summary.unit+' em '+fmt(previous.at):'Não registrada'}</p>}
@@ -124,17 +130,20 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   </form>}
   {mode==='receive'&&p?.trackExpiry&&lots.length>0&&<section className="receiving-card">
    <h2>Lotes recebidos — ordem de validade</h2>
-   <p>Quantidades de entrada acumuladas; não são saldos disponíveis e ainda não há baixa FEFO.</p>
-   <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>LOTE</th><th>VALIDADE</th><th>RECEBIDO</th></tr></thead><tbody>
-    {lots.map(x=><tr key={x.id}><td>{x.lot}</td><td>{x.expiryDate}</td><td>{qty(x.receivedQuantity)} {x.unit}</td></tr>)}
+   <p>Recebimentos e saldos disponíveis por lote. Lotes antigos precisam de conciliação administrativa antes da baixa FEFO.</p>
+   <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>LOTE</th><th>VALIDADE</th><th>RECEBIDO</th><th>DISPONÍVEL</th></tr></thead><tbody>
+    {lots.map(x=><tr key={x.id}><td>{x.lot}</td><td>{x.expiryDate}</td><td>{qty(x.receivedQuantity)} {x.unit}</td><td>{Number.isFinite(x.availableQuantity)?qty(x.availableQuantity)+' '+x.unit:'A conferir'}</td></tr>)}
    </tbody></table></div>
   </section>}
   <section className="receiving-card"><div className="inventory-list-header"><h2>Histórico real</h2><button type="button" onClick={load}>Atualizar</button></div>
    {rows.length===0?<p>Nenhum registro salvo nesta unidade.</p>:
     <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>QUANDO</th><th>TIPO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>RESPONSÁVEL</th></tr></thead><tbody>
-     {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{r.kind==='receive'?'Recebimento':'Contagem'}</td><td>{r.productName}</td><td>{r.kind==='receive'||mode==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')'}</td><td>{r.actorUid}</td></tr>)}
+     {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência'})[r.kind]||'Operação'}</td><td>{r.productName}</td><td>{r.kind==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':
+      r.kind==='count'?qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')':
+      r.kind==='transfer'?qty(r.quantity)+' '+r.unit+' · '+r.from+' → '+r.to:
+      qty(r.quantity)+' '+r.unit+' · '+r.location+' · '+r.reason}</td><td>{r.actorName||r.actorUid}</td></tr>)}
     </tbody></table></div>}
-   {(more.receipts||more.counts)&&<button type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore?'Carregando...':'Carregar registros anteriores'}</button>}
+   {(more.receipts||more.counts||more.outflows||more.transfers)&&<button type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore?'Carregando...':'Carregar registros anteriores'}</button>}
   </section>
  </section>;
 }
