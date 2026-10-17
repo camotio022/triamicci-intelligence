@@ -14,7 +14,7 @@ const numeric=(s)=>s===''?null:Number(s);
 export default function PhysicalStock({membership,mode='receive'}){
  const [products,setProducts]=useState([]),[catalog,setCatalog]=useState([]),[history,setHistory]=useState({receipts:[],counts:[]});
  const [productId,setProductId]=useState(''),[supplier,setSupplier]=useState(''),[weight,setWeight]=useState('');
- const [amount,setAmount]=useState(''),[orderedWeight,setOrderedWeight]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
+ const [amount,setAmount]=useState(''),[orderedQuantity,setOrderedQuantity]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
  const [lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
  const [summary,setSummary]=useState(null);
@@ -38,6 +38,8 @@ export default function PhysicalStock({membership,mode='receive'}){
  const catalogProduct=catalog.find(x=>x.id===p?.catalogId);
  const physicalUnit=catalogProduct?.operationalUnit||p?.operationalUnit||(['alcatra-bife','alcatra-cubos','frango-file-120g'].includes(p?.catalogId)?'un':p?.unit||'un');
  const previous=summary?.previous;
+ const receivingUnit=catalogProduct?.receivingUnit||p?.unit||'un';
+ const deliveredCommercial=receivingUnit===physicalUnit?Number(amount):receivingUnit==='kg'&&physicalUnit==='un'?Number(weight):null;
  const total=numeric(reserve)!==null&&numeric(rotation)!==null?Number(reserve)+Number(rotation):null;
  const submit=async e=>{
   e.preventDefault();if(busy||!p)return;
@@ -48,9 +50,9 @@ export default function PhysicalStock({membership,mode='receive'}){
    if(mode==='receive'){
     if(!canReceive)throw Error('Só administrador ou gerente registra recebimentos.');
     await api('/api/operations/stock','receive',{productId,requestId,supplier:supplier.trim(),
-     orderedWeightKg:orderedWeight===''?null:Number(orderedWeight),deliveredWeightKg:weight===''?null:Number(weight),physicalQuantity:Number(amount),
+     orderedQuantity:Number(orderedQuantity),deliveredWeightKg:weight===''?null:Number(weight),physicalQuantity:Number(amount),
      lot:lot.trim(),expiryDate:expiry,notes:notes.trim()});
-    setAmount('');setWeight('');setOrderedWeight('');setNotes('');setLot('');setExpiry('');
+    setAmount('');setWeight('');setOrderedQuantity('');setNotes('');setLot('');setExpiry('');
    }else{
     await api('/api/operations/stock','count',{productId,requestId,reserve:Number(reserve),rotation:Number(rotation),notes:notes.trim()});
     setReserve('');setRotation('');setNotes('');
@@ -75,7 +77,7 @@ export default function PhysicalStock({membership,mode='receive'}){
     {mode==='receive'?<>
      <label>Fornecedor<input required minLength={1} maxLength={160} value={supplier} onChange={e=>{setSupplier(e.target.value);setPendingId(null)}} /></label>
      <label>Quantidade física recebida ({physicalUnit})<input required type="number" min="0.001" step={physicalUnit==='un'?'1':'0.001'} value={amount} onChange={e=>{setAmount(e.target.value);setPendingId(null)}}/></label>
-     <label>Peso solicitado (kg){physicalUnit==='un'&&p?.catalogId!=='frango-file-120g'?' (obrigatório para carnes em peças)':''}<input type="number" min="0.001" step="0.001" value={orderedWeight} onChange={e=>{setOrderedWeight(e.target.value);setPendingId(null)}}/></label>
+     <label>Quantidade solicitada ({receivingUnit})<input required type="number" min={receivingUnit==='un'?'1':'0.001'} step={receivingUnit==='un'?'1':'0.001'} value={orderedQuantity} onChange={e=>{setOrderedQuantity(e.target.value);setPendingId(null)}}/></label>
      <label>Peso entregue (kg), quando houver<input type="number" min="0.001" step="0.001" value={weight} onChange={e=>{setWeight(e.target.value);setPendingId(null)}}/></label>
      {p?.trackExpiry&&<>
       <label>Lote<input required maxLength={80} value={lot} onChange={e=>{setLot(e.target.value);setPendingId(null)}}/></label>
@@ -87,7 +89,7 @@ export default function PhysicalStock({membership,mode='receive'}){
     </>}
     <label>Observação<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setPendingId(null)}}/></label>
    </div>
-   {mode==='receive'&&orderedWeight!==''&&weight!==''&&<p><strong>Diferença do pedido:</strong> {qty(Number(weight)-Number(orderedWeight))} kg.</p>}
+   {mode==='receive'&&orderedQuantity!==''&&amount!==''&&deliveredCommercial!==null&&(receivingUnit===physicalUnit||weight!=='')&&<p><strong>Diferença do pedido:</strong> {qty(deliveredCommercial-Number(orderedQuantity))} {receivingUnit}.</p>}
    {mode==='count'&&summary&&<p><strong>Última entrega:</strong> {summary.lastDelivery?qty(summary.lastDelivery.physicalQuantity)+' '+summary.lastDelivery.unit+' · '+fmt(summary.lastDelivery.at):'Nenhuma registrada'}.
    <strong> Entradas desde a contagem anterior:</strong> {summary.entriesSincePrevious===null?'Indisponível':qty(summary.entriesSincePrevious)+' '+summary.unit}.</p>}
    {mode==='count'&&summary?.complete&&previous&&total!==null&&<p><strong>Diferença física estimada:</strong> {qty(previous.total+summary.entriesSincePrevious-total)} {summary.unit}.
