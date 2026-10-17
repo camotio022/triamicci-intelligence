@@ -38,6 +38,7 @@ export default async function handler(req,res){
       if(docs.empty)return send(res,409,'Catálogo central vazio. Importe os produtos primeiro.');
       const unitProducts=db.collection('units').doc(m.unitId).collection('products');
       const refs=docs.docs.map(doc=>unitProducts.doc(hashId(doc.data().name||doc.id)));
+      if(new Set(refs.map(ref=>ref.id)).size!==refs.length)return send(res,409,'Existem nomes duplicados no catálogo central. Revise antes da ativação.');
       const auditRef=db.collection('auditLogs').doc();
       let result;
       await db.runTransaction(async tx=>{
@@ -53,7 +54,9 @@ export default async function handler(req,res){
           }
           if(existing.exists){
             if(existing.data().catalogId&&existing.data().catalogId!==cat.id){conflicts.push(cat.id);continue;}
-            preserved.push(cat.id);continue;
+            preserved.push(cat.id);
+            if(existing.data().status!=='active')tx.update(ref,{status:'active',updatedAt:new Date(),updatedBy:actor.uid});
+            continue;
           }
           created.push({id:cat.id,ref,data:{
             name:p.name,category:p.category,unit:p.stockUnit,minStock:0,
