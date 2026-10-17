@@ -81,12 +81,13 @@ export default async function handler(req,res){
   }
   if(action==='list'){
    const size=30;
-   const before=req.body?.before;
-   if(before!==undefined&&(typeof before!=='string'||!/^\\d{4}-\\d{2}-\\d{2}T/.test(before)||!Number.isFinite(Date.parse(before))))throw Error('INVALID');
-   const bound=before?new Date(before):null;
-   const getPage=async collection=>{
+   const beforeReceipts=req.body?.beforeReceipts,beforeCounts=req.body?.beforeCounts;
+   for(const before of [beforeReceipts,beforeCounts]){
+    if(before!==undefined&&(typeof before!=='string'||!Number.isFinite(Date.parse(before))))throw Error('INVALID');
+   }
+   const getPage=async(collection,before)=>{
     let q=unit.collection(collection).orderBy('at','desc');
-    if(bound)q=q.where('at','<',bound);
+    if(before)q=q.where('at','<',new Date(before));
     const snap=await q.limit(size+1).get();
     return {items:snap.docs.slice(0,size).map(clean),hasMore:snap.size>size};
    };
