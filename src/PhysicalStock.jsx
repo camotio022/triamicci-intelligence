@@ -17,6 +17,7 @@ export default function PhysicalStock({membership,mode='receive'}){
  const [amount,setAmount]=useState(''),[orderedWeight,setOrderedWeight]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
  const [lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
+ const [summary,setSummary]=useState(null);
  const canReceive=['admin','manager'].includes(membership.role);
  const load=useCallback(async()=>{
   try{
@@ -25,9 +26,17 @@ export default function PhysicalStock({membership,mode='receive'}){
   }catch(e){setStatus(e.message)}
  },[]);
  useEffect(()=>{load()},[load]);
+ useEffect(()=>{
+  let active=true;setSummary(null);
+  if(!productId)return;
+  api('/api/operations/stock','summary',{productId})
+   .then(data=>{if(active)setSummary(data.summary)})
+   .catch(err=>{if(active)setStatus(err.message)});
+  return ()=>{active=false};
+ },[productId,history]);
  const p=products.find(x=>x.id===productId);
  const physicalUnit=['alcatra-bife','alcatra-cubos','frango-file-120g'].includes(p?.catalogId)?'un':p?.unit||'un';
- const previous=history.counts.find(c=>c.productId===productId);
+ const previous=summary?.previous;
  const total=numeric(reserve)!==null&&numeric(rotation)!==null?Number(reserve)+Number(rotation):null;
  const submit=async e=>{
   e.preventDefault();if(busy||!p)return;
@@ -78,7 +87,12 @@ export default function PhysicalStock({membership,mode='receive'}){
     <label>Observação<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setPendingId(null)}}/></label>
    </div>
    {mode==='receive'&&orderedWeight!==''&&weight!==''&&<p><strong>Diferença do pedido:</strong> {qty(Number(weight)-Number(orderedWeight))} kg.</p>}
-   {mode==='count'&&<p><strong>Total agora:</strong> {total===null?'—':qty(total)+' '+physicalUnit}. <strong>Última contagem:</strong> {previous?qty(previous.reserve+previous.rotation)+' '+previous.unit+' em '+fmt(previous.at):'Não registrada'}</p>}
+   {mode==='count'&&summary&&<p><strong>Última entrega:</strong> {summary.lastDelivery?qty(summary.lastDelivery.physicalQuantity)+' '+summary.lastDelivery.unit+' · '+fmt(summary.lastDelivery.at):'Nenhuma registrada'}.
+   <strong> Entradas desde a contagem anterior:</strong> {summary.entriesSincePrevious===null?'Indisponível':qty(summary.entriesSincePrevious)+' '+summary.unit}.</p>}
+   {mode==='count'&&summary?.complete&&previous&&total!==null&&<p><strong>Diferença física estimada:</strong> {qty(previous.total+summary.entriesSincePrevious-total)} {summary.unit}.
+   Diferença entre contagens; não significa necessariamente venda ou consumo.</p>}
+   {mode==='count'&&summary&&!summary.complete&&<p role="alert">{summary.reason}</p>}
+   {mode==='count'&&<p><strong>Total agora:</strong> {total===null?'—':qty(total)+' '+physicalUnit}. <strong>Última contagem:</strong> {previous?qty(previous.total)+' '+summary.unit+' em '+fmt(previous.at):'Não registrada'}</p>}
    <button type="submit" disabled={busy||!productId}>{busy?'Salvando...':mode==='receive'?'Salvar recebimento':'Salvar contagem'}</button>
    {status&&<p role="status">{status}</p>}
   </form>}
