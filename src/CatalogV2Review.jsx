@@ -19,7 +19,7 @@ export default function CatalogV2Review(){
     headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({action,confirm:action==='apply'?'APLICAR_CATALOGO_V2':undefined})});
    const data=await res.json();if(!res.ok)throw Error(data.message);
-   setPlan(data.plan);setNotice(data.message+(data.applied!==undefined?' Itens atualizados: '+data.applied:''));
+   setPlan(action==='apply'?null:data.plan);setNotice(data.message+(data.applied!==undefined?' Itens atualizados: '+data.applied+'. Gere uma nova prévia para conferir.':''));
   }catch(e){setNotice(e.message)}finally{setBusy(false)}
  };
 
@@ -40,7 +40,7 @@ export default function CatalogV2Review(){
   </div>
   {notice&&<p role="status">{notice}</p>}
   {plan&&<div><strong>Resultado da conferência:</strong> {['ready','new','unchanged','conflict','missing','pending'].map(k=><span key={k}> {({ready:'Prontos',new:'Novos',unchanged:'Atualizados',conflict:'Conflitos',missing:'Ausentes',pending:'Pendentes'})[k]}: {plan.filter(x=>x.status===k).length} ·</span>)}
-  <p>Produtos novos suficientemente definidos podem ser criados inativos. Produtos divergentes ou incompletos permanecerão para revisão.</p></div>}
+  <p>Produtos novos suficientemente definidos podem ser criados inativos. Produtos divergentes ou incompletos permanecerão para revisão.</p><ul>{plan.filter(x=>x.status!=='unchanged').map(x=><li key={x.id}>{x.id}: {x.status}{x.reason?' — '+x.reason:''}</li>)}</ul></div>}
   {show&&<>
    <div className="inventory-fields">
     <label>Pesquisar proposta<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Filé de alcatra, peito de frango..." /></label>
