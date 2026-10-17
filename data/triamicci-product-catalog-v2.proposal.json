@@ -1,0 +1,364 @@
+{
+  "schemaVersion": 2,
+  "brand": "Triamicci",
+  "notes": "PROPOSTA Catálogo v2, não migrar para Firebase automaticamente. Produtos existentes devem ser preservados; unidades de controle por peças e regras de substituição ainda precisam de homologação.",
+  "products": [
+    {
+      "id": "peito-frango",
+      "name": "Peito de frango inteiro (pacote)",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "relatedProducts": [
+        "frango-cubos",
+        "frango-file-120g"
+      ],
+      "source": "supplier",
+      "receivingUnit": "kg",
+      "operationalUnit": "kg",
+      "countLocations": [
+        "reserva",
+        "giro"
+      ],
+      "notes": "Peito inteiro recebido em pacote; preferência para strogonoff de frango. Peso de embalagem a confirmar."
+    },
+    {
+      "id": "frango-cubos",
+      "name": "Frango em cubos para strogonoff",
+      "category": "Proteínas",
+      "type": "intermediate",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "producedFrom": [
+        "peito-frango"
+      ],
+      "relatedProducts": [
+        "strogonoff-frango"
+      ]
+    },
+    {
+      "id": "frango-file-120g",
+      "name": "Filé de frango 120 g",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "un",
+      "weightPerUnitKg": 0.12,
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "un"
+      ],
+      "notes": "Matéria-prima recebida já porcionada, alternativa para strogonoff quando faltar peito inteiro.",
+      "relatedProducts": [],
+      "source": "supplier",
+      "receivingUnit": "un",
+      "operationalUnit": "un",
+      "countLocations": [
+        "reserva",
+        "giro"
+      ]
+    },
+    {
+      "id": "strogonoff-frango",
+      "name": "Strogonoff de frango",
+      "category": "Preparações",
+      "type": "prepared",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "ingredientsPending": true,
+      "relatedProducts": [
+        "frango-cubos"
+      ],
+      "notes": "Ficha técnica e rendimento ainda não confirmados; não baixar ingredientes automaticamente."
+    },
+    {
+      "id": "oleo-soja",
+      "name": "Óleo de soja",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "L",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "L",
+        "mL"
+      ],
+      "notes": "Embalagens dependem de cadastro posterior. Conversão exata mL→L."
+    },
+    {
+      "id": "alcatra",
+      "name": "Alcatra (cadastro legado em revisão)",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "source": "supplier",
+      "receivingUnit": "kg",
+      "operationalUnit": null,
+      "reviewRequired": true,
+      "notes": "Separar bifes cortados e cubos; cadastro genérico antigo não deve ser convertido automaticamente."
+    },
+    {
+      "id": "file-mignon",
+      "name": "Filé mignon",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "contrafile-chorizo",
+      "name": "Contrafilé / chorizo",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "alcatra-cubos",
+      "name": "Cubos de alcatra",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "notes": "Cubos já chegam cortados do fornecedor. Cada unidade operacional é contada individualmente na reserva e no giro; sem conversão automática de kg para unidades.",
+      "source": "supplier",
+      "receivingUnit": "kg",
+      "operationalUnit": "un",
+      "countLocations": [
+        "reserva",
+        "giro"
+      ],
+      "countingMethod": "individual"
+    },
+    {
+      "id": "noisettes",
+      "name": "Noisettes",
+      "category": "Proteínas",
+      "type": "intermediate",
+      "stockUnit": "un",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "un"
+      ],
+      "notes": "Peso por porção a confirmar."
+    },
+    {
+      "id": "tilapia",
+      "name": "Tilápia",
+      "category": "Proteínas",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "almondegas",
+      "name": "Almôndegas",
+      "category": "Preparações",
+      "type": "prepared",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "ingredientsPending": true
+    },
+    {
+      "id": "arroz",
+      "name": "Arroz",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "feijao",
+      "name": "Feijão",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "ovos",
+      "name": "Ovos",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "un",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "un"
+      ]
+    },
+    {
+      "id": "margarina",
+      "name": "Margarina",
+      "category": "Laticínios",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ]
+    },
+    {
+      "id": "queijos",
+      "name": "Queijos (tipo a definir)",
+      "category": "Laticínios",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "notes": "Desdobrar em produtos específicos conforme tipos usados."
+    },
+    {
+      "id": "massas",
+      "name": "Massas (tipo a definir)",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "notes": "Desdobrar por tipo."
+    },
+    {
+      "id": "hortifruti",
+      "name": "Verduras e legumes (itens a definir)",
+      "category": "Hortifrúti",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "notes": "Categoria temporária; não usar como item movimentável."
+    },
+    {
+      "id": "temperos",
+      "name": "Temperos (itens a definir)",
+      "category": "Mercearia",
+      "type": "raw",
+      "stockUnit": "kg",
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "notes": "Categoria temporária; não usar como item movimentável."
+    },
+    {
+      "id": "alcatra-bife",
+      "name": "Bife de alcatra fatiado",
+      "category": "Proteínas",
+      "type": "raw",
+      "source": "supplier",
+      "stockUnit": "kg",
+      "receivingUnit": "kg",
+      "operationalUnit": "un",
+      "countLocations": [
+        "reserva",
+        "giro"
+      ],
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "reviewRequired": true,
+      "notes": "Filés fatiados já chegam do fornecedor. Cada filé é contado individualmente na reserva e no giro; sem conversão automática de kg para unidades.",
+      "countingMethod": "individual"
+    },
+    {
+      "id": "strogonoff-carne",
+      "name": "Strogonoff de carne",
+      "category": "Preparações",
+      "type": "prepared",
+      "source": "internal",
+      "stockUnit": "kg",
+      "receivingUnit": null,
+      "operationalUnit": null,
+      "trackExpiry": true,
+      "allowedInputUnits": [
+        "kg",
+        "g"
+      ],
+      "ingredientsPending": true,
+      "reviewRequired": true,
+      "notes": "Ficha técnica, rendimentos e unidades ainda pendentes. Sem baixa automática."
+    }
+  ],
+  "productionRules": [
+    {
+      "id": "strogonoff-frango-principal",
+      "resultProductId": "strogonoff-frango",
+      "preferredInputId": "peito-frango",
+      "alternativeInputIds": [
+        "frango-file-120g"
+      ],
+      "fallbackCondition": "insufficient_preferred_stock",
+      "manualConfirmationRequired": true,
+      "autoDeduct": false,
+      "notes": "Corte em cubos; ficha técnica e rendimentos pendentes."
+    },
+    {
+      "id": "strogonoff-carne-principal",
+      "resultProductId": "strogonoff-carne",
+      "preferredInputId": "alcatra-cubos",
+      "alternativeInputIds": [
+        "alcatra-bife"
+      ],
+      "fallbackCondition": "insufficient_preferred_stock",
+      "manualConfirmationRequired": true,
+      "autoDeduct": false,
+      "notes": "Cubos e bifes são ambos fornecidos já cortados; não cadastrar cubos como transformação interna."
+    }
+  ]
+}
