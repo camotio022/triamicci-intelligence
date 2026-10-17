@@ -1,0 +1,113 @@
+/* Pacote 02.5 — tokens e refinamento visual responsivo; sem alterar dados. */
+:root{
+ --ui-brand:#9f2420;--ui-brand-hover:#84201d;--ui-ink:#192336;--ui-muted:#5b6679;
+ --ui-line:#dfe4ed;--ui-surface:#ffffff;--ui-page:#f6f7fa;
+ --ui-radius:16px;--ui-shadow:0 3px 18px rgba(20,31,49,.035);
+ --ui-space:clamp(14px,2.4vw,24px);
+}
+html{scroll-behavior:smooth}
+body{background:var(--ui-page);color:var(--ui-ink);-webkit-text-size-adjust:100%}
+#root,.app-shell,.main-content{min-width:0}
+.main-content{overflow-x:clip}
+:is(button,input,select,textarea){font-family:inherit}
+:is(button,[role="button"],a,summary){-webkit-tap-highlight-color:transparent}
+button:disabled{cursor:not-allowed;opacity:.58}
+:is(button,a,input,select,textarea,summary,[role="button"]):focus-visible{outline:3px solid #157b58;outline-offset:3px}
+:where(.inventory-page,.receiving-page,.team-page,.kitchen-home,.product-detail-page){max-width:1200px;margin-inline:auto;min-width:0}
+:where(.inventory-page,.receiving-page,.team-page,.kitchen-home,.product-detail-page) h1{font-family:Manrope,'DM Sans',sans-serif;font-size:clamp(25px,3vw,34px);line-height:1.2;letter-spacing:-.04em;color:var(--ui-ink);overflow-wrap:break-word}
+:where(.inventory-page,.receiving-page,.team-page,.kitchen-home,.product-detail-page) h2{font-family:Manrope,'DM Sans',sans-serif;font-size:clamp(17px,2vw,21px);line-height:1.32;letter-spacing:-.02em}
+:where(.inventory-page,.receiving-page,.team-page,.kitchen-home,.product-detail-page) p{line-height:1.55}
+.eyebrow{font-size:11px;letter-spacing:.095em;color:#6c7586}
+.inventory-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0 22px}
+.inventory-summary>*{min-width:0;display:flex;align-items:center;justify-content:center;overflow-wrap:anywhere;background:#fff;border:1px solid var(--ui-line);border-radius:12px;padding:13px;font-size:clamp(12px,1.2vw,14px);line-height:1.35;text-align:center}
+.inventory-list-header{margin:24px 0 12px;flex-wrap:wrap}
+.inventory-list-header h2{font-size:clamp(18px,2vw,22px)}
+.inventory-list-header button,.inventory-actions button,.product-detail-heading button{min-height:44px}
+.operational-product,.product-detail-panel,.receiving-card,.inventory-form,.team-panel,.kitchen-action{border:1px solid var(--ui-line);border-radius:var(--ui-radius);box-shadow:var(--ui-shadow)}
+.operational-products{gap:14px}
+.operational-product{padding:18px;gap:14px}
+.operational-product-head strong{font-size:clamp(16px,1.65vw,19px);line-height:1.3}
+.operational-counts{gap:8px}
+.operational-counts>div{padding:13px 7px}
+.operational-counts strong{font-size:clamp(19px,2.2vw,25px)}
+.operational-uncounted{gap:5px}
+.operational-meta{font-size:13px}
+.kitchen-actions{gap:12px}
+.kitchen-action{padding:18px;min-height:140px}
+.kitchen-action span{line-height:1.4}
+.kitchen-summary>div{background:#fff;border-color:var(--ui-line)}
+.inventory-fields{gap:16px}
+.inventory-fields label,.inventory-search{font-size:14px;line-height:1.4}
+.inventory-fields :is(input,select,textarea),.inventory-search input,.team-panel :is(input,select,textarea),.receiving-card :is(input,select,textarea){width:100%;max-width:100%;min-width:0;min-height:46px;border:1px solid #cfd7e3;border-radius:11px;background:#fff;color:var(--ui-ink);padding:11px 13px}
+.inventory-fields :is(input,select,textarea):disabled{background:#f3f5f8;color:#667085}
+.inventory-actions button,.kitchen-header button,.product-detail-actions button{white-space:normal;overflow-wrap:anywhere}
+.receiving-card{padding:22px}
+.receiving-notice{font-size:13px;line-height:1.5}
+.receiving-scroll,.inventory-table-wrap,.table-wrap{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+.receiving-scroll table{min-width:650px}
+.receiving-table th,.receiving-table td{white-space:normal;vertical-align:top}
+.footer{gap:12px;flex-wrap:wrap;line-height:1.4}
+.product-detail-actions button{min-width:0}
+.product-detail-panel dl>div{min-width:0}
+.product-detail-panel dd{overflow-wrap:anywhere}
+.sidebar .nav-item{min-height:44px}
+@media(max-width:900px){
+ .main-content{padding-inline:clamp(14px,3vw,22px)}
+ .topbar{height:62px;gap:6px}
+ .top-actions{gap:3px}
+ .breadcrumb{font-size:13px;min-width:0}
+ .icon-button,.mobile-menu,.top-avatar{flex-shrink:0;min-width:44px;min-height:44px}
+ .mobile-page-tabs{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity;overscroll-behavior-x:contain;padding:12px 1px 10px;margin-inline:-1px;scrollbar-width:none}
+ .mobile-page-tabs::-webkit-scrollbar{display:none}
+ .mobile-page-tabs button{flex:0 0 auto;scroll-snap-align:start;min-height:44px;border-radius:11px;padding:9px 14px;font-size:13px;white-space:nowrap}
+ .sidebar{max-height:100dvh;overflow-y:auto}
+ .sidebar-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+}
+@media(max-width:640px){
+ .main-content{padding:0 15px max(18px,env(safe-area-inset-bottom,0px))}
+ .topbar{height:60px}
+ .breadcrumb{font-size:12px;margin-left:5px}
+ .top-actions .search-box{display:none}
+ .kitchen-home,.receiving-page,.inventory-page,.product-detail-page,.team-page{padding-top:12px}
+ .inventory-page>h1,.receiving-page>h1,.product-detail-heading h1{font-size:clamp(24px,6.8vw,29px);line-height:1.19;margin:7px 0 10px}
+ .inventory-page>p,.receiving-page>p,.kitchen-header p,.product-detail-heading p{font-size:14px;line-height:1.5;margin:7px 0 12px}
+ .inventory-summary{gap:7px;margin:14px 0 18px}
+ .inventory-summary>*{padding:10px 7px;font-size:12px;border-radius:10px}
+ .inventory-list-header{margin:18px 0 12px;align-items:center}
+ .inventory-list-header button{padding:9px 11px;font-size:13px}
+ .inventory-search{margin:0 0 12px}
+ .operational-products{gap:12px;margin:12px 0 24px}
+ .operational-product{padding:16px;gap:13px}
+ .operational-counts{gap:6px}
+ .operational-counts>div{padding:12px 4px}
+ .operational-counts span{font-size:12px}
+ .operational-counts strong{font-size:20px}
+ .kitchen-header{gap:10px;margin-bottom:16px}
+ .kitchen-actions{margin:16px 0;gap:10px}
+ .kitchen-action{min-height:122px;padding:14px;gap:8px}
+ .kitchen-action strong{font-size:14px;line-height:1.3}
+ .kitchen-action span{font-size:12px}
+ .kitchen-summary{margin:10px 0 18px;gap:7px}
+ .kitchen-summary>div{padding:10px 6px}
+ .kitchen-summary strong{font-size:20px}
+ .kitchen-summary span{font-size:11px}
+ .receiving-page{padding-top:12px}
+ .receiving-card,.inventory-form,.product-detail-panel,.team-panel{padding:16px;margin-bottom:14px}
+ .inventory-fields{grid-template-columns:minmax(0,1fr);gap:13px}
+ .inventory-fields :is(input,select),.inventory-search input,.team-panel :is(input,select){font-size:16px}
+ .inventory-actions{display:grid;grid-template-columns:1fr}
+ .inventory-actions button{width:100%;text-align:center;min-height:46px}
+ .receiving-card :is(button[type="submit"]){min-height:48px;max-width:100%;padding:11px 15px}
+ .product-detail-actions{gap:10px}
+ .product-detail-actions button{min-height:52px}
+ .footer{font-size:11px;flex-direction:column;align-items:flex-start}
+ .footer span:last-child{text-align:left}
+}
+@media(max-width:360px){
+ .main-content{padding-inline:11px}
+ .top-actions{gap:0}
+ .breadcrumb span{padding:0 4px}
+ .inventory-summary>*{font-size:11px;padding:9px 5px}
+ .operational-counts span{font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.operational-product-clickable{transition:none}}
