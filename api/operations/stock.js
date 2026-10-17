@@ -1,0 +1,79 @@
+import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
+
+// Ledger físico independente dos saldos legados até conciliação e migração homologadas.
+const idPattern=/^[a-f0-9]{40}$/;
+const reqPattern=/^[a-f0-9-]{36}$/i;
+const nonnegative=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=100000&&Math.round(x*1000)===x*1000;
+const positive=x=>nonnegative(x)&&x>0;
+const pieces=new Set(['alcatra-bife','alcatra-cubos','frango-file-120g']);
+const physicalUnit=p=>pieces.has(p.catalogId)?'un':p.unit;
+const iso=x=>x?.toDate?.()?.toISOString?.()||null;
+const clean=(doc)=>({id:doc.id,...doc.data(),at:iso(doc.data().at)});
+const validText=(v,min=1,max=160)=>typeof v==='string'&&v.trim().length>=min&&v.trim().length<=max;
+function error(res,e){
+ const errors={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem permissão.'],
+ NOT_FOUND:[404,'Produto não vinculado à unidade.'],INACTIVE:[409,'Produto inativo.'],
+ CONFLICT:[409,'Esta operação já foi registrada com outros dados.'],
+ INVALID:[400,'Dados inválidos. Confira unidades, quantidades e campos obrigatórios.']};
+ if(errors[e.message])return send(res,...errors[e.message]);
+ console.error('Physical operations:',e.message);return send(res,500,'Não foi possível completar a operação.');
+}
+export default async function handler(req,res){
+ if(!checkRequest(req,res))return;
+ res.setHeader('Cache-Control','no-store');
+ try{
+  const actor=await authenticate(req),m=await membership(actor.uid);
+  if(!m?.unitId)return send(res,403,'Vínculo ativo necessário.');
+  const db=getDb(),unit=db.collection('units').doc(m.unitId),actorRef=db.doc('memberships/'+actor.uid);
+  const {action}=req.body||{};
+  if(action==='list'){
+   const [receipts,counts]=await Promise.all([
+    unit.collection('physicalReceipts').orderBy('at','desc').limit(50).get(),
+    unit.collection('physicalCounts').orderBy('at','desc').limit(50).get()]);
+   return send(res,200,'Histórico físico carregado.',{receipts:receipts.docs.map(clean),counts:counts.docs.map(clean)});
+  }
+  if(!['receive','count'].includes(action))return send(res,400,'Ação inválida.');
+  const {productId,requestId}=req.body||{};
+  if(!idPattern.test(productId||'')||!reqPattern.test(requestId||''))throw Error('INVALID');
+  if(action==='receive'&&!['admin','manager'].includes(m.role))throw Error('FORBIDDEN');
+  const productRef=unit.collection('products').doc(productId);
+  const ref=unit.collection(action==='receive'?'physicalReceipts':'physicalCounts').doc(requestId);
+  const auditRef=db.collection('auditLogs').doc();
+  const payload= action==='receive'?
+   {supplier:req.body.supplier,deliveredWeightKg:req.body.deliveredWeightKg,physicalQuantity:req.body.physicalQuantity,lot:req.body.lot,expiryDate:req.body.expiryDate,notes:req.body.notes||''}:
+   {reserve:req.body.reserve,rotation:req.body.rotation,notes:req.body.notes||''};
+  if(action==='receive'){
+   if(!validText(payload.supplier)||!positive(payload.physicalQuantity)||
+     !(payload.deliveredWeightKg===null||payload.deliveredWeightKg===undefined||positive(payload.deliveredWeightKg))||
+     !validText(payload.notes,0,240))throw Error('INVALID');
+  }else if(!nonnegative(payload.reserve)||!nonnegative(payload.rotation)||!validText(payload.notes,0,240))throw Error('INVALID');
+  const now=new Date();let result;
+  await db.runTransaction(async tx=>{
+   const [actorSnap,pSnap,existing]=await Promise.all([tx.get(actorRef),tx.get(productRef),tx.get(ref)]);
+   const current=actorSnap.data();
+   if(!current||current.status!=='active'||current.unitId!==m.unitId||
+    (action==='receive'&&!['admin','manager'].includes(current.role)))throw Error('FORBIDDEN');
+   if(!pSnap.exists)throw Error('NOT_FOUND');
+   const p=pSnap.data();if(p.status!=='active')throw Error('INACTIVE');
+   const unitName=physicalUnit(p);
+   if(unitName==='un'&&(action==='receive'? !Number.isInteger(payload.physicalQuantity):
+    !Number.isInteger(payload.reserve)||!Number.isInteger(payload.rotation)))throw Error('INVALID');
+   if(action==='receive'&&p.trackExpiry===true){
+    if(!validText(payload.lot,1,80)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(payload.expiryDate||'')||
+     !Number.isFinite(Date.parse(payload.expiryDate+'T12:00:00Z'))||payload.expiryDate<now.toISOString().slice(0,10))throw Error('INVALID');
+   }
+   const record={...payload,productId,productName:p.name,unit:unitName,
+    actorUid:actor.uid,unitId:m.unitId,at:now,kind:action};
+   if(existing.exists){
+    const old=existing.data();
+    if(old.actorUid!==actor.uid||JSON.stringify({...old,at:null,actorUid:null,unitId:null,productName:null,unit:null,kind:null})!==JSON.stringify({...record,at:null,actorUid:null,unitId:null,productName:null,unit:null,kind:null}))throw Error('CONFLICT');
+    result={id:requestId,duplicate:true,record:old};return;
+   }
+   tx.create(ref,record);
+   tx.create(auditRef,{event:action==='receive'?'physical.received':'physical.counted',unitId:m.unitId,
+    productId,actorUid:actor.uid,operationId:requestId,details:payload,at:now});
+   result={id:requestId,duplicate:false,record};
+  });
+  return send(res,200,result.duplicate?'Registro já existente.':'Registro físico salvo no Firebase.',{operation:{id:result.id,duplicate:result.duplicate}});
+ }catch(e){return error(res,e)}
+}
