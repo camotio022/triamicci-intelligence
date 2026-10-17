@@ -78,7 +78,7 @@ export default function PhysicalStock({membership,mode='receive'}){
      <label>Fornecedor<input required minLength={1} maxLength={160} value={supplier} onChange={e=>{setSupplier(e.target.value);setPendingId(null)}} /></label>
      <label>Quantidade física recebida ({physicalUnit})<input required type="number" min="0.001" step={physicalUnit==='un'?'1':'0.001'} value={amount} onChange={e=>{setAmount(e.target.value);setPendingId(null)}}/></label>
      <label>Quantidade solicitada ({receivingUnit})<input required type="number" min={receivingUnit==='un'?'1':'0.001'} step={receivingUnit==='un'?'1':'0.001'} value={orderedQuantity} onChange={e=>{setOrderedQuantity(e.target.value);setPendingId(null)}}/></label>
-     <label>Peso entregue (kg), quando houver<input type="number" min="0.001" step="0.001" value={weight} onChange={e=>{setWeight(e.target.value);setPendingId(null)}}/></label>
+     <label>{receivingUnit==='kg'&&physicalUnit==='un'?'Peso efetivamente entregue (kg) — obrigatório':'Peso entregue (kg), quando houver'}<input required={receivingUnit==='kg'&&physicalUnit==='un'} type="number" min="0.001" step="0.001" value={weight} onChange={e=>{setWeight(e.target.value);setPendingId(null)}}/></label>
      {p?.trackExpiry&&<>
       <label>Lote<input required maxLength={80} value={lot} onChange={e=>{setLot(e.target.value);setPendingId(null)}}/></label>
       <label>Validade<input required type="date" value={expiry} onChange={e=>{setExpiry(e.target.value);setPendingId(null)}}/></label>
@@ -102,7 +102,7 @@ export default function PhysicalStock({membership,mode='receive'}){
   <section className="receiving-card"><div className="inventory-list-header"><h2>Histórico real</h2><button type="button" onClick={load}>Atualizar</button></div>
    {rows.length===0?<p>Nenhum registro salvo nesta unidade.</p>:
     <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>QUANDO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>RESPONSÁVEL</th></tr></thead><tbody>
-     {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{r.productName}</td><td>{mode==='receive'?qty(r.physicalQuantity)+' '+r.unit:qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')'}</td><td>{r.actorUid}</td></tr>)}
+     {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{r.productName}</td><td>{mode==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')'}</td><td>{r.actorUid}</td></tr>)}
     </tbody></table></div>}
   </section>
  </section>;
