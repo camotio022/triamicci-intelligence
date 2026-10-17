@@ -1,12 +1,11 @@
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
-import {countUnit,validQuantity,individualCatalogIds} from './logic.js';
+import {countUnit,validQuantity,commercialDelivery} from './logic.js';
 
 // Ledger físico independente dos saldos legados até conciliação e migração homologadas.
 const idPattern=/^[a-f0-9]{40}$/;
 const reqPattern=/^[a-f0-9-]{36}$/i;
 const nonnegative=x=>validQuantity(x,{allowZero:true});
 const positive=x=>validQuantity(x);
-const pieces=individualCatalogIds;
 const physicalUnit=countUnit;
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
 const clean=(doc)=>({id:doc.id,...doc.data(),at:iso(doc.data().at)});
@@ -68,11 +67,11 @@ export default async function handler(req,res){
   const ref=unit.collection(action==='receive'?'physicalReceipts':'physicalCounts').doc(requestId);
   const auditRef=db.collection('auditLogs').doc();
   const payload= action==='receive'?
-   {supplier:req.body.supplier,orderedWeightKg:req.body.orderedWeightKg,deliveredWeightKg:req.body.deliveredWeightKg,physicalQuantity:req.body.physicalQuantity,lot:req.body.lot,expiryDate:req.body.expiryDate,notes:req.body.notes||''}:
+   {supplier:req.body.supplier,orderedQuantity:req.body.orderedQuantity,deliveredWeightKg:req.body.deliveredWeightKg,physicalQuantity:req.body.physicalQuantity,lot:req.body.lot,expiryDate:req.body.expiryDate,notes:req.body.notes||''}:
    {reserve:req.body.reserve,rotation:req.body.rotation,notes:req.body.notes||''};
   if(action==='receive'){
    if(!validText(payload.supplier)||!positive(payload.physicalQuantity)||
-     !(payload.orderedWeightKg===null||payload.orderedWeightKg===undefined||positive(payload.orderedWeightKg))||
+     !positive(payload.orderedQuantity)||
      !(payload.deliveredWeightKg===null||payload.deliveredWeightKg===undefined||positive(payload.deliveredWeightKg))||
      !validText(payload.notes,0,240))throw Error('INVALID');
   }else if(!nonnegative(payload.reserve)||!nonnegative(payload.rotation)||!validText(payload.notes,0,240))throw Error('INVALID');
@@ -88,13 +87,17 @@ export default async function handler(req,res){
    const unitName=physicalUnit(p,central?.data());
    if(unitName==='un'&&(action==='receive'? !Number.isInteger(payload.physicalQuantity):
     !Number.isInteger(payload.reserve)||!Number.isInteger(payload.rotation)))throw Error('INVALID');
-   if(action==='receive'&&unitName==='un'&&(central?.data()?.receivingUnit==='kg'||pieces.has(p.catalogId))&&(!positive(payload.orderedWeightKg)||!positive(payload.deliveredWeightKg)))throw Error('INVALID');
+   const receivingUnit=central?.data()?.receivingUnit||p.receivingUnit||p.unit;
+   const commercial=action==='receive'?commercialDelivery({orderedQuantity:payload.orderedQuantity,
+    physicalQuantity:payload.physicalQuantity,deliveredWeightKg:payload.deliveredWeightKg,
+    receivingUnit,operationalUnit:unitName}):null;
+   if(action==='receive'&&!commercial)throw Error('INVALID');
    if(action==='receive'&&p.trackExpiry===true){
     if(!validText(payload.lot,1,80)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(payload.expiryDate||'')||
      !Number.isFinite(Date.parse(payload.expiryDate+'T12:00:00Z'))||
      new Date(payload.expiryDate+'T12:00:00Z').toISOString().slice(0,10)!==payload.expiryDate||payload.expiryDate<now.toISOString().slice(0,10))throw Error('INVALID');
    }
-   const record={...payload,productId,productName:p.name,unit:unitName,
+   const record={...payload,...(commercial||{}),productId,productName:p.name,unit:unitName,
     actorUid:actor.uid,unitId:m.unitId,at:now,kind:action};
    if(existing.exists){
     const old=existing.data();
