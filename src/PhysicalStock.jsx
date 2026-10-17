@@ -12,7 +12,7 @@ const fmt=at=>at?new Date(at).toLocaleString('pt-BR'):'—';
 const qty=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const numeric=(s)=>s===''?null:Number(s);
 export default function PhysicalStock({membership,mode='receive'}){
- const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[]});
+ const [products,setProducts]=useState([]),[catalog,setCatalog]=useState([]),[history,setHistory]=useState({receipts:[],counts:[]});
  const [productId,setProductId]=useState(''),[supplier,setSupplier]=useState(''),[weight,setWeight]=useState('');
  const [amount,setAmount]=useState(''),[orderedWeight,setOrderedWeight]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
  const [lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState('');
@@ -21,8 +21,8 @@ export default function PhysicalStock({membership,mode='receive'}){
  const canReceive=['admin','manager'].includes(membership.role);
  const load=useCallback(async()=>{
   try{
-   const [p,h]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list')]);
-   setProducts(p.products||[]);setHistory({receipts:h.receipts||[],counts:h.counts||[]});
+   const [p,h,c]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list'),api('/api/catalog/manage','list')]);
+   setProducts(p.products||[]);setCatalog(c.catalog||[]);setHistory({receipts:h.receipts||[],counts:h.counts||[]});
   }catch(e){setStatus(e.message)}
  },[]);
  useEffect(()=>{load()},[load]);
@@ -35,7 +35,8 @@ export default function PhysicalStock({membership,mode='receive'}){
   return ()=>{active=false};
  },[productId,history]);
  const p=products.find(x=>x.id===productId);
- const physicalUnit=['alcatra-bife','alcatra-cubos','frango-file-120g'].includes(p?.catalogId)?'un':p?.unit||'un';
+ const catalogProduct=catalog.find(x=>x.id===p?.catalogId);
+ const physicalUnit=catalogProduct?.operationalUnit||p?.operationalUnit||(['alcatra-bife','alcatra-cubos','frango-file-120g'].includes(p?.catalogId)?'un':p?.unit||'un');
  const previous=summary?.previous;
  const total=numeric(reserve)!==null&&numeric(rotation)!==null?Number(reserve)+Number(rotation):null;
  const submit=async e=>{
