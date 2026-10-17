@@ -3,6 +3,10 @@ import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 
 const allowedUnits = new Set(['kg','L','un']);
 const genericIds = new Set(['queijos','massas','hortifruti','temperos']);
+const eligible=p=>p.schemaVersion===2&&p.reviewRequired!==true&&p.ingredientsPending!==true&&
+  ['supplier','internal'].includes(p.source)&&
+  ['kg','L','un'].includes(p.operationalUnit)&&
+  (p.source==='internal'||['kg','L','un'].includes(p.receivingUnit));
 const hashId = name => createHash('sha256').update(name.trim().toLocaleLowerCase('pt-BR')).digest('hex').slice(0,40);
 
 export default async function handler(req,res){
@@ -21,7 +25,9 @@ export default async function handler(req,res){
         return {id:doc.id,name:p.name,category:p.category,stockUnit:p.stockUnit,
           type:p.type,trackExpiry:p.trackExpiry===true,relatedProducts:p.relatedProducts||[],
           producedFrom:p.producedFrom||[],notes:p.notes||'',active:p.active===true,
-          reviewRequired:p.active!==true || genericIds.has(doc.id)};
+          reviewRequired:p.active!==true || genericIds.has(doc.id),
+          approvalEligible:!genericIds.has(doc.id)&&eligible(p),schemaVersion:p.schemaVersion||1,
+          receivingUnit:p.receivingUnit||null,operationalUnit:p.operationalUnit||null};
       }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
       return send(res,200,'Catálogo central carregado.',{catalog:items});
     }
@@ -42,7 +48,7 @@ export default async function handler(req,res){
           const doc=snaps[i],id=ids[i];const product=doc.data();
           if(!doc.exists||typeof product.name!=='string'||!allowedUnits.has(product.stockUnit)||
            typeof product.category!=='string'||typeof product.trackExpiry!=='boolean'||
-           product.reviewRequired===true||product.ingredientsPending===true){
+           !eligible(product)){
              outcome.rejected.push(id);continue;
           }
           if(product.active===true){outcome.alreadyActive.push(id);continue;}
@@ -69,7 +75,7 @@ export default async function handler(req,res){
         if(!catSnap.exists)throw new Error('NOT_FOUND');
         const p=catSnap.data();
         if(typeof p.name!=='string'||!allowedUnits.has(p.stockUnit)||typeof p.category!=='string'||
-          typeof p.trackExpiry!=='boolean')throw new Error('INVALID_CATALOG');
+          typeof p.trackExpiry!=='boolean'||!eligible(p))throw new Error('INVALID_CATALOG');
         if(p.active===true)return;
         tx.update(catalogRef,{active:true,approvedAt:now,approvedBy:actor.uid});
         tx.create(auditRef,{event:'catalog.approved',unitId:m.unitId,catalogId,actorUid:actor.uid,at:now});
