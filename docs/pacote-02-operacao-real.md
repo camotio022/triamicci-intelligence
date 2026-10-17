@@ -38,8 +38,12 @@
 
 ## Limites de escopo que não devem ser escondidos
 
-A conciliação do saldo legado, ledger por lote/FEFO, ajustes manuais, devoluções e paginação de histórico **não estão concluídos**. Se forem requisitos indispensáveis para o aceite total do Pacote 02, precisam de implementação e testes adicionais antes de merge.
+A conciliação do saldo legado, saldo disponível/baixa por lote/FEFO, ajustes manuais, devoluções e paginação completa do histórico **não estão concluídos**. Se forem requisitos indispensáveis para o aceite total do Pacote 02, precisam de implementação e testes adicionais antes de merge.
+
+## Procedimento de testes no projeto Firebase atual
+
+A pedido do proprietário, o aceite poderá ocorrer no projeto Firebase já usado pelo aplicativo, com **produtos e movimentações fictícios identificados** e sem autorizar alterações destrutivas dos dados legados. O catálogo central é compartilhado, portanto sua homologação deve ser tratada com cuidado; não rodar migração ampla sem revisar prévia e consequências. A configuração opcional de staging permanece no código, mas **não é pré-requisito**.
 
 ## Publicação
 
-Nada neste documento autoriza implantação de produção. A branch do pacote tem PR **draft**, sem merge e sem aplicação automática de migração. A Vercel Preview continua desativada para economizar deployments.
+Nada neste documento autoriza implantação de produção. A branch do pacote tem PR **draft**, sem merge e sem aplicação automática de migração. Não utilizar deploys de preview desnecessários para economizar cotas; o deployment após o merge é controlado pela configuração Vercel existente.
