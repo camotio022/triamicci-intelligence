@@ -57,7 +57,7 @@ export default function Inventory({membership}) {
   return <section className="inventory-page">
     <p className="eyebrow">OPERAÇÃO · UNIDADE {membership.unitId.toUpperCase()}</p>
     <h1>Estoque · Catálogo de insumos</h1>
-    <p>Selecione produtos do catálogo central. Saldos só mudam por movimentações auditadas; o vínculo inicial começa com zero.</p>
+    <p>Selecione produtos do catálogo central. A última contagem física tem destaque quando existente. O saldo legado continua separado e preservado.</p>
     <div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>
     {membership.role === 'admin' && <CatalogV2Review />}
     {canEdit && <CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} />}
@@ -77,8 +77,8 @@ export default function Inventory({membership}) {
     <div className="inventory-list-header"><h2>Insumos da unidade</h2><button type="button" onClick={load} disabled={loading}>{loading?'Carregando...':'Atualizar'}</button></div>
     <label className="inventory-search">Buscar insumo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome ou categoria"/></label>
     {error && <p role="alert">{error}</p>}
-    <div className="inventory-table-wrap"><table className="inventory-table"><thead><tr><th>INSUMO</th><th>CATEGORIA</th><th>SALDO</th><th>MÍNIMO</th><th>VALIDADE</th><th>SITUAÇÃO</th>{canEdit && <th>AÇÃO</th>}</tr></thead><tbody>
-      {visible.map(p=><tr key={p.id}><td><strong>{p.name}</strong></td><td>{p.category}</td><td>{p.quantity} {p.unit}</td><td>{p.minStock} {p.unit}</td><td>{p.trackExpiry?'Controlada':'Não exigida'}</td><td>{p.status==='active'?'Ativo':'Inativo'}</td>{canEdit && <td><button type="button" onClick={()=>edit(p)}>Editar</button></td>}</tr>)}
+    <div className="inventory-table-wrap"><table className="inventory-table"><thead><tr><th>INSUMO</th><th>CATEGORIA</th><th>CONTAGEM FÍSICA / SALDO LEGADO</th><th>MÍNIMO</th><th>VALIDADE</th><th>SITUAÇÃO</th>{canEdit && <th>AÇÃO</th>}</tr></thead><tbody>
+      {visible.map(p=><tr key={p.id}><td><strong>{p.name}</strong></td><td>{p.category}</td><td>{p.physicalBalance?<><strong>{p.physicalBalance.total} {p.physicalBalance.unit}</strong><small> Última contagem: {p.physicalBalance.reserve} reserva + {p.physicalBalance.rotation} giro</small></>:<><span>{p.quantity} {p.unit}</span><small> Saldo legado; sem contagem física registrada</small></>}</td><td>{p.minStock} {p.unit}</td><td>{p.trackExpiry?'Controlada':'Não exigida'}</td><td>{p.status==='active'?'Ativo':'Inativo'}</td>{canEdit && <td><button type="button" onClick={()=>edit(p)}>Editar</button></td>}</tr>)}
     </tbody></table>{!loading && !error && visible.length===0 && <p>Nenhum insumo encontrado.</p>}</div>
     <StockMovements products={products} membership={membership} onUpdated={load}/>
     <p className="inventory-footnote">Entradas e saídas já atualizam o saldo real. Produtos com controle de validade permanecem bloqueados para movimentação até implementarmos lotes. Recebimentos e contagens físicas agora possuem histórico próprio no Firebase, ainda sem conciliação com o saldo legado.</p>
