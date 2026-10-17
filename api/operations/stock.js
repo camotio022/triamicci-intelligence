@@ -66,7 +66,7 @@ export default async function handler(req,res){
     actorUid:actor.uid,unitId:m.unitId,at:now,kind:action};
    if(existing.exists){
     const old=existing.data();
-    if(old.actorUid!==actor.uid||JSON.stringify({...old,at:null,actorUid:null,unitId:null,productName:null,unit:null,kind:null})!==JSON.stringify({...record,at:null,actorUid:null,unitId:null,productName:null,unit:null,kind:null}))throw Error('CONFLICT');
+    if(old.actorUid!==actor.uid||old.productId!==productId||Object.keys(payload).some(k=>old[k]!==payload[k]))throw Error('CONFLICT');
     result={id:requestId,duplicate:true,record:old};return;
    }
    tx.create(ref,record);
