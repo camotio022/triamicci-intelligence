@@ -60,7 +60,24 @@ export default async function handler(req,res){
    if(!idPattern.test(id||''))throw Error('INVALID');
    const p=await unit.collection('products').doc(id).get();
    if(!p.exists)throw Error('NOT_FOUND');
-   const catalogSnap=p.data().catalogId?await db.collection('productCatalog').doc(p.data().catalogId).get():null;
+   const [catalogSnap,balanceSnap]=await Promise.all([
+    p.data().catalogId?db.collection('productCatalog').doc(p.data().catalogId).get():Promise.resolve(null),
+    unit.collection('physicalBalances').doc(id).get()
+   ]);
+   const unitName=physicalUnit(p.data(),catalogSnap?.data());
+   const b=balanceSnap.data();
+   if(b&&Number.isFinite(b.countedTotal)){
+    const compatible=b.unit===unitName;
+    return send(res,200,'Resumo físico carregado dos acumulados auditados.',{summary:{
+     complete:compatible,reason:compatible?null:'A contagem está numa unidade diferente do catálogo.',
+     unit:unitName,
+     previous:{reserve:b.countedReserve,rotation:b.countedRotation,total:b.countedTotal,
+      at:iso(b.at)},
+     lastDelivery:b.lastDelivery||null,
+     entriesSincePrevious:compatible?(b.entriesSinceCount||0):null,
+     exitsSincePrevious:compatible?(b.exitsSinceCount||0):null
+    }});
+   }
    const [cSnap,rSnap,oSnap]=await Promise.all([
     unit.collection('physicalCounts').where('productId','==',id).limit(501).get(),
     unit.collection('physicalReceipts').where('productId','==',id).limit(501).get(),
@@ -72,7 +89,6 @@ export default async function handler(req,res){
    const receipts=rSnap.docs.map(x=>x.data()).sort((a,b)=>b.at.toMillis()-a.at.toMillis());
    const outflows=oSnap.docs.map(x=>x.data());
    const last=counts[0]||null,lastDelivery=receipts[0]||null;
-   const unitName=physicalUnit(p.data(),catalogSnap?.data());
    const sinceLast=last?receipts.filter(x=>x.at.toMillis()>last.at.toMillis()):[];
    const compatible=!last||last.unit===unitName&&sinceLast.every(x=>x.unit===unitName);
    const incoming=compatible?sinceLast:[];
@@ -160,6 +176,8 @@ export default async function handler(req,res){
     if(prior?.at?.toMillis?.()>now.getTime())throw Error('CONFLICT');
     tx.set(balanceRef,{productId,productName:p.name,unit:unitName,
      reserve:payload.reserve,rotation:payload.rotation,total:payload.reserve+payload.rotation,
+     countedReserve:payload.reserve,countedRotation:payload.rotation,
+     countedTotal:payload.reserve+payload.rotation,entriesSinceCount:0,exitsSinceCount:0,
      countId:requestId,actorUid:actor.uid,at:now});
    }
    if(action==='receive'&&balanceSnap?.exists){
@@ -169,6 +187,10 @@ export default async function handler(req,res){
     const nextTotal=Number((oldBalance.total+payload.physicalQuantity).toFixed(3));
     if(!nonnegative(nextReserve)||!nonnegative(nextTotal))throw Error('INVALID');
     tx.update(balanceRef,{reserve:nextReserve,total:nextTotal,
+      ...(Number.isFinite(oldBalance.countedTotal)?{entriesSinceCount:
+       Math.round(((oldBalance.entriesSinceCount||0)+payload.physicalQuantity)*1000)/1000}:{}),
+      lastDelivery:{physicalQuantity:payload.physicalQuantity,unit:unitName,
+       supplier:payload.supplier,at:now.toISOString()},
       lastReceiptId:requestId,lastMovementAt:now});
    }
    if(action==='receive'&&p.trackExpiry===true){
