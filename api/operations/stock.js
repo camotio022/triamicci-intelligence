@@ -32,15 +32,19 @@ export default async function handler(req,res){
    if(!idPattern.test(id||''))throw Error('INVALID');
    const product=await unit.collection('products').doc(id).get();
    if(!product.exists)throw Error('NOT_FOUND');
-   const [receipts,counts]=await Promise.all([
+   const [receipts,counts,outflows,transfers]=await Promise.all([
     unit.collection('physicalReceipts').where('productId','==',id).limit(100).get(),
-    unit.collection('physicalCounts').where('productId','==',id).limit(100).get()
+    unit.collection('physicalCounts').where('productId','==',id).limit(100).get(),
+    unit.collection('physicalOutflows').where('productId','==',id).limit(100).get(),
+    unit.collection('physicalTransfers').where('productId','==',id).limit(100).get()
    ]);
    const records=[...receipts.docs.map(d=>({...clean(d),kind:'receive'})),
-     ...counts.docs.map(d=>({...clean(d),kind:'count'}))]
+     ...counts.docs.map(d=>({...clean(d),kind:'count'})),
+     ...outflows.docs.map(d=>({...clean(d),kind:'dispatch'})),
+     ...transfers.docs.map(d=>({...clean(d),kind:'transfer'}))]
      .sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,30);
    return send(res,200,'Atividade deste produto.',{records,
-    limited:receipts.size===100||counts.size===100});
+    limited:[receipts,counts,outflows,transfers].some(x=>x.size===100)});
   }
   if(action==='lots'){
    const id=req.body?.productId;
@@ -57,44 +61,49 @@ export default async function handler(req,res){
    const p=await unit.collection('products').doc(id).get();
    if(!p.exists)throw Error('NOT_FOUND');
    const catalogSnap=p.data().catalogId?await db.collection('productCatalog').doc(p.data().catalogId).get():null;
-   const [cSnap,rSnap]=await Promise.all([
+   const [cSnap,rSnap,oSnap]=await Promise.all([
     unit.collection('physicalCounts').where('productId','==',id).limit(501).get(),
-    unit.collection('physicalReceipts').where('productId','==',id).limit(501).get()
+    unit.collection('physicalReceipts').where('productId','==',id).limit(501).get(),
+    unit.collection('physicalOutflows').where('productId','==',id).limit(501).get()
    ]);
-   if(cSnap.size>500||rSnap.size>500)return send(res,200,'Histórico muito extenso para conciliação simples.',{
+   if(cSnap.size>500||rSnap.size>500||oSnap.size>500)return send(res,200,'Histórico muito extenso para conciliação simples.',{
     summary:{complete:false,reason:'Há mais de 500 registros. É necessário paginar para calcular com segurança.'}});
    const counts=cSnap.docs.map(x=>x.data()).sort((a,b)=>b.at.toMillis()-a.at.toMillis());
    const receipts=rSnap.docs.map(x=>x.data()).sort((a,b)=>b.at.toMillis()-a.at.toMillis());
+   const outflows=oSnap.docs.map(x=>x.data());
    const last=counts[0]||null,lastDelivery=receipts[0]||null;
    const unitName=physicalUnit(p.data(),catalogSnap?.data());
    const sinceLast=last?receipts.filter(x=>x.at.toMillis()>last.at.toMillis()):[];
    const compatible=!last||last.unit===unitName&&sinceLast.every(x=>x.unit===unitName);
    const incoming=compatible?sinceLast:[];
+   const leaving=last?outflows.filter(x=>x.at.toMillis()>last.at.toMillis()):[];
+   const allCompatible=compatible&&leaving.every(x=>x.unit===unitName);
    return send(res,200,'Resumo físico consultado.',{summary:{
-    complete:compatible,reason:compatible?null:'A última contagem ou as entregas posteriores têm unidades diferentes; não converter automaticamente.',
+    complete:allCompatible,reason:allCompatible?null:'A última contagem ou as entregas posteriores têm unidades diferentes; não converter automaticamente.',
     unit:unitName,previous: last?{reserve:last.reserve,rotation:last.rotation,
       total:last.reserve+last.rotation,at:iso(last.at)}:null,
     lastDelivery:lastDelivery?{physicalQuantity:lastDelivery.physicalQuantity,unit:lastDelivery.unit,
       at:iso(lastDelivery.at),supplier:lastDelivery.supplier}:null,
-    entriesSincePrevious:last&&compatible?Number(incoming.reduce((n,x)=>n+x.physicalQuantity,0).toFixed(3)):null
+    entriesSincePrevious:last&&allCompatible?Number(incoming.reduce((n,x)=>n+x.physicalQuantity,0).toFixed(3)):null,
+    exitsSincePrevious:last&&allCompatible?Number(leaving.reduce((n,x)=>n+x.quantity,0).toFixed(3)):null
    }});
   }
   if(action==='list'){
    const size=30;
-   const beforeReceipts=req.body?.beforeReceipts,beforeCounts=req.body?.beforeCounts;
-   for(const before of [beforeReceipts,beforeCounts]){
+   const types=[['receipts','physicalReceipts'],['counts','physicalCounts'],
+    ['outflows','physicalOutflows'],['transfers','physicalTransfers']];
+   const result={};
+   await Promise.all(types.map(async([key,col])=>{
+    if(req.body?.['skip'+key]){result[key]=[];result['hasMore_'+key]=false;return}
+    const before=req.body?.['before_'+key];
     if(before!==undefined&&(typeof before!=='string'||!Number.isFinite(Date.parse(before))))throw Error('INVALID');
-   }
-   const getPage=async(collection,before)=>{
-    let q=unit.collection(collection).orderBy('at','desc');
+    let q=unit.collection(col).orderBy('at','desc');
     if(before)q=q.where('at','<',new Date(before));
     const snap=await q.limit(size+1).get();
-    return {items:snap.docs.slice(0,size).map(clean),hasMore:snap.size>size};
-   };
-   const empty={items:[],hasMore:false};
-   const [receipts,counts]=await Promise.all([req.body?.skipReceipts?empty:getPage('physicalReceipts',beforeReceipts),req.body?.skipCounts?empty:getPage('physicalCounts',beforeCounts)]);
-   return send(res,200,'Histórico físico carregado.',{receipts:receipts.items,counts:counts.items,
-    hasMoreReceipts:receipts.hasMore,hasMoreCounts:counts.hasMore});
+    result[key]=snap.docs.slice(0,size).map(clean);
+    result['hasMore_'+key]=snap.size>size;
+   }));
+   return send(res,200,'Histórico físico carregado.',result);
   }
   if(!['receive','count'].includes(action))return send(res,400,'Ação inválida.');
   const {productId,requestId}=req.body||{};
@@ -138,7 +147,9 @@ export default async function handler(req,res){
      new Date(payload.expiryDate+'T12:00:00Z').toISOString().slice(0,10)!==payload.expiryDate||payload.expiryDate<now.toISOString().slice(0,10))throw Error('INVALID');
    }
    const record={...payload,...(commercial||{}),productId,productName:p.name,unit:unitName,
-    actorUid:actor.uid,unitId:m.unitId,at:now,kind:action};
+    actorUid:actor.uid,actorName:current.displayName||current.name||actor.email||actor.uid,
+    unitId:m.unitId,at:now,kind:action,
+    ...(action==='count'?{difference:balanceSnap?.exists?Math.round((balanceSnap.data().total-payload.reserve-payload.rotation)*1000)/1000:null}:{} )};
    if(existing.exists){
     const old=existing.data();
     if(old.actorUid!==actor.uid||old.productId!==productId||Object.keys(payload).some(k=>old[k]!==payload[k]))throw Error('CONFLICT');
