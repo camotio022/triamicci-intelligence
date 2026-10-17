@@ -106,7 +106,7 @@ export default async function handler(req,res){
   }else if(!nonnegative(payload.reserve)||!nonnegative(payload.rotation)||!validText(payload.notes,0,240))throw Error('INVALID');
   const now=new Date();let result;
   await db.runTransaction(async tx=>{
-   const [actorSnap,pSnap,existing,balanceSnap,lotSnap]=await Promise.all([tx.get(actorRef),tx.get(productRef),tx.get(ref),action==='count'?tx.get(balanceRef):Promise.resolve(null),batchRef?tx.get(batchRef):Promise.resolve(null)]);
+   const [actorSnap,pSnap,existing,balanceSnap,lotSnap]=await Promise.all([tx.get(actorRef),tx.get(productRef),tx.get(ref),tx.get(balanceRef),batchRef?tx.get(batchRef):Promise.resolve(null)]);
    const current=actorSnap.data();
    if(!current||current.status!=='active'||current.unitId!==m.unitId||
     (action==='receive'&&!['admin','manager'].includes(current.role)))throw Error('FORBIDDEN');
@@ -139,6 +139,15 @@ export default async function handler(req,res){
     tx.set(balanceRef,{productId,productName:p.name,unit:unitName,
      reserve:payload.reserve,rotation:payload.rotation,total:payload.reserve+payload.rotation,
      countId:requestId,actorUid:actor.uid,at:now});
+   }
+   if(action==='receive'&&balanceSnap?.exists){
+    const oldBalance=balanceSnap.data();
+    if(oldBalance.unit!==unitName)throw Error('CONFLICT');
+    const nextReserve=Number((oldBalance.reserve+payload.physicalQuantity).toFixed(3));
+    const nextTotal=Number((oldBalance.total+payload.physicalQuantity).toFixed(3));
+    if(!nonnegative(nextReserve)||!nonnegative(nextTotal))throw Error('INVALID');
+    tx.update(balanceRef,{reserve:nextReserve,total:nextTotal,
+      lastReceiptId:requestId,lastMovementAt:now});
    }
    if(action==='receive'&&p.trackExpiry===true){
     const oldAmount=lotSnap?.exists?lotSnap.data().receivedQuantity:0;
