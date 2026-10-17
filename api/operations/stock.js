@@ -90,9 +90,9 @@ export default async function handler(req,res){
     const snap=await q.limit(size+1).get();
     return {items:snap.docs.slice(0,size).map(clean),hasMore:snap.size>size};
    };
-   const [receipts,counts]=await Promise.all([getPage('physicalReceipts'),getPage('physicalCounts')]);
+   const [receipts,counts]=await Promise.all([getPage('physicalReceipts',beforeReceipts),getPage('physicalCounts',beforeCounts)]);
    return send(res,200,'Histórico físico carregado.',{receipts:receipts.items,counts:counts.items,
-    hasMore:receipts.hasMore||counts.hasMore});
+    hasMoreReceipts:receipts.hasMore,hasMoreCounts:counts.hasMore});
   }
   if(!['receive','count'].includes(action))return send(res,400,'Ação inválida.');
   const {productId,requestId}=req.body||{};
