@@ -25,6 +25,18 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
  useEffect(()=>{reload();},[reload]);
  const visible=useMemo(()=>catalog.filter(p=>(p.name+' '+p.category).toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR'))),[catalog,search]);
  const item=catalog.find(p=>p.id===selected);
+ const approveBatch=async()=>{
+   const candidates=catalog.filter(p=>!p.active&&!['queijos','massas','hortifruti','temperos'].includes(p.id)&&
+    !p.ingredientsPending&&!p.explicitReviewRequired);
+   if(!isAdmin||busy||!candidates.length)return;
+   if(!window.confirm('Solicitar aprovação dos '+candidates.length+' produtos candidatos? Produtos com revisão pendente serão recusados pelo servidor.'))return;
+   setBusy(true);setError('');setNotice('');
+   try{
+     const data=await request('approveBatch',{catalogIds:candidates.map(p=>p.id)});
+     setNotice('Aprovados: '+data.approved.length+' · Já ativos: '+data.alreadyActive.length+' · Não elegíveis: '+data.rejected.length);
+     await reload();
+   }catch(e){setError(e.message)}finally{setBusy(false)}
+ };
  const approve=async()=>{
    if(!item||!isAdmin||busy||!window.confirm('Aprovar '+item.name+' com unidade '+item.stockUnit+' no catálogo central?'))return;
    setBusy(true);setError('');setNotice('');
@@ -43,6 +55,7 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
  return <form className="inventory-form catalog-picker" onSubmit={submit}>
   <h2>Adicionar produto do catálogo inteligente</h2>
   <p>Escolha um produto já definido pela Triamicci. Categoria, unidade e validade vêm do Firebase e não podem ser alteradas aqui.</p>
+  {isAdmin&&<div className="inventory-actions"><button type="button" onClick={approveBatch} disabled={busy||loading}>Revisar e aprovar candidatos em lote</button></div>}
   <div className="inventory-fields">
    <label>Buscar no catálogo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Ex.: óleo, frango, strogonoff" /></label>
    <label>Produto<select value={selected} onChange={e=>{setSelected(e.target.value);setError('');setNotice('');}} disabled={loading} required>
