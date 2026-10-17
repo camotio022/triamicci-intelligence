@@ -1,6 +1,8 @@
 // Regras puras compartilhadas pelo endpoint e pelos testes.
 export const individualCatalogIds=new Set(['alcatra-bife','alcatra-cubos','frango-file-120g']);
-export function countUnit(product){
+export function countUnit(product,catalog){
+ if(['kg','g','L','ml','un'].includes(catalog?.operationalUnit))return catalog.operationalUnit;
+ if(['kg','g','L','ml','un'].includes(product.operationalUnit))return product.operationalUnit;
  return individualCatalogIds.has(product.catalogId)?'un':product.unit;
 }
 export function validQuantity(x,{allowZero=false,unit='kg'}={}){
