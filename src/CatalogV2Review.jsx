@@ -1,4 +1,5 @@
 import React,{useMemo,useState} from 'react';
+import {auth} from './firebase.js';
 import proposal from '../data/triamicci-product-catalog-v2.proposal.json';
 
 const textUnit = unit => unit==='un'?'unidades':unit||'a definir';
@@ -7,6 +8,21 @@ export default function CatalogV2Review(){
  const [query,setQuery]=useState('');
  const [selected,setSelected]=useState('alcatra-bife');
  const [show,setShow]=useState(false);
+ const [plan,setPlan]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
+ const sync=async action=>{
+  if(busy)return;
+  if(action==='apply'&&!window.confirm('Aplicar somente metadados compatíveis do catálogo v2 ao Firebase? Nenhum saldo ou aprovação será alterado.'))return;
+  setBusy(true);setNotice('');
+  try{
+   const token=await auth.currentUser.getIdToken();
+   const res=await fetch('/api/catalog/sync-v2',{method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({action,confirm:action==='apply'?'APLICAR_CATALOGO_V2':undefined})});
+   const data=await res.json();if(!res.ok)throw Error(data.message);
+   setPlan(action==='apply'?null:data.plan);setNotice(data.message+(data.applied!==undefined?' Itens atualizados: '+data.applied+'. Gere uma nova prévia para conferir.':''));
+  }catch(e){setNotice(e.message)}finally{setBusy(false)}
+ };
+
  const products=proposal.products;
  const matches=useMemo(()=>products.filter(p=>(p.name+' '+p.id+' '+p.category).toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'))),[products,query]);
  const p=products.find(x=>x.id===selected);
@@ -17,7 +33,14 @@ export default function CatalogV2Review(){
    <h2>Catálogo v2 — revisão administrativa</h2>
    <button type="button" onClick={()=>setShow(v=>!v)} aria-expanded={show}>{show?'Recolher':'Revisar proposta'}</button>
   </div>
-  <p>Proposta de {products.length} produtos e {proposal.productionRules.length} regras de preferência. <strong>Não sincronizada com o Firebase.</strong> Esta área é somente leitura; não altera estoque, aprovações ou cadastros.</p>
+  <p>Proposta de {products.length} produtos e {proposal.productionRules.length} regras de preferência. Consulte a situação dos metadados no Firebase antes de qualquer aplicação; nenhum saldo ou aprovação é alterado por esta migração.</p>
+  <div className="inventory-actions">
+   <button type="button" onClick={()=>sync('preview')} disabled={busy}>{busy?'Aguarde...':'Conferir diferenças no Firebase'}</button>
+   <button type="button" onClick={()=>sync('apply')} disabled={busy||!plan||!plan.some(x=>x.status==='ready'||x.status==='new')}>Aplicar apenas itens compatíveis</button>
+  </div>
+  {notice&&<p role="status">{notice}</p>}
+  {plan&&<div><strong>Resultado da conferência:</strong> {['ready','new','unchanged','conflict','missing','pending'].map(k=><span key={k}> {({ready:'Prontos',new:'Novos',unchanged:'Atualizados',conflict:'Conflitos',missing:'Ausentes',pending:'Pendentes'})[k]}: {plan.filter(x=>x.status===k).length} ·</span>)}
+  <p>Produtos novos suficientemente definidos podem ser criados inativos. Produtos divergentes ou incompletos permanecerão para revisão.</p><ul>{plan.filter(x=>x.status!=='unchanged').map(x=><li key={x.id}>{x.id}: {x.status}{x.reason?' — '+x.reason:''}</li>)}</ul></div>}
   {show&&<>
    <div className="inventory-fields">
     <label>Pesquisar proposta<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Filé de alcatra, peito de frango..." /></label>
@@ -35,7 +58,7 @@ export default function CatalogV2Review(){
     {p.notes&&<p><strong>Observações:</strong> {p.notes}</p>}
     {rules.length>0&&<div><h4>Regras de produção associadas</h4>{rules.map(r=><p key={r.id}>Preparação: {names[r.resultProductId]}; preferencial: {names[r.preferredInputId]}; alternativa: {r.alternativeInputIds.map(id=>names[id]).join(', ')}. <strong>Sem baixa automática.</strong></p>)}</div>}
    </div>}
-   <p role="status">Revisão visual apenas. Para mudar cadastros ou saldos é necessário um plano de migração aprovado.</p>
+   <p role="status">A homologação operacional continua obrigatória antes de modificar saldos.</p>
   </>}
  </section>;
 }

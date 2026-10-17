@@ -23,9 +23,14 @@ export default async function handler(req,res) {
     const db = getDb();
     const products = db.collection('units').doc(m.unitId).collection('products');
     if (action === 'list') {
-      const snap = await products.limit(201).get();
+      const [snap,balanceSnap] = await Promise.all([products.limit(201).get(),db.collection('units').doc(m.unitId).collection('physicalBalances').limit(201).get()]);
       if (snap.size > 200) return send(res,409,'Catálogo acima do limite inicial de 200 itens. Paginação necessária.');
-      return send(res,200,'Catálogo carregado.',{products:snap.docs.map(clean).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))});
+      const balances=new Map(balanceSnap.docs.map(doc=>[doc.id,doc.data()]));
+      return send(res,200,'Catálogo carregado.',{products:snap.docs.map(doc=>{
+       const p=clean(doc),b=balances.get(doc.id);
+       return {...p,physicalBalance:b?{reserve:b.reserve,rotation:b.rotation,total:b.total,
+        unit:b.unit,at:b.at?.toDate?.()?.toISOString?.()||null}:null};
+      }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))});
     }
     if (!['admin','manager'].includes(m.role)) return send(res,403,'Somente administração pode alterar o catálogo.');
     if (action !== 'create' && action !== 'update') return send(res,400,'Ação inválida.');

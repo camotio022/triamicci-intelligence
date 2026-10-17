@@ -3,6 +3,10 @@ import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 
 const allowedUnits = new Set(['kg','L','un']);
 const genericIds = new Set(['queijos','massas','hortifruti','temperos']);
+const eligible=p=>p.schemaVersion===2&&p.reviewRequired!==true&&p.ingredientsPending!==true&&
+  ['supplier','internal'].includes(p.source)&&
+  ['kg','L','un'].includes(p.operationalUnit)&&
+  (p.source==='internal'||['kg','L','un'].includes(p.receivingUnit));
 const hashId = name => createHash('sha256').update(name.trim().toLocaleLowerCase('pt-BR')).digest('hex').slice(0,40);
 
 export default async function handler(req,res){
@@ -21,9 +25,40 @@ export default async function handler(req,res){
         return {id:doc.id,name:p.name,category:p.category,stockUnit:p.stockUnit,
           type:p.type,trackExpiry:p.trackExpiry===true,relatedProducts:p.relatedProducts||[],
           producedFrom:p.producedFrom||[],notes:p.notes||'',active:p.active===true,
-          reviewRequired:p.active!==true || genericIds.has(doc.id)};
+          reviewRequired:p.active!==true || genericIds.has(doc.id),
+          approvalEligible:!genericIds.has(doc.id)&&eligible(p),schemaVersion:p.schemaVersion||1,
+          receivingUnit:p.receivingUnit||null,operationalUnit:p.operationalUnit||null};
       }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
       return send(res,200,'Catálogo central carregado.',{catalog:items});
+    }
+    if(req.body?.action==='approveBatch'){
+      if(m.role!=='admin')return send(res,403,'Aprovação restrita ao administrador.');
+      const ids=req.body.catalogIds;
+      if(!Array.isArray(ids)||ids.length<1||ids.length>30||new Set(ids).size!==ids.length||
+        ids.some(id=>typeof id!=='string'||!/^[a-z0-9-]{2,80}$/.test(id)||genericIds.has(id)))
+        return send(res,400,'Selecione somente IDs específicos válidos e sem duplicatas.');
+      const refs=ids.map(id=>catalog.doc(id));
+      const actorRef=db.doc('memberships/'+actor.uid),now=new Date();
+      const outcome={approved:[],alreadyActive:[],rejected:[]};
+      await db.runTransaction(async tx=>{
+        const [memberSnap,...snaps]=await Promise.all([tx.get(actorRef),...refs.map(ref=>tx.get(ref))]);
+        const current=memberSnap.data();
+        if(!current||current.status!=='active'||current.unitId!==m.unitId||current.role!=='admin')throw new Error('FORBIDDEN');
+        for(let i=0;i<snaps.length;i++){
+          const doc=snaps[i],id=ids[i];const product=doc.data();
+          if(!doc.exists||typeof product.name!=='string'||!allowedUnits.has(product.stockUnit)||
+           typeof product.category!=='string'||typeof product.trackExpiry!=='boolean'||
+           !eligible(product)){
+             outcome.rejected.push(id);continue;
+          }
+          if(product.active===true){outcome.alreadyActive.push(id);continue;}
+          tx.update(refs[i],{active:true,approvedAt:now,approvedBy:actor.uid});
+          tx.create(db.collection('auditLogs').doc(),{event:'catalog.approved_batch',catalogId:id,
+           actorUid:actor.uid,unitId:m.unitId,at:now});
+          outcome.approved.push(id);
+        }
+      });
+      return send(res,200,'Revisão em lote concluída.',outcome);
     }
     if(req.body?.action==='approve'){
       if(m.role!=='admin')return send(res,403,'Aprovação restrita ao administrador.');
@@ -40,7 +75,7 @@ export default async function handler(req,res){
         if(!catSnap.exists)throw new Error('NOT_FOUND');
         const p=catSnap.data();
         if(typeof p.name!=='string'||!allowedUnits.has(p.stockUnit)||typeof p.category!=='string'||
-          typeof p.trackExpiry!=='boolean')throw new Error('INVALID_CATALOG');
+          typeof p.trackExpiry!=='boolean'||!eligible(p))throw new Error('INVALID_CATALOG');
         if(p.active===true)return;
         tx.update(catalogRef,{active:true,approvedAt:now,approvedBy:actor.uid});
         tx.create(auditRef,{event:'catalog.approved',unitId:m.unitId,catalogId,actorUid:actor.uid,at:now});
