@@ -40,10 +40,11 @@ export default async function handler(req,res){
   const ref=unit.collection(action==='receive'?'physicalReceipts':'physicalCounts').doc(requestId);
   const auditRef=db.collection('auditLogs').doc();
   const payload= action==='receive'?
-   {supplier:req.body.supplier,deliveredWeightKg:req.body.deliveredWeightKg,physicalQuantity:req.body.physicalQuantity,lot:req.body.lot,expiryDate:req.body.expiryDate,notes:req.body.notes||''}:
+   {supplier:req.body.supplier,orderedWeightKg:req.body.orderedWeightKg,deliveredWeightKg:req.body.deliveredWeightKg,physicalQuantity:req.body.physicalQuantity,lot:req.body.lot,expiryDate:req.body.expiryDate,notes:req.body.notes||''}:
    {reserve:req.body.reserve,rotation:req.body.rotation,notes:req.body.notes||''};
   if(action==='receive'){
    if(!validText(payload.supplier)||!positive(payload.physicalQuantity)||
+     !(payload.orderedWeightKg===null||payload.orderedWeightKg===undefined||positive(payload.orderedWeightKg))||
      !(payload.deliveredWeightKg===null||payload.deliveredWeightKg===undefined||positive(payload.deliveredWeightKg))||
      !validText(payload.notes,0,240))throw Error('INVALID');
   }else if(!nonnegative(payload.reserve)||!nonnegative(payload.rotation)||!validText(payload.notes,0,240))throw Error('INVALID');
@@ -58,9 +59,11 @@ export default async function handler(req,res){
    const unitName=physicalUnit(p);
    if(unitName==='un'&&(action==='receive'? !Number.isInteger(payload.physicalQuantity):
     !Number.isInteger(payload.reserve)||!Number.isInteger(payload.rotation)))throw Error('INVALID');
+   if(action==='receive'&&pieces.has(p.catalogId)&&(!positive(payload.orderedWeightKg)||!positive(payload.deliveredWeightKg)))throw Error('INVALID');
    if(action==='receive'&&p.trackExpiry===true){
     if(!validText(payload.lot,1,80)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(payload.expiryDate||'')||
-     !Number.isFinite(Date.parse(payload.expiryDate+'T12:00:00Z'))||payload.expiryDate<now.toISOString().slice(0,10))throw Error('INVALID');
+     !Number.isFinite(Date.parse(payload.expiryDate+'T12:00:00Z'))||
+     new Date(payload.expiryDate+'T12:00:00Z').toISOString().slice(0,10)!==payload.expiryDate||payload.expiryDate<now.toISOString().slice(0,10))throw Error('INVALID');
    }
    const record={...payload,productId,productName:p.name,unit:unitName,
     actorUid:actor.uid,unitId:m.unitId,at:now,kind:action};
