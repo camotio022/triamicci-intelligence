@@ -11,9 +11,9 @@ async function api(path,action,extra={}){
 const fmt=at=>at?new Date(at).toLocaleString('pt-BR'):'—';
 const qty=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const numeric=(s)=>s===''?null:Number(s);
-export default function PhysicalStock({membership,mode='receive'}){
+export default function PhysicalStock({membership,mode='receive',initialProductId=null}){
  const [products,setProducts]=useState([]),[catalog,setCatalog]=useState([]),[history,setHistory]=useState({receipts:[],counts:[]});
- const [productId,setProductId]=useState(''),[supplier,setSupplier]=useState(''),[weight,setWeight]=useState('');
+ const [productId,setProductId]=useState(initialProductId||''),[supplier,setSupplier]=useState(''),[weight,setWeight]=useState('');
  const [amount,setAmount]=useState(''),[orderedQuantity,setOrderedQuantity]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
  const [lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
@@ -27,6 +27,7 @@ export default function PhysicalStock({membership,mode='receive'}){
   }catch(e){setStatus(e.message)}
  },[]);
  useEffect(()=>{load()},[load]);
+ useEffect(()=>{if(initialProductId)setProductId(initialProductId)},[initialProductId]);
  useEffect(()=>{
   let active=true;setSummary(null);setLots([]);
   if(!productId)return;
@@ -65,7 +66,7 @@ export default function PhysicalStock({membership,mode='receive'}){
    try{await load()}catch{ /* gravação já confirmada; atualização pode ser repetida */ }
   }catch(e){setStatus(e.message)}finally{setBusy(false)}
  };
- const rows=mode==='history'?[...history.receipts.map(x=>({...x,kind:'receive'})),...history.counts.map(x=>({...x,kind:'count'}))].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)):mode==='receive'?history.receipts:history.counts;
+ const rows=(mode==='history'?[...history.receipts.map(x=>({...x,kind:'receive'})),...history.counts.map(x=>({...x,kind:'count'}))].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)):mode==='receive'?history.receipts:history.counts).filter(x=>!initialProductId||x.productId===initialProductId);
  return <section className="receiving-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId}</p>
   <h1>{mode==='history'?'Histórico da operação':mode==='receive'?'Recebimento de mercadorias':'Contagem diária — reserva e giro'}</h1>
