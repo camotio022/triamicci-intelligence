@@ -56,7 +56,7 @@
       "allowedInputUnits": [
         "un"
       ],
-      "notes": "Matéria-prima recebida já porcionada, alternativa para strogonoff quando faltar peito inteiro.",
+      "notes": "Filé recebido do fornecedor já porcionado em 120 g. Contado individualmente tanto na reserva quanto no giro. Alternativa para strogonoff quando faltar peito inteiro; sem baixa automática.",
       "relatedProducts": [],
       "source": "supplier",
       "receivingUnit": "un",
@@ -64,7 +64,8 @@
       "countLocations": [
         "reserva",
         "giro"
-      ]
+      ],
+      "countingMethod": "individual"
     },
     {
       "id": "strogonoff-frango",
