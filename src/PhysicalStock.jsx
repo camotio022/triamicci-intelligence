@@ -58,9 +58,9 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
  };
  const p=products.find(x=>x.id===productId);
  const catalogProduct=catalog.find(x=>x.id===p?.catalogId);
- const physicalUnit=catalogProduct?.operationalUnit||p?.operationalUnit||(['alcatra-bife','alcatra-cubos','frango-file-120g'].includes(p?.catalogId)?'un':p?.unit||'un');
+ const physicalUnit=p?.operationalUnitOverride||catalogProduct?.operationalUnit||p?.operationalUnit||(['alcatra-bife','alcatra-cubos','frango-file-120g'].includes(p?.catalogId)?'un':p?.unit||'un');
  const previous=summary?.previous;
- const receivingUnit=catalogProduct?.receivingUnit||p?.unit||'un';
+ const receivingUnit=p?.receivingUnitOverride||catalogProduct?.receivingUnit||p?.unit||'un';
  const deliveredCommercial=receivingUnit===physicalUnit?Number(amount):receivingUnit==='kg'&&physicalUnit==='un'?Number(weight):null;
  const total=numeric(reserve)!==null&&numeric(rotation)!==null?Number(reserve)+Number(rotation):null;
  const submit=async e=>{
