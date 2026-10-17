@@ -68,6 +68,7 @@ export default async function handler(req,res){
   const ref=unit.collection(action==='receive'?'physicalReceipts':'physicalCounts').doc(requestId);
   const auditRef=db.collection('auditLogs').doc();
   const balanceRef=unit.collection('physicalBalances').doc(productId);
+  const lotRef=unit.collection('physicalLots').doc(productId).collection('lots');
   const payload= action==='receive'?
    {supplier:req.body.supplier,orderedQuantity:req.body.orderedQuantity,deliveredWeightKg:req.body.deliveredWeightKg,physicalQuantity:req.body.physicalQuantity,lot:req.body.lot,expiryDate:req.body.expiryDate,notes:req.body.notes||''}:
    {reserve:req.body.reserve,rotation:req.body.rotation,notes:req.body.notes||''};
@@ -112,6 +113,16 @@ export default async function handler(req,res){
     tx.set(balanceRef,{productId,productName:p.name,unit:unitName,
      reserve:payload.reserve,rotation:payload.rotation,total:payload.reserve+payload.rotation,
      countId:requestId,actorUid:actor.uid,at:now});
+   }
+   if(action==='receive'&&p.trackExpiry===true){
+    const lotKey=Buffer.from(payload.lot.trim()).toString('hex').slice(0,150)+'-'+payload.expiryDate;
+    const batchRef=lotRef.doc(lotKey);
+    const priorLot=await tx.get(batchRef);
+    const oldAmount=priorLot.exists?priorLot.data().receivedQuantity:0;
+    if(!Number.isFinite(oldAmount)||oldAmount<0||oldAmount+payload.physicalQuantity>100000000)throw Error('INVALID');
+    tx.set(batchRef,{lot:payload.lot.trim(),expiryDate:payload.expiryDate,productId,
+      productName:p.name,unit:unitName,receivedQuantity:Math.round((oldAmount+payload.physicalQuantity)*1000)/1000,
+      lastReceiptId:requestId,updatedAt:now},{merge:true});
    }
    tx.create(ref,record);
    tx.create(auditRef,{event:action==='receive'?'physical.received':'physical.counted',unitId:m.unitId,
