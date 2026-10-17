@@ -26,6 +26,32 @@ export default async function handler(req,res){
   if(!m?.unitId)return send(res,403,'Vínculo ativo necessário.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId),actorRef=db.doc('memberships/'+actor.uid);
   const {action}=req.body||{};
+  if(action==='summary'){
+   const id=req.body?.productId;
+   if(!idPattern.test(id||''))throw Error('INVALID');
+   const p=await unit.collection('products').doc(id).get();
+   if(!p.exists)throw Error('NOT_FOUND');
+   const [cSnap,rSnap]=await Promise.all([
+    unit.collection('physicalCounts').where('productId','==',id).limit(501).get(),
+    unit.collection('physicalReceipts').where('productId','==',id).limit(501).get()
+   ]);
+   if(cSnap.size>500||rSnap.size>500)return send(res,200,'Histórico muito extenso para conciliação simples.',{
+    summary:{complete:false,reason:'Há mais de 500 registros. É necessário paginar para calcular com segurança.'}});
+   const counts=cSnap.docs.map(x=>x.data()).sort((a,b)=>b.at.toMillis()-a.at.toMillis());
+   const receipts=rSnap.docs.map(x=>x.data()).sort((a,b)=>b.at.toMillis()-a.at.toMillis());
+   const last=counts[0]||null,lastDelivery=receipts[0]||null;
+   const unitName=physicalUnit(p.data());
+   const compatible=receipts.every(x=>x.unit===unitName);
+   const incoming=last?receipts.filter(x=>x.at.toMillis()>last.at.toMillis()&&x.unit===unitName):[];
+   return send(res,200,'Resumo físico consultado.',{summary:{
+    complete:compatible,reason:compatible?null:'Existem entradas com unidades diferentes; não converter automaticamente.',
+    unit:unitName,previous: last?{reserve:last.reserve,rotation:last.rotation,
+      total:last.reserve+last.rotation,at:iso(last.at)}:null,
+    lastDelivery:lastDelivery?{physicalQuantity:lastDelivery.physicalQuantity,unit:lastDelivery.unit,
+      at:iso(lastDelivery.at),supplier:lastDelivery.supplier}:null,
+    entriesSincePrevious:compatible?Number(incoming.reduce((n,x)=>n+x.physicalQuantity,0).toFixed(3)):null
+   }});
+  }
   if(action==='list'){
    const [receipts,counts]=await Promise.all([
     unit.collection('physicalReceipts').orderBy('at','desc').limit(50).get(),
