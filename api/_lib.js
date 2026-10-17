@@ -11,6 +11,14 @@ export function getDb() {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
     if (!raw) throw new Error('SERVER_NOT_CONFIGURED');
     const credential = JSON.parse(raw);
+    const expected = process.env.FIREBASE_EXPECTED_PROJECT_ID;
+    const staging = process.env.APP_ENV === 'staging';
+    if (staging && (!expected || expected === 'triamicci-intelligence')) {
+      throw new Error('STAGING_PROJECT_REQUIRED');
+    }
+    if (expected && credential.project_id !== expected) {
+      throw new Error('FIREBASE_PROJECT_MISMATCH');
+    }
     admin.initializeApp({ credential: admin.credential.cert(credential) });
   }
   return admin.firestore();
