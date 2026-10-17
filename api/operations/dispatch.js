@@ -58,6 +58,7 @@ export default async function handler(req,res){
     const lots=await tx.get(query);
     if(lots.size>100)throw Error('HISTORY_LIMIT');
     const tracked=lots.docs.map(d=>({id:d.id,...d.data()}));
+    for(const doc of lots.docs)lotsData.set(doc.id,doc.data());
     const totals=areaTotals(tracked);
     if(!totals||totals.reserva!==current.reserve||totals.giro!==current.rotation)throw Error('LOTS_NOT_READY');
     const parts=allocateFEFO(tracked,{area:location,quantity,
