@@ -80,6 +80,8 @@ export default async function handler(req,res){
      availableQuantity:qtyRound((original.reserva||0)+(original.giro||0)-l.quantity),updatedAt:now});
    }
    tx.update(balanceRef,{reserve:nextReserve,rotation:nextRotation,total:nextTotal,
+    ...(Number.isFinite(current.countedTotal)?{exitsSinceCount:
+     qtyRound((current.exitsSinceCount||0)+quantity)}:{}),
     lastMovementAt:now,lastOutflowId:requestId});
    const record={productId,productName:p.name,quantity,unit:unitName,location,reason,
     notes,actorUid:actor.uid,unitId:m.unitId,at:now,lots:lotAllocations.map(l=>({
