@@ -79,6 +79,7 @@ export default async function handler(req,res){
   const auditRef=db.collection('auditLogs').doc();
   const balanceRef=unit.collection('physicalBalances').doc(productId);
   const lotRef=unit.collection('physicalLots').doc(productId).collection('lots');
+  const batchRef=action==='receive'&&typeof req.body?.lot==='string'&&typeof req.body?.expiryDate==='string' ? lotRef.doc(createHash('sha256').update(req.body.lot.trim()+'|'+req.body.expiryDate).digest('hex')) : null;
   const payload= action==='receive'?
    {supplier:req.body.supplier,orderedQuantity:req.body.orderedQuantity,deliveredWeightKg:req.body.deliveredWeightKg,physicalQuantity:req.body.physicalQuantity,lot:req.body.lot,expiryDate:req.body.expiryDate,notes:req.body.notes||''}:
    {reserve:req.body.reserve,rotation:req.body.rotation,notes:req.body.notes||''};
@@ -90,7 +91,7 @@ export default async function handler(req,res){
   }else if(!nonnegative(payload.reserve)||!nonnegative(payload.rotation)||!validText(payload.notes,0,240))throw Error('INVALID');
   const now=new Date();let result;
   await db.runTransaction(async tx=>{
-   const [actorSnap,pSnap,existing,balanceSnap]=await Promise.all([tx.get(actorRef),tx.get(productRef),tx.get(ref),...(action==='count'?[tx.get(balanceRef)]:[Promise.resolve(null)])]);
+   const [actorSnap,pSnap,existing,balanceSnap,lotSnap]=await Promise.all([tx.get(actorRef),tx.get(productRef),tx.get(ref),action==='count'?tx.get(balanceRef):Promise.resolve(null),batchRef?tx.get(batchRef):Promise.resolve(null)]);
    const current=actorSnap.data();
    if(!current||current.status!=='active'||current.unitId!==m.unitId||
     (action==='receive'&&!['admin','manager'].includes(current.role)))throw Error('FORBIDDEN');
@@ -125,10 +126,7 @@ export default async function handler(req,res){
      countId:requestId,actorUid:actor.uid,at:now});
    }
    if(action==='receive'&&p.trackExpiry===true){
-    const lotKey=createHash('sha256').update(payload.lot.trim()+'|'+payload.expiryDate).digest('hex');
-    const batchRef=lotRef.doc(lotKey);
-    const priorLot=await tx.get(batchRef);
-    const oldAmount=priorLot.exists?priorLot.data().receivedQuantity:0;
+    const oldAmount=lotSnap?.exists?lotSnap.data().receivedQuantity:0;
     if(!Number.isFinite(oldAmount)||oldAmount<0||oldAmount+payload.physicalQuantity>100000000)throw Error('INVALID');
     tx.set(batchRef,{lot:payload.lot.trim(),expiryDate:payload.expiryDate,productId,
       productName:p.name,unit:unitName,receivedQuantity:Math.round((oldAmount+payload.physicalQuantity)*1000)/1000,
