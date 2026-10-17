@@ -19,11 +19,12 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
  const [summary,setSummary]=useState(null);
  const [lots,setLots]=useState([]);
+ const [more,setMore]=useState({receipts:false,counts:false}),[loadingMore,setLoadingMore]=useState(false);
  const canReceive=['admin','manager'].includes(membership.role);
  const load=useCallback(async()=>{
   try{
    const [p,h,c]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list'),api('/api/catalog/manage','list')]);
-   setProducts(p.products||[]);setCatalog(c.catalog||[]);setHistory({receipts:h.receipts||[],counts:h.counts||[]});
+   setProducts(p.products||[]);setCatalog(c.catalog||[]);setHistory({receipts:h.receipts||[],counts:h.counts||[]});setMore({receipts:!!h.hasMoreReceipts,counts:!!h.hasMoreCounts});
   }catch(e){setStatus(e.message)}
  },[]);
  useEffect(()=>{load()},[load]);
@@ -39,6 +40,22 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
    .catch(err=>{if(active)setStatus(err.message)});
   return ()=>{active=false};
  },[productId,history]);
+ const loadMore=async()=>{
+  if(loadingMore||!more.receipts&&!more.counts)return;
+  setLoadingMore(true);
+  try{
+   const h=await api('/api/operations/stock','list',{
+    beforeReceipts:more.receipts?history.receipts.at(-1)?.at:undefined,
+    beforeCounts:more.counts?history.counts.at(-1)?.at:undefined,
+    skipReceipts:!more.receipts,skipCounts:!more.counts
+   });
+   setHistory(old=>({
+    receipts:[...old.receipts,...(h.receipts||[])],
+    counts:[...old.counts,...(h.counts||[])]
+   }));
+   setMore({receipts:!!h.hasMoreReceipts,counts:!!h.hasMoreCounts});
+  }catch(e){setStatus(e.message)}finally{setLoadingMore(false)}
+ };
  const p=products.find(x=>x.id===productId);
  const catalogProduct=catalog.find(x=>x.id===p?.catalogId);
  const physicalUnit=catalogProduct?.operationalUnit||p?.operationalUnit||(['alcatra-bife','alcatra-cubos','frango-file-120g'].includes(p?.catalogId)?'un':p?.unit||'un');
@@ -117,6 +134,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
     <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>QUANDO</th><th>TIPO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>RESPONSÁVEL</th></tr></thead><tbody>
      {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{r.kind==='receive'?'Recebimento':'Contagem'}</td><td>{r.productName}</td><td>{r.kind==='receive'||mode==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')'}</td><td>{r.actorUid}</td></tr>)}
     </tbody></table></div>}
+   {(more.receipts||more.counts)&&<button type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore?'Carregando...':'Carregar registros anteriores'}</button>}
   </section>
  </section>;
 }
