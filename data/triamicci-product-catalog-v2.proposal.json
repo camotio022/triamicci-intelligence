@@ -148,14 +148,15 @@
         "kg",
         "g"
       ],
-      "notes": "Cubos já cortados pelo fornecedor; confirmar se contagem operacional é em peças/porções e método de embalagem.",
+      "notes": "Cubos já chegam cortados do fornecedor. Cada unidade operacional é contada individualmente na reserva e no giro; sem conversão automática de kg para unidades.",
       "source": "supplier",
       "receivingUnit": "kg",
       "operationalUnit": "un",
       "countLocations": [
         "reserva",
         "giro"
-      ]
+      ],
+      "countingMethod": "individual"
     },
     {
       "id": "noisettes",
@@ -312,7 +313,8 @@
         "g"
       ],
       "reviewRequired": true,
-      "notes": "Chega fatiado do fornecedor. Conferir se 1 unidade operacional é um bife, a unidade de pedido e os controles de lote."
+      "notes": "Filés fatiados já chegam do fornecedor. Cada filé é contado individualmente na reserva e no giro; sem conversão automática de kg para unidades.",
+      "countingMethod": "individual"
     },
     {
       "id": "strogonoff-carne",
