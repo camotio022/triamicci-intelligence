@@ -25,6 +25,15 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
  useEffect(()=>{reload();},[reload]);
  const visible=useMemo(()=>catalog.filter(p=>(p.name+' '+p.category).toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR'))),[catalog,search]);
  const item=catalog.find(p=>p.id===selected);
+ const activateAll=async()=>{
+   if(!isAdmin||busy||!window.confirm('Disponibilizar TODOS os produtos do catálogo Firebase nesta unidade? Produtos novos entram ativos com saldo 0. Saldos e contagens existentes serão preservados.'))return;
+   setBusy(true);setError('');setNotice('');
+   try{
+     const data=await request('activateUnitCatalog');
+     setNotice('Catálogo disponibilizado! '+data.created+' produtos novos com saldo zero; '+data.preserved+' produtos existentes preservados.');
+     await reload();await onAttached?.();
+   }catch(e){setError(e.message)}finally{setBusy(false)}
+ };
  const approveBatch=async()=>{
    const candidates=catalog.filter(p=>!p.active&&p.approvalEligible);
    if(!isAdmin||busy||!candidates.length)return;
@@ -53,7 +62,8 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
  };
  return <form className="inventory-form catalog-picker" onSubmit={submit}>
   <h2>Adicionar produto do catálogo inteligente</h2>
-  <p>Escolha um produto já definido pela Triamicci. Categoria, unidade e validade vêm do Firebase e não podem ser alteradas aqui.</p>
+  <p>Para começar sem cadastros manuais, use a ativação em lote. Todos os produtos existentes no catálogo Firebase serão disponibilizados na unidade. Produtos novos começam com saldo zero; os já cadastrados mantêm seu saldo.</p>
+  {isAdmin&&<div className="inventory-actions"><button type="button" onClick={activateAll} disabled={busy||loading}>Disponibilizar todo o catálogo na unidade (saldo zero)</button></div>}
   {isAdmin&&<div className="inventory-actions"><button type="button" onClick={approveBatch} disabled={busy||loading}>Revisar e aprovar candidatos em lote</button></div>}
   <div className="inventory-fields">
    <label>Buscar no catálogo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Ex.: óleo, frango, strogonoff" /></label>
