@@ -32,6 +32,7 @@ export default async function handler(req,res){
    if(!idPattern.test(id||''))throw Error('INVALID');
    const p=await unit.collection('products').doc(id).get();
    if(!p.exists)throw Error('NOT_FOUND');
+   const catalogSnap=p.data().catalogId?await db.collection('productCatalog').doc(p.data().catalogId).get():null;
    const [cSnap,rSnap]=await Promise.all([
     unit.collection('physicalCounts').where('productId','==',id).limit(501).get(),
     unit.collection('physicalReceipts').where('productId','==',id).limit(501).get()
@@ -41,7 +42,7 @@ export default async function handler(req,res){
    const counts=cSnap.docs.map(x=>x.data()).sort((a,b)=>b.at.toMillis()-a.at.toMillis());
    const receipts=rSnap.docs.map(x=>x.data()).sort((a,b)=>b.at.toMillis()-a.at.toMillis());
    const last=counts[0]||null,lastDelivery=receipts[0]||null;
-   const unitName=physicalUnit(p.data());
+   const unitName=physicalUnit(p.data(),catalogSnap?.data());
    const compatible=receipts.every(x=>x.unit===unitName);
    const incoming=last?receipts.filter(x=>x.at.toMillis()>last.at.toMillis()&&x.unit===unitName):[];
    return send(res,200,'Resumo físico consultado.',{summary:{
@@ -83,10 +84,11 @@ export default async function handler(req,res){
     (action==='receive'&&!['admin','manager'].includes(current.role)))throw Error('FORBIDDEN');
    if(!pSnap.exists)throw Error('NOT_FOUND');
    const p=pSnap.data();if(p.status!=='active')throw Error('INACTIVE');
-   const unitName=physicalUnit(p);
+   const central=p.catalogId?await tx.get(db.collection('productCatalog').doc(p.catalogId)):null;
+   const unitName=physicalUnit(p,central?.data());
    if(unitName==='un'&&(action==='receive'? !Number.isInteger(payload.physicalQuantity):
     !Number.isInteger(payload.reserve)||!Number.isInteger(payload.rotation)))throw Error('INVALID');
-   if(action==='receive'&&pieces.has(p.catalogId)&&(!positive(payload.orderedWeightKg)||!positive(payload.deliveredWeightKg)))throw Error('INVALID');
+   if(action==='receive'&&unitName==='un'&&(central?.data()?.receivingUnit==='kg'||pieces.has(p.catalogId))&&(!positive(payload.orderedWeightKg)||!positive(payload.deliveredWeightKg)))throw Error('INVALID');
    if(action==='receive'&&p.trackExpiry===true){
     if(!validText(payload.lot,1,80)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(payload.expiryDate||'')||
      !Number.isFinite(Date.parse(payload.expiryDate+'T12:00:00Z'))||
