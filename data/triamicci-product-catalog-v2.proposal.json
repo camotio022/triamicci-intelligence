@@ -313,8 +313,7 @@
         "kg",
         "g"
       ],
-      "reviewRequired": true,
-      "notes": "Filés fatiados já chegam do fornecedor. Cada filé é contado individualmente na reserva e no giro; sem conversão automática de kg para unidades.",
+      "notes": "Filés de alcatra já chegam fatiados do fornecedor. Conferir peso pedido e entregue em kg, contar cada filé individualmente na reserva e no giro. Sem conversão automática kg→peças.",
       "countingMethod": "individual"
     },
     {
