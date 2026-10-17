@@ -27,6 +27,21 @@ export default async function handler(req,res){
   if(!m?.unitId)return send(res,403,'Vínculo ativo necessário.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId),actorRef=db.doc('memberships/'+actor.uid);
   const {action}=req.body||{};
+  if(action==='productActivity'){
+   const id=req.body?.productId;
+   if(!idPattern.test(id||''))throw Error('INVALID');
+   const product=await unit.collection('products').doc(id).get();
+   if(!product.exists)throw Error('NOT_FOUND');
+   const [receipts,counts]=await Promise.all([
+    unit.collection('physicalReceipts').where('productId','==',id).limit(100).get(),
+    unit.collection('physicalCounts').where('productId','==',id).limit(100).get()
+   ]);
+   const records=[...receipts.docs.map(d=>({...clean(d),kind:'receive'})),
+     ...counts.docs.map(d=>({...clean(d),kind:'count'}))]
+     .sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,30);
+   return send(res,200,'Atividade deste produto.',{records,
+    limited:receipts.size===100||counts.size===100});
+  }
   if(action==='lots'){
    const id=req.body?.productId;
    if(!idPattern.test(id||''))throw Error('INVALID');
