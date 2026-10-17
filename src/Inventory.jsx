@@ -3,6 +3,7 @@ import { auth } from './firebase.js';
 import StockMovements from './StockMovements.jsx';
 import CatalogPicker from './CatalogPicker.jsx';
 import CatalogV2Review from './CatalogV2Review.jsx';
+import ProductDetails from './ProductDetails.jsx';
 
 const categories = ['Preparações','Proteínas','Hortifruti','Laticínios','Mercearia','Congelados','Bebidas','Limpeza','Descartáveis','Outros'];
 const units = ['kg','g','L','ml','un'];
@@ -17,7 +18,7 @@ async function call(action, payload={}) {
   if (!res.ok) throw new Error(data.message || 'Erro ao consultar catálogo.');
   return data;
 }
-export default function Inventory({membership,mode='stock'}) {
+export default function Inventory({membership,mode='stock',onAction}) {
   const [products,setProducts] = useState([]);
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
@@ -26,6 +27,7 @@ export default function Inventory({membership,mode='stock'}) {
   const [form,setForm] = useState(blank);
   const [editing,setEditing] = useState(null);
   const [saving,setSaving] = useState(false);
+  const [detailId,setDetailId] = useState(null);
   const canEdit = ['admin','manager'].includes(membership.role);
   const administration = mode === 'catalog';
   const load = useCallback(async () => {
@@ -55,6 +57,8 @@ export default function Inventory({membership,mode='stock'}) {
     finally {setSaving(false);}
   };
   const set = (field,value) => setForm(old=>({...old,[field]:value}));
+  const detail=products.find(p=>p.id===detailId);
+  if(detail&&!administration)return <ProductDetails product={detail} membership={membership} onBack={()=>{setDetailId(null);load()}} onAction={onAction}/>;
   return <section className="inventory-page">
     <p className="eyebrow">OPERAÇÃO · UNIDADE {membership.unitId.toUpperCase()}</p>
     <h1>{administration?'Administração · Catálogo':'Estoque físico da cozinha'}</h1>
@@ -79,7 +83,7 @@ export default function Inventory({membership,mode='stock'}) {
     <label className="inventory-search">Buscar insumo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome ou categoria"/></label>
     {error && <p role="alert">{error}</p>}
     {!administration && <div className="operational-products" aria-label="Estoque por produto">
-      {visible.map(p=><article className="operational-product" key={p.id}>
+      {visible.map(p=><article className="operational-product operational-product-clickable" key={p.id} role="button" tabIndex={0} aria-label={"Abrir ficha operacional de "+p.name} onClick={()=>setDetailId(p.id)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setDetailId(p.id)}}}>
         <div className="operational-product-head"><div><strong>{p.name}</strong><span>{p.category}</span></div><span className="operational-product-state">{p.status==='active'?'Ativo':'Inativo'}</span></div>
         {p.physicalBalance ? <>
           <div className="operational-counts">
