@@ -27,6 +27,7 @@ export default async function handler(req,res){
   const now=new Date();
   let duplicate=false,lotAllocations=[];
   await db.runTransaction(async tx=>{
+   lotAllocations=[];
    const [member,product,balance,previous]=await Promise.all([
     tx.get(actorRef),tx.get(productRef),tx.get(balanceRef),tx.get(movementRef)
    ]);
@@ -48,6 +49,7 @@ export default async function handler(req,res){
    if(!validQuantity(quantity,{unit:unitName}))throw Error('INVALID');
    if(!validQuantity(current[location],{allowZero:true,unit:unitName})||quantity>current[location]||
      !validQuantity(current.total,{allowZero:true,unit:unitName})||quantity>current.total)throw Error('INSUFFICIENT');
+   const lotsData=new Map();
    if(p.trackExpiry===true){
     // Quantidade disponível é homologada por lote; entradas legadas sem esse campo NÃO são presumidas disponíveis.
     const query=unit.collection('physicalLots').doc(productId).collection('lots')
@@ -57,13 +59,13 @@ export default async function handler(req,res){
     let remaining=quantity;
     const dateToday=now.toISOString().slice(0,10);
     for(const doc of lots.docs){
-     const lot=doc.data();
-     if(!Number.isFinite(lot.availableQuantity)||lot.availableQuantity<=0)continue;
+     const lot=doc.data();lotsData.set(doc.id,lot);
+     if(!Number.isFinite(lot[location])||lot[location]<=0)continue;
      if(reason==='consumption'&&lot.expiryDate<dateToday)continue;
-     const amount=Math.min(qtyRound(remaining),qtyRound(lot.availableQuantity));
+     const amount=Math.min(qtyRound(remaining),qtyRound(lot[location]));
      if(amount<=0)continue;
      lotAllocations.push({ref:doc.ref,id:doc.id,quantity:amount,lot:lot.lot,expiryDate:lot.expiryDate,
-       remaining:qtyRound(lot.availableQuantity-amount)});
+       remaining:qtyRound(lot[location]-amount)});
      remaining=qtyRound(remaining-amount);
      if(remaining<=0)break;
     }
@@ -73,7 +75,11 @@ export default async function handler(req,res){
    const nextRotation=qtyRound(current.rotation-(location==='giro'?quantity:0));
    const nextTotal=qtyRound(current.total-quantity);
    if(nextReserve<0||nextRotation<0||nextTotal<0)throw Error('INSUFFICIENT');
-   for(const l of lotAllocations)tx.update(l.ref,{availableQuantity:l.remaining,updatedAt:now});
+   for(const l of lotAllocations){
+    const original=lotsData.get(l.id);
+    tx.update(l.ref,{[location]:l.remaining,
+     availableQuantity:qtyRound((original.reserva||0)+(original.giro||0)-l.quantity),updatedAt:now});
+   }
    tx.update(balanceRef,{reserve:nextReserve,rotation:nextRotation,total:nextTotal,
     lastMovementAt:now,lastOutflowId:requestId});
    const record={productId,productName:p.name,quantity,unit:unitName,location,reason,
