@@ -66,6 +66,7 @@ export default async function handler(req,res){
   const productRef=unit.collection('products').doc(productId);
   const ref=unit.collection(action==='receive'?'physicalReceipts':'physicalCounts').doc(requestId);
   const auditRef=db.collection('auditLogs').doc();
+  const balanceRef=unit.collection('physicalBalances').doc(productId);
   const payload= action==='receive'?
    {supplier:req.body.supplier,orderedQuantity:req.body.orderedQuantity,deliveredWeightKg:req.body.deliveredWeightKg,physicalQuantity:req.body.physicalQuantity,lot:req.body.lot,expiryDate:req.body.expiryDate,notes:req.body.notes||''}:
    {reserve:req.body.reserve,rotation:req.body.rotation,notes:req.body.notes||''};
@@ -77,7 +78,7 @@ export default async function handler(req,res){
   }else if(!nonnegative(payload.reserve)||!nonnegative(payload.rotation)||!validText(payload.notes,0,240))throw Error('INVALID');
   const now=new Date();let result;
   await db.runTransaction(async tx=>{
-   const [actorSnap,pSnap,existing]=await Promise.all([tx.get(actorRef),tx.get(productRef),tx.get(ref)]);
+   const [actorSnap,pSnap,existing,balanceSnap]=await Promise.all([tx.get(actorRef),tx.get(productRef),tx.get(ref),...(action==='count'?[tx.get(balanceRef)]:[Promise.resolve(null)])]);
    const current=actorSnap.data();
    if(!current||current.status!=='active'||current.unitId!==m.unitId||
     (action==='receive'&&!['admin','manager'].includes(current.role)))throw Error('FORBIDDEN');
@@ -103,6 +104,13 @@ export default async function handler(req,res){
     const old=existing.data();
     if(old.actorUid!==actor.uid||old.productId!==productId||Object.keys(payload).some(k=>old[k]!==payload[k]))throw Error('CONFLICT');
     result={id:requestId,duplicate:true,record:old};return;
+   }
+   if(action==='count'){
+    const prior=balanceSnap?.data();
+    if(prior?.at?.toMillis?.()>now.getTime())throw Error('CONFLICT');
+    tx.set(balanceRef,{productId,productName:p.name,unit:unitName,
+     reserve:payload.reserve,rotation:payload.rotation,total:payload.reserve+payload.rotation,
+     countId:requestId,actorUid:actor.uid,at:now});
    }
    tx.create(ref,record);
    tx.create(auditRef,{event:action==='receive'?'physical.received':'physical.counted',unitId:m.unitId,
