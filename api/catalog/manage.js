@@ -31,6 +31,51 @@ export default async function handler(req,res){
       }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
       return send(res,200,'Catálogo central carregado.',{catalog:items});
     }
+    if(req.body?.action==='activateUnitCatalog'){
+      if(m.role!=='admin')return send(res,403,'A ativação em lote exige administrador.');
+      const docs=await catalog.limit(201).get();
+      if(docs.size>200)return send(res,409,'Catálogo acima do limite de 200 itens; faça a ativação paginada.');
+      if(docs.empty)return send(res,409,'Catálogo central vazio. Importe os produtos primeiro.');
+      const unitProducts=db.collection('units').doc(m.unitId).collection('products');
+      const refs=docs.docs.map(doc=>unitProducts.doc(hashId(doc.data().name||doc.id)));
+      const auditRef=db.collection('auditLogs').doc();
+      let result;
+      await db.runTransaction(async tx=>{
+        const [memberSnap,...existingSnaps]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),...refs.map(ref=>tx.get(ref))]);
+        const current=memberSnap.data();
+        if(!current||current.status!=='active'||current.unitId!==m.unitId||current.role!=='admin')throw Error('FORBIDDEN');
+        const invalid=[],created=[],preserved=[],conflicts=[];
+        for(let i=0;i<docs.docs.length;i++){
+          const cat=docs.docs[i],p=cat.data(),ref=refs[i],existing=existingSnaps[i];
+          if(typeof p.name!=='string'||p.name.trim().length<2||typeof p.category!=='string'||
+             !allowedUnits.has(p.stockUnit)||typeof p.trackExpiry!=='boolean'){
+            invalid.push(cat.id);continue;
+          }
+          if(existing.exists){
+            if(existing.data().catalogId&&existing.data().catalogId!==cat.id){conflicts.push(cat.id);continue;}
+            preserved.push(cat.id);continue;
+          }
+          created.push({id:cat.id,ref,data:{
+            name:p.name,category:p.category,unit:p.stockUnit,minStock:0,
+            trackExpiry:p.trackExpiry,quantity:0,status:'active',catalogId:cat.id,
+            productType:p.type||'raw',relatedCatalogIds:p.relatedProducts||[],
+            createdAt:new Date(),createdBy:actor.uid,updatedAt:new Date()
+          }});
+        }
+        if(conflicts.length)throw Error('CATALOG_CONFLICT');
+        if(invalid.length)throw Error('INVALID_CATALOG');
+        for(const item of created)tx.create(item.ref,item.data);
+        for(let i=0;i<docs.docs.length;i++){
+          const cat=docs.docs[i];
+          if(cat.data().active!==true)tx.update(cat.ref,{active:true,approvedBy:actor.uid,approvedAt:new Date()});
+        }
+        tx.create(auditRef,{event:'catalog.unit_bootstrapped',unitId:m.unitId,actorUid:actor.uid,
+          catalogCount:docs.size,createdCount:created.length,preservedCount:preserved.length,
+          createdCatalogIds:created.map(x=>x.id),at:new Date()});
+        result={created:created.length,preserved:preserved.length,total:docs.size};
+      });
+      return send(res,200,'Produtos do catálogo disponibilizados à unidade; novos produtos começam em zero.',result);
+    }
     if(req.body?.action==='approveBatch'){
       if(m.role!=='admin')return send(res,403,'Aprovação restrita ao administrador.');
       const ids=req.body.catalogIds;
@@ -122,6 +167,7 @@ export default async function handler(req,res){
     if(e.message==='NOT_FOUND')return send(res,404,'Produto não encontrado no catálogo central.');
     if(e.message==='NOT_APPROVED')return send(res,409,'Produto ainda não aprovado no catálogo central.');
     if(e.message==='INVALID_CATALOG')return send(res,409,'Produto central precisa de revisão técnica.');
+    if(e.message==='CATALOG_CONFLICT')return send(res,409,'Existe conflito entre IDs e produtos existentes; nenhum dado foi modificado.');
     if(e.message==='DUPLICATE')return send(res,409,'Este produto já está cadastrado na unidade.');
     console.error('Catalog attach:',e.message);
     return send(res,500,'Falha ao consultar ou vincular catálogo.');
