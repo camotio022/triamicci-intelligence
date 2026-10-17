@@ -65,14 +65,14 @@ export default function PhysicalStock({membership,mode='receive'}){
    try{await load()}catch{ /* gravação já confirmada; atualização pode ser repetida */ }
   }catch(e){setStatus(e.message)}finally{setBusy(false)}
  };
- const rows=mode==='receive'?history.receipts:history.counts;
+ const rows=mode==='history'?[...history.receipts.map(x=>({...x,kind:'receive'})),...history.counts.map(x=>({...x,kind:'count'}))].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)):mode==='receive'?history.receipts:history.counts;
  return <section className="receiving-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId}</p>
-  <h1>{mode==='receive'?'Recebimento de mercadorias':'Contagem diária — reserva e giro'}</h1>
-  <p>{mode==='receive'?'Registre a mercadoria conferida com a quantidade física efetivamente recebida.':
+  <h1>{mode==='history'?'Histórico da operação':mode==='receive'?'Recebimento de mercadorias':'Contagem diária — reserva e giro'}</h1>
+  <p>{mode==='history'?'Registros físicos de recebimento e contagem, com data e responsável.':mode==='receive'?'Registre a mercadoria conferida com a quantidade física efetivamente recebida.':
     'Informe o estoque físico encontrado em cada área; confira o histórico antes de salvar.'}</p>
   <div className="receiving-notice">Estes registros são reais e auditados no Firestore. O saldo legado do catálogo ainda não é alterado automaticamente: a conciliação e o controle de lotes serão homologados separadamente.</div>
-  {mode==='receive'&&!canReceive?<p>Somente administrador ou gerente pode registrar recebimentos.</p>:
+  {mode==='history'?null:mode==='receive'&&!canReceive?<p>Somente administrador ou gerente pode registrar recebimentos.</p>:
   <form className="receiving-card" onSubmit={submit}>
    <h2>{mode==='receive'?'Conferir entrega':'Registrar contagem'}</h2>
    <div className="inventory-fields">
@@ -113,8 +113,8 @@ export default function PhysicalStock({membership,mode='receive'}){
   </section>}
   <section className="receiving-card"><div className="inventory-list-header"><h2>Histórico real</h2><button type="button" onClick={load}>Atualizar</button></div>
    {rows.length===0?<p>Nenhum registro salvo nesta unidade.</p>:
-    <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>QUANDO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>RESPONSÁVEL</th></tr></thead><tbody>
-     {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{r.productName}</td><td>{mode==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')'}</td><td>{r.actorUid}</td></tr>)}
+    <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>QUANDO</th><th>TIPO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>RESPONSÁVEL</th></tr></thead><tbody>
+     {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{r.kind==='receive'?'Recebimento':'Contagem'}</td><td>{r.productName}</td><td>{r.kind==='receive'||mode==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')'}</td><td>{r.actorUid}</td></tr>)}
     </tbody></table></div>}
   </section>
  </section>;
