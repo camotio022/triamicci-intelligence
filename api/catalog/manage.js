@@ -1,7 +1,9 @@
+import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 
 const allowedUnits = new Set(['kg','L','un']);
+const catalogProposal=JSON.parse(readFileSync(new URL('../../data/triamicci-product-catalog-v2.proposal.json',import.meta.url),'utf8')).products;
 const genericIds = new Set(['queijos','massas','hortifruti','temperos']);
 const eligible=p=>p.schemaVersion===2&&p.reviewRequired!==true&&p.ingredientsPending!==true&&
   ['supplier','internal'].includes(p.source)&&
@@ -35,19 +37,25 @@ export default async function handler(req,res){
       if(m.role!=='admin')return send(res,403,'A ativação em lote exige administrador.');
       const docs=await catalog.limit(201).get();
       if(docs.size>200)return send(res,409,'Catálogo acima do limite de 200 itens; faça a ativação paginada.');
-      if(docs.empty)return send(res,409,'Catálogo central vazio. Importe os produtos primeiro.');
+      const centralIds=new Set(docs.docs.map(d=>d.id));
+      const missing=catalogProposal.filter(p=>!centralIds.has(p.id));
+      const catalogItems=[...docs.docs.map(d=>({ref:d.ref,id:d.id,data:d.data(),missing:false})),
+        ...missing.map(p=>({ref:catalog.doc(p.id),id:p.id,data:p,missing:true}))];
+      if(catalogItems.length>200)return send(res,409,'Mais de 200 produtos no catálogo; ativação paginada necessária.');
       const unitProducts=db.collection('units').doc(m.unitId).collection('products');
-      const refs=docs.docs.map(doc=>unitProducts.doc(hashId(doc.data().name||doc.id)));
+      const refs=catalogItems.map(item=>unitProducts.doc(hashId(item.data.name||item.id)));
       if(new Set(refs.map(ref=>ref.id)).size!==refs.length)return send(res,409,'Existem nomes duplicados no catálogo central. Revise antes da ativação.');
       const auditRef=db.collection('auditLogs').doc();
       let result;
       await db.runTransaction(async tx=>{
-        const [memberSnap,...existingSnaps]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),...refs.map(ref=>tx.get(ref))]);
+        const [memberSnap,...allSnaps]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),...refs.map(ref=>tx.get(ref)),...missing.map(p=>tx.get(catalog.doc(p.id)))]);
+        const existingSnaps=allSnaps.slice(0,refs.length),missingSnaps=allSnaps.slice(refs.length);
+        if(missingSnaps.some(s=>s.exists))throw Error('CATALOG_CONFLICT');
         const current=memberSnap.data();
         if(!current||current.status!=='active'||current.unitId!==m.unitId||current.role!=='admin')throw Error('FORBIDDEN');
         const invalid=[],created=[],preserved=[],conflicts=[];
-        for(let i=0;i<docs.docs.length;i++){
-          const cat=docs.docs[i],p=cat.data(),ref=refs[i],existing=existingSnaps[i];
+        for(let i=0;i<catalogItems.length;i++){
+          const cat=catalogItems[i],p=cat.data,ref=refs[i],existing=existingSnaps[i];
           if(typeof p.name!=='string'||p.name.trim().length<2||typeof p.category!=='string'||
              !allowedUnits.has(p.stockUnit)||typeof p.trackExpiry!=='boolean'){
             invalid.push(cat.id);continue;
@@ -68,14 +76,15 @@ export default async function handler(req,res){
         if(conflicts.length)throw Error('CATALOG_CONFLICT');
         if(invalid.length)throw Error('INVALID_CATALOG');
         for(const item of created)tx.create(item.ref,item.data);
-        for(let i=0;i<docs.docs.length;i++){
-          const cat=docs.docs[i];
-          if(cat.data().active!==true)tx.update(cat.ref,{active:true,approvedBy:actor.uid,approvedAt:new Date()});
+        for(const cat of catalogItems){
+          if(cat.missing)tx.create(cat.ref,{...cat.data,brandId:'triamicci',schemaVersion:2,
+            active:true,approvedBy:actor.uid,approvedAt:new Date(),createdAt:new Date()});
+          else if(cat.data.active!==true)tx.update(cat.ref,{active:true,approvedBy:actor.uid,approvedAt:new Date()});
         }
         tx.create(auditRef,{event:'catalog.unit_bootstrapped',unitId:m.unitId,actorUid:actor.uid,
-          catalogCount:docs.size,createdCount:created.length,preservedCount:preserved.length,
+          catalogCount:catalogItems.length,createdCount:created.length,preservedCount:preserved.length,
           createdCatalogIds:created.map(x=>x.id),at:new Date()});
-        result={created:created.length,preserved:preserved.length,total:docs.size};
+        result={created:created.length,preserved:preserved.length,total:catalogItems.length};
       });
       return send(res,200,'Produtos do catálogo disponibilizados à unidade; novos produtos começam em zero.',result);
     }
