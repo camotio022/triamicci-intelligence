@@ -58,7 +58,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
   };
   const set = (field,value) => setForm(old=>({...old,[field]:value}));
   const detail=products.find(p=>p.id===detailId);
-  if(detail&&!administration)return <ProductDetails product={detail} membership={membership} onBack={()=>{setDetailId(null);load()}} onAction={onAction}/>;
+  if(detail&&!administration)return <ProductDetails product={detail} membership={membership} onBack={()=>{setDetailId(null);load()}} onAction={onAction} onRefresh={load}/>;
   return <section className="inventory-page">
     <p className="eyebrow">OPERAÇÃO · UNIDADE {membership.unitId.toUpperCase()}</p>
     <h1>{administration?'Administração · Catálogo':'Estoque físico da cozinha'}</h1>
