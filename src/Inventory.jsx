@@ -81,6 +81,6 @@ export default function Inventory({membership}) {
       {visible.map(p=><tr key={p.id}><td><strong>{p.name}</strong></td><td>{p.category}</td><td>{p.quantity} {p.unit}</td><td>{p.minStock} {p.unit}</td><td>{p.trackExpiry?'Controlada':'Não exigida'}</td><td>{p.status==='active'?'Ativo':'Inativo'}</td>{canEdit && <td><button type="button" onClick={()=>edit(p)}>Editar</button></td>}</tr>)}
     </tbody></table>{!loading && !error && visible.length===0 && <p>Nenhum insumo encontrado.</p>}</div>
     <StockMovements products={products} membership={membership} onUpdated={load}/>
-    <p className="inventory-footnote">Entradas e saídas já atualizam o saldo real. Produtos com controle de validade permanecem bloqueados para movimentação até implementarmos lotes. A tela Recebimento continua demonstrativa e não altera os saldos.</p>
+    <p className="inventory-footnote">Entradas e saídas já atualizam o saldo real. Produtos com controle de validade permanecem bloqueados para movimentação até implementarmos lotes. Recebimentos e contagens físicas agora possuem histórico próprio no Firebase, ainda sem conciliação com o saldo legado.</p>
   </section>;
 }
