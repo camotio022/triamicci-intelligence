@@ -3,19 +3,19 @@ import {auth} from './firebase.js';
 import {PackageCheck,ClipboardCheck,Boxes,History,RefreshCw,AlertCircle} from 'lucide-react';
 
 export default function KitchenHome({membership,navigate}){
- const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[]}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
+ const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[]}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const load=useCallback(async()=>{
   setLoading(true);setError('');
   try{
    const token=await auth.currentUser.getIdToken();
    const call=async(url,action)=>{const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action})});const data=await res.json();if(!res.ok)throw Error(data.message||'Falha ao carregar a operação');return data};
    const [stock,ops]=await Promise.all([call('/api/products/manage','list'),call('/api/operations/stock','list')]);
-   setProducts(stock.products||[]);setHistory({receipts:ops.receipts||[],counts:ops.counts||[]});
+   setProducts(stock.products||[]);setHistory({receipts:ops.receipts||[],counts:ops.counts||[],outflows:ops.outflows||[],transfers:ops.transfers||[]});
   }catch(e){setError(e.message)}finally{setLoading(false)}
  },[]);
  useEffect(()=>{load()},[load]);
  const counted=products.filter(p=>p.physicalBalance);
- const latest=[...history.receipts.map(x=>({...x,label:'Recebimento'})),...history.counts.map(x=>({...x,label:'Contagem'}))]
+ const latest=[...history.receipts.map(x=>({...x,label:'Recebimento'})),...history.counts.map(x=>({...x,label:'Contagem'})),...history.outflows.map(x=>({...x,label:'Saída'})),...history.transfers.map(x=>({...x,label:'Transferência'}))]
    .sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,5);
  const actions=[{name:'Receber mercadoria',description:'Conferir fornecedor e entrega',page:'receiving',Icon:PackageCheck},
   {name:'Contagem diária',description:'Registrar reserva e giro',page:'count',Icon:ClipboardCheck},
