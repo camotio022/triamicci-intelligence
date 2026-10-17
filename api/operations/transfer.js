@@ -1,5 +1,6 @@
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {countUnit,validQuantity} from './logic.js';
+import {areaTotals,allocateFEFO} from './lot-logic.js';
 
 const idPattern=/^[a-f0-9]{40}$/;
 const reqPattern=/^[a-f0-9-]{36}$/i;
@@ -45,22 +46,17 @@ export default async function handler(req,res){
     const lotRef=unit.collection('physicalLots').doc(productId).collection('lots');
     lotSnapshots=await tx.get(lotRef.orderBy('expiryDate').limit(101));
     if(lotSnapshots.size>100)throw Error('LIMIT');
-    const list=lotSnapshots.docs.map(d=>({ref:d.ref,...d.data()}));
-    if(round(list.reduce((n,l)=>n+(Number.isFinite(l.reserva)?l.reserva:0),0))!==b.reserve||
-       round(list.reduce((n,l)=>n+(Number.isFinite(l.giro)?l.giro:0),0))!==b.rotation)throw Error('LOTS_NOT_READY');
-    let remaining=quantity;
-    for(const lot of list){
-     const available=lot[from]||0;
-     if(!Number.isFinite(available)||available<=0)continue;
-     // Não transferir lote vencido para giro.
-     if(to==='giro'&&lot.expiryDate<new Date().toISOString().slice(0,10))continue;
-     const part=round(Math.min(available,remaining));
-     allocations.push({ref:lot.ref,lot:lot.lot,expiryDate:lot.expiryDate,quantity:part,
-       fromAfter:round(available-part),toAfter:round((lot[to]||0)+part)});
-     remaining=round(remaining-part);
-     if(remaining<=0)break;
+    const list=lotSnapshots.docs.map(d=>({id:d.id,ref:d.ref,...d.data()}));
+    const totals=areaTotals(list);
+    if(!totals||totals.reserva!==b.reserve||totals.giro!==b.rotation)throw Error('LOTS_NOT_READY');
+    const parts=allocateFEFO(list,{area:from,quantity,
+      allowExpired:to!=='giro',today:new Date().toISOString().slice(0,10)});
+    if(!parts)throw Error('LOTS_NOT_READY');
+    for(const part of parts){
+     const lot=list.find(l=>l.id===part.id);
+     allocations.push({ref:lot.ref,lot:lot.lot,expiryDate:lot.expiryDate,quantity:part.quantity,
+       fromAfter:round(lot[from]-part.quantity),toAfter:round(lot[to]+part.quantity)});
     }
-    if(remaining>0)throw Error('LOTS_NOT_READY');
    }
    const now=new Date();
    for(const l of allocations)tx.update(l.ref,{[from]:l.fromAfter,[to]:l.toAfter,updatedAt:now});
