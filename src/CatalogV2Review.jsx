@@ -36,11 +36,11 @@ export default function CatalogV2Review(){
   <p>Proposta de {products.length} produtos e {proposal.productionRules.length} regras de preferência. Consulte a situação dos metadados no Firebase antes de qualquer aplicação; nenhum saldo ou aprovação é alterado por esta migração.</p>
   <div className="inventory-actions">
    <button type="button" onClick={()=>sync('preview')} disabled={busy}>{busy?'Aguarde...':'Conferir diferenças no Firebase'}</button>
-   <button type="button" onClick={()=>sync('apply')} disabled={busy||!plan||!plan.some(x=>x.status==='ready')}>Aplicar apenas itens compatíveis</button>
+   <button type="button" onClick={()=>sync('apply')} disabled={busy||!plan||!plan.some(x=>x.status==='ready'||x.status==='new')}>Aplicar apenas itens compatíveis</button>
   </div>
   {notice&&<p role="status">{notice}</p>}
-  {plan&&<div><strong>Resultado da conferência:</strong> {['ready','unchanged','conflict','missing','pending'].map(k=><span key={k}> {({ready:'Prontos',unchanged:'Atualizados',conflict:'Conflitos',missing:'Ausentes',pending:'Pendentes'})[k]}: {plan.filter(x=>x.status===k).length} ·</span>)}
-  <p>Produtos ausentes, divergentes ou com ficha técnica pendente não serão modificados.</p></div>
+  {plan&&<div><strong>Resultado da conferência:</strong> {['ready','new','unchanged','conflict','missing','pending'].map(k=><span key={k}> {({ready:'Prontos',new:'Novos',unchanged:'Atualizados',conflict:'Conflitos',missing:'Ausentes',pending:'Pendentes'})[k]}: {plan.filter(x=>x.status===k).length} ·</span>)}
+  <p>Produtos novos suficientemente definidos podem ser criados inativos. Produtos divergentes ou incompletos permanecerão para revisão.</p></div>
   {show&&<>
    <div className="inventory-fields">
     <label>Pesquisar proposta<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Filé de alcatra, peito de frango..." /></label>
