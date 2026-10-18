@@ -6,7 +6,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {validateRosterEntry} from '../../server/team/roster-rules.js';
 import {validatePersonalProfile,earnedRecognition} from '../../server/team/personal-rules.js';
 import {profileChanges,professionalNotice} from '../../server/team/ux-rules.js';
-import {validateProfessionalProfile,canManageProfessionalProfile,invalidNewSectorSkills} from '../../server/team/profile-rules.js';
+import {validateProfessionalProfile,canManageProfessionalProfile,invalidNewSectorSkills,eligibleSkills} from '../../server/team/profile-rules.js';
 import { getDb, getAuth, authenticate, membership, roles, checkRequest, send } from '../../server/_lib.js';
 
 const statuses = ['active','inactive'];
