@@ -19,8 +19,8 @@ async function call(action, payload={}) {
   if (!res.ok) throw new Error(data.message || 'Erro ao consultar catálogo.');
   return data;
 }
-export default function Inventory({
- const {notify}=useFeedback();membership,mode='stock',onAction}) {
+export default function Inventory({membership,mode='stock',onAction}) {
+ const {notify}=useFeedback();
   const [products,setProducts] = useState([]);
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
