@@ -13,6 +13,8 @@ export default function MasterRegistry(){
  const refresh=useCallback(async()=>{setBusy(true);setError('');try{const v=await api('masterRegistryPreview');setData(v);const claimsData=await api('masterRegistryClaims');setClaims(claimsData.claims||[]);setSelected([])}catch(e){setError(e.message)}finally{setBusy(false)}},[]);
  useEffect(()=>{refresh()},[refresh]);
  const selectable=(data?.people||[]).filter(p=>p.state==='new');
+ const activate=async()=>{if(!window.confirm('Confirmou os 12 colaboradores, cargos, folgas e vínculos? Ativar esta base como fonte de novas escalas?'))return;setBusy(true);setError('');try{const d=await api('masterRegistryActivate',{confirm:true});setNotice(d.message);await refresh()}catch(err){setError(err.message);notifyLocal(err.message)}finally{setBusy(false)}};
+ const notifyLocal=message=>setError(message);
  const linkAccount=async(claim)=>{if(!window.confirm('Confirmou pessoalmente que esta conta pertence ao colaborador?'))return;setBusy(true);try{const d=await api('masterRegistryLink',{id:claim.registryId,uid:claim.accountUid});setNotice(d.message);await refresh()}catch(e){setError(e.message)}finally{setBusy(false)}};
  const importSelected=async()=>{
   if(!selected.length||!window.confirm('Criar '+selected.length+' fichas sem login? Contas já existentes não serão modificadas.'))return;
@@ -34,13 +36,14 @@ export default function MasterRegistry(){
     <thead><tr><th>Importar</th><th>Colaborador</th><th>Cargo / setor</th><th>Turno</th><th>Folga</th><th>Conciliação</th></tr></thead>
     <tbody>{(data?.people||[]).map(p=><tr key={p.name} style={{borderBottom:'1px solid #ddd'}}>
      <td><input type="checkbox" aria-label={'Selecionar '+p.name} checked={selected.includes(p.name)} disabled={busy||p.state!=='new'} onChange={e=>setSelected(old=>e.target.checked?[...old,p.name]:old.filter(x=>x!==p.name))}/></td>
-     <td>{p.name}</td><td>{p.jobTitle} · {p.sector}</td><td>{p.shift==='manha'?'Manhã':'Noite'}</td><td>{days[p.fixedWeekday]}</td><td>{states[p.state]}{p.accountMatches>0?' ('+p.accountMatches+' conta(s) possível(is))':''}</td>
+     <td>{p.name}</td><td>{p.jobTitle} · {p.sector}</td><td>{p.shift==='manha'?'Manhã':'Noite'}</td><td>{days[p.fixedWeekday]}</td><td>{states[p.state]}{p.state==='needs_review'&&<div><small>Código para reivindicação: <code>{p.seedId}</code></small></div>}{p.accountMatches>0?' ('+p.accountMatches+' conta(s) possível(is))':''}</td>
     </tr>)}</tbody>
    </table>
   </div>
+  <section style={{padding:12,border:'1px solid #aaa',borderRadius:8,margin:'16px 0'}}><h3>Fonte oficial para escalas</h3><p>{data?.activated?'Cadastro Mestre ativado. Novas escalas usarão apenas as fichas ativas, não contas de teste.':'Ainda em conferência. Escalas continuam no modelo anterior até você ativar os 12 cadastros completos.'}</p><button type="button" disabled={busy||!data||data.activated} onClick={activate}>{data?.activated?'Cadastro ativado':'Ativar Cadastro Mestre após conferência'}</button></section>
   <h3>Vínculos solicitados pelos próprios usuários</h3>
   {!claims.length&&<p>Nenhuma solicitação pendente.</p>}
-  {claims.map(claim=><article key={claim.id} style={{padding:12,border:'1px solid #ddd',borderRadius:8,marginBottom:8}}><strong>{data?.registry?.find(p=>p.id===claim.registryId)?.name||'Ficha '+claim.registryId}</strong> · Conta {data?.accounts?.find(x=>x.uid===claim.accountUid)?.name||claim.accountUid}<p>Confirme a identidade do colaborador antes de vincular. Nome parecido não é comprovação.</p><button type="button" disabled={busy} onClick={()=>linkAccount(claim)}>Confirmar vínculo</button></article>)}
+  {claims.map(claim=><article key={claim.id} style={{padding:12,border:'1px solid #ddd',borderRadius:8,marginBottom:8}}><strong>{data?.registry?.find(p=>p.id===claim.registryId)?.name||data?.people?.find(p=>p.seedId===claim.registryId)?.name||'Ficha '+claim.registryId}</strong> · Conta {data?.accounts?.find(x=>x.uid===claim.accountUid)?.name||claim.accountUid}<p>Confirme a identidade do colaborador antes de vincular. Nome parecido não é comprovação.</p><button type="button" disabled={busy} onClick={()=>linkAccount(claim)}>Confirmar vínculo</button></article>)}
   <h3>Fichas já criadas</h3>
   {!data?.registry?.length&&<p>Nenhuma ficha cadastrada nesta unidade.</p>}
   <div style={{display:'grid',gap:8}}>
@@ -63,6 +66,7 @@ export default function MasterRegistry(){
    <button type="submit" disabled={busy}>Salvar ficha</button>
    <button type="button" onClick={()=>setEditing(null)}>Cancelar</button>
   </form>}
+  <p>Para pessoas com conta existente, compartilhe o código da ficha mostrado na prévia. O colaborador solicita o vínculo em Minha ficha; a gerência verifica a identidade e confirma aqui.</p>
   <p>Colaboradores com correspondência ficam bloqueados para importação até conferirmos identidade e vínculo. Daniel e Geraldo não participam desta importação.</p>
   <button type="button" onClick={importSelected} disabled={busy||selected.length===0}>Criar {selected.length} ficha(s) selecionada(s)</button>
   <button type="button" onClick={()=>setSelected(selectable.map(p=>p.name))} disabled={busy||!selectable.length} style={{marginLeft:8}}>Selecionar sem conflito</button>
