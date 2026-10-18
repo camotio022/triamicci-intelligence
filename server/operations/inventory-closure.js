@@ -2,7 +2,7 @@ import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const productPattern=/^[a-f0-9]{40}$/;
 const requestPattern=/^[a-f0-9-]{36}$/i;
 const toIso=v=>v?.toDate?.()?.toISOString?.()||null;
-const localDay=d=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+const localDay=d=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);const v=Object.fromEntries(parts.map(x=>[x.type,x.value]));return `${v.year}-${v.month}-${v.day}`;};
 const fail=(res,e)=>{
  const m={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Acesso gerencial necessário.'],INVALID:[400,'Dados inválidos.'],NOT_FOUND:[404,'Registro não encontrado.'],CONFLICT:[409,'Contagem ou saldo mudou; atualize e solicite novamente.'],ALREADY_CLOSED:[409,'Fechamento deste dia já aprovado.']};
  if(m[e.message])return send(res,...m[e.message]);
