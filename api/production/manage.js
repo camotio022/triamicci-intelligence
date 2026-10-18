@@ -1,6 +1,7 @@
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {countUnit,validQuantity} from '../operations/logic.js';
 import {areaTotals,allocateFEFO} from '../operations/lot-logic.js';
+import {validProductionSelection} from './logic.js';
 import {createHash} from 'node:crypto';
 
 const productIdPattern=/^[a-f0-9]{40}$/;
@@ -75,8 +76,7 @@ export default async function handler(req,res){
    if(!recipe.exists||recipe.data().active!==true)throw Error('RECIPE_NOT_FOUND');
    const recipeData=recipe.data(),productDocs=docs.slice(0,items.length),balanceDocs=docs.slice(items.length);
    if(productDocs.some(p=>!p.exists||p.data().status!=='active')||balanceDocs.some(b=>!b.exists))throw Error('MISSING_STOCK');
-   if(items.length!==recipeData.lines.length||
-      items.some((i,index)=>![recipeData.lines[index].productId,...(recipeData.lines[index].substitutes||[])].includes(i.productId)))
+   if(!validProductionSelection(recipeData.lines,items))
       throw Error('UNAUTHORIZED_SUBSTITUTE');
    // Fetch all lot snapshots and catalog definitions BEFORE any transaction writes.
    const centralDocs=await Promise.all(productDocs.map(p=>p.data().catalogId?
