@@ -1,3 +1,10 @@
+export function defaultStaffAvailability(shift,fixedWeekday){
+ const days=['dom','seg','ter','qua','qui','sex','sab'];
+ if(!['manha','noite'].includes(shift))return [];
+ const weekday=shift==='manha'?{start:'08:00',end:'16:20',breakStart:'14:00',breakEnd:'15:00'}:{start:'14:00',end:'22:20',breakStart:'15:00',breakEnd:'16:00'};
+ const sunday=shift==='manha'?{start:'08:00',end:'16:20',breakStart:'10:30',breakEnd:'11:30'}:{start:'12:00',end:'20:20',breakStart:'14:00',breakEnd:'15:00'};
+ return days.map((day,index)=>index===fixedWeekday?null:{day,...(index===0?sunday:weekday)}).filter(Boolean);
+}
 // Prévia determinística: nunca vincular contas somente pelo nome.
 export const staffSeed=[
  ['Patrícia','Auxiliar de cozinha','cozinha','manha',1],
