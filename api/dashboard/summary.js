@@ -11,15 +11,24 @@ export default async function handler(req,res) {
     const unit=db.collection('units').doc(m.unitId);
     const end=new Date();
     const start=new Date(end.getTime()-7*86400000);
-    const [productsSnap,movementsSnap]=await Promise.all([
+    const [productsSnap,movementsSnap,balancesSnap]=await Promise.all([
       unit.collection('products').limit(201).get(),
-      unit.collection('movements').where('at','>=',start).orderBy('at','asc').limit(1001).get()
+      unit.collection('movements').where('at','>=',start).orderBy('at','asc').limit(1001).get(),
+      unit.collection('physicalBalances').limit(201).get()
     ]);
-    if(productsSnap.size>200 || movementsSnap.size>1000)
+    if(productsSnap.size>200 || movementsSnap.size>1000 || balancesSnap.size>200)
       return send(res,409,'Dados acima do limite inicial do dashboard. É necessário paginar ou agregar os registros.');
     const products=productsSnap.docs.map(doc=>({id:doc.id,...doc.data()}));
     const active=products.filter(p=>p.status==='active');
-    const low=active.filter(p=>typeof p.quantity==='number' && typeof p.minStock==='number' && p.quantity<=p.minStock);
+    // Alertar apenas quando houver contagem física atual e unidade mínima compatível.
+    // Nunca confundir quantity legado com estoque conferido.
+    const balances=new Map(balancesSnap.docs.map(d=>[d.id,d.data()]));
+    const low=active.map(p=>{
+      const b=balances.get(p.id);
+      if(!b || !Number.isFinite(b.total) || b.unit!==p.unit ||
+         !Number.isFinite(p.minStock) || p.minStock<0)return null;
+      return {...p,physicalQuantity:b.total,physicalUnit:b.unit};
+    }).filter(p=>p && p.physicalQuantity<=p.minStock);
     const movements=movementsSnap.docs.map(doc=>doc.data());
     const days=Array.from({length:7},(_,i)=>{
       const date=new Date(start.getTime()+(i+1)*86400000);
@@ -39,11 +48,11 @@ export default async function handler(req,res) {
     for(const p of active){const name=typeof p.category==='string'?p.category:'Outros';categories[name]=(categories[name]||0)+1;}
     return send(res,200,'Indicadores reais da unidade.',{
       generatedAt:end.toISOString(),productCount:products.length,activeCount:active.length,
-      attentionCount:low.length,entries:movements.filter(x=>x.type==='entry').length,
+      attentionCount:low.length,uncountedCount:active.filter(p=>!balances.has(p.id)).length,entries:movements.filter(x=>x.type==='entry').length,
       exits:movements.filter(x=>x.type==='exit').length,
       days,categories:Object.entries(categories).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value),
-      lowProducts:low.sort((a,b)=>(a.quantity||0)-(b.quantity||0)).slice(0,10)
-        .map(p=>({id:p.id,name:p.name,category:p.category,quantity:p.quantity,unit:p.unit,minStock:p.minStock}))
+      lowProducts:low.sort((a,b)=>a.physicalQuantity-b.physicalQuantity).slice(0,10)
+        .map(p=>({id:p.id,name:p.name,category:p.category,quantity:p.physicalQuantity,unit:p.physicalUnit,minStock:p.minStock}))
     });
   }catch(e){
     if(e.message==='UNAUTHENTICATED')return send(res,401,'Entre com Google.');
