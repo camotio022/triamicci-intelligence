@@ -1,6 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
-import {suggestedQuantity} from '../api/production/logic.js';
+import {suggestedQuantity} from '../server/production/logic.js';
 const idFor=s=>s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,50);
 async function call(path,action,payload={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login.');
