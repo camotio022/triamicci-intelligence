@@ -20,7 +20,7 @@ export default function MyProfessionalProfile({membership}){
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[editing,setEditing]=useState(false);
  const editingRef=useRef(false);editingRef.current=editing;
  const [syncedAt,setSyncedAt]=useState(null);const [avatar,setAvatar]=useState(null);const [uploading,setUploading]=useState(false);
- const [photoFile,setPhotoFile]=useState(null);
+ const [photoFile,setPhotoFile]=useState(null);const [registryCode,setRegistryCode]=useState(''),[claiming,setClaiming]=useState(false);
  const [error,setError]=useState(''),[skill,setSkill]=useState(''),[reason,setReason]=useState(''),[requesting,setRequesting]=useState(false);
  const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const data=await api('myProfile');
  setProfile(data.professional);setAvatar(data.avatar||null);if(!editingRef.current)setPersonal({...blank,...(data.personal||{})});setRecognition(data.recognition);setSyncedAt(new Date());
@@ -38,6 +38,7 @@ export default function MyProfessionalProfile({membership}){
  catch(e){notify(e.message,'error')}finally{setSaving(false)}};
  const request=async e=>{e.preventDefault();if(requesting)return;setRequesting(true);try{const d=await api('skillReviewRequest',{skill,reason});
  notify(d.message,'success');setSkill('');setReason('')}catch(e){notify(e.message,'error')}finally{setRequesting(false)}};
+ const requestRegistryLink=async e=>{e.preventDefault();setClaiming(true);try{const result=await api('masterRegistryClaim',{id:registryCode.trim()});notify(result.message,'success');setRegistryCode('')}catch(err){notify(err.message,'error')}finally{setClaiming(false)}};
  const confirmed=new Set(profile?.certifications||[]);
  const name=personal.displayName||auth.currentUser?.displayName||auth.currentUser?.email?.split('@')[0]||'Colaborador';
  return <section className="ti-premium team-page">
@@ -85,6 +86,7 @@ export default function MyProfessionalProfile({membership}){
      {profile?.availability?.length?<div className="ti-premium-schedule">{profile.availability.map(d=><div key={d.day}>
       <strong>{days[d.day]||d.day}</strong><span>{d.start}–{d.end}</span><small>Pausa {d.breakStart}–{d.breakEnd}</small></div>)}</div>:<p>Jornada ainda não cadastrada pela gerência.</p>}
     </section>
+    <section className="ti-premium-card"><h2><UserRound size={21}/> Vincular minha ficha ao Cadastro Mestre</h2><p>Peça à gerência o código da sua ficha. A vinculação somente ocorrerá após confirmação da identidade pela gerência; suas permissões não mudam.</p><form className="ti-premium-form" onSubmit={requestRegistryLink}><label>Código da ficha<input required maxLength={128} pattern="[A-Za-z0-9_-]+" value={registryCode} onChange={e=>setRegistryCode(e.target.value)} placeholder="Código fornecido pela gerência"/></label><button type="submit" disabled={claiming||!registryCode.trim()}>Solicitar vínculo</button></form></section>
     <section className="ti-premium-card"><h2><Send size={21}/> Quero desenvolver uma habilidade</h2>
      <p>Conte à gerência qual habilidade gostaria de ter revisada. O pedido não confirma a habilidade automaticamente.</p>
      <form className="ti-premium-form" onSubmit={request}>
