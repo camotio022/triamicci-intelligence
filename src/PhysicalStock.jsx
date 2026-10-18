@@ -64,6 +64,9 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
  const previous=summary?.previous;
  const receivingUnit=p?.receivingUnitOverride||catalogProduct?.receivingUnit||p?.unit||'un';
  const deliveredCommercial=receivingUnit===physicalUnit?Number(amount):receivingUnit==='kg'&&physicalUnit==='un'?Number(weight):null;
+ const weightToPieces=receivingUnit==='kg'&&physicalUnit==='un';
+ const proteinMismatch=p?.category==='Proteínas'&&physicalUnit!=='un';
+
  const total=numeric(reserve)!==null&&numeric(rotation)!==null?Number(reserve)+Number(rotation):null;
  const submit=async e=>{
   e.preventDefault();if(busy||!p)return;
@@ -101,13 +104,15 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   {mode==='history'?null:mode==='receive'&&!canReceive?<p>Somente administrador ou gerente pode registrar recebimentos.</p>:
   <form className="receiving-card" onSubmit={submit}>
    <h2>{mode==='receive'?'Conferir entrega':'Registrar contagem'}</h2>
+   {p&&weightToPieces&&<div className="receiving-notice"><strong>Conferência por peso → contagem por peças:</strong> registre o peso pedido e o peso efetivamente entregue em kg. Após porcionar, informe a quantidade real de peças encontradas. Não calculamos peças automaticamente a partir dos quilos.</div>}
+   {p&&proteinMismatch&&<div className="receiving-notice" role="alert"><strong>Unidade operacional a conferir:</strong> este produto está configurado para {physicalUnit}. Se for carne porcionada, um administrador deve corrigir a unidade operacional para un e realizar nova contagem; saldos antigos não serão convertidos automaticamente.</div>}
    <div className="inventory-fields">
     <label>Produto<select required value={productId} onChange={e=>{setProductId(e.target.value);setPendingId(null);setStatus('')}}>
      <option value="">Selecione o produto da unidade</option>{products.filter(x=>x.status==='active').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
     </select></label>
     {mode==='receive'?<>
      <label>Fornecedor<input required minLength={1} maxLength={160} value={supplier} onChange={e=>{setSupplier(e.target.value);setPendingId(null)}} /></label>
-     <label>Quantidade física recebida ({physicalUnit})<input required type="number" min="0.001" step={physicalUnit==='un'?'1':'0.001'} value={amount} onChange={e=>{setAmount(e.target.value);setPendingId(null)}}/></label>
+     <label>{weightToPieces?'Peças obtidas após porcionamento (un)':'Quantidade física recebida ('+physicalUnit+')'}<input required type="number" min="0.001" step={physicalUnit==='un'?'1':'0.001'} value={amount} onChange={e=>{setAmount(e.target.value);setPendingId(null)}}/></label>
      <label>Quantidade solicitada ({receivingUnit})<input required type="number" min={receivingUnit==='un'?'1':'0.001'} step={receivingUnit==='un'?'1':'0.001'} value={orderedQuantity} onChange={e=>{setOrderedQuantity(e.target.value);setPendingId(null)}}/></label>
      <label>{receivingUnit==='kg'&&physicalUnit==='un'?'Peso efetivamente entregue (kg) — obrigatório':'Peso entregue (kg), quando houver'}<input required={receivingUnit==='kg'&&physicalUnit==='un'} type="number" min="0.001" step="0.001" value={weight} onChange={e=>{setWeight(e.target.value);setPendingId(null)}}/></label>
      {p?.trackExpiry&&<>
@@ -144,7 +149,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
       r.kind==='count'?qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')':
       r.kind==='production'?r.portions+' porções · '+r.items?.map(i=>i.productName+' '+qty(i.quantity)+' '+i.unit).join(' + '):
       r.kind==='transfer'?qty(r.quantity)+' '+r.unit+' · '+r.from+' → '+r.to:
-      qty(r.quantity)+' '+r.unit+' · '+r.location+' · '+r.reason}</td><td>{r.actorName||r.actorUid}</td></tr>)}
+      qty(r.quantity)+' '+r.unit+' · '+r.location+' · '+r.reason}</td><td>{r.actorName||'Responsável não identificado'}</td></tr>)}
     </tbody></table></div>}
    {(more.receipts||more.counts||more.outflows||more.transfers||more.productions)&&<button type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore?'Carregando...':'Carregar registros anteriores'}</button>}
   </section>
