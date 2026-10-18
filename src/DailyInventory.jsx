@@ -15,9 +15,10 @@ export default function DailyInventory({membership}){
  const [products,setProducts]=useState([]),[productId,setProductId]=useState('');
  const [result,setResult]=useState(null),[loading,setLoading]=useState(false);
  const [error,setError]=useState('');
- const [closures,setClosures]=useState([]),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
+ const [closures,setClosures]=useState([]),[moreClosures,setMoreClosures]=useState(false),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const isManager=['admin','manager'].includes(membership.role);
- const refreshClosures=async()=>{if(!isManager)return;const d=await request('/api/operations/stock','closeList');setClosures(d.closures||[])};
+ const refreshClosures=async()=>{if(!isManager)return;const d=await request('/api/operations/stock','closeList');setClosures(d.closures||[]);setMoreClosures(!!d.hasMore)};
+ const loadMoreClosures=async()=>{if(busy||!moreClosures||!closures.length)return;setBusy(true);try{const d=await request('/api/operations/stock','closeList',{before:closures.at(-1).submittedAt});setClosures(old=>[...old,...(d.closures||[])]);setMoreClosures(!!d.hasMore)}catch(e){setError(e.message)}finally{setBusy(false)}};
  useEffect(()=>{if(isManager)refreshClosures().catch(e=>setError(e.message))},[membership.role]);
  const decide=async(action,id,pid,reason='')=>{setBusy(true);setNotice('');try{const d=await request('/api/operations/stock',action,{productId:pid,requestId:id,reason});setNotice(d.message);await refreshClosures()}catch(e){setError(e.message)}finally{setBusy(false)}};
  useEffect(()=>{
@@ -83,6 +84,7 @@ export default function DailyInventory({membership}){
      <button disabled={busy} type="button" onClick={()=>decide("closeApprove",x.countId,x.productId)}>Aprovar fechamento</button>
      <button disabled={busy} type="button" onClick={()=>{const reason=window.prompt("Justificativa da recusa:");if(reason?.trim())decide("closeReject",x.countId,x.productId,reason.trim())}}>Recusar</button>
     </div>}</article>)}
+   {moreClosures&&<button type="button" disabled={busy} onClick={loadMoreClosures}>Carregar fechamentos anteriores</button>}
   </section>}
  </section>;
 }
