@@ -20,8 +20,8 @@ async function request(action, payload = {}) {
   return data;
 }
 
-export default function MemberDirectory({
- const {notify}=useFeedback();user,membership}) {
+export default function MemberDirectory({user,membership}) {
+ const {notify}=useFeedback();
   const [members,setMembers] = useState([]);
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
