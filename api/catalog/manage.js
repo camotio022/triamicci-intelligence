@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 
 const allowedUnits = new Set(['kg','L','un']);
 const catalogProposal=JSON.parse(readFileSync(new URL('../../data/triamicci-product-catalog-v2.proposal.json',import.meta.url),'utf8')).products;
