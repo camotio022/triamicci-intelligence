@@ -9,10 +9,11 @@ async function api(action,extra={}){
  const data=await r.json();if(!r.ok)throw Error(data.message||'Erro ao consultar cadastro.');return data;
 }
 export default function MasterRegistry(){
- const [editing,setEditing]=useState(null),[form,setForm]=useState({}),[data,setData]=useState(null),[selected,setSelected]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
- const refresh=useCallback(async()=>{setBusy(true);setError('');try{const v=await api('masterRegistryPreview');setData(v);setSelected([])}catch(e){setError(e.message)}finally{setBusy(false)}},[]);
+ const [claims,setClaims]=useState([]),[editing,setEditing]=useState(null),[form,setForm]=useState({}),[data,setData]=useState(null),[selected,setSelected]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ const refresh=useCallback(async()=>{setBusy(true);setError('');try{const v=await api('masterRegistryPreview');setData(v);const claimsData=await api('masterRegistryClaims');setClaims(claimsData.claims||[]);setSelected([])}catch(e){setError(e.message)}finally{setBusy(false)}},[]);
  useEffect(()=>{refresh()},[refresh]);
  const selectable=(data?.people||[]).filter(p=>p.state==='new');
+ const linkAccount=async(claim)=>{if(!window.confirm('Confirmou pessoalmente que esta conta pertence ao colaborador?'))return;setBusy(true);try{const d=await api('masterRegistryLink',{id:claim.registryId,uid:claim.accountUid});setNotice(d.message);await refresh()}catch(e){setError(e.message)}finally{setBusy(false)}};
  const importSelected=async()=>{
   if(!selected.length||!window.confirm('Criar '+selected.length+' fichas sem login? Contas já existentes não serão modificadas.'))return;
   setBusy(true);setError('');
@@ -37,6 +38,9 @@ export default function MasterRegistry(){
     </tr>)}</tbody>
    </table>
   </div>
+  <h3>Vínculos solicitados pelos próprios usuários</h3>
+  {!claims.length&&<p>Nenhuma solicitação pendente.</p>}
+  {claims.map(claim=><article key={claim.id} style={{padding:12,border:'1px solid #ddd',borderRadius:8,marginBottom:8}}><strong>{data?.registry?.find(p=>p.id===claim.registryId)?.name||'Ficha '+claim.registryId}</strong> · Conta {data?.accounts?.find(x=>x.uid===claim.accountUid)?.name||claim.accountUid}<p>Confirme a identidade do colaborador antes de vincular. Nome parecido não é comprovação.</p><button type="button" disabled={busy} onClick={()=>linkAccount(claim)}>Confirmar vínculo</button></article>)}
   <h3>Fichas já criadas</h3>
   {!data?.registry?.length&&<p>Nenhuma ficha cadastrada nesta unidade.</p>}
   <div style={{display:'grid',gap:8}}>
