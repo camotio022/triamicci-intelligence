@@ -1,4 +1,4 @@
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
+import {getDb,getAuth,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 import {dateOk,cappedExpiry,canReplaceLabel} from '../../server/labels/rules.js';
 const idOk=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 const textOk=(x,max)=>typeof x==='string'&&x.trim().length>0&&x.length<=max;
@@ -20,7 +20,16 @@ export default async function handler(req,res){
    const id=req.body?.id;if(!idOk(id))return send(res,400,'Identificador inválido.');
    const doc=await labels.doc(id).get();if(!doc.exists)return send(res,404,'Etiqueta não encontrada.');
    const snap=await labels.doc(id).collection('events').orderBy('at','desc').limit(100).get();
-   return send(res,200,'Histórico da etiqueta.',{label:safeDoc(doc),events:snap.docs.map(safeDoc)});
+   const events=snap.docs.map(safeDoc);
+   const uids=[...new Set(events.map(e=>e.actorUid).filter(Boolean))];
+   const profiles=uids.length?await db.getAll(...uids.map(uid=>db.collection('memberships').doc(uid))):[];
+   const names=new Map(profiles.filter(p=>p.exists&&p.data().unitId===m.unitId).map(p=>[p.id,p.data().name||'']));
+   const missing=uids.filter(uid=>!names.get(uid));
+   for(let i=0;i<missing.length;i+=100){
+    const result=await getAuth().getUsers(missing.slice(i,i+100).map(uid=>({uid})));
+    for(const u of result.users)names.set(u.uid,u.displayName||'');
+   }
+   return send(res,200,'Histórico da etiqueta.',{label:safeDoc(doc),events:events.map(e=>({...e,actorName:names.get(e.actorUid)||'Responsável não identificado'}))});
   }
   if(action==='policyDraft'){
    if(m.role!=='admin')return send(res,403,'Apenas administradores configuram regras.');
