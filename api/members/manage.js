@@ -71,14 +71,16 @@ export default async function handler(req,res) {
       if(typeof id!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(id)||typeof uid!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(uid))return send(res,400,'Identificadores inválidos.');
       const unit=db.collection('units').doc(actingMember.unitId),ref=unit.collection('staffRegistry').doc(id),claim=unit.collection('staffRegistryClaims').doc(id+'_'+uid),account=db.collection('memberships').doc(uid);
       const other=await unit.collection('staffRegistry').where('accountUid','==',uid).limit(1).get();
+      const linkLock=unit.collection('staffRegistryLinks').doc(uid);
       const seed=staffSeed.find(p=>'staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40)===id);
       if(!other.empty&&other.docs[0].id!==id)return send(res,409,'Conta já vinculada a outra ficha.');
       const now=new Date();
       await db.runTransaction(async tx=>{
-        const [p,q,a]=await Promise.all([tx.get(ref),tx.get(claim),tx.get(account)]);
-        if((!p.exists&&!seed)||(p.exists&&(p.data().status!=='active'||p.data().accountUid))||!q.exists||q.data().status!=='pending'||q.data().accountUid!==uid||!a.exists||a.data().unitId!==actingMember.unitId||a.data().status!=='active')throw Error('CONFLICT');
+        const [p,q,a,lock]=await Promise.all([tx.get(ref),tx.get(claim),tx.get(account),tx.get(linkLock)]);
+        if(lock.exists&&lock.data().registryId!==id||(!p.exists&&!seed)||(p.exists&&(p.data().status!=='active'||p.data().accountUid))||!q.exists||q.data().status!=='pending'||q.data().accountUid!==uid||!a.exists||a.data().unitId!==actingMember.unitId||a.data().status!=='active')throw Error('CONFLICT');
         if(p.exists)tx.update(ref,{accountUid:uid,linkedAt:now,linkedBy:actor.uid,updatedAt:now});
         else tx.create(ref,{...seed,availability:defaultStaffAvailability(seed.shift,seed.fixedWeekday),normalizedName:normalizeStaffName(seed.name),status:'active',skills:[],certifications:[],accountUid:uid,linkedAt:now,linkedBy:actor.uid,createdAt:now,createdBy:actor.uid,updatedAt:now,source:'levantamento_escala_2026'});
+        if(!lock.exists)tx.create(linkLock,{registryId:id,accountUid:uid,linkedAt:now,linkedBy:actor.uid});
         tx.update(claim,{status:'approved',reviewedAt:now,reviewedBy:actor.uid});
         tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_account_linked',unitId:actingMember.unitId,actorUid:actor.uid,targetUid:uid,registryId:id,at:now});
       });
