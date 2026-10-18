@@ -12,6 +12,25 @@ export default async function handler(req,res){
   if(!m)return send(res,403,'Acesso não autorizado.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId),schedules=unit.collection('schedules');
   const action=req.body?.action;
+  if(action==='fixedOffList'){
+   if(!['admin','manager'].includes(m.role))return send(res,403,'Apenas a gerência consulta o planejamento de folgas.');
+   const snap=await unit.collection('fixedOffDays').limit(200).get();
+   return send(res,200,'Folgas habituais carregadas.',{fixedOffDays:Object.fromEntries(snap.docs.map(d=>[d.id,d.data().weekday]))});
+  }
+  if(action==='fixedOffSet'){
+   if(!['admin','manager'].includes(m.role))return send(res,403,'Apenas a gerência altera folgas habituais.');
+   const {uid,weekday}=req.body||{};
+   if(!idOk(uid)||!Number.isInteger(weekday)||weekday<1||weekday>4)return send(res,400,'Selecione um dia entre segunda e quinta.');
+   const ref=unit.collection('fixedOffDays').doc(uid),now=new Date();
+   await db.runTransaction(async tx=>{
+    const [actorSnap,target,prior]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(db.doc('memberships/'+uid)),tx.get(ref)]);
+    if(!actorSnap.exists||actorSnap.data().status!=='active'||actorSnap.data().unitId!==m.unitId||!['admin','manager'].includes(actorSnap.data().role))throw Error('FORBIDDEN');
+    if(!target.exists||target.data().unitId!==m.unitId||target.data().status!=='active')throw Error('FORBIDDEN');
+    tx.set(ref,{weekday,unitId:m.unitId,updatedAt:now,updatedBy:actor.uid});
+    tx.create(db.collection('auditLogs').doc(),{event:'schedule.fixed_off_changed',unitId:m.unitId,actorUid:actor.uid,targetUid:uid,previousWeekday:prior.exists?prior.data().weekday:null,weekday,at:now});
+   });
+   return send(res,200,'Folga habitual atualizada. Escalas publicadas não foram alteradas.');
+  }
   if(action==='list'){
    const snap=await schedules.limit(120).get();
    const manager=['admin','manager'].includes(m.role);
