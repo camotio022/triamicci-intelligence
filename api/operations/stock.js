@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto';
 import dispatchHandler from '../../server/operations/dispatch.js';
+import dailyReport from '../../server/operations/daily-report.js';
 import transferHandler from '../../server/operations/transfer.js';
 import reconcileLotsHandler from '../../server/operations/reconcile-lots.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
@@ -24,6 +25,7 @@ function error(res,e){
 }
 export default async function handler(req,res){
  const subaction=req.body?.action;
+ if(subaction==='dailyReport')return dailyReport(req,res);
  if(subaction==='dispatch')return dispatchHandler(req,res);
  if(subaction==='transfer')return transferHandler(req,res);
  if(subaction==='reconcile')return reconcileLotsHandler(req,res);
