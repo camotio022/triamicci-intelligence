@@ -39,7 +39,7 @@ export default function DailyInventory({membership}){
  },[productId]);
  const r=result?.report;
  return <section className="receiving-page">
-  <p className="eyebrow">PACOTE 04 · CONCILIAÇÃO FÍSICA · {membership.unitId}</p>
+  <p className="eyebrow">OPERAÇÃO · INVENTÁRIO · {membership.unitId.toUpperCase()}</p>
   <h1>Inventário inteligente</h1>
   <p>Consulte a diferença entre as duas últimas contagens físicas, considerando recebimentos e baixas registradas. Esta apuração não modifica o estoque.</p>
   <div className="receiving-card">
