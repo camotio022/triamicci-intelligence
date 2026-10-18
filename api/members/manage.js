@@ -1,3 +1,4 @@
+import {staffSeed,reconcileStaff,normalizeStaffName} from '../../server/team/master-registry.js';
 import schedulesWorkflow from '../../server/workflows/schedules.js';
 import muralWorkflow from '../../server/workflows/mural.js';
 import labelsWorkflow from '../../server/workflows/labels.js';
@@ -35,6 +36,27 @@ export default async function handler(req,res) {
 
     const { action } = req.body || {};
     const db = getDb();
+    if(action==='masterRegistryPreview'||action==='masterRegistryImport'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Apenas gerência pode revisar colaboradores.');
+      const unit=db.collection('units').doc(actingMember.unitId),registryRef=unit.collection('staffRegistry');
+      const [staff,accounts]=await Promise.all([registryRef.limit(200).get(),db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get()]);
+      if(staff.size>=200||accounts.size>200)return send(res,409,'Limite de conferência atingido; importação bloqueada.');
+      const registry=staff.docs.map(d=>({id:d.id,...d.data()}));
+      const existingAccounts=accounts.docs.map(d=>({uid:d.id,name:d.data().name||'',status:d.data().status||''}));
+      const preview=reconcileStaff(staffSeed,registry,existingAccounts);
+      if(action==='masterRegistryPreview')return send(res,200,'Prévia carregada; nenhuma conta será vinculada automaticamente.',{people:preview,registry,accounts:existingAccounts});
+      if(req.body?.confirm!==true)return send(res,400,'Confirme a importação após revisar a prévia.');
+      const ambiguous=preview.filter(p=>p.state!=='new');
+      if(ambiguous.length)return send(res,409,'Existem nomes que podem corresponder a contas ou fichas existentes; revise antes de importar.',{people:preview});
+      const now=new Date();
+      const batch=db.batch();
+      for(const p of preview){
+        const ref=registryRef.doc();
+        batch.create(ref,{name:p.name,normalizedName:normalizeStaffName(p.name),jobTitle:p.jobTitle,sector:p.sector,shift:p.shift,fixedWeekday:p.fixedWeekday,status:'active',accountUid:null,skills:[],createdBy:actor.uid,createdAt:now,updatedAt:now,source:'levantamento_escala_2026'});
+      }
+      await batch.commit();
+      return send(res,201,'Fichas criadas sem contas de acesso. Nenhum perfil anterior foi modificado.',{created:preview.length});
+    }
     if(action==='rosterList'){
       if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
       const snap=await db.collection('units').doc(actingMember.unitId).collection('rosterEntries').limit(200).get();
