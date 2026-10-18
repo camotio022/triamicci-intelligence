@@ -17,7 +17,7 @@ jobs:
         run: |
           if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
       - name: Regras de equipe
-        run: node --test tests/team-profile.test.js tests/ux-team.test.js tests/personal-profile.test.js tests/roster-entry.test.js
+        run: node --test tests/team-profile.test.js tests/ux-team.test.js tests/personal-profile.test.js tests/roster-entry.test.js tests/sector-skills.test.js tests/schedules-rules.test.js
       - name: Verificar API
         run: |
           node --check api/members/manage.js
@@ -25,5 +25,6 @@ jobs:
           node --check server/team/ux-rules.js
           node --check server/team/personal-rules.js
           node --check server/team/roster-rules.js
+          node --check server/schedules/rules.js
       - name: Build
         run: npm run build
