@@ -232,3 +232,11 @@ button:disabled{cursor:not-allowed;opacity:.58}
 
 .production-confirm{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:12px;font-weight:500!important;line-height:1.5;color:#344054}
 .production-confirm input[type="checkbox"]{width:20px!important;min-width:20px!important;height:20px!important;min-height:20px!important;flex:0 0 20px;margin:2px 0 0;padding:0}
+
+/* Premium design foundations — aplicadas a telas operacionais sem alterar identidade visual */
+:root{--ti-brand:#a71916;--ti-brand-hover:#84221e;--ti-brand-soft:#fff2f0;--ti-text:#252b38;--ti-subtle:#667085;--ti-border:#e5e5eb;--ti-canvas:#f7f8fa;--ti-radius-sm:10px;--ti-radius-md:14px;--ti-radius-lg:18px}
+:is(.receiving-page,.inventory-page,.production-page,.team-page,.ti-planning,.ti-premium){min-width:0;max-width:100%}
+:is(.receiving-page,.inventory-page,.production-page,.team-page,.ti-planning,.ti-premium) :is(button,input,select,textarea):focus-visible{outline:2px solid var(--ti-brand);outline-offset:2px}
+:is(.receiving-page,.inventory-page,.production-page,.team-page,.ti-planning,.ti-premium) :is(input[type="checkbox"],input[type="radio"]){appearance:auto;-webkit-appearance:auto;width:18px;min-width:18px;max-width:18px;height:18px;min-height:18px;max-height:18px;padding:0;margin:0;flex:0 0 18px;accent-color:var(--ti-brand)}
+:is(.receiving-page,.inventory-page,.production-page,.team-page,.ti-planning,.ti-premium) :is(button,input,select,textarea){max-width:100%}
+@media(max-width:640px){:is(.receiving-page,.inventory-page,.production-page,.team-page,.ti-planning,.ti-premium) :is(h1,h2,h3){overflow-wrap:anywhere}:is(.receiving-page,.inventory-page,.production-page,.team-page,.ti-planning,.ti-premium) :is(table){max-width:100%}}
