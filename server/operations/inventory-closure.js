@@ -1,8 +1,9 @@
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {canApproveClosure,closureDay} from './inventory-closure-rules.js';
 const productPattern=/^[a-f0-9]{40}$/;
 const requestPattern=/^[a-f0-9-]{36}$/i;
 const toIso=v=>v?.toDate?.()?.toISOString?.()||null;
-const localDay=d=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);const v=Object.fromEntries(parts.map(x=>[x.type,x.value]));return `${v.year}-${v.month}-${v.day}`;};
+
 const fail=(res,e)=>{
  const m={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Acesso gerencial necessário.'],INVALID:[400,'Dados inválidos.'],NOT_FOUND:[404,'Registro não encontrado.'],CONFLICT:[409,'Contagem ou saldo mudou; atualize e solicite novamente.'],ALREADY_CLOSED:[409,'Fechamento deste dia já aprovado.']};
  if(m[e.message])return send(res,...m[e.message]);
@@ -44,7 +45,7 @@ export default async function inventoryClosure(req,res) {
     if(!b.exists||b.data().countId!==requestId)throw Error('CONFLICT');
     const countAt=count.data().at?.toDate?.();
     if(!(countAt instanceof Date)||Number.isNaN(countAt.getTime()))throw Error('INVALID');
-    const day=localDay(countAt);
+    const day=closureDay(countAt);
     const ref=unit.collection('inventoryClosures').doc(productId+'_'+day);
     const existing=await tx.get(ref);
     if(existing.exists){
@@ -72,7 +73,7 @@ export default async function inventoryClosure(req,res) {
    if(!count.exists||count.data().productId!==productId)throw Error('NOT_FOUND');
    const countAt=count.data().at?.toDate?.();
    if(!countAt)throw Error('INVALID');
-   const ref=unit.collection('inventoryClosures').doc(productId+'_'+localDay(countAt));
+   const ref=unit.collection('inventoryClosures').doc(productId+'_'+closureDay(countAt));
    await db.runTransaction(async tx=>{
     const [actorSnap,snap,b]=await Promise.all([tx.get(actorRef),tx.get(ref),tx.get(balanceRef)]);
     const a=actorSnap.data();
@@ -86,9 +87,7 @@ export default async function inventoryClosure(req,res) {
     if(current.status!=='pending')throw Error('CONFLICT');
     if(action==='closeApprove'){
      // Só aprovar a contagem que ainda é a referência física atual, e sem novas movimentações.
-     if(!b.exists||b.data().countId!==requestId||
-        b.data().total!==current.balanceTotalAtRequest||
-        (toIso(b.data().lastMovementAt)||toIso(b.data().at))!==current.balanceMovementAt)
+     if(!b.exists||!canApproveClosure(current,b.data()))
        throw Error('CONFLICT');
     }
     tx.update(ref,{status:next,decidedBy:actor.uid,decidedAt:now,reason:reason.trim()});
