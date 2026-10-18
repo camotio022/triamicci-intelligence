@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { auth } from './firebase.js';
+import {useFeedback} from './FeedbackProvider.jsx';
 
 const roleLabels = {admin:'Administrador',manager:'Gerente',cook:'Cozinheiro',auxiliar:'Auxiliar'};
 const roles = Object.entries(roleLabels);
@@ -19,7 +20,8 @@ async function request(action, payload = {}) {
   return data;
 }
 
-export default function MemberDirectory({user,membership}) {
+export default function MemberDirectory({
+ const {notify}=useFeedback();user,membership}) {
   const [members,setMembers] = useState([]);
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
@@ -60,10 +62,10 @@ export default function MemberDirectory({user,membership}) {
     setSaving(true);setNotice('');
     try {
       const data = await request('update',{uid:editing.uid,role,status});
-      setNotice(data.message);
+      setNotice(data.message);notify(data.message,'success');
       setEditing(null);
       await load();
-    } catch (err) {setNotice(err.message);}
+    } catch (err) {setNotice(err.message);notify(err.message,'error');}
     finally {setSaving(false);}
   };
 
