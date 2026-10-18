@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
+import './notifications.css';
 import {Bell,Check,RefreshCw} from 'lucide-react';
 import {useFeedback} from './FeedbackProvider.jsx';
 async function call(action,payload={}){
