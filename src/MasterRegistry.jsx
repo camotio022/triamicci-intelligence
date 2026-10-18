@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
+const skillOptions={cozinha:['preparo','montagem','chapa','recebimento','estoque','etiquetagem'],frente:['vitrine','vendas','ifood'],caixa:['caixa','vendas','ifood'],apoio:['recebimento','estoque','etiquetagem','montagem'],gestao:['lideranca','recebimento','estoque','etiquetagem']};
 const days=['Domingo','Segunda','Terça','Quarta','Quinta'];
 const states={existing:'Ficha existente',needs_review:'Possível conta existente',ambiguous:'Duplicidade',new:'Sem correspondência'};
 async function api(action,extra={}){
@@ -17,7 +18,8 @@ export default function MasterRegistry(){
   setBusy(true);setError('');
   try{const r=await api('masterRegistryImport',{confirm:true,names:selected});setNotice(r.message);await refresh()}catch(e){setError(e.message)}finally{setBusy(false)}
  };
- const openEdit=p=>{setEditing(p.id);setForm({jobTitle:p.jobTitle||'',sector:p.sector||'cozinha',shift:p.shift||'manha',fixedWeekday:p.fixedWeekday||1,status:p.status||'active'});setError('');};
+ const openEdit=p=>{setEditing(p.id);setForm({jobTitle:p.jobTitle||'',sector:p.sector||'cozinha',shift:p.shift||'manha',fixedWeekday:p.fixedWeekday||1,status:p.status||'active',skills:p.skills||[],certifications:p.certifications||[]});setError('');};
+ const toggleSkill=(skill)=>setForm(old=>{const skills=old.skills.includes(skill)?old.skills.filter(s=>s!==skill):[...old.skills,skill];return {...old,skills,certifications:old.certifications.filter(s=>skills.includes(s))}});
  const saveEdit=async e=>{e.preventDefault();setBusy(true);setError('');try{const r=await api('masterRegistryUpdate',{id:editing,changes:form});setNotice(r.message);setEditing(null);await refresh()}catch(err){setError(err.message)}finally{setBusy(false)}};
  return <section className="ti-planning-card" style={{padding:20,maxWidth:1000,margin:'auto'}}>
   <h2>Cadastro Mestre de Colaboradores</h2>
@@ -47,9 +49,11 @@ export default function MasterRegistry(){
   {editing&&<form onSubmit={saveEdit} style={{display:'grid',gap:8,border:'1px solid #aaa',padding:16,borderRadius:8,marginTop:12}}>
    <h3>Editar ficha · {data.registry.find(p=>p.id===editing)?.name}</h3>
    <label>Cargo <input required maxLength={80} value={form.jobTitle} onChange={e=>setForm(old=>({...old,jobTitle:e.target.value}))}/></label>
-   <label>Setor <select value={form.sector} onChange={e=>setForm(old=>({...old,sector:e.target.value}))}>{[['cozinha','Cozinha'],['frente','Frente'],['caixa','Caixa'],['apoio','Apoio'],['gestao','Gestão']].map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
+   <label>Setor <select value={form.sector} onChange={e=>setForm(old=>({...old,sector:e.target.value,skills:[],certifications:[]}))}>{[['cozinha','Cozinha'],['frente','Frente'],['caixa','Caixa'],['apoio','Apoio'],['gestao','Gestão']].map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
    <label>Turno <select value={form.shift} onChange={e=>setForm(old=>({...old,shift:e.target.value}))}>{[['manha','Manhã'],['noite','Noite'],['intermediario','Intermediário'],['variavel','Variável']].map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
    <label>Folga fixa <select value={form.fixedWeekday} onChange={e=>setForm(old=>({...old,fixedWeekday:Number(e.target.value)}))}>{[1,2,3,4].map(i=><option key={i} value={i}>{days[i]}</option>)}</select></label>
+   <fieldset><legend>Habilidades confirmadas</legend>{(skillOptions[form.sector]||[]).map(skill=><label key={skill} style={{display:'inline-flex',alignItems:'center',gap:4,marginRight:12}}><input type="checkbox" checked={form.skills.includes(skill)} onChange={()=>toggleSkill(skill)}/>{skill}</label>)}</fieldset>
+   <fieldset><legend>Certificações validadas</legend>{form.skills.map(skill=><label key={skill} style={{display:'inline-flex',gap:4,marginRight:12}}><input type="checkbox" checked={form.certifications.includes(skill)} onChange={()=>setForm(old=>({...old,certifications:old.certifications.includes(skill)?old.certifications.filter(x=>x!==skill):[...old.certifications,skill]}))}/>{skill}</label>)}</fieldset>
    <label>Situação <select value={form.status} onChange={e=>setForm(old=>({...old,status:e.target.value}))}><option value="active">Ativo</option><option value="inactive">Desligado</option></select></label>
    <p>Não altera a conta de acesso nem as escalas já publicadas.</p>
    <button type="submit" disabled={busy}>Salvar ficha</button>
