@@ -1,6 +1,19 @@
 // Dados profissionais independentes de permissões de login.
 export const sectors=['cozinha','frente','caixa','apoio','gestao'];
-export const skillCatalog=['preparo','montagem','chapa','vitrine','vendas','ifood','caixa','recebimento','estoque','lideranca'];
+export const skillCatalog=['preparo','montagem','chapa','vitrine','vendas','ifood','caixa','recebimento','estoque','lideranca','etiquetagem'];
+export const skillsBySector={
+ cozinha:['preparo','montagem','chapa','recebimento','estoque','etiquetagem'],
+ frente:['vitrine','vendas','ifood'],
+ caixa:['caixa','vendas','ifood'],
+ apoio:['recebimento','estoque','etiquetagem','montagem'],
+ gestao:['lideranca','recebimento','estoque','etiquetagem']
+};
+export const eligibleSkills=sector=>skillsBySector[sector]||[];
+export function invalidNewSectorSkills(previous,next){
+ const allowedSet=new Set(eligibleSkills(next.sector));
+ const existing=new Set([...(previous?.skills||[]),...(previous?.certifications||[])]);
+ return next.skills.filter(k=>!allowedSet.has(k)&&!existing.has(k));
+}
 export const days=['seg','ter','qua','qui','sex','sab','dom'];
 export const shifts=['manha','noite','intermediario','variavel'];
 const allowed=(x,values)=>typeof x==='string'&&values.includes(x);
