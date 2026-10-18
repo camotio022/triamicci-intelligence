@@ -21,9 +21,9 @@ jobs:
       - name: Validar sintaxe das APIs
         run: |
           node --check api/operations/stock.js
-          node --check api/operations/dispatch.js
-          node --check api/operations/transfer.js
-          node --check api/operations/reconcile-lots.js
+          node --check server/operations/dispatch.js
+          node --check server/operations/transfer.js
+          node --check server/operations/reconcile-lots.js
           node --check api/operations/lot-logic.js
           node --check api/production/manage.js
           node --check api/production/logic.js

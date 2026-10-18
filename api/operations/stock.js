@@ -1,4 +1,7 @@
 import {createHash} from 'node:crypto';
+import dispatchHandler from '../../server/operations/dispatch.js';
+import transferHandler from '../../server/operations/transfer.js';
+import reconcileLotsHandler from '../../server/operations/reconcile-lots.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {countUnit,validQuantity,commercialDelivery} from './logic.js';
 
@@ -20,6 +23,10 @@ function error(res,e){
  console.error('Physical operations:',e.message);return send(res,500,'Não foi possível completar a operação.');
 }
 export default async function handler(req,res){
+ const subaction=req.body?.action;
+ if(subaction==='dispatch')return dispatchHandler(req,res);
+ if(subaction==='transfer')return transferHandler(req,res);
+ if(subaction==='reconcile')return reconcileLotsHandler(req,res);
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
  try{
