@@ -36,6 +36,29 @@ export default async function handler(req,res) {
 
     const { action } = req.body || {};
     const db = getDb();
+    if(action==='masterRegistryUpdate'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Apenas gerência edita fichas.');
+      const {id,changes}=req.body||{};
+      if(typeof id!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(id)||!changes||typeof changes!=='object'||Array.isArray(changes))return send(res,400,'Dados inválidos.');
+      const allowed=['jobTitle','sector','shift','fixedWeekday','status'];
+      if(!Object.keys(changes).length||Object.keys(changes).some(k=>!allowed.includes(k)))return send(res,400,'Somente cargo, setor, turno, folga e situação podem ser alterados.');
+      if(changes.jobTitle!==undefined&&(typeof changes.jobTitle!=='string'||!changes.jobTitle.trim()||changes.jobTitle.length>80))return send(res,400,'Cargo inválido.');
+      if(changes.sector!==undefined&&!['cozinha','frente','caixa','apoio','gestao'].includes(changes.sector))return send(res,400,'Setor inválido.');
+      if(changes.shift!==undefined&&!['manha','noite','intermediario','variavel'].includes(changes.shift))return send(res,400,'Turno inválido.');
+      if(changes.fixedWeekday!==undefined&&(!Number.isInteger(changes.fixedWeekday)||changes.fixedWeekday<1||changes.fixedWeekday>4))return send(res,400,'Folga inválida.');
+      if(changes.status!==undefined&&!['active','inactive'].includes(changes.status))return send(res,400,'Situação inválida.');
+      const ref=db.collection('units').doc(actingMember.unitId).collection('staffRegistry').doc(id),now=new Date();
+      let found=false;
+      await db.runTransaction(async tx=>{
+        const snap=await tx.get(ref);
+        if(!snap.exists)return;
+        found=true;
+        const before=snap.data();
+        tx.update(ref,{...changes,updatedBy:actor.uid,updatedAt:now});
+        tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_updated',unitId:actingMember.unitId,actorUid:actor.uid,registryId:id,before:Object.fromEntries(Object.keys(changes).map(k=>[k,before[k]??null])),changes,at:now});
+      });
+      return found?send(res,200,'Ficha atualizada sem modificar conta de acesso.'):send(res,404,'Ficha não encontrada.');
+    }
     if(action==='masterRegistryPreview'||action==='masterRegistryImport'){
       if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Apenas gerência pode revisar colaboradores.');
       const unit=db.collection('units').doc(actingMember.unitId),registryRef=unit.collection('staffRegistry');
