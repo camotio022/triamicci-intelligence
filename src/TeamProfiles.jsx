@@ -1,12 +1,13 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
+import {DEFAULT_DAY,defaultAvailability} from '../server/team/ux-rules.js';
 import {validateProfessionalProfile} from '../server/team/profile-rules.js';
 const sectors={cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'};
 const abilities={preparo:'Preparo',montagem:'Montagem',chapa:'Chapa',vitrine:'Vitrine',vendas:'Vendas',ifood:'iFood',caixa:'Caixa',recebimento:'Recebimento',estoque:'Estoque',lideranca:'Liderança'};
 const shifts={manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variavel:'Variável'};
 const days={seg:'Segunda',ter:'Terça',qua:'Quarta',qui:'Quinta',sex:'Sexta',sab:'Sábado',dom:'Domingo'};
-const blank=()=>({sector:'cozinha',jobTitle:'Auxiliar de cozinha',skills:[],certifications:[],shift:'manha',availability:[],notes:''});
+const blank=()=>({sector:'cozinha',jobTitle:'Auxiliar de cozinha',skills:[],certifications:[],shift:'manha',availability:defaultAvailability(),notes:''});
 async function api(action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Sessão expirada.');
  const token=await user.getIdToken();
@@ -29,10 +30,10 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  const update=(key,value)=>setForm(old=>({...old,[key]:value}));
  const toggle=(key,value)=>setForm(old=>{const arr=old[key].includes(value)?old[key].filter(x=>x!==value):[...old[key],value];
   return {...old,[key]:arr,...(key==='skills'?{certifications:old.certifications.filter(x=>arr.includes(x))}:{})}});
- const setDay=(day,checked)=>setForm(old=>({...old,availability:checked?[...old.availability,{day,start:'08:00',end:'17:00',breakStart:'12:00',breakEnd:'13:00'}]:old.availability.filter(x=>x.day!==day)}));
+ const setDay=(day,checked)=>setForm(old=>({...old,availability:checked?[...old.availability,{day,...DEFAULT_DAY}]:old.availability.filter(x=>x.day!==day)}));
  const setTime=(day,key,value)=>setForm(old=>({...old,availability:old.availability.map(x=>x.day===day?{...x,[key]:value}:x)}));
  const save=async e=>{e.preventDefault();if(!selected||saving)return;
-  if(!validateProfessionalProfile(form)){setError('Confira os horários completos: entrada anterior à saída e pausa dentro da jornada. Confira também as habilitações.');return;}
+  if(!validateProfessionalProfile(form)){const msg='Confira os horários: entrada anterior à saída e pausa dentro da jornada. Confira também as habilitações.';setError(msg);notify(msg,'error');return;}
   setSaving(true);setNotice('');setError('');
   try{const d=await api('profileSave',{uid:selected,profile:form});setNotice(d.message);notify('Ficha profissional salva com sucesso.','success');await load()}
   catch(e){setError(e.message);notify(e.message,'error')}finally{setSaving(false)}};
@@ -68,7 +69,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
     <div className="team-skills-grid">{Object.entries(abilities).map(([v,l])=><label key={v}><input disabled={!editable} type="checkbox" checked={form.skills.includes(v)} onChange={()=>toggle('skills',v)}/>{l}</label>)}</div>
     <h4>Habilitações confirmadas pela gerência</h4><p className="team-note">Marque somente habilitações verificadas internamente. Este registro não substitui certificação legal.</p>
     <div className="team-skills-grid">{form.skills.map(v=><label key={v}><input disabled={!editable} type="checkbox" checked={form.certifications.includes(v)} onChange={()=>toggle('certifications',v)}/>{abilities[v]}</label>)}</div>
-    <h4>Disponibilidade semanal habitual</h4><p className="team-note">Dados de referência para o próximo módulo de escalas; não autorizam folgas ou trabalho fora da jornada.</p>
+    <h4>Jornada habitual</h4><button type="button" disabled={!editable} className="team-secondary" onClick={()=>update('availability',defaultAvailability())}>Aplicar horário padrão (segunda a sábado)</button><p className="team-note">Dados de referência para o próximo módulo de escalas; não autorizam folgas ou trabalho fora da jornada.</p>
     {Object.entries(days).map(([key,label])=>{const d=form.availability.find(x=>x.day===key);return <div key={key} className="team-availability-day">
      <label className="team-checkbox"><input disabled={!editable} type="checkbox" checked={Boolean(d)} onChange={e=>setDay(key,e.target.checked)}/>{label}</label>
      {d&&<div className="team-times-grid">{[['start','Entrada'],['end','Saída'],['breakStart','Início da pausa'],['breakEnd','Fim da pausa']].map(([field,text])=><label key={field}>{text}<input disabled={!editable} type="time" value={d[field]} onChange={e=>setTime(key,field,e.target.value)}/></label>)}</div>}
