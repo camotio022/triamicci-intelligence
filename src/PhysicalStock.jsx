@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
+import {useFeedback} from './FeedbackProvider.jsx';
 
 async function api(path,action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Sessão expirada.');
@@ -12,6 +13,7 @@ const fmt=at=>at?new Date(at).toLocaleString('pt-BR'):'—';
 const qty=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const numeric=(s)=>s===''?null:Number(s);
 export default function PhysicalStock({membership,mode='receive',initialProductId=null}){
+ const {notify}=useFeedback();
  const [products,setProducts]=useState([]),[catalog,setCatalog]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[],productions:[]});
  const [productId,setProductId]=useState(initialProductId||''),[supplier,setSupplier]=useState(''),[weight,setWeight]=useState('');
  const [amount,setAmount]=useState(''),[orderedQuantity,setOrderedQuantity]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
@@ -79,9 +81,9 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
     await api('/api/operations/stock','count',{productId,requestId,reserve:Number(reserve),rotation:Number(rotation),notes:notes.trim()});
     setReserve('');setRotation('');setNotes('');
    }
-   setPendingId(null);setStatus('Registro salvo no Firebase.');
+   setPendingId(null);setStatus('Registro salvo no Firebase.');notify(mode==='receive'?'Recebimento registrado com sucesso.':'Contagem registrada com sucesso.','success');
    try{await load()}catch{ /* gravação já confirmada; atualização pode ser repetida */ }
-  }catch(e){setStatus(e.message)}finally{setBusy(false)}
+  }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const rows=(mode==='history'?[
   ...history.receipts.map(x=>({...x,kind:'receive'})),
