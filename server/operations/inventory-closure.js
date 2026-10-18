@@ -49,6 +49,8 @@ export default async function inventoryClosure(req,res) {
     if(!b.exists||b.data().countId!==requestId)throw Error('CONFLICT');
     const countAt=count.data().at?.toDate?.();
     if(!(countAt instanceof Date)||Number.isNaN(countAt.getTime()))throw Error('INVALID');
+    const movementAt=b.data().lastMovementAt?.toDate?.()||b.data().at?.toDate?.();
+    if(!movementAt||movementAt.getTime()>countAt.getTime())throw Error('CONFLICT');
     const day=closureDay(countAt);
     const ref=unit.collection('inventoryClosures').doc(productId+'_'+day);
     const existing=await tx.get(ref);
