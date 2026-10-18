@@ -158,6 +158,8 @@ export default async function handler(req,res) {
        const [a,target,existing]=await Promise.all([tx.get(actorRef),tx.get(memberRef),tx.get(profileRef)]);
        if(!target.exists||target.data().unitId!==actingMember.unitId)throw Error('NOT_FOUND');
        if(!a.exists||!canManageProfessionalProfile(a.data(),target.data()))throw Error('FORBIDDEN');
+       const previousExceptions=existing.data()?.profile?.sectorExceptions||[];
+       if(JSON.stringify(previousExceptions)!==JSON.stringify(normalized.sectorExceptions)&&a.data().role!=='admin')throw Error('FORBIDDEN');
        const unauthorized=invalidNewSectorSkills(existing.data()?.profile,normalized);
        if(unauthorized.length)throw Error('SKILL_SECTOR');
        const now=new Date();
