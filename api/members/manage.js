@@ -155,6 +155,12 @@ export default async function handler(req,res) {
 
       const now = new Date();
       tx.update(targetRef,{role,status,updatedAt:now,updatedBy:actor.uid});
+      const parts=[];
+      if(target.role!==role)parts.push('Perfil de acesso: '+target.role+' → '+role);
+      if(target.status!==status)parts.push('Situação: '+target.status+' → '+status);
+      const noteRef=db.collection('units').doc(currentActor.unitId).collection('memberNotifications').doc(uid).collection('items').doc();
+      tx.create(noteRef,{title:'Acesso atualizado',message:parts.join(' · '),changes:parts,read:false,
+       recipientUid:uid,actorUid:actor.uid,unitId:currentActor.unitId,at:now});
       tx.create(auditRef,{
         event:'member.updated',unitId:currentActor.unitId,actorUid:actor.uid,
         targetUid:uid,fromRole:target.role,toRole:role,fromStatus:target.status,toStatus:status,at:now
