@@ -46,16 +46,18 @@ export default async function handler(req,res) {
       const preview=reconcileStaff(staffSeed,registry,existingAccounts);
       if(action==='masterRegistryPreview')return send(res,200,'Prévia carregada; nenhuma conta será vinculada automaticamente.',{people:preview,registry,accounts:existingAccounts});
       if(req.body?.confirm!==true)return send(res,400,'Confirme a importação após revisar a prévia.');
-      const ambiguous=preview.filter(p=>p.state!=='new');
-      if(ambiguous.length)return send(res,409,'Existem nomes que podem corresponder a contas ou fichas existentes; revise antes de importar.',{people:preview});
+      const selected=req.body?.names;
+      if(!Array.isArray(selected)||selected.length<1||selected.length>12||new Set(selected).size!==selected.length||selected.some(x=>typeof x!=='string'))return send(res,400,'Selecione nomes válidos na prévia.');
+      const chosen=preview.filter(p=>selected.includes(p.name));
+      if(chosen.length!==selected.length||chosen.some(p=>p.state!=='new'))return send(res,409,'Uma ficha já existe ou pode corresponder a conta atual. Atualize a prévia e revise o vínculo antes de importar.',{people:preview});
       const now=new Date();
       const batch=db.batch();
-      for(const p of preview){
+      for(const p of chosen){
         const ref=registryRef.doc();
         batch.create(ref,{name:p.name,normalizedName:normalizeStaffName(p.name),jobTitle:p.jobTitle,sector:p.sector,shift:p.shift,fixedWeekday:p.fixedWeekday,status:'active',accountUid:null,skills:[],createdBy:actor.uid,createdAt:now,updatedAt:now,source:'levantamento_escala_2026'});
       }
       await batch.commit();
-      return send(res,201,'Fichas criadas sem contas de acesso. Nenhum perfil anterior foi modificado.',{created:preview.length});
+      return send(res,201,'Fichas criadas sem contas de acesso. Nenhum perfil anterior foi modificado.',{created:chosen.length});
     }
     if(action==='rosterList'){
       if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
