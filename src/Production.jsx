@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
+import {useFeedback} from './FeedbackProvider.jsx';
 import {suggestedQuantity} from '../server/production/logic.js';
 const idFor=s=>s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,50);
 async function call(path,action,payload={}){
@@ -10,6 +11,7 @@ async function call(path,action,payload={}){
  const data=await res.json();if(!res.ok)throw Error(data.message||'Erro na operação.');return data;
 }
 export default function Production({membership}){
+ const {notify}=useFeedback();
  const [recipes,setRecipes]=useState([]),[runs,setRuns]=useState([]),[products,setProducts]=useState([]);
  const [recipeId,setRecipeId]=useState(''),[name,setName]=useState(''),[yieldQuantity,setYield]=useState('1');
  const [lines,setLines]=useState([{productId:'',quantity:'',substitutes:[]}]);
@@ -39,8 +41,8 @@ export default function Production({membership}){
    await call('/api/production/manage','saveRecipe',{
     id:idFor(name),name,yieldQuantity:Number(yieldQuantity),
     lines:lines.map(l=>({productId:l.productId,quantity:Number(l.quantity),substitutes:l.substitutes}))});
-   setStatus('Ficha técnica salva no Firebase.');await load();
-  }catch(e){setStatus(e.message)}finally{setBusy(false)}
+   setStatus('Ficha técnica salva no Firebase.');notify('Ficha técnica salva com sucesso.','success');await load();
+  }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const finish=async e=>{
   e.preventDefault();if(busy||!confirmed)return;
@@ -50,8 +52,8 @@ export default function Production({membership}){
   try{
    const data=await call('/api/production/manage','finish',{recipeId,requestId:id,portions:Number(portions),
     items:items.map(i=>({productId:i.productId,quantity:Number(i.quantity)})),notes});
-   setStatus(data.message);setRequestId(null);setConfirmed(false);await load();
-  }catch(e){setStatus(e.message)}finally{setBusy(false)}
+   setStatus(data.message);notify(data.message,'success');setRequestId(null);setConfirmed(false);await load();
+  }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const option=(id)=>products.find(p=>p.id===id);
  return <section className="inventory-page production-page">
