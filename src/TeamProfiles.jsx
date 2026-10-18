@@ -20,12 +20,12 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  [form,setForm]=useState(blank()),[error,setError]=useState(''),[notice,setNotice]=useState(''),
  [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[search,setSearch]=useState('');
  const load=useCallback(async()=>{setLoading(true);setError('');
-  try{const d=await api('profiles');setMembers(d.members||[]);const q=await api('skillReviewList');setRequests(q.requests||[])}
+  try{const [d,reg,q]=await Promise.all([api('profiles'),api('masterRegistryPreview'),api('skillReviewList')]);const registered=(reg.registry||[]).map(p=>({uid:p.id,name:p.name,status:p.status,registry:true,role:p.jobTitle==='Cozinheiro'?'cook':p.jobTitle==='Auxiliar de cozinha'?'auxiliar':'staff',professional:{sector:p.sector,jobTitle:p.jobTitle,shift:p.shift,availability:p.availability||[],skills:p.skills||[],certifications:p.certifications||[],notes:p.notes||'',sectorExceptions:[]}}));const linked=new Set((reg.registry||[]).map(p=>p.accountUid).filter(Boolean));setMembers([...(d.members||[]).filter(m=>!linked.has(m.uid)),...registered]);setRequests(q.requests||[])}
   catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useEffect(()=>{load()},[load]);
  const filtered=useMemo(()=>members.filter(m=>(m.name+' '+m.email+' '+(m.professional?.jobTitle||'')).toLowerCase().includes(search.toLowerCase())),[members,search]);
  const current=members.find(x=>x.uid===selected);
- const editable=current&&(membership.role==='admin'||['cook','auxiliar'].includes(current.role));
+ const editable=current&&(current.registry||membership.role==='admin'||['cook','auxiliar'].includes(current.role));
  const select=m=>{setSelected(m.uid);setForm(m.professional?{...blank(),...structuredClone(m.professional)}:blank());setNotice('');setError('');setTab('profiles')};
  const update=(key,value)=>setForm(old=>({...old,[key]:value}));
  const toggle=(key,value)=>setForm(old=>{const arr=old[key].includes(value)?old[key].filter(x=>x!==value):[...old[key],value];
@@ -35,7 +35,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  const save=async e=>{e.preventDefault();if(!selected||saving)return;
   if(!validateProfessionalProfile(form)){const msg='Confira os horários: entrada anterior à saída e pausa dentro da jornada. Confira também as habilitações.';setError(msg);notify(msg,'error');return;}
   setSaving(true);setNotice('');setError('');
-  try{const d=await api('profileSave',{uid:selected,profile:form});setNotice(d.message);notify('Ficha profissional salva com sucesso.','success');await load()}
+  try{const d=current?.registry?await api('masterRegistryUpdate',{id:selected,changes:{sector:form.sector,jobTitle:form.jobTitle,shift:form.shift,skills:form.skills,certifications:form.certifications,availability:form.availability,notes:form.notes}}):await api('profileSave',{uid:selected,profile:form});setNotice(d.message);notify('Ficha profissional salva com sucesso.','success');await load()}
   catch(e){setError(e.message);notify(e.message,'error')}finally{setSaving(false)}};
  return <section className="team-panel team-profiles">
   <h2>Gestão operacional da equipe</h2>
