@@ -46,7 +46,7 @@ export default function MasterRegistry(){
   <div style={{display:'grid',gap:8}}>
    {(data?.registry||[]).map(p=><article key={p.id} style={{border:'1px solid #ccc',borderRadius:8,padding:12}}>
     <strong>{p.name}</strong> · {p.jobTitle||'Cargo pendente'} · {p.status==='inactive'?'Desligado':'Ativo'}
-    <div><small>{p.sector} · {p.shift} · {days[p.fixedWeekday]||'Folga pendente'} · {p.accountUid?'Conta vinculada':'Sem conta vinculada'}</small></div>
+    <div><small>{p.sector} · {p.shift} · {days[p.fixedWeekday]||'Folga pendente'} · {p.accountUid?'Conta vinculada':'Sem conta vinculada'}</small></div><div><small>Código da ficha: <code>{p.id}</code></small> <button type="button" onClick={()=>navigator.clipboard?.writeText(p.id)}>Copiar código</button></div>
     <button type="button" disabled={busy} onClick={()=>openEdit(p)}>Abrir ficha</button>
    </article>)}
   </div>
