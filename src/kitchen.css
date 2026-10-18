@@ -5,3 +5,43 @@
 .product-detail-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.product-detail-heading h1{margin:5px 0 10px}.product-detail-heading>button{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .product-detail-counts{max-width:720px}.product-detail-counts>div{padding:22px 10px}.product-detail-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.product-detail-actions button{display:flex;gap:8px;align-items:center;justify-content:center;text-align:center;min-height:70px;border:1px solid #d9dfe8;background:#fff;color:#9b2721;border-radius:12px;padding:12px;cursor:pointer;font-weight:650}.product-detail-actions button:hover{background:#fff4f3}.product-detail-panel{background:#fff;border:1px solid #e2e6ed;border-radius:16px;padding:22px;min-width:0}.product-detail-panel h2{margin-top:0}.product-detail-panel dl{margin:0}.product-detail-panel dl>div{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid #eff0f4}.product-detail-panel dt{color:#657085}.product-detail-panel dd{margin:0;font-weight:600;text-align:right}.product-detail-list>div{display:flex;flex-direction:column;gap:5px;padding:12px 0;border-bottom:1px solid #eceff4}.product-detail-list>div:last-child{border:0}.product-detail-list span,.product-detail-list small{color:#657085}
 @media(max-width:640px){.product-detail-heading{flex-direction:column}.product-detail-actions{grid-template-columns:1fr}.product-detail-actions button{justify-content:flex-start;min-height:56px}.product-detail-panel{padding:16px}.product-detail-counts>div{padding:15px 4px}}
+
+
+/* Pacote 05: formulários e cartões móveis, sem herdar checkbox de largura total */
+.team-profiles{min-width:0;max-width:100%;overflow:hidden}
+.team-profiles-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.team-profiles-tabs button{min-width:0;min-height:46px;white-space:normal;line-height:1.3}
+.team-profiles-search{display:flex;align-items:end;gap:12px;margin-top:18px}
+.team-profiles-search label{width:min(100%,460px);display:flex;flex-direction:column;gap:7px}
+.team-profiles-search>button{min-height:44px}
+.team-profiles-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.team-profile-form{max-width:100%;padding:22px;margin:20px 0 0;border:1px solid #e5e9f0;border-radius:14px;background:#fafbfc;gap:14px}
+.team-profile-form>label{display:block;margin-top:4px}
+.team-profile-form>input,.team-profile-form>select,.team-profile-form>textarea{display:block;width:100%;max-width:100%;min-width:0}
+.team-profile-form>textarea{min-height:90px;border:1px solid #dce2eb;border-radius:9px;padding:12px;font:inherit}
+.team-profile-form h4{margin:14px 0 0;font-size:15px}
+.team-skills-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px}
+.team-skills-grid label,.team-checkbox{display:flex!important;align-items:center;gap:10px;min-width:0;padding:12px;border:1px solid #e1e5ed;border-radius:10px;background:white;font-weight:600}
+.team-profiles input[type="checkbox"]{appearance:auto!important;flex:0 0 20px!important;width:20px!important;height:20px!important;min-height:20px!important;margin:0!important;padding:0!important;accent-color:#a71916}
+.team-availability-day{padding:14px;border:1px solid #e1e5ed;background:white;border-radius:12px;display:flex;flex-direction:column;gap:12px}
+.team-availability-day>.team-checkbox{border:0;padding:0}
+.team-times-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.team-times-grid label{display:flex;flex-direction:column;gap:6px;min-width:0}
+.team-times-grid input{width:100%;min-width:0;max-width:100%}
+.team-matrix-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.team-matrix-scroll table{min-width:1100px}
+.team-profiles .team-member{align-items:center}
+@media(max-width:760px){
+ .team-profiles{padding:16px}
+ .team-profiles-tabs{grid-template-columns:1fr}
+ .team-profiles-tabs button{width:100%;min-height:44px}
+ .team-profiles-search{flex-direction:column;align-items:stretch}
+ .team-profiles-search label,.team-profiles-search>button{width:100%}
+ .team-profiles-list{grid-template-columns:1fr}
+ .team-profile-form{padding:15px}
+ .team-skills-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .team-times-grid{grid-template-columns:1fr}
+ .team-profile-form .team-edit-actions{flex-direction:column}
+ .team-profile-form .team-edit-actions button{width:100%}
+}
+@media(max-width:390px){.team-skills-grid{grid-template-columns:1fr}}
