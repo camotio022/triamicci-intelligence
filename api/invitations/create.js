@@ -1,4 +1,4 @@
-import { getDb, getAuth, authenticate, membership, normalizeEmail, emailPattern, roles, newToken, hashToken, deliverInvite, checkRequest, send } from '../_lib.js';
+import { getDb, getAuth, authenticate, membership, normalizeEmail, emailPattern, roles, newToken, hashToken, deliverInvite, checkRequest, send } from '../../server/_lib.js';
 export default async function handler(req,res) {
   if (!checkRequest(req,res)) return;
   try {
