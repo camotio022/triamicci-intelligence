@@ -1,3 +1,4 @@
+import {staffSeed,reconcileStaff,normalizeStaffName,defaultStaffAvailability} from '../../server/team/master-registry.js';
 import schedulesWorkflow from '../../server/workflows/schedules.js';
 import muralWorkflow from '../../server/workflows/mural.js';
 import labelsWorkflow from '../../server/workflows/labels.js';
@@ -5,7 +6,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {validateRosterEntry} from '../../server/team/roster-rules.js';
 import {validatePersonalProfile,earnedRecognition} from '../../server/team/personal-rules.js';
 import {profileChanges,professionalNotice} from '../../server/team/ux-rules.js';
-import {validateProfessionalProfile,canManageProfessionalProfile,invalidNewSectorSkills} from '../../server/team/profile-rules.js';
+import {validateProfessionalProfile,canManageProfessionalProfile,invalidNewSectorSkills,eligibleSkills} from '../../server/team/profile-rules.js';
 import { getDb, getAuth, authenticate, membership, roles, checkRequest, send } from '../../server/_lib.js';
 
 const statuses = ['active','inactive'];
@@ -35,6 +36,115 @@ export default async function handler(req,res) {
 
     const { action } = req.body || {};
     const db = getDb();
+    if(action==='masterRegistryActivate'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Apenas gerência ativa o Cadastro Mestre.');
+      if(req.body?.confirm!==true)return send(res,400,'Confirmação obrigatória.');
+      const unit=db.collection('units').doc(actingMember.unitId),snap=await unit.collection('staffRegistry').limit(200).get();
+      const active=snap.docs.filter(d=>d.data().status==='active');
+      const missing=staffSeed.filter(seed=>active.filter(d=>normalizeStaffName(d.data().name)===normalizeStaffName(seed.name)).length!==1);
+      if(missing.length)return send(res,409,'Fichas incompletas ou duplicadas. Resolva antes da ativação.',{missing:missing.map(p=>p.name)});
+      const links=active.map(d=>d.data().accountUid).filter(Boolean);
+      if(new Set(links).size!==links.length)return send(res,409,'Há contas associadas a mais de uma ficha.');
+      const now=new Date(),ref=unit.collection('configuration').doc('staffRegistry');
+      await db.runTransaction(async tx=>{
+        const a=await tx.get(db.collection('memberships').doc(actor.uid));
+        if(!a.exists||a.data().status!=='active'||a.data().unitId!==actingMember.unitId||!['admin','manager'].includes(a.data().role))throw Error('FORBIDDEN');
+        tx.set(ref,{active:true,activatedAt:now,activatedBy:actor.uid,updatedAt:now});
+        tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_activated',unitId:actingMember.unitId,actorUid:actor.uid,at:now,activeCount:active.length});
+      });
+      return send(res,200,'Cadastro Mestre ativado para novas escalas. Históricos preservados.');
+    }
+    if(action==='masterRegistryClaim'){
+      const id=req.body?.id;
+      if(typeof id!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(id))return send(res,400,'Ficha inválida.');
+      const unit=db.collection('units').doc(actingMember.unitId),ref=unit.collection('staffRegistry').doc(id);
+      const request=unit.collection('staffRegistryClaims').doc(id+'_'+actor.uid);
+      const person=await ref.get();
+      const seed=staffSeed.find(p=>'staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40)===id);
+      if(person.exists&&(person.data().status!=='active'||person.data().accountUid)||!person.exists&&!seed)return send(res,409,'Ficha indisponível para solicitação.');
+      await request.set({registryId:id,accountUid:actor.uid,status:'pending',createdAt:new Date(),requestedBy:actor.uid,unitId:actingMember.unitId});
+      return send(res,200,'Solicitação enviada à gerência. O vínculo ainda não foi feito.');
+    }
+    if(action==='masterRegistryLink'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Somente gerência confirma vínculos.');
+      const {id,uid}=req.body||{};
+      if(typeof id!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(id)||typeof uid!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(uid))return send(res,400,'Identificadores inválidos.');
+      const unit=db.collection('units').doc(actingMember.unitId),ref=unit.collection('staffRegistry').doc(id),claim=unit.collection('staffRegistryClaims').doc(id+'_'+uid),account=db.collection('memberships').doc(uid);
+      const other=await unit.collection('staffRegistry').where('accountUid','==',uid).limit(1).get();
+      const linkLock=unit.collection('staffRegistryLinks').doc(uid);
+      const seed=staffSeed.find(p=>'staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40)===id);
+      if(!other.empty&&other.docs[0].id!==id)return send(res,409,'Conta já vinculada a outra ficha.');
+      const now=new Date();
+      await db.runTransaction(async tx=>{
+        const [p,q,a,lock]=await Promise.all([tx.get(ref),tx.get(claim),tx.get(account),tx.get(linkLock)]);
+        if(lock.exists&&lock.data().registryId!==id||(!p.exists&&!seed)||(p.exists&&(p.data().status!=='active'||p.data().accountUid))||!q.exists||q.data().status!=='pending'||q.data().accountUid!==uid||!a.exists||a.data().unitId!==actingMember.unitId||a.data().status!=='active')throw Error('CONFLICT');
+        if(p.exists)tx.update(ref,{accountUid:uid,linkedAt:now,linkedBy:actor.uid,updatedAt:now});
+        else tx.create(ref,{...seed,availability:defaultStaffAvailability(seed.shift,seed.fixedWeekday),normalizedName:normalizeStaffName(seed.name),status:'active',skills:[],certifications:[],accountUid:uid,linkedAt:now,linkedBy:actor.uid,createdAt:now,createdBy:actor.uid,updatedAt:now,source:'levantamento_escala_2026'});
+        if(!lock.exists)tx.create(linkLock,{registryId:id,accountUid:uid,linkedAt:now,linkedBy:actor.uid});
+        tx.update(claim,{status:'approved',reviewedAt:now,reviewedBy:actor.uid});
+        tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_account_linked',unitId:actingMember.unitId,actorUid:actor.uid,targetUid:uid,registryId:id,at:now});
+      });
+      return send(res,200,'Vínculo confirmado sem alterar permissões de acesso.');
+    }
+    if(action==='masterRegistryClaims'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
+      const snap=await db.collection('units').doc(actingMember.unitId).collection('staffRegistryClaims').limit(200).get();
+      return send(res,200,'Solicitações de vínculo carregadas.',{claims:snap.docs.filter(d=>d.data().status==='pending').map(d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null}))});
+    }
+    if(action==='masterRegistryUpdate'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Apenas gerência edita fichas.');
+      const {id,changes}=req.body||{};
+      if(typeof id!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(id)||!changes||typeof changes!=='object'||Array.isArray(changes))return send(res,400,'Dados inválidos.');
+      const allowed=['jobTitle','sector','shift','fixedWeekday','status','skills','certifications','availability','notes'];
+      if(!Object.keys(changes).length||Object.keys(changes).some(k=>!allowed.includes(k)))return send(res,400,'Somente cargo, setor, turno, folga e situação podem ser alterados.');
+      if(changes.jobTitle!==undefined&&(typeof changes.jobTitle!=='string'||!changes.jobTitle.trim()||changes.jobTitle.length>80))return send(res,400,'Cargo inválido.');
+      if(changes.sector!==undefined&&!['cozinha','frente','caixa','apoio','gestao'].includes(changes.sector))return send(res,400,'Setor inválido.');
+      if(changes.shift!==undefined&&!['manha','noite','intermediario','variavel'].includes(changes.shift))return send(res,400,'Turno inválido.');
+      if(changes.fixedWeekday!==undefined&&(!Number.isInteger(changes.fixedWeekday)||changes.fixedWeekday<1||changes.fixedWeekday>4))return send(res,400,'Folga inválida.');
+      if(changes.status!==undefined&&!['active','inactive'].includes(changes.status))return send(res,400,'Situação inválida.');
+      if(changes.skills!==undefined&&(!Array.isArray(changes.skills)||changes.skills.length>11||changes.skills.some(s=>!['preparo','montagem','chapa','vitrine','vendas','ifood','caixa','recebimento','estoque','lideranca','etiquetagem'].includes(s))||new Set(changes.skills).size!==changes.skills.length))return send(res,400,'Habilidades inválidas.');
+      if(changes.certifications!==undefined&&(!Array.isArray(changes.certifications)||changes.certifications.length>11||changes.certifications.some(s=>!['preparo','montagem','chapa','vitrine','vendas','ifood','caixa','recebimento','estoque','lideranca','etiquetagem'].includes(s))||new Set(changes.certifications).size!==changes.certifications.length))return send(res,400,'Certificações inválidas.');
+      if(changes.notes!==undefined&&(typeof changes.notes!=='string'||changes.notes.length>240))return send(res,400,'Observações inválidas.');
+      if(changes.availability!==undefined&&(!Array.isArray(changes.availability)||changes.availability.length>7))return send(res,400,'Horários inválidos.');
+      const ref=db.collection('units').doc(actingMember.unitId).collection('staffRegistry').doc(id),now=new Date();
+      let found=false;
+      await db.runTransaction(async tx=>{
+        const snap=await tx.get(ref);
+        if(!snap.exists)return;
+        found=true;
+        const before=snap.data();
+        const sector=changes.sector||before.sector,skills=changes.skills||before.skills||[],certifications=changes.certifications||before.certifications||[];
+        if(!skills.every(s=>eligibleSkills(sector).includes(s))||!certifications.every(s=>skills.includes(s)))throw Error('Habilidades incompatíveis com setor ou certificações.');
+        if(changes.availability!==undefined&&!validateProfessionalProfile({sector,jobTitle:changes.jobTitle||before.jobTitle,skills,certifications,sectorExceptions:[],shift:changes.shift||before.shift,availability:changes.availability,notes:changes.notes||before.notes||''}))throw Error('Horários ou intervalos inválidos.');
+        tx.update(ref,{...changes,...(changes.availability!==undefined?{}:changes.shift!==undefined||changes.fixedWeekday!==undefined?{availability:defaultStaffAvailability(changes.shift||before.shift,changes.fixedWeekday||before.fixedWeekday)}:{}),updatedBy:actor.uid,updatedAt:now});
+        tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_updated',unitId:actingMember.unitId,actorUid:actor.uid,registryId:id,before:Object.fromEntries(Object.keys(changes).map(k=>[k,before[k]??null])),changes,at:now});
+      });
+      return found?send(res,200,'Ficha atualizada sem modificar conta de acesso.'):send(res,404,'Ficha não encontrada.');
+    }
+    if(action==='masterRegistryPreview'||action==='masterRegistryImport'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Apenas gerência pode revisar colaboradores.');
+      const unit=db.collection('units').doc(actingMember.unitId),registryRef=unit.collection('staffRegistry');
+      const [staff,accounts]=await Promise.all([registryRef.limit(200).get(),db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get()]);
+      if(staff.size>=200||accounts.size>200)return send(res,409,'Limite de conferência atingido; importação bloqueada.');
+      const registry=staff.docs.map(d=>({id:d.id,...d.data()}));
+      const existingAccounts=accounts.docs.map(d=>({uid:d.id,name:d.data().name||'',status:d.data().status||''}));
+      const config=await unit.collection('configuration').doc('staffRegistry').get();
+      const preview=reconcileStaff(staffSeed,registry,existingAccounts).map(p=>({...p,seedId:'staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40)}));
+      if(action==='masterRegistryPreview')return send(res,200,'Prévia carregada; nenhuma conta será vinculada automaticamente.',{people:preview,registry,accounts:existingAccounts,activated:config.data()?.active===true});
+      if(req.body?.confirm!==true)return send(res,400,'Confirme a importação após revisar a prévia.');
+      const selected=req.body?.names;
+      if(!Array.isArray(selected)||selected.length<1||selected.length>12||new Set(selected).size!==selected.length||selected.some(x=>typeof x!=='string'))return send(res,400,'Selecione nomes válidos na prévia.');
+      const chosen=preview.filter(p=>selected.includes(p.name));
+      if(chosen.length!==selected.length||chosen.some(p=>p.state!=='new'))return send(res,409,'Uma ficha já existe ou pode corresponder a conta atual. Atualize a prévia e revise o vínculo antes de importar.',{people:preview});
+      const now=new Date();
+      const batch=db.batch();
+      for(const p of chosen){
+        const ref=registryRef.doc('staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40));
+        batch.create(ref,{name:p.name,normalizedName:normalizeStaffName(p.name),jobTitle:p.jobTitle,sector:p.sector,shift:p.shift,fixedWeekday:p.fixedWeekday,availability:defaultStaffAvailability(p.shift,p.fixedWeekday),status:'active',accountUid:null,skills:[],createdBy:actor.uid,createdAt:now,updatedAt:now,source:'levantamento_escala_2026'});
+      }
+      await batch.commit();
+      return send(res,201,'Fichas criadas sem contas de acesso. Nenhum perfil anterior foi modificado.',{created:chosen.length});
+    }
     if(action==='rosterList'){
       if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
       const snap=await db.collection('units').doc(actingMember.unitId).collection('rosterEntries').limit(200).get();
@@ -80,7 +190,9 @@ export default async function handler(req,res) {
       const snap=await ref.get();
       const personalRef=db.collection('units').doc(actingMember.unitId).collection('memberPersonal').doc(actor.uid);
       const personalSnap=await personalRef.get();
-      const professional=snap.exists?snap.data().profile:null;
+      const linked=await db.collection('units').doc(actingMember.unitId).collection('staffRegistry').where('accountUid','==',actor.uid).limit(1).get();
+      const registered=linked.docs[0]?.data();
+      const professional=registered?{sector:registered.sector,jobTitle:registered.jobTitle,shift:registered.shift,availability:registered.availability||[],skills:registered.skills||[],certifications:registered.certifications||[],notes:registered.notes||'',sectorExceptions:[]}:snap.exists?snap.data().profile:null;
       return send(res,200,'Perfil consultado.',{professional,personal:personalSnap.exists?personalSnap.data().fields:null,
        recognition:earnedRecognition(professional),avatar:personalSnap.exists?personalSnap.data().avatar||null:null});
     }

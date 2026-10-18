@@ -8,7 +8,7 @@ async function call(action,extra={}){
  const d=await r.json();if(!r.ok)throw Error([d.message,...(d.issues||[]).slice(0,5)].join(' · '));return d;
 }
 async function membersApi(){
- const token=await auth.currentUser?.getIdToken();const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'profiles'})});const d=await r.json();if(!r.ok)throw Error(d.message);return d.members||[];
+ const token=await auth.currentUser?.getIdToken();const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'profiles'})});const d=await r.json();if(!r.ok)throw Error(d.message);const staff=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryPreview'})});const sd=await staff.json();if(!staff.ok)throw Error(sd.message||'Cadastro Mestre indisponível.');return sd.activated?(sd.registry||[]).filter(p=>p.status==='active').map(p=>({uid:p.id,name:p.name,status:p.status,professional:{sector:p.sector,shift:p.shift,jobTitle:p.jobTitle,skills:p.skills||[],certifications:p.certifications||[]},fixedWeekday:p.fixedWeekday,registry:true})):d.members||[];
 }
 const labels={draft:'Rascunho',in_review:'Em análise',approved:'Aprovada',published:'Publicada',work:'Trabalho',off:'Folga',leave:'Ausência',monthly_sunday:'Domingo mensal adicional'};
 export default function SchedulePlanner({membership}){
@@ -16,7 +16,7 @@ export default function SchedulePlanner({membership}){
  const [fixedOff,setFixedOff]=useState({}),[sundayOff,setSundayOff]=useState({}),[savingFixed,setSavingFixed]=useState(''),[selectedPerson,setSelectedPerson]=useState(''),[matrixSector,setMatrixSector]=useState('todos');
  const [uid,setUid]=useState(''),[date,setDate]=useState(''),[type,setType]=useState('work'),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const allowed=['admin','manager'].includes(membership.role);
- const refresh=useCallback(async()=>{setLoading(true);setError('');try{const [p,m,f]=await Promise.all([call('list'),membersApi(),call('fixedOffList')]);setPlans(p.schedules||[]);setPeople(m.filter(x=>x.status==='active'));setFixedOff(f.fixedOffDays||{})}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
+ const refresh=useCallback(async()=>{setLoading(true);setError('');try{const [p,m,f]=await Promise.all([call('list'),membersApi(),call('fixedOffList')]);setPlans(p.schedules||[]);setPeople(m.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})})}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useEffect(()=>{refresh()},[refresh]);
  const chosen=plans.find(x=>x.id===selected);
  const dateSelected=date;
@@ -26,7 +26,7 @@ export default function SchedulePlanner({membership}){
  const filteredPeople=people.filter(p=>matrixSector==='todos'||p.professional?.sector===matrixSector);
  const saveFixed=async(person,value)=>{
   setSavingFixed(person.uid);try{
-   await call('fixedOffSet',{uid:person.uid,weekday:Number(value)});
+   if(person.registry){const token=await auth.currentUser.getIdToken();const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryUpdate',id:person.uid,changes:{fixedWeekday:Number(value)}})});const d=await r.json();if(!r.ok)throw Error(d.message)}else await call('fixedOffSet',{uid:person.uid,weekday:Number(value)});
    setFixedOff(old=>({...old,[person.uid]:Number(value)}));
    notify('Folga habitual de '+(person.name||person.email)+' atualizada.','success');
   }catch(e){setError(e.message);notify(e.message,'error')}finally{setSavingFixed('')}
