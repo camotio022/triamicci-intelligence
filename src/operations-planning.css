@@ -14,3 +14,5 @@
  .ti-print-commands{display:none!important}
  .ti-print-paper{border:1px solid #111!important;width:80mm!important;padding:3mm!important;page-break-inside:avoid!important}
 }
+
+.ti-leave-form{display:flex;flex-direction:column;gap:14px}.ti-leave-form label{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:700}.ti-leave-form button{background:#a71916;color:#fff;border:0;border-radius:10px;padding:12px;min-height:46px;font-weight:700;cursor:pointer}.ti-leave-form button:disabled{opacity:.5}.ti-label-record textarea{box-sizing:border-box;width:100%;min-height:72px;border:1px solid #c9d2df;border-radius:10px;padding:10px;font:inherit;font-size:16px}
