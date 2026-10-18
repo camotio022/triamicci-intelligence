@@ -1,4 +1,4 @@
-import { getDb, getAuth, authenticate, membership, roles, checkRequest, send } from '../_lib.js';
+import { getDb, getAuth, authenticate, membership, roles, checkRequest, send } from '../../server/_lib.js';
 
 const statuses = ['active','inactive'];
 const cleanMember = (doc) => {
