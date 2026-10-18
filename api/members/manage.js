@@ -1,3 +1,4 @@
+import {profileChanges,professionalNotice} from '../../server/team/ux-rules.js';
 import {validateProfessionalProfile,canManageProfessionalProfile} from '../../server/team/profile-rules.js';
 import { getDb, getAuth, authenticate, membership, roles, checkRequest, send } from '../../server/_lib.js';
 
@@ -21,11 +22,33 @@ export default async function handler(req,res) {
   try {
     const actor = await authenticate(req);
     const actingMember = await membership(actor.uid);
-    if (!actingMember || !['admin','manager'].includes(actingMember.role))
-      return send(res,403,'Sem permissão para gerir colaboradores.');
+    if (!actingMember) return send(res,403,'Sem vínculo ativo.');
 
     const { action } = req.body || {};
     const db = getDb();
+    if(action==='myProfile'){
+      const ref=db.collection('units').doc(actingMember.unitId).collection('staffProfiles').doc(actor.uid);
+      const snap=await ref.get();
+      return send(res,200,'Perfil consultado.',{professional:snap.exists?snap.data().profile:null});
+    }
+    if(action==='notifications'){
+      const snap=await db.collection('units').doc(actingMember.unitId).collection('memberNotifications').doc(actor.uid).collection('items').orderBy('at','desc').limit(50).get();
+      return send(res,200,'Notificações carregadas.',{notifications:snap.docs.map(d=>({
+       id:d.id,title:d.data().title||'Alteração profissional',message:d.data().message||'',read:!!d.data().read,
+       at:d.data().at?.toDate?.()?.toISOString?.()||null
+      }))});
+    }
+    if(action==='notificationRead'){
+      const id=req.body?.id;
+      if(typeof id!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(id))return send(res,400,'Aviso inválido.');
+      const ref=db.collection('units').doc(actingMember.unitId).collection('memberNotifications').doc(actor.uid).collection('items').doc(id);
+      const snap=await ref.get();
+      if(!snap.exists)return send(res,404,'Aviso não encontrado.');
+      await ref.update({read:true,readAt:new Date()});
+      return send(res,200,'Aviso marcado como lido.');
+    }
+    if(!['admin','manager'].includes(actingMember.role))
+      return send(res,403,'Sem permissão para gerir colaboradores.');
     if (action === 'profiles') {
       const snap=await db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get();
       if(snap.size>200)return send(res,409,'Limite de equipe atingido.');
@@ -57,6 +80,11 @@ export default async function handler(req,res) {
        if(!target.exists||target.data().unitId!==actingMember.unitId)throw Error('NOT_FOUND');
        if(!a.exists||!canManageProfessionalProfile(a.data(),target.data()))throw Error('FORBIDDEN');
        const now=new Date();
+       const changes=profileChanges(existing.data()?.profile,normalized);
+       if(!changes.length)throw Error('NO_CHANGES');
+       const noticeRef=db.collection('units').doc(actingMember.unitId).collection('memberNotifications').doc(uid).collection('items').doc();
+       tx.create(noticeRef,{title:'Ficha profissional atualizada',message:professionalNotice(changes),changes,
+         unitId:actingMember.unitId,recipientUid:uid,actorUid:actor.uid,at:now,read:false});
        tx.set(profileRef,{uid,unitId:actingMember.unitId,profile:normalized,updatedAt:now,
          updatedBy:actor.uid,revision:(existing.data()?.revision||0)+1},{merge:true});
        tx.create(db.collection('auditLogs').doc(),{event:'team.professional_updated',unitId:actingMember.unitId,
