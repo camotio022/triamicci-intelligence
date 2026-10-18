@@ -25,5 +25,6 @@ jobs:
           node --check server/operations/inventory-closure.js
           node --check server/operations/inventory-closure-rules.js
           node --check api/operations/stock.js
+          node --check api/dashboard/summary.js
       - name: Compilar interface
         run: npm run build
