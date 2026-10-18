@@ -93,7 +93,7 @@ export default async function handler(req,res) {
       if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Apenas gerência edita fichas.');
       const {id,changes}=req.body||{};
       if(typeof id!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(id)||!changes||typeof changes!=='object'||Array.isArray(changes))return send(res,400,'Dados inválidos.');
-      const allowed=['jobTitle','sector','shift','fixedWeekday','status','skills','certifications'];
+      const allowed=['jobTitle','sector','shift','fixedWeekday','status','skills','certifications','availability','notes'];
       if(!Object.keys(changes).length||Object.keys(changes).some(k=>!allowed.includes(k)))return send(res,400,'Somente cargo, setor, turno, folga e situação podem ser alterados.');
       if(changes.jobTitle!==undefined&&(typeof changes.jobTitle!=='string'||!changes.jobTitle.trim()||changes.jobTitle.length>80))return send(res,400,'Cargo inválido.');
       if(changes.sector!==undefined&&!['cozinha','frente','caixa','apoio','gestao'].includes(changes.sector))return send(res,400,'Setor inválido.');
@@ -102,6 +102,8 @@ export default async function handler(req,res) {
       if(changes.status!==undefined&&!['active','inactive'].includes(changes.status))return send(res,400,'Situação inválida.');
       if(changes.skills!==undefined&&(!Array.isArray(changes.skills)||changes.skills.length>11||changes.skills.some(s=>!['preparo','montagem','chapa','vitrine','vendas','ifood','caixa','recebimento','estoque','lideranca','etiquetagem'].includes(s))||new Set(changes.skills).size!==changes.skills.length))return send(res,400,'Habilidades inválidas.');
       if(changes.certifications!==undefined&&(!Array.isArray(changes.certifications)||changes.certifications.length>11||changes.certifications.some(s=>!['preparo','montagem','chapa','vitrine','vendas','ifood','caixa','recebimento','estoque','lideranca','etiquetagem'].includes(s))||new Set(changes.certifications).size!==changes.certifications.length))return send(res,400,'Certificações inválidas.');
+      if(changes.notes!==undefined&&(typeof changes.notes!=='string'||changes.notes.length>240))return send(res,400,'Observações inválidas.');
+      if(changes.availability!==undefined&&(!Array.isArray(changes.availability)||changes.availability.length>7))return send(res,400,'Horários inválidos.');
       const ref=db.collection('units').doc(actingMember.unitId).collection('staffRegistry').doc(id),now=new Date();
       let found=false;
       await db.runTransaction(async tx=>{
@@ -111,7 +113,8 @@ export default async function handler(req,res) {
         const before=snap.data();
         const sector=changes.sector||before.sector,skills=changes.skills||before.skills||[],certifications=changes.certifications||before.certifications||[];
         if(!skills.every(s=>eligibleSkills(sector).includes(s))||!certifications.every(s=>skills.includes(s)))throw Error('Habilidades incompatíveis com setor ou certificações.');
-        tx.update(ref,{...changes,...(changes.shift!==undefined||changes.fixedWeekday!==undefined?{availability:defaultStaffAvailability(changes.shift||before.shift,changes.fixedWeekday||before.fixedWeekday)}:{}),updatedBy:actor.uid,updatedAt:now});
+        if(changes.availability!==undefined&&!validateProfessionalProfile({sector,jobTitle:changes.jobTitle||before.jobTitle,skills,certifications,sectorExceptions:[],shift:changes.shift||before.shift,availability:changes.availability,notes:changes.notes||before.notes||''}))throw Error('Horários ou intervalos inválidos.');
+        tx.update(ref,{...changes,...(changes.availability!==undefined?{}:changes.shift!==undefined||changes.fixedWeekday!==undefined?{availability:defaultStaffAvailability(changes.shift||before.shift,changes.fixedWeekday||before.fixedWeekday)}:{}),updatedBy:actor.uid,updatedAt:now});
         tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_updated',unitId:actingMember.unitId,actorUid:actor.uid,registryId:id,before:Object.fromEntries(Object.keys(changes).map(k=>[k,before[k]??null])),changes,at:now});
       });
       return found?send(res,200,'Ficha atualizada sem modificar conta de acesso.'):send(res,404,'Ficha não encontrada.');
