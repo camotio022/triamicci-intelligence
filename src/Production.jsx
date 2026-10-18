@@ -109,7 +109,7 @@ export default function Production({membership}){
     <div className="production-history">{runs.map(r=><article key={r.id}><strong>{r.recipeName}</strong>
      <span>{r.portions} porções · {r.at?new Date(r.at).toLocaleString('pt-BR'):'—'}</span>
      <small>{r.items?.map(i=>i.productName+' '+i.quantity+' '+i.unit).join(' · ')}</small>
-     <small>Responsável: {r.actorUid}</small></article>)}</div>}
+     <small>Responsável: {r.actorName||r.actorUid}</small></article>)}</div>}
   </section>
  </section>;
 }
