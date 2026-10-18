@@ -128,6 +128,7 @@ export default async function handler(req,res){
  }catch(e){
   const errors={FORBIDDEN:[403,'Sem permissão.'],PRODUCT_NOT_FOUND:[409,'Produto da receita não está ativo.'],
    LEGACY_CUT:[409,'Alcatra genérica é cadastro legado; selecione bife ou cubos de alcatra com contagem própria.'],
+   INVALID_UNIT_QUANTITY:[409,'Peças devem ser inteiras; revise a quantidade da ficha técnica.'],
    RECIPE_NOT_FOUND:[404,'Preparação não encontrada.'],MISSING_STOCK:[409,'Faça a contagem física antes de produzir.'],
    UNAUTHORIZED_SUBSTITUTE:[409,'Produto não autorizado nesta ficha técnica.'],
    INSUFFICIENT:[409,'Saldo de giro insuficiente ou unidade incompatível.'],
