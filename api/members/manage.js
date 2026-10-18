@@ -188,7 +188,9 @@ export default async function handler(req,res) {
       const snap=await ref.get();
       const personalRef=db.collection('units').doc(actingMember.unitId).collection('memberPersonal').doc(actor.uid);
       const personalSnap=await personalRef.get();
-      const professional=snap.exists?snap.data().profile:null;
+      const linked=await db.collection('units').doc(actingMember.unitId).collection('staffRegistry').where('accountUid','==',actor.uid).limit(1).get();
+      const registered=linked.docs[0]?.data();
+      const professional=registered?{sector:registered.sector,jobTitle:registered.jobTitle,shift:registered.shift,availability:registered.availability||[],skills:registered.skills||[],certifications:registered.certifications||[],notes:registered.notes||'',sectorExceptions:[]}:snap.exists?snap.data().profile:null;
       return send(res,200,'Perfil consultado.',{professional,personal:personalSnap.exists?personalSnap.data().fields:null,
        recognition:earnedRecognition(professional),avatar:personalSnap.exists?personalSnap.data().avatar||null:null});
     }
