@@ -1,3 +1,4 @@
+import {validateProfessionalProfile} from '../../server/team/profile-rules.js';
 import { getDb, getAuth, authenticate, membership, roles, checkRequest, send } from '../../server/_lib.js';
 
 const statuses = ['active','inactive'];
@@ -25,6 +26,46 @@ export default async function handler(req,res) {
 
     const { action } = req.body || {};
     const db = getDb();
+    if (action === 'profiles') {
+      const snap=await db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get();
+      if(snap.size>200)return send(res,409,'Limite de equipe atingido.');
+      const members=snap.docs.map(cleanMember);
+      const refs=members.map(m=>db.collection('units').doc(actingMember.unitId).collection('staffProfiles').doc(m.uid));
+      const profiles=refs.length?await db.getAll(...refs):[];
+      const byId=new Map(profiles.filter(x=>x.exists).map(x=>[x.id,x.data()]));
+      const names=new Map();
+      for(let i=0;i<members.length;i+=100){
+       const authBatch=await getAuth().getUsers(members.slice(i,i+100).map(m=>({uid:m.uid})));
+       for(const u of authBatch.users)names.set(u.uid,u.displayName||u.email||'');
+      }
+      return send(res,200,'Perfis profissionais consultados.',{members:members.map(m=>({
+       ...m,name:m.name||names.get(m.uid)||'',professional:byId.get(m.uid)?.profile||null,
+       professionalUpdatedAt:byId.get(m.uid)?.updatedAt?.toDate?.()?.toISOString?.()||null
+      }))});
+    }
+    if(action==='profileSave'){
+      const {uid,profile}=req.body||{};
+      if(typeof uid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(uid))
+       return send(res,400,'Colaborador inválido.');
+      const normalized=validateProfessionalProfile(profile);
+      if(!normalized)return send(res,400,'Perfil profissional ou horários inválidos.');
+      const actorRef=db.collection('memberships').doc(actor.uid);
+      const memberRef=db.collection('memberships').doc(uid);
+      const profileRef=db.collection('units').doc(actingMember.unitId).collection('staffProfiles').doc(uid);
+      await db.runTransaction(async tx=>{
+       const [a,target,existing]=await Promise.all([tx.get(actorRef),tx.get(memberRef),tx.get(profileRef)]);
+       if(!a.exists||a.data().status!=='active'||!['admin','manager'].includes(a.data().role)||
+          a.data().unitId!==actingMember.unitId)throw Error('FORBIDDEN');
+       if(!target.exists||target.data().unitId!==actingMember.unitId)throw Error('NOT_FOUND');
+       if(a.data().role==='manager'&&!['cook','auxiliar'].includes(target.data().role))throw Error('FORBIDDEN');
+       const now=new Date();
+       tx.set(profileRef,{uid,unitId:actingMember.unitId,profile:normalized,updatedAt:now,
+         updatedBy:actor.uid,revision:(existing.data()?.revision||0)+1},{merge:true});
+       tx.create(db.collection('auditLogs').doc(),{event:'team.professional_updated',unitId:actingMember.unitId,
+         actorUid:actor.uid,targetUid:uid,at:now,before:existing.data()?.profile||null,after:normalized});
+      });
+      return send(res,200,'Perfil profissional atualizado com auditoria.');
+    }
     if (action === 'list') {
       const snap = await db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get();
       if (snap.size > 200) return send(res,409,'A unidade excede o limite da listagem. Paginação necessária.');
