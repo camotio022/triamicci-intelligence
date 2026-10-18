@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
+import {suggestedQuantity} from '../api/production/logic.js';
 const idFor=s=>s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,50);
 async function call(path,action,payload={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login.');
@@ -15,6 +16,7 @@ export default function Production({membership}){
  const [portions,setPortions]=useState('1'),[items,setItems]=useState([]),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[status,setStatus]=useState('');
  const [requestId,setRequestId]=useState(null);
+ const [confirmed,setConfirmed]=useState(false);
  const admin=['admin','manager'].includes(membership.role);
  const load=useCallback(async()=>{
   setLoading(true);try{
@@ -25,12 +27,12 @@ export default function Production({membership}){
  useEffect(()=>{load()},[load]);
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=id=>{
-  setRecipeId(id);setRequestId(null);
+  setRecipeId(id);setRequestId(null);setConfirmed(false);
   const r=recipes.find(x=>x.id===id);
   setPortions(String(r?.yieldQuantity||1));
   setItems((r?.lines||[]).map(l=>({productId:l.productId,quantity:String(l.quantity)})));
  };
- const selectProduct=(i,value)=>{setItems(a=>a.map((x,j)=>j===i?{...x,productId:value}:x));setRequestId(null)};
+ const selectProduct=(i,value)=>{setItems(a=>a.map((x,j)=>j===i?{...x,productId:value}:x));setRequestId(null);setConfirmed(false)};
  const saveRecipe=async e=>{
   e.preventDefault();if(busy)return;setBusy(true);setStatus('');
   try{
@@ -41,14 +43,14 @@ export default function Production({membership}){
   }catch(e){setStatus(e.message)}finally{setBusy(false)}
  };
  const finish=async e=>{
-  e.preventDefault();if(busy)return;
+  e.preventDefault();if(busy||!confirmed)return;
   if(!window.confirm('Confirmar a produção e descontar agora os ingredientes realmente utilizados do giro?'))return;
   setBusy(true);setStatus('');
   const id=requestId||crypto.randomUUID();setRequestId(id);
   try{
    const data=await call('/api/production/manage','finish',{recipeId,requestId:id,portions:Number(portions),
     items:items.map(i=>({productId:i.productId,quantity:Number(i.quantity)})),notes});
-   setStatus(data.message);setRequestId(null);await load();
+   setStatus(data.message);setRequestId(null);setConfirmed(false);await load();
   }catch(e){setStatus(e.message)}finally{setBusy(false)}
  };
  const option=(id)=>products.find(p=>p.id===id);
@@ -65,7 +67,9 @@ export default function Production({membership}){
       {recipes.map(r=><option key={r.id} value={r.id}>{r.name} · versão {r.version}</option>)}
      </select></label>
      {selected&&<>
-      <label>Porções produzidas<input type="number" required min="1" step="1" value={portions} onChange={e=>{setPortions(e.target.value);setRequestId(null)}}/></label>
+      <label>Porções produzidas<input type="number" required min="1" step="1" value={portions} onChange={e=>{const n=Number(e.target.value);setPortions(e.target.value);setRequestId(null);setConfirmed(false);
+       if(n>0&&selected)setItems(selected.lines.map(line=>({productId:line.productId,
+        quantity:String(suggestedQuantity(line.quantity,n,selected.yieldQuantity,{individual:option(line.productId)?.physicalUnit==='un'})??'')})))}}/></label>
       <p>Revise as quantidades reais. Os valores iniciais vêm da ficha técnica e podem ser corrigidos.</p>
       {items.map((item,i)=>{
        const original=selected.lines[i];const allowed=[original.productId,...(original.substitutes||[])];
@@ -74,10 +78,11 @@ export default function Production({membership}){
          {allowed.map(id=><option key={id} value={id}>{option(id)?.name||id}</option>)}
         </select></label>
         <label>Quantidade utilizada<input type="number" required min={option(item.productId)?.physicalUnit==='un'?'1':'.001'} step={option(item.productId)?.operationalUnitOverride==='un'||option(item.productId)?.unit==='un'?'1':'.001'} value={item.quantity}
-          onChange={e=>{setItems(a=>a.map((x,j)=>j===i?{...x,quantity:e.target.value}:x));setRequestId(null)}}/></label>
+          onChange={e=>{setItems(a=>a.map((x,j)=>j===i?{...x,quantity:e.target.value}:x));setRequestId(null);setConfirmed(false)}}/></label>
        </div>})}
-      <label>Observações<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setRequestId(null)}}/></label>
-      <button type="submit" className="stock-action-save" disabled={busy||!items.length}>{busy?'Registrando...':'Finalizar e descontar do giro'}</button>
+      <label>Observações<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setRequestId(null);setConfirmed(false)}}/></label>
+      <label className="production-confirm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Conferi os ingredientes e as quantidades reais utilizadas, não apenas as sugestões da ficha.</label>
+      <button type="submit" className="stock-action-save" disabled={busy||!items.length||!confirmed}>{busy?'Registrando...':'Finalizar e descontar do giro'}</button>
      </>}
     </form>
    </section>
