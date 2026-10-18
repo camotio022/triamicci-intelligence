@@ -28,7 +28,7 @@ export default function ProductDetails({product,onBack,onAction,membership,onRef
   }catch(e){if(mounted)setError(e.message)}finally{if(mounted)setLoading(false)}
  };go();return ()=>{mounted=false}},[product.id]);
  const b=product.physicalBalance,minimum=Number(product.minStock);
- const operationUnit=product.operationalUnitOverride||product.unit;
+ const operationUnit=product.physicalUnit||product.operationalUnitOverride||product.unit;
  const low=b&&b.unit===product.unit&&Number.isFinite(minimum)&&b.total<minimum;
  return <section className="product-detail-page">
   <button className="product-detail-back" type="button" onClick={onBack}><ArrowLeft size={18}/> Voltar ao estoque</button>
