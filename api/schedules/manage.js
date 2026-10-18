@@ -26,7 +26,7 @@ export default async function handler(req,res){
    const {period,entries,title,id}=req.body||{};
    if(!yyyyMm(period)||!Array.isArray(entries)||entries.length>1000||typeof title!=='string'||title.trim().length<3||title.length>100||id&&!idOk(id))
     return send(res,400,'Período, título ou escala inválidos.');
-   if(!entries.every(e=>e&&idOk(e.uid)&&validDate(e.date)&&e.date.startsWith(period)&&['work','off','leave'].includes(e.type)))
+   if(!entries.every(e=>e&&idOk(e.uid)&&validDate(e.date)&&e.date.startsWith(period)&&['work','off','leave','monthly_sunday'].includes(e.type)))
     return send(res,400,'Escala contém datas, colaboradores ou ocorrências inválidos.');
    const ref=id?schedules.doc(id):schedules.doc();
    const membersSnap=await db.collection('memberships').where('unitId','==',m.unitId).limit(201).get();
@@ -57,7 +57,7 @@ export default async function handler(req,res){
    const profileRefs=memberList.map(x=>unit.collection('staffProfiles').doc(x.uid));
    const profiles=profileRefs.length?await db.getAll(...profileRefs):[];
    const members=memberList.map((x,i)=>({...x,professional:profiles[i]?.data()?.profile||null}));
-   const issues=validateRosterSchedule({entries:snap.data().entries||[],members});
+   const issues=validateRosterSchedule({entries:snap.data().entries||[],members,period:snap.data().period,complete:true});
    if(issues.length)return send(res,409,'A escala contém conflitos de cobertura ou folgas.',{issues});
    const states={submit:'in_review',approve:'approved',publish:'published'},now=new Date();
    await db.runTransaction(async tx=>{
