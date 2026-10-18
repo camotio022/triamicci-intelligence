@@ -24,14 +24,16 @@ export default async function handler(req,res){
   }
   if(!['admin','manager'].includes(m.role))return send(res,403,'Sem permissão para administrar publicações.');
   if(action==='saveDraft'){
-   const normalized=normalize(req.body?.item),id=req.body?.id;
-   if(!normalized||id&&!idOk(id))return send(res,400,'Confira título, conteúdo, ingredientes, rendimento e alergênicos.');
+   const normalized=normalize(req.body?.item),id=req.body?.id,supersedesId=req.body?.supersedesId||null;
+   if(!normalized||id&&!idOk(id)||supersedesId&&!idOk(supersedesId))return send(res,400,'Confira título, conteúdo, ingredientes, rendimento e alergênicos.');
    const ref=id?items.doc(id):items.doc(),now=new Date();
    await db.runTransaction(async tx=>{
-    const [member,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
+    const priorRef=supersedesId?items.doc(supersedesId):null;
+    const [member,old,prior]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref),priorRef?tx.get(priorRef):Promise.resolve(null)]);
     if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager'].includes(member.data().role))throw Error('FORBIDDEN');
     if(old.exists&&old.data().status!=='draft')throw Error('LOCKED');
-    tx.set(ref,{...normalized,status:'draft',version:(old.data()?.version||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
+    if(supersedesId&&(!prior?.exists||prior.data().status!=='published'||prior.data().kind!==normalized.kind))throw Error('LOCKED');
+    tx.set(ref,{...normalized,supersedesId:supersedesId||old.data()?.supersedesId||null,status:'draft',version:(old.data()?.version||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
     tx.create(db.collection('auditLogs').doc(),{event:'mural.draft_saved',actorUid:actor.uid,unitId:m.unitId,at:now,itemId:ref.id});
    });
    return send(res,200,'Rascunho salvo sem publicação.',{id:ref.id});
@@ -44,8 +46,12 @@ export default async function handler(req,res){
     const [member,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
     if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||member.data().role!=='admin')throw Error('FORBIDDEN');
     if(!old.exists||old.data().status!=='draft')throw Error('LOCKED');
+    const priorRef=old.data().supersedesId?items.doc(old.data().supersedesId):null;
+    const prior=priorRef?await tx.get(priorRef):null;
+    if(priorRef&&(!prior?.exists||prior.data().status!=='published'))throw Error('LOCKED');
     if(old.data().createdBy===actor.uid)throw Error('SELF_APPROVAL');
-    tx.update(ref,{status:'published',publishedAt:now,publishedBy:actor.uid});
+    if(priorRef)tx.update(priorRef,{status:'superseded',supersededAt:now,supersededBy:id});
+    tx.update(ref,{status:'published',publishedAt:now,publishedBy:actor.uid,version:prior?prior.data().version+1:old.data().version});
     tx.create(db.collection('auditLogs').doc(),{event:'mural.published',unitId:m.unitId,actorUid:actor.uid,itemId:id,version:old.data().version,at:now});
    });
    return send(res,200,'Conteúdo aprovado e publicado no Mural.');
