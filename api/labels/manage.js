@@ -49,6 +49,20 @@ export default async function handler(req,res){
    });
    return send(res,200,'Regra aprovada para a unidade.');
   }
+  if(action==='classifyProduct'){
+   if(m.role!=='admin')return send(res,403,'Apenas administradores classificam produtos para validade.');
+   const {productId,category,reason}=req.body||{};
+   if(!idOk(productId)||!categories.includes(category)||!textOk(reason,240)||reason.trim().length<10)return send(res,400,'Produto, categoria ou justificativa inválidos.');
+   const ref=unit.collection('products').doc(productId),now=new Date();
+   await db.runTransaction(async tx=>{
+    const [ms,p]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
+    if(!ms.exists||ms.data().status!=='active'||ms.data().unitId!==m.unitId||ms.data().role!=='admin')throw Error('FORBIDDEN');
+    if(!p.exists||p.data().status!=='active')throw Error('NOT_FOUND');
+    tx.update(ref,{labelCategory:category,labelCategoryUpdatedAt:now,labelCategoryUpdatedBy:actor.uid});
+    tx.create(db.collection('auditLogs').doc(),{event:'label.category_classified',unitId:m.unitId,actorUid:actor.uid,productId,category,previousCategory:p.data().labelCategory||null,reason:reason.trim(),at:now});
+   });
+   return send(res,200,'Categoria de etiquetagem definida com auditoria.');
+  }
   if(action==='issue'){
    const {productId,category,zone,lot,quantity,unit:quantityUnit,startedOn,sourceExpiryDate,note}=req.body||{};
    if(!idOk(productId)||!categories.includes(category)||!zones.includes(zone)||!textOk(lot,80)||!textOk(note,240)||!dateOk(startedOn)||!dateOk(sourceExpiryDate)||
@@ -56,6 +70,7 @@ export default async function handler(req,res){
     return send(res,400,'Dados da etiqueta inválidos.');
    const product=await unit.collection('products').doc(productId).get();
    if(!product.exists||product.data().status!=='active')return send(res,404,'Produto ativo não localizado.');
+   if(product.data().labelCategory!==category)return send(res,409,'Produto sem classificação de validade aprovada ou categoria diferente. Solicite classificação administrativa.');
    const p=await policies.doc(policyId(category,zone)).get();
    if(!p.exists||p.data().status!=='approved')return send(res,409,'Não há regra de validade aprovada para a categoria e o local.');
    const today=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
@@ -104,6 +119,7 @@ export default async function handler(req,res){
  }catch(e){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Essa operação exige permissão ou habilidade de etiquetagem confirmada.');
+  if(e.message==='NOT_FOUND')return send(res,404,'Produto não encontrado.');
   if(e.message==='POLICY_STATE')return send(res,409,'Regra ou etiqueta alterada; recarregue antes de prosseguir.');
   console.error('Labels:',e.message);return send(res,500,'Não foi possível registrar etiqueta.');
  }
