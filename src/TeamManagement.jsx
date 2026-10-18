@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, limit } from 'firebase/firestore';
 import { db, auth } from './firebase.js';
+import {useFeedback} from './FeedbackProvider.jsx';
 import MemberDirectory from './MemberDirectory.jsx';
 import TeamProfiles from './TeamProfiles.jsx';
 
@@ -12,7 +13,8 @@ const roleOptions = [
   { value: 'admin', label: 'Administrador' }
 ];
 
-export default function TeamManagement({ user, membership }) {
+export default function TeamManagement({
+ const {notify}=useFeedback(); user, membership }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('auxiliar');
   const [invitations, setInvitations] = useState([]);
@@ -48,8 +50,8 @@ export default function TeamManagement({ user, membership }) {
       } else {
         setEmail('');
       }
-      setFeedback(data.message);
-    } catch(error) { setFeedback(error.message || 'Não foi possível enviar.'); }
+      setFeedback(data.message);notify(data.message,'success');
+    } catch(error) { setFeedback(error.message || 'Não foi possível enviar.');notify(error.message,'error'); }
     finally { setSubmitting(false); }
   };
 
@@ -86,7 +88,7 @@ export default function TeamManagement({ user, membership }) {
       if (!response.ok) throw new Error(data.message || 'Falha ao revogar convite.');
       setFeedback(data.message);
       setShareInvite(null);
-    } catch (error) { setFeedback(error.message || 'Não foi possível revogar.'); }
+    } catch (error) { setFeedback(error.message || 'Não foi possível revogar.');notify(error.message,'error'); }
     finally { setRevokingId(''); }
   };
 
