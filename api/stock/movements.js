@@ -27,7 +27,11 @@ export default async function handler(req,res) {
 
     if (action === 'list') {
       const snap = await movements.orderBy('at','desc').limit(50).get();
-      return send(res,200,'Movimentações carregadas.',{movements:snap.docs.map(clean)});
+      const records=snap.docs.map(clean);
+      const ids=[...new Set(records.map(r=>r.actorUid).filter(Boolean))];
+      const actors=await Promise.all(ids.map(async uid=>{const d=await db.collection('memberships').doc(uid).get();return [uid,d.exists&&d.data().unitId===m.unitId?(d.data().name||d.data().email||null):null]}));
+      const names=Object.fromEntries(actors);
+      return send(res,200,'Movimentações carregadas.',{movements:records.map(r=>({...r,actorName:names[r.actorUid]||'Responsável não identificado'}))});
     }
     if (action !== 'create') return send(res,400,'Ação inválida.');
     const {productId,type,amount,note,requestId} = req.body || {};
