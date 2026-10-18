@@ -12,7 +12,7 @@ const fmt=at=>at?new Date(at).toLocaleString('pt-BR'):'—';
 const qty=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const numeric=(s)=>s===''?null:Number(s);
 export default function PhysicalStock({membership,mode='receive',initialProductId=null}){
- const [products,setProducts]=useState([]),[catalog,setCatalog]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[]});
+ const [products,setProducts]=useState([]),[catalog,setCatalog]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[],productions:[]});
  const [productId,setProductId]=useState(initialProductId||''),[supplier,setSupplier]=useState(''),[weight,setWeight]=useState('');
  const [amount,setAmount]=useState(''),[orderedQuantity,setOrderedQuantity]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
  const [lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState('');
@@ -24,8 +24,8 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
  const load=useCallback(async()=>{
   try{
    const [p,h,c]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list'),api('/api/catalog/manage','list')]);
-   setProducts(p.products||[]);setCatalog(c.catalog||[]);setHistory({receipts:h.receipts||[],counts:h.counts||[],outflows:h.outflows||[],transfers:h.transfers||[]});
-   setMore({receipts:!!h.hasMore_receipts,counts:!!h.hasMore_counts,outflows:!!h.hasMore_outflows,transfers:!!h.hasMore_transfers});
+   setProducts(p.products||[]);setCatalog(c.catalog||[]);setHistory({receipts:h.receipts||[],counts:h.counts||[],outflows:h.outflows||[],transfers:h.transfers||[],productions:h.productions||[]});
+   setMore({receipts:!!h.hasMore_receipts,counts:!!h.hasMore_counts,outflows:!!h.hasMore_outflows,transfers:!!h.hasMore_transfers,productions:!!h.hasMore_productions});
   }catch(e){setStatus(e.message)}
  },[]);
  useEffect(()=>{load()},[load]);
@@ -42,7 +42,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   return ()=>{active=false};
  },[productId,history]);
  const loadMore=async()=>{
-  const types=['receipts','counts','outflows','transfers'];
+  const types=['receipts','counts','outflows','transfers','productions'];
   if(loadingMore||!types.some(k=>more[k]))return;
   setLoadingMore(true);
   try{
@@ -87,9 +87,9 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   ...history.receipts.map(x=>({...x,kind:'receive'})),
   ...history.counts.map(x=>({...x,kind:'count'})),
   ...history.outflows.map(x=>({...x,kind:'dispatch'})),
-  ...history.transfers.map(x=>({...x,kind:'transfer'}))
+  ...history.transfers.map(x=>({...x,kind:'transfer'})),...history.productions.map(x=>({...x,kind:'production'}))
  ].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)):mode==='receive'?history.receipts:history.counts)
- .filter(x=>!initialProductId||x.productId===initialProductId);
+ .filter(x=>!initialProductId||x.productId===initialProductId||x.kind==='production'&&x.items?.some(i=>i.productId===initialProductId));
  return <section className="receiving-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId}</p>
   <h1>{mode==='history'?'Histórico da operação':mode==='receive'?'Recebimento de mercadorias':'Contagem diária — reserva e giro'}</h1>
@@ -138,12 +138,13 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   <section className="receiving-card"><div className="inventory-list-header"><h2>Histórico real</h2><button type="button" onClick={load}>Atualizar</button></div>
    {rows.length===0?<p>Nenhum registro salvo nesta unidade.</p>:
     <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>QUANDO</th><th>TIPO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>RESPONSÁVEL</th></tr></thead><tbody>
-     {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência'})[r.kind]||'Operação'}</td><td>{r.productName}</td><td>{r.kind==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':
+     {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'}</td><td>{r.productName||r.recipeName}</td><td>{r.kind==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':
       r.kind==='count'?qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')':
+      r.kind==='production'?r.portions+' porções · '+r.items?.map(i=>i.productName+' '+qty(i.quantity)+' '+i.unit).join(' + '):
       r.kind==='transfer'?qty(r.quantity)+' '+r.unit+' · '+r.from+' → '+r.to:
       qty(r.quantity)+' '+r.unit+' · '+r.location+' · '+r.reason}</td><td>{r.actorName||r.actorUid}</td></tr>)}
     </tbody></table></div>}
-   {(more.receipts||more.counts||more.outflows||more.transfers)&&<button type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore?'Carregando...':'Carregar registros anteriores'}</button>}
+   {(more.receipts||more.counts||more.outflows||more.transfers||more.productions)&&<button type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore?'Carregando...':'Carregar registros anteriores'}</button>}
   </section>
  </section>;
 }
