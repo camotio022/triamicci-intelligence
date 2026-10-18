@@ -1,3 +1,5 @@
+import {createHash,randomUUID} from 'node:crypto';
+import {validateRosterEntry} from '../../server/team/roster-rules.js';
 import {validatePersonalProfile,earnedRecognition} from '../../server/team/personal-rules.js';
 import {profileChanges,professionalNotice} from '../../server/team/ux-rules.js';
 import {validateProfessionalProfile,canManageProfessionalProfile} from '../../server/team/profile-rules.js';
@@ -27,6 +29,40 @@ export default async function handler(req,res) {
 
     const { action } = req.body || {};
     const db = getDb();
+    if(action==='rosterList'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
+      const snap=await db.collection('units').doc(actingMember.unitId).collection('rosterEntries').limit(200).get();
+      return send(res,200,'Pré-cadastros consultados.',{entries:snap.docs.map(d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null}))});
+    }
+    if(action==='rosterCreate'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
+      const entry=validateRosterEntry(req.body?.entry,actingMember.role);
+      if(!entry)return send(res,400,'Confira nome, e-mail, cargo, setor e permissões.');
+      if(!entry.email)return send(res,400,'Informe o e-mail para evitar cadastros duplicados e vincular o futuro convite.');
+      const id=createHash('sha256').update(entry.email).digest('hex');
+      const ref=db.collection('units').doc(actingMember.unitId).collection('rosterEntries').doc(id);
+      const existing=await ref.get();
+      if(existing.exists)return send(res,409,'Colaborador já pré-cadastrado com esse e-mail.');
+      const memberships=await db.collection('memberships').where('unitId','==',actingMember.unitId).where('email','==',entry.email).limit(1).get();
+      if(!memberships.empty)return send(res,409,'Esse e-mail já possui acesso nesta unidade. Use a ficha profissional existente.');
+      await ref.create({...entry,status:'pending_invite',createdAt:new Date(),createdBy:actor.uid,unitId:actingMember.unitId});
+      return send(res,201,'Colaborador pré-cadastrado. Envie o convite quando necessário.');
+    }
+    if(action==='avatarSave'){
+      const avatar=req.body?.avatar;
+      if(typeof avatar!=='string'||avatar.length>180000||!/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(avatar))
+        return send(res,400,'Foto inválida. Use JPEG, PNG ou WebP de até 130 KB.');
+      const encoded=avatar.split(',')[1];const bytes=Buffer.from(encoded,'base64');
+      if(bytes.length>130000||bytes.length<100)return send(res,400,'Tamanho de foto inválido.');
+      const ref=db.collection('units').doc(actingMember.unitId).collection('memberPersonal').doc(actor.uid);
+      await ref.set({avatar,avatarUpdatedAt:new Date()},{merge:true});
+      return send(res,200,'Foto atualizada com sucesso.');
+    }
+    if(action==='avatarRemove'){
+      const ref=db.collection('units').doc(actingMember.unitId).collection('memberPersonal').doc(actor.uid);
+      await ref.set({avatar:null,avatarUpdatedAt:new Date()},{merge:true});
+      return send(res,200,'Foto removida.');
+    }
     if(action==='myProfile'){
       const ref=db.collection('units').doc(actingMember.unitId).collection('staffProfiles').doc(actor.uid);
       const snap=await ref.get();
@@ -34,7 +70,7 @@ export default async function handler(req,res) {
       const personalSnap=await personalRef.get();
       const professional=snap.exists?snap.data().profile:null;
       return send(res,200,'Perfil consultado.',{professional,personal:personalSnap.exists?personalSnap.data().fields:null,
-       recognition:earnedRecognition(professional)});
+       recognition:earnedRecognition(professional),avatar:personalSnap.exists?personalSnap.data().avatar||null:null});
     }
     if(action==='personalSave'){
       const fields=validatePersonalProfile(req.body?.fields);
