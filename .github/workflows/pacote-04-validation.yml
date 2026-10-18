@@ -22,6 +22,7 @@ jobs:
         run: |
           node --check server/operations/daily-inventory.js
           node --check server/operations/daily-report.js
+          node --check server/operations/inventory-closure.js
           node --check api/operations/stock.js
       - name: Compilar interface
         run: npm run build
