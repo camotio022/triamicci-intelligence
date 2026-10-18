@@ -30,6 +30,38 @@ export default async function handler(req,res){
    const snap=await schedules.where('status','==','published').limit(100).get();
    return send(res,200,'Minha escala publicada.',{schedules:snap.docs.map(clean).map(s=>({...s,entries:(s.entries||[]).filter(e=>e.uid===actor.uid)})).filter(s=>s.entries.length)});
   }
+  if(action==='leaveRequest'){
+   const {date,reason}=req.body||{};
+   if(!validDate(date)||typeof reason!=='string'||reason.trim().length<10||reason.length>400)return send(res,400,'Informe data e justificativa entre 10 e 400 caracteres.');
+   if(date<new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}))return send(res,400,'Não é possível solicitar folga em data anterior.');
+   const ref=unit.collection('leaveRequests').doc(),now=new Date();
+   await db.runTransaction(async tx=>{
+    const current=await tx.get(db.doc('memberships/'+actor.uid));
+    if(!current.exists||current.data().status!=='active'||current.data().unitId!==m.unitId)throw Error('FORBIDDEN');
+    tx.create(ref,{uid:actor.uid,date,reason:reason.trim(),status:'pending',createdAt:now,unitId:m.unitId});
+    tx.create(db.collection('auditLogs').doc(),{event:'leave.requested',actorUid:actor.uid,unitId:m.unitId,requestId:ref.id,at:now});
+   });
+   return send(res,201,'Solicitação enviada. A folga depende de aprovação.',{id:ref.id});
+  }
+  if(action==='leaveList'){
+   const manager=['admin','manager'].includes(m.role),snap=await unit.collection('leaveRequests').orderBy('createdAt','desc').limit(100).get();
+   return send(res,200,'Solicitações carregadas.',{requests:snap.docs.filter(d=>manager||d.data().uid===actor.uid).map(d=>({id:d.id,...d.data(),createdAt:iso(d.data().createdAt),decidedAt:iso(d.data().decidedAt)}))});
+  }
+  if(action==='leaveDecision'){
+   if(!['admin','manager'].includes(m.role))return send(res,403,'Somente gerência decide solicitações.');
+   const {id,decision,note}=req.body||{};
+   if(!idOk(id)||!['approved','rejected'].includes(decision)||typeof note!=='string'||note.trim().length<8||note.length>400)return send(res,400,'Decisão e justificativa obrigatórias.');
+   const ref=unit.collection('leaveRequests').doc(id),now=new Date();
+   await db.runTransaction(async tx=>{
+    const [current,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
+    if(!current.exists||current.data().status!=='active'||current.data().unitId!==m.unitId||!['admin','manager'].includes(current.data().role))throw Error('FORBIDDEN');
+    if(!old.exists||old.data().status!=='pending'||old.data().uid===actor.uid)throw Error('CONFLICT');
+    tx.update(ref,{status:decision,note:note.trim(),decidedAt:now,decidedBy:actor.uid});
+    tx.create(unit.collection('memberNotifications').doc(old.data().uid).collection('items').doc(),{title:'Solicitação de folga analisada',message:old.data().date+' · '+(decision==='approved'?'Aprovada':'Recusada')+'. Consulte a escala oficial para confirmar a programação.',recipientUid:old.data().uid,unitId:m.unitId,actorUid:actor.uid,at:now,read:false});
+    tx.create(db.collection('auditLogs').doc(),{event:'leave.'+decision,actorUid:actor.uid,targetUid:old.data().uid,requestId:id,unitId:m.unitId,at:now,note:note.trim()});
+   });
+   return send(res,200,'Decisão registrada. A escala oficial precisa ser atualizada e publicada separadamente.');
+  }
   if(!['admin','manager'].includes(m.role))return send(res,403,'Somente gerência pode administrar escalas.');
   if(action==='saveDraft'){
    const {period,entries,title,id}=req.body||{};
