@@ -1,4 +1,4 @@
-import { getDb, authenticate, membership, checkRequest, send } from '../_lib.js';
+import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
 
 const idPattern = /^[a-f0-9]{40}$/;
 const requestPattern = /^[a-f0-9-]{36}$/i;
