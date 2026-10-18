@@ -229,3 +229,6 @@ button:disabled{cursor:not-allowed;opacity:.58}
 .production-history :is(span,small){color:#657085}
 @media(max-width:800px){.production-layout{grid-template-columns:1fr;gap:16px}}
 @media(max-width:640px){.production-page{padding-top:16px}.production-layout{margin:16px 0}.production-layout>.receiving-card{padding:16px}.production-layout .stock-action-form{gap:16px}}
+
+.production-confirm{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:12px;font-weight:500!important;line-height:1.5;color:#344054}
+.production-confirm input[type="checkbox"]{width:20px!important;min-width:20px!important;height:20px!important;min-height:20px!important;flex:0 0 20px;margin:2px 0 0;padding:0}
