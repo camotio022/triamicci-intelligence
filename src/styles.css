@@ -295,3 +295,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .sidebar .workspace-unit-info strong{color:#fff;font-size:13px;font-weight:800;text-transform:capitalize;overflow-wrap:anywhere}
 .sidebar .workspace-unit-status{font-size:10px;color:#77e8a6;font-weight:700;white-space:nowrap}
 @media(max-width:900px){.sidebar .brand-signature{margin-top:0}.sidebar .workspace-unit-card{min-height:62px}}
+
+
+/* Ajuste dos avatares nos menus: a imagem deve preencher o círculo inteiro. */
+.sidebar .user-row .avatar,.topbar .top-avatar{overflow:hidden;padding:0;flex-shrink:0}
+.ti-user-avatar-img{width:100%;height:100%;display:block;object-fit:cover;object-position:center center;border-radius:50%}
+.profile-menu-wrap{position:relative}
