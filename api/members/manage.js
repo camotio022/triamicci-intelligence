@@ -43,8 +43,9 @@ export default async function handler(req,res) {
       const ref=db.collection('units').doc(actingMember.unitId).collection('rosterEntries').doc(id);
       const existing=await ref.get();
       if(existing.exists)return send(res,409,'Colaborador já pré-cadastrado com esse e-mail.');
-      const memberships=await db.collection('memberships').where('unitId','==',actingMember.unitId).where('email','==',entry.email).limit(1).get();
-      if(!memberships.empty)return send(res,409,'Esse e-mail já possui acesso nesta unidade. Use a ficha profissional existente.');
+      const memberships=await db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get();
+      if(memberships.size>200)return send(res,409,'Equipe acima do limite de consulta para pré-cadastro.');
+      if(memberships.docs.some(m=>String(m.data().email||'').trim().toLowerCase()===entry.email))return send(res,409,'Esse e-mail já possui acesso nesta unidade. Use a ficha profissional existente.');
       await ref.create({...entry,status:'pending_invite',createdAt:new Date(),createdBy:actor.uid,unitId:actingMember.unitId});
       return send(res,201,'Colaborador pré-cadastrado. Envie o convite quando necessário.');
     }
