@@ -36,6 +36,24 @@ export default async function handler(req,res) {
 
     const { action } = req.body || {};
     const db = getDb();
+    if(action==='masterRegistryActivate'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Apenas gerência ativa o Cadastro Mestre.');
+      if(req.body?.confirm!==true)return send(res,400,'Confirmação obrigatória.');
+      const unit=db.collection('units').doc(actingMember.unitId),snap=await unit.collection('staffRegistry').limit(200).get();
+      const active=snap.docs.filter(d=>d.data().status==='active');
+      const missing=staffSeed.filter(seed=>active.filter(d=>normalizeStaffName(d.data().name)===normalizeStaffName(seed.name)).length!==1);
+      if(missing.length)return send(res,409,'Fichas incompletas ou duplicadas. Resolva antes da ativação.',{missing:missing.map(p=>p.name)});
+      const links=active.map(d=>d.data().accountUid).filter(Boolean);
+      if(new Set(links).size!==links.length)return send(res,409,'Há contas associadas a mais de uma ficha.');
+      const now=new Date(),ref=unit.collection('configuration').doc('staffRegistry');
+      await db.runTransaction(async tx=>{
+        const a=await tx.get(db.collection('memberships').doc(actor.uid));
+        if(!a.exists||a.data().status!=='active'||a.data().unitId!==actingMember.unitId||!['admin','manager'].includes(a.data().role))throw Error('FORBIDDEN');
+        tx.set(ref,{active:true,activatedAt:now,activatedBy:actor.uid,updatedAt:now});
+        tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_activated',unitId:actingMember.unitId,actorUid:actor.uid,at:now,activeCount:active.length});
+      });
+      return send(res,200,'Cadastro Mestre ativado para novas escalas. Históricos preservados.');
+    }
     if(action==='masterRegistryClaim'){
       const id=req.body?.id;
       if(typeof id!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(id))return send(res,400,'Ficha inválida.');
@@ -105,8 +123,9 @@ export default async function handler(req,res) {
       if(staff.size>=200||accounts.size>200)return send(res,409,'Limite de conferência atingido; importação bloqueada.');
       const registry=staff.docs.map(d=>({id:d.id,...d.data()}));
       const existingAccounts=accounts.docs.map(d=>({uid:d.id,name:d.data().name||'',status:d.data().status||''}));
+      const config=await unit.collection('configuration').doc('staffRegistry').get();
       const preview=reconcileStaff(staffSeed,registry,existingAccounts).map(p=>({...p,seedId:'staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40)}));
-      if(action==='masterRegistryPreview')return send(res,200,'Prévia carregada; nenhuma conta será vinculada automaticamente.',{people:preview,registry,accounts:existingAccounts});
+      if(action==='masterRegistryPreview')return send(res,200,'Prévia carregada; nenhuma conta será vinculada automaticamente.',{people:preview,registry,accounts:existingAccounts,activated:config.data()?.active===true});
       if(req.body?.confirm!==true)return send(res,400,'Confirme a importação após revisar a prévia.');
       const selected=req.body?.names;
       if(!Array.isArray(selected)||selected.length<1||selected.length>12||new Set(selected).size!==selected.length||selected.some(x=>typeof x!=='string'))return send(res,400,'Selecione nomes válidos na prévia.');
