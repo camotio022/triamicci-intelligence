@@ -11,8 +11,8 @@ async function api(action,extra={}){
  const res=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
  const data=await res.json();if(!res.ok)throw Error(data.message||'Não foi possível carregar equipe.');return data;
 }
-export default function TeamProfiles({membership}){
- const [members,setMembers]=useState([]),[tab,setTab]=useState('profiles'),[selected,setSelected]=useState(''),
+export default function TeamProfiles({membership,initialTab='profiles'}){
+ const [members,setMembers]=useState([]),[tab,setTab]=useState(initialTab),[selected,setSelected]=useState(''),
  [form,setForm]=useState(blank()),[error,setError]=useState(''),[notice,setNotice]=useState(''),
  [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[search,setSearch]=useState('');
  const load=useCallback(async()=>{setLoading(true);setError('');
