@@ -2,7 +2,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {validateRosterEntry} from '../../server/team/roster-rules.js';
 import {validatePersonalProfile,earnedRecognition} from '../../server/team/personal-rules.js';
 import {profileChanges,professionalNotice} from '../../server/team/ux-rules.js';
-import {validateProfessionalProfile,canManageProfessionalProfile} from '../../server/team/profile-rules.js';
+import {validateProfessionalProfile,canManageProfessionalProfile,invalidNewSectorSkills} from '../../server/team/profile-rules.js';
 import { getDb, getAuth, authenticate, membership, roles, checkRequest, send } from '../../server/_lib.js';
 
 const statuses = ['active','inactive'];
@@ -96,7 +96,7 @@ export default async function handler(req,res) {
     }
     if(action==='skillReviewRequest'){
       const skill=req.body?.skill,reason=req.body?.reason;
-      if(!['preparo','montagem','chapa','vitrine','vendas','ifood','caixa','recebimento','estoque','lideranca'].includes(skill)
+      if(!['preparo','montagem','chapa','vitrine','vendas','ifood','caixa','recebimento','estoque','lideranca','etiquetagem'].includes(skill)
         ||typeof reason!=='string'||reason.trim().length<10||reason.length>400)
         return send(res,400,'Selecione uma habilidade e informe um motivo entre 10 e 400 caracteres.');
       const ref=db.collection('units').doc(actingMember.unitId).collection('skillReviewRequests').doc();
@@ -158,6 +158,10 @@ export default async function handler(req,res) {
        const [a,target,existing]=await Promise.all([tx.get(actorRef),tx.get(memberRef),tx.get(profileRef)]);
        if(!target.exists||target.data().unitId!==actingMember.unitId)throw Error('NOT_FOUND');
        if(!a.exists||!canManageProfessionalProfile(a.data(),target.data()))throw Error('FORBIDDEN');
+       const previousExceptions=existing.data()?.profile?.sectorExceptions||[];
+       if(JSON.stringify(previousExceptions)!==JSON.stringify(normalized.sectorExceptions)&&a.data().role!=='admin')throw Error('FORBIDDEN');
+       const unauthorized=invalidNewSectorSkills(existing.data()?.profile,normalized);
+       if(unauthorized.length)throw Error('SKILL_SECTOR');
        const now=new Date();
        const changes=profileChanges(existing.data()?.profile,normalized);
        if(!changes.length)throw Error('NO_CHANGES');
@@ -252,6 +256,7 @@ export default async function handler(req,res) {
     if (error.message === 'NOT_FOUND') return send(res,404,'Colaborador não encontrado nesta unidade.');
     if (error.message === 'TOO_MANY_MEMBERS') return send(res,409,'Unidade grande demais para esta operação; contacte o suporte.');
     if (error.message === 'LAST_ADMIN') return send(res,409,'Não é possível remover o último administrador ativo da unidade.');
+    if (error.message === 'SKILL_SECTOR') return send(res,400,'Novas habilidades devem corresponder ao setor selecionado.');
     if (error.message === 'NO_CHANGES') return send(res,409,'Nenhuma alteração foi feita.');
     if (error.message === 'INVALID_STATE') return send(res,409,'O vínculo atual está inconsistente.');
     console.error('Member management:',error.message);

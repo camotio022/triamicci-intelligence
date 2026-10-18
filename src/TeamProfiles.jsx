@@ -2,12 +2,12 @@ import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {DEFAULT_DAY,defaultAvailability} from '../server/team/ux-rules.js';
-import {validateProfessionalProfile} from '../server/team/profile-rules.js';
+import {validateProfessionalProfile,eligibleSkills} from '../server/team/profile-rules.js';
 const sectors={cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'};
-const abilities={preparo:'Preparo',montagem:'Montagem',chapa:'Chapa',vitrine:'Vitrine',vendas:'Vendas',ifood:'iFood',caixa:'Caixa',recebimento:'Recebimento',estoque:'Estoque',lideranca:'Liderança'};
+const abilities={preparo:'Preparo',montagem:'Montagem',chapa:'Chapa',vitrine:'Vitrine',vendas:'Vendas',ifood:'iFood',caixa:'Caixa',recebimento:'Recebimento',estoque:'Estoque',lideranca:'Liderança',etiquetagem:'Etiquetagem e validades'};
 const shifts={manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variavel:'Variável'};
 const days={seg:'Segunda',ter:'Terça',qua:'Quarta',qui:'Quinta',sex:'Sexta',sab:'Sábado',dom:'Domingo'};
-const blank=()=>({sector:'cozinha',jobTitle:'Auxiliar de cozinha',skills:[],certifications:[],shift:'manha',availability:defaultAvailability(),notes:''});
+const blank=()=>({sector:'cozinha',jobTitle:'Auxiliar de cozinha',skills:[],certifications:[],sectorExceptions:[],shift:'manha',availability:defaultAvailability(),notes:''});
 async function api(action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Sessão expirada.');
  const token=await user.getIdToken();
@@ -26,7 +26,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  const filtered=useMemo(()=>members.filter(m=>(m.name+' '+m.email+' '+(m.professional?.jobTitle||'')).toLowerCase().includes(search.toLowerCase())),[members,search]);
  const current=members.find(x=>x.uid===selected);
  const editable=current&&(membership.role==='admin'||['cook','auxiliar'].includes(current.role));
- const select=m=>{setSelected(m.uid);setForm(m.professional?structuredClone(m.professional):blank());setNotice('');setError('');setTab('profiles')};
+ const select=m=>{setSelected(m.uid);setForm(m.professional?{...blank(),...structuredClone(m.professional)}:blank());setNotice('');setError('');setTab('profiles')};
  const update=(key,value)=>setForm(old=>({...old,[key]:value}));
  const toggle=(key,value)=>setForm(old=>{const arr=old[key].includes(value)?old[key].filter(x=>x!==value):[...old[key],value];
   return {...old,[key]:arr,...(key==='skills'?{certifications:old.certifications.filter(x=>arr.includes(x))}:{})}});
@@ -71,7 +71,9 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
     <label>Cargo operacional (não altera permissões)</label><input disabled={!editable} required maxLength={80} minLength={2} value={form.jobTitle} onChange={e=>update('jobTitle',e.target.value)}/>
     <label>Turno habitual</label><select disabled={!editable} value={form.shift} onChange={e=>update('shift',e.target.value)}>{Object.entries(shifts).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>
     <h4>Habilidades informadas</h4>
-    <div className="team-skills-grid">{Object.entries(abilities).map(([v,l])=><label key={v}><input disabled={!editable} type="checkbox" checked={form.skills.includes(v)} onChange={()=>toggle('skills',v)}/>{l}</label>)}</div>
+    <p className="team-note">Habilidades fora do setor ficam desabilitadas para novas atribuições. As já registradas permanecem no histórico.</p>
+    <div className="team-skills-grid">{Object.entries(abilities).map(([v,l])=>{const permitted=(eligibleSkills(form.sector).includes(v)||(form.sectorExceptions||[]).includes(v)),historic=form.skills.includes(v);return <label key={v} title={!permitted?'Habilidade de outro setor':''}><input disabled={!editable||(!permitted&&!historic)} type="checkbox" checked={historic} onChange={()=>toggle('skills',v)}/>{l}{!permitted&&<small> · {historic?'histórico':'outro setor'}</small>}</label>})}</div>
+    {membership.role==='admin'&&<><h4>Exceções multifuncionais autorizadas</h4><p className="team-note">Somente administradores podem autorizar novas habilidades fora do setor. A autorização não confirma a habilidade.</p><div className="team-skills-grid">{Object.entries(abilities).filter(([v])=>!eligibleSkills(form.sector).includes(v)).map(([v,l])=><label key={v}><input disabled={!editable} type="checkbox" checked={(form.sectorExceptions||[]).includes(v)} onChange={()=>toggle('sectorExceptions',v)}/>{l}</label>)}</div></>}
     <h4>Habilitações confirmadas pela gerência</h4><p className="team-note">Marque somente habilitações verificadas internamente. Este registro não substitui certificação legal.</p>
     <div className="team-skills-grid">{form.skills.map(v=><label key={v}><input disabled={!editable} type="checkbox" checked={form.certifications.includes(v)} onChange={()=>toggle('certifications',v)}/>{abilities[v]}</label>)}</div>
     <h4>Jornada habitual</h4><button type="button" disabled={!editable} className="team-secondary" onClick={()=>update('availability',defaultAvailability())}>Aplicar horário padrão (segunda a sábado)</button><p className="team-note">Dados de referência para o próximo módulo de escalas; não autorizam folgas ou trabalho fora da jornada.</p>
