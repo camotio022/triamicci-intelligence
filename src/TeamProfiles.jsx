@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
+import {useFeedback} from './FeedbackProvider.jsx';
 import {validateProfessionalProfile} from '../server/team/profile-rules.js';
 const sectors={cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'};
 const abilities={preparo:'Preparo',montagem:'Montagem',chapa:'Chapa',vitrine:'Vitrine',vendas:'Vendas',ifood:'iFood',caixa:'Caixa',recebimento:'Recebimento',estoque:'Estoque',lideranca:'Liderança'};
@@ -13,6 +14,7 @@ async function api(action,extra={}){
  const data=await res.json();if(!res.ok)throw Error(data.message||'Não foi possível carregar equipe.');return data;
 }
 export default function TeamProfiles({membership,initialTab='profiles'}){
+ const {notify}=useFeedback();
  const [members,setMembers]=useState([]),[tab,setTab]=useState(initialTab),[selected,setSelected]=useState(''),
  [form,setForm]=useState(blank()),[error,setError]=useState(''),[notice,setNotice]=useState(''),
  [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[search,setSearch]=useState('');
@@ -32,8 +34,8 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  const save=async e=>{e.preventDefault();if(!selected||saving)return;
   if(!validateProfessionalProfile(form)){setError('Confira os horários completos: entrada anterior à saída e pausa dentro da jornada. Confira também as habilitações.');return;}
   setSaving(true);setNotice('');setError('');
-  try{const d=await api('profileSave',{uid:selected,profile:form});setNotice(d.message);await load()}
-  catch(e){setError(e.message)}finally{setSaving(false)}};
+  try{const d=await api('profileSave',{uid:selected,profile:form});setNotice(d.message);notify('Ficha profissional salva com sucesso.','success');await load()}
+  catch(e){setError(e.message);notify(e.message,'error')}finally{setSaving(false)}};
  return <section className="team-panel team-profiles">
   <h2>Gestão operacional da equipe</h2>
   <p>Perfis profissionais, competências e disponibilidade habitual. Permissões de acesso continuam independentes.</p>
