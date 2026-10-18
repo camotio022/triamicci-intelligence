@@ -16,11 +16,11 @@ async function api(action,extra={}){
 }
 export default function TeamProfiles({membership,initialTab='profiles'}){
  const {notify}=useFeedback();
- const [members,setMembers]=useState([]),[tab,setTab]=useState(initialTab),[selected,setSelected]=useState(''),
+ const [requests,setRequests]=useState([]);const [members,setMembers]=useState([]),[tab,setTab]=useState(initialTab),[selected,setSelected]=useState(''),
  [form,setForm]=useState(blank()),[error,setError]=useState(''),[notice,setNotice]=useState(''),
  [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[search,setSearch]=useState('');
  const load=useCallback(async()=>{setLoading(true);setError('');
-  try{const d=await api('profiles');setMembers(d.members||[])}
+  try{const d=await api('profiles');setMembers(d.members||[]);const q=await api('skillReviewList');setRequests(q.requests||[])}
   catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useEffect(()=>{load()},[load]);
  const filtered=useMemo(()=>members.filter(m=>(m.name+' '+m.email+' '+(m.professional?.jobTitle||'')).toLowerCase().includes(search.toLowerCase())),[members,search]);
@@ -48,6 +48,11 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
   <div className="team-directory-heading team-profiles-search"><label>Buscar colaborador
    <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome, cargo ou e-mail"/>
   </label><button type="button" onClick={load} disabled={loading}>Atualizar</button></div>
+  {requests.some(r=>r.status==='pending')&&<section className="team-review-requests" aria-label="Solicitações de revisão de habilidades">
+   <h3>Solicitações de habilidades pendentes</h3><p>Analise os pedidos dos colaboradores e faça as alterações pela ficha profissional após confirmar a competência.</p>
+   {requests.filter(r=>r.status==='pending').map(r=><article key={r.id}><strong>{members.find(m=>m.uid===r.uid)?.name||'Colaborador da unidade'}</strong>
+    <span>Habilidade: {abilities[r.skill]||r.skill}</span><p>{r.reason}</p></article>)}
+  </section>}
   {error&&<p role="alert" className="team-error">{error}</p>}
   {notice&&<p role="status" className="team-notice">{notice}</p>}
   {loading&&<p>Carregando perfis reais da unidade...</p>}

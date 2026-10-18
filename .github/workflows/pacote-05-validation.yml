@@ -17,11 +17,12 @@ jobs:
         run: |
           if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
       - name: Regras de equipe
-        run: node --test tests/team-profile.test.js tests/ux-team.test.js
+        run: node --test tests/team-profile.test.js tests/ux-team.test.js tests/personal-profile.test.js
       - name: Verificar API
         run: |
           node --check api/members/manage.js
           node --check server/team/profile-rules.js
           node --check server/team/ux-rules.js
+          node --check server/team/personal-rules.js
       - name: Build
         run: npm run build

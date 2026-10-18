@@ -1,3 +1,4 @@
+import {validatePersonalProfile,earnedRecognition} from '../../server/team/personal-rules.js';
 import {profileChanges,professionalNotice} from '../../server/team/ux-rules.js';
 import {validateProfessionalProfile,canManageProfessionalProfile} from '../../server/team/profile-rules.js';
 import { getDb, getAuth, authenticate, membership, roles, checkRequest, send } from '../../server/_lib.js';
@@ -29,7 +30,36 @@ export default async function handler(req,res) {
     if(action==='myProfile'){
       const ref=db.collection('units').doc(actingMember.unitId).collection('staffProfiles').doc(actor.uid);
       const snap=await ref.get();
-      return send(res,200,'Perfil consultado.',{professional:snap.exists?snap.data().profile:null});
+      const personalRef=db.collection('units').doc(actingMember.unitId).collection('memberPersonal').doc(actor.uid);
+      const personalSnap=await personalRef.get();
+      const professional=snap.exists?snap.data().profile:null;
+      return send(res,200,'Perfil consultado.',{professional,personal:personalSnap.exists?personalSnap.data().fields:null,
+       recognition:earnedRecognition(professional)});
+    }
+    if(action==='personalSave'){
+      const fields=validatePersonalProfile(req.body?.fields);
+      if(!fields)return send(res,400,'Dados pessoais inválidos. Confira os limites e o turno preferencial.');
+      const ref=db.collection('units').doc(actingMember.unitId).collection('memberPersonal').doc(actor.uid);
+      const before=await ref.get();
+      if(JSON.stringify(before.data()?.fields||null)===JSON.stringify(fields))return send(res,200,'Seus dados já estão atualizados.');
+      const now=new Date();
+      await db.runTransaction(async tx=>{
+       const [active,existing]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
+       if(!active.exists||active.data().status!=='active'||active.data().unitId!==actingMember.unitId)throw Error('FORBIDDEN');
+       tx.set(ref,{uid:actor.uid,unitId:actingMember.unitId,fields,updatedAt:now},{merge:true});
+       tx.create(db.collection('auditLogs').doc(),{event:'team.personal_updated',unitId:actingMember.unitId,
+         actorUid:actor.uid,targetUid:actor.uid,at:now,changedFields:Object.keys(fields).filter(k=>fields[k]!==existing.data()?.fields?.[k])});
+      });
+      return send(res,200,'Suas preferências foram salvas.');
+    }
+    if(action==='skillReviewRequest'){
+      const skill=req.body?.skill,reason=req.body?.reason;
+      if(!['preparo','montagem','chapa','vitrine','vendas','ifood','caixa','recebimento','estoque','lideranca'].includes(skill)
+        ||typeof reason!=='string'||reason.trim().length<10||reason.length>400)
+        return send(res,400,'Selecione uma habilidade e informe um motivo entre 10 e 400 caracteres.');
+      const ref=db.collection('units').doc(actingMember.unitId).collection('skillReviewRequests').doc();
+      await ref.create({uid:actor.uid,unitId:actingMember.unitId,skill,reason:reason.trim(),status:'pending',createdAt:new Date()});
+      return send(res,200,'Solicitação registrada para avaliação da gerência.');
     }
     if(action==='notifications'){
       const snap=await db.collection('units').doc(actingMember.unitId).collection('memberNotifications').doc(actor.uid).collection('items').orderBy('at','desc').limit(50).get();
@@ -49,6 +79,13 @@ export default async function handler(req,res) {
     }
     if(!['admin','manager'].includes(actingMember.role))
       return send(res,403,'Sem permissão para gerir colaboradores.');
+    if(action==='skillReviewList'){
+      const snap=await db.collection('units').doc(actingMember.unitId).collection('skillReviewRequests').orderBy('createdAt','desc').limit(60).get();
+      return send(res,200,'Solicitações de habilidades consultadas.',{requests:snap.docs.map(d=>({
+       id:d.id,uid:d.data().uid,skill:d.data().skill,reason:d.data().reason,status:d.data().status,
+       createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null
+      }))});
+    }
     if (action === 'profiles') {
       const snap=await db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get();
       if(snap.size>200)return send(res,409,'Limite de equipe atingido.');
