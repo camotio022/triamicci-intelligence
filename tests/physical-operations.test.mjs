@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {countUnit,validQuantity,reconcile,commercialDelivery} from '../api/operations/logic.js';
+import {countUnit,validQuantity,reconcile,commercialDelivery} from '../server/operations/logic.js';
 
 test('alcatra e filé de frango 120g são contados individualmente',()=>{
  for(const catalogId of ['alcatra-bife','alcatra-cubos','frango-file-120g']){
