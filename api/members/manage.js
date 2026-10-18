@@ -1,4 +1,4 @@
-import {validateProfessionalProfile} from '../../server/team/profile-rules.js';
+import {validateProfessionalProfile,canManageProfessionalProfile} from '../../server/team/profile-rules.js';
 import { getDb, getAuth, authenticate, membership, roles, checkRequest, send } from '../../server/_lib.js';
 
 const statuses = ['active','inactive'];
@@ -54,10 +54,8 @@ export default async function handler(req,res) {
       const profileRef=db.collection('units').doc(actingMember.unitId).collection('staffProfiles').doc(uid);
       await db.runTransaction(async tx=>{
        const [a,target,existing]=await Promise.all([tx.get(actorRef),tx.get(memberRef),tx.get(profileRef)]);
-       if(!a.exists||a.data().status!=='active'||!['admin','manager'].includes(a.data().role)||
-          a.data().unitId!==actingMember.unitId)throw Error('FORBIDDEN');
        if(!target.exists||target.data().unitId!==actingMember.unitId)throw Error('NOT_FOUND');
-       if(a.data().role==='manager'&&!['cook','auxiliar'].includes(target.data().role))throw Error('FORBIDDEN');
+       if(!a.exists||!canManageProfessionalProfile(a.data(),target.data()))throw Error('FORBIDDEN');
        const now=new Date();
        tx.set(profileRef,{uid,unitId:actingMember.unitId,profile:normalized,updatedAt:now,
          updatedBy:actor.uid,revision:(existing.data()?.revision||0)+1},{merge:true});
