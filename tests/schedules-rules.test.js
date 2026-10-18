@@ -18,3 +18,12 @@ test('folga semanal fixa não é sexta, sábado ou domingo',()=>{
  const issues=validateRosterSchedule({entries:[{uid:'a',date:'2026-10-23',type:'off'}],members:m});
  assert(issues.some(x=>x.includes('segunda a quinta')));
 });
+
+test('rascunho incompleto não gera alerta de cobertura antes de publicação',()=>{
+ const issues=validateRosterSchedule({entries:[{uid:'a',date:'2026-10-19',type:'work'}],members:m,minKitchen:4,complete:false});
+ assert(!issues.some(x=>x.includes('Cobertura de cozinha')));
+});
+test('mínimo de cobertura fora dos limites é rejeitado',()=>{
+ const issues=validateRosterSchedule({entries:[],members:m,minKitchen:-1});
+ assert(issues.some(x=>x.includes('Cobertura mínima inválida')));
+});
