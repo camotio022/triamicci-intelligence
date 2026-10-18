@@ -1,5 +1,6 @@
 import React, {useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
+import {useFeedback} from './FeedbackProvider.jsx';
 
 async function api(action,payload={}) {
   const user=auth.currentUser;
@@ -32,7 +33,8 @@ export default function StockMovements({products,membership,onUpdated}) {
   const load=useCallback(async()=>{
     setLoading(true);setError('');
     try{const result=await api('list');setHistory(result.movements||[]);}
-    catch(e){setError(e.message);}
+    catch(e){
+ const {notify}=useFeedback();setError(e.message);}
     finally{setLoading(false);}
   },[]);
   useEffect(()=>{load();},[load]);
@@ -51,10 +53,10 @@ export default function StockMovements({products,membership,onUpdated}) {
     setSaving(true);setNotice('');
     try{
       const result=await api('create',{productId,type,amount:quantity,note:note.trim(),requestId});
-      setNotice(result.message+' Novo saldo: '+fmt(result.movement.after)+' '+selected.unit+'.');
+      setNotice(result.message+' Novo saldo: '+fmt(result.movement.after)+' '+selected.unit+'.');notify(result.message,'success');
       setAmount('');setNote('');resetRequest();
       await Promise.all([load(),onUpdated()]);
-    }catch(e){setNotice(e.message);}
+    }catch(e){setNotice(e.message);notify(e.message,'error');}
     finally{setSaving(false);}
   };
   return <section className="inventory-movements">

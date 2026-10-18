@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { auth } from './firebase.js';
+import {useFeedback} from './FeedbackProvider.jsx';
 import StockMovements from './StockMovements.jsx';
 import CatalogPicker from './CatalogPicker.jsx';
 import CatalogV2Review from './CatalogV2Review.jsx';
@@ -19,6 +20,7 @@ async function call(action, payload={}) {
   return data;
 }
 export default function Inventory({membership,mode='stock',onAction}) {
+ const {notify}=useFeedback();
   const [products,setProducts] = useState([]);
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
@@ -52,8 +54,8 @@ export default function Inventory({membership,mode='stock',onAction}) {
       const payload={name:form.name.trim(),category:form.category.trim(),unit:form.unit,
         minStock:minimum,trackExpiry:form.trackExpiry};
       const result=await call(editing?'update':'create',editing?{...payload,productId:editing.id,status:form.status}:payload);
-      setNotice(result.message);cancel();await load();
-    } catch(e) {setNotice(e.message);}
+      setNotice(result.message);notify(result.message,'success');cancel();await load();
+    } catch(e) {setNotice(e.message);notify(e.message,'error');}
     finally {setSaving(false);}
   };
   const set = (field,value) => setForm(old=>({...old,[field]:value}));

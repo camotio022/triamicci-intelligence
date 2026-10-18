@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
+import {useFeedback} from './FeedbackProvider.jsx';
 async function request(action,payload={}){
  const token=await auth.currentUser?.getIdToken();
  if(!token)throw new Error('Sessão expirada.');
@@ -9,6 +10,7 @@ async function request(action,payload={}){
  return data;
 }
 export default function CatalogPicker({onAttached,isAdmin=false}){
+ const {notify}=useFeedback();
  const [catalog,setCatalog]=useState([]);
  const [search,setSearch]=useState('');
  const [selected,setSelected]=useState('');
@@ -32,7 +34,7 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
      const data=await request('activateUnitCatalog');
      setNotice('Catálogo disponibilizado! '+data.created+' produtos novos com saldo zero; '+data.preserved+' produtos existentes preservados.');
      await reload();await onAttached?.();
-   }catch(e){setError(e.message)}finally{setBusy(false)}
+   }catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const approveBatch=async()=>{
    const candidates=catalog.filter(p=>!p.active&&p.approvalEligible);
@@ -48,7 +50,7 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
  const approve=async()=>{
    if(!item||!isAdmin||busy||!window.confirm('Aprovar '+item.name+' com unidade '+item.stockUnit+' no catálogo central?'))return;
    setBusy(true);setError('');setNotice('');
-   try{const data=await request('approve',{catalogId:item.id});setNotice(data.message);await reload();}
+   try{const data=await request('approve',{catalogId:item.id});setNotice(data.message);notify(data.message,'success');await reload();}
    catch(e){setError(e.message);}finally{setBusy(false);}
  };
  const submit=async e=>{
@@ -57,7 +59,7 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
    const value=Number(minimum);
    if(!Number.isFinite(value)||value<0){setError('Estoque mínimo inválido.');return;}
    setBusy(true);setError('');setNotice('');
-   try{const data=await request('attach',{catalogId:item.id,minStock:value});setNotice(data.message);setSelected('');await onAttached?.();}
+   try{const data=await request('attach',{catalogId:item.id,minStock:value});setNotice(data.message);notify(data.message,'success');setSelected('');await onAttached?.();}
    catch(e){setError(e.message);}finally{setBusy(false);}
  };
  return <form className="inventory-form catalog-picker" onSubmit={submit}>

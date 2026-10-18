@@ -1,10 +1,12 @@
 import React,{useMemo,useState} from 'react';
 import {auth} from './firebase.js';
+import {useFeedback} from './FeedbackProvider.jsx';
 import proposal from '../data/triamicci-product-catalog-v2.proposal.json';
 
 const textUnit = unit => unit==='un'?'unidades':unit||'a definir';
 const origin = source => source==='supplier'?'Fornecedor':source==='internal'?'Produção interna':'A confirmar';
 export default function CatalogV2Review(){
+ const {notify}=useFeedback();
  const [query,setQuery]=useState('');
  const [selected,setSelected]=useState('alcatra-bife');
  const [show,setShow]=useState(false);
@@ -19,8 +21,8 @@ export default function CatalogV2Review(){
     headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({action,confirm:action==='apply'?'APLICAR_CATALOGO_V2':undefined})});
    const data=await res.json();if(!res.ok)throw Error(data.message);
-   setPlan(action==='apply'?null:data.plan);setNotice(data.message+(data.applied!==undefined?' Itens atualizados: '+data.applied+'. Gere uma nova prévia para conferir.':''));
-  }catch(e){setNotice(e.message)}finally{setBusy(false)}
+   setPlan(action==='apply'?null:data.plan);notify(data.message,'success');setNotice(data.message+(data.applied!==undefined?' Itens atualizados: '+data.applied+'. Gere uma nova prévia para conferir.':''));
+  }catch(e){setNotice(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
 
  const products=proposal.products;
