@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import {FeedbackProvider} from './FeedbackProvider.jsx';
 import PhysicalStock from './PhysicalStock.jsx';
 import DailyInventory from './DailyInventory.jsx';
 import AuthGate from './AuthGate.jsx';
@@ -37,7 +38,7 @@ function Metric({icon:Icon,label,value,change,positive=true,detail}) {
 }
 
 export default function App() {
- return <AuthGate>{({ user, membership, logout }) => <Workspace user={user} membership={membership} logout={logout} />}</AuthGate>;
+ return <FeedbackProvider><AuthGate>{({ user, membership, logout }) => <Workspace user={user} membership={membership} logout={logout} />}</AuthGate></FeedbackProvider>;
 }
 
 function Workspace({ user, membership, logout }) {
