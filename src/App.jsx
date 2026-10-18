@@ -53,8 +53,8 @@ function Workspace({ user, membership, logout }) {
  return <div className="app-shell">
   {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
   <aside className={menuOpen ? "sidebar sidebar-open" : "sidebar"} id="primary-sidebar" aria-label="Menu principal">
-    <div className="brand-mark brand-mark-official"><div className="brand-logo-stack"><TriamicciLogo className="triamicci-logo"/><span className="brand-product-name">INTELLIGENCE</span></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setMenuOpen(false)}><X size={20}/></button></div>
-    <div className="workspace"><span className="workspace-dot"/> <span>Unidade: {membership.unitId}</span><ChevronDown size={15}/></div>
+    <div className="brand-mark brand-mark-official brand-signature"><div className="brand-logo-stack"><TriamicciLogo className="triamicci-logo"/><div className="brand-signature-bottom"><span className="brand-signature-line"/><span className="brand-product-name">INTELLIGENCE</span><span className="brand-signature-line"/></div></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setMenuOpen(false)}><X size={20}/></button></div>
+    <div className="workspace workspace-unit-card" aria-label={"Unidade atual: "+membership.unitId}><div className="workspace-unit-icon"><span className="workspace-dot"/></div><div className="workspace-unit-info"><small>UNIDADE ATUAL</small><strong>{membership.unitId}</strong></div><span className="workspace-unit-status">Ativa</span></div>
     <p className="nav-caption">ÁREA DE TRABALHO</p>
     <nav>
       <button type="button" className={page === "my-profile" ? "nav-item active" : "nav-item"} onClick={()=>navigate("my-profile")}><Users size={18}/> Minha ficha profissional</button>
