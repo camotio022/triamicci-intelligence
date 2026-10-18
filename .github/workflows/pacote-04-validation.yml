@@ -17,12 +17,13 @@ jobs:
         run: |
           if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
       - name: Testar regras de inventário
-        run: node --test tests/daily-inventory.test.js
+        run: node --test tests/daily-inventory.test.js tests/inventory-closure.test.js
       - name: Checar sintaxe do backend
         run: |
           node --check server/operations/daily-inventory.js
           node --check server/operations/daily-report.js
           node --check server/operations/inventory-closure.js
+          node --check server/operations/inventory-closure-rules.js
           node --check api/operations/stock.js
       - name: Compilar interface
         run: npm run build
