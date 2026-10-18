@@ -69,13 +69,25 @@ export default async function handler(req,res){
    const issues=validateRosterSchedule({entries:snap.data().entries||[],members,period:snap.data().period,complete:true});
    if(issues.length)return send(res,409,'A escala contém conflitos de cobertura ou folgas.',{issues});
    const states={submit:'in_review',approve:'approved',publish:'published'},now=new Date();
+   const lockRef=unit.collection('schedulePublicationState').doc(snap.data().period);
    await db.runTransaction(async tx=>{
-    const [member,current]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
+    const [member,current,lock]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref),action==='publish'?tx.get(lockRef):Promise.resolve(null)]);
+    const previousId=action==='publish'?lock?.data()?.activeId:null;
+    const previousRef=previousId&&previousId!==id?schedules.doc(previousId):null;
+    const previous=previousRef?await tx.get(previousRef):null;
     if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager'].includes(member.data().role))throw Error('FORBIDDEN');
     if(['approve','publish'].includes(action)&&member.data().role!=='admin')throw Error('FORBIDDEN');
     const expected={submit:'draft',approve:'in_review',publish:'approved'}[action];
     if(!current.exists||current.data().status!==expected||current.data().revision!==snap.data().revision)throw Error('CONFLICT');
     if(action==='approve'&&current.data().createdBy===actor.uid)throw Error('CONFLICT');
+    if(action==='publish'){
+     if(previous?.exists&&previous.data().status==='published')tx.update(previousRef,{status:'superseded',supersededAt:now,supersededBy:id});
+     tx.set(lockRef,{activeId:id,unitId:m.unitId,period:current.data().period,updatedAt:now});
+     for(const worker of memberList){
+      const noticeRef=unit.collection('memberNotifications').doc(worker.uid).collection('items').doc();
+      tx.create(noticeRef,{title:'Nova escala publicada',message:current.data().title+' · '+current.data().period,unitId:m.unitId,recipientUid:worker.uid,actorUid:actor.uid,read:false,at:now});
+     }
+    }
     tx.update(ref,{status:states[action],updatedAt:now,updatedBy:actor.uid,...(action==='publish'?{publishedAt:now,publishedBy:actor.uid}:{})});
     tx.create(db.collection('auditLogs').doc(),{event:'schedule.'+action,unitId:m.unitId,actorUid:actor.uid,scheduleId:id,at:now,revision:current.data().revision});
    });
