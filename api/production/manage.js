@@ -116,7 +116,9 @@ export default async function handler(req,res){
    for(const x of lotUpdates)tx.update(x.ref,x.data);
    for(const x of updates)tx.update(x.ref,x.data);
    const record={recipeId,recipeName:recipeData.name,recipeVersion:recipeData.version,
-    portions,items:used,payloadHash,notes,actorUid:actor.uid,unitId:member.unitId,at:now};
+    portions,items:used,payloadHash,notes,actorUid:actor.uid,
+    actorName:a.data().displayName||a.data().name||actor.name||actor.email||actor.uid,
+    unitId:member.unitId,at:now};
    tx.create(ref,record);
    tx.create(db.collection('auditLogs').doc(),{event:'production.finished',unitId:member.unitId,
     operationId:requestId,actorUid:actor.uid,at:now,details:record});
