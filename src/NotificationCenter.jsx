@@ -12,7 +12,7 @@ async function call(action,payload={}){
 export default function NotificationCenter({openProfile}){
  const {notify}=useFeedback(),[open,setOpen]=useState(false),[items,setItems]=useState([]),[busy,setBusy]=useState(false);
  const load=useCallback(async()=>{try{const data=await call('notifications');setItems(data.notifications||[])}catch(e){notify(e.message,'error')}},[notify]);
- useEffect(()=>{load()},[load]);
+ useEffect(()=>{load();const poll=()=>{if(document.visibilityState==='visible')load()};const timer=setInterval(poll,15000);window.addEventListener('focus',poll);return()=>{clearInterval(timer);window.removeEventListener('focus',poll)}},[load]);
  const read=async id=>{setBusy(true);try{await call('notificationRead',{id});setItems(old=>old.map(x=>x.id===id?{...x,read:true}:x))}catch(e){notify(e.message,'error')}finally{setBusy(false)}};
  const unread=items.filter(x=>!x.read).length;
  return <div className="ti-bell-wrap">
