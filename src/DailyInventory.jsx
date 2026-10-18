@@ -15,6 +15,11 @@ export default function DailyInventory({membership}){
  const [products,setProducts]=useState([]),[productId,setProductId]=useState('');
  const [result,setResult]=useState(null),[loading,setLoading]=useState(false);
  const [error,setError]=useState('');
+ const [closures,setClosures]=useState([]),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
+ const isManager=['admin','manager'].includes(membership.role);
+ const refreshClosures=async()=>{if(!isManager)return;const d=await request('/api/operations/stock','closeList');setClosures(d.closures||[])};
+ useEffect(()=>{if(isManager)refreshClosures().catch(e=>setError(e.message))},[membership.role]);
+ const decide=async(action,id,pid,reason='')=>{setBusy(true);setNotice('');try{const d=await request('/api/operations/stock',action,{productId:pid,requestId:id,reason});setNotice(d.message);await refreshClosures()}catch(e){setError(e.message)}finally{setBusy(false)}};
  useEffect(()=>{
   let active=true;
   request('/api/products/manage','list').then(d=>{if(active)setProducts((d.products||[]).filter(p=>p.status==='active'))})
@@ -66,7 +71,18 @@ export default function DailyInventory({membership}){
      {r.divergence&&<p role="alert">Diferença para conciliação: {fmt(r.divergence.quantity)} {r.unit} — {r.divergence.kind==='POSITIVE_ADJUSTMENT'?'aumento físico não explicado':'diferença entre saída física estimada e baixas registradas'}.</p>}
     </>}
     <p className="receiving-notice">Apuração informativa; não é prova de venda, perda ou desperdício. Não gera baixa adicional nem aprova fechamento.</p>
+    {r.currentCountId&&<button type="button" disabled={busy} onClick={()=>decide("closeSubmit",r.currentCountId,productId)}>Solicitar fechamento desta contagem</button>}
    </>}
   </div>
+  {notice&&<p role="status">{notice}</p>}
+  {isManager&&<section className="receiving-card"><h2>Fechamentos para conferência</h2>
+   {!closures.length?<p>Nenhum fechamento localizado.</p>:closures.map(x=><article key={x.id} className="operational-product">
+    <strong>{x.productName} · {x.day}</strong><p>{x.countedTotal} {x.unit} · {x.status==="pending"?"Pendente":x.status==="approved"?"Aprovado":"Recusado"}</p>
+    <p>Contagem: {x.countId} · Solicitado em {date(x.submittedAt)}</p>
+    {x.status==="pending"&&<div className="receiving-actions">
+     <button disabled={busy} type="button" onClick={()=>decide("closeApprove",x.countId,x.productId)}>Aprovar fechamento</button>
+     <button disabled={busy} type="button" onClick={()=>{const reason=window.prompt("Justificativa da recusa:");if(reason?.trim())decide("closeReject",x.countId,x.productId,reason.trim())}}>Recusar</button>
+    </div>}</article>)}
+  </section>}
  </section>;
 }
