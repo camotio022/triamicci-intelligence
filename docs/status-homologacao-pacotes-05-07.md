@@ -7,7 +7,8 @@
 - Na última rodada verificada (commit 5000cec), Pacotes 02/04/05 de CI concluíram com sucesso.
 
 ## Pendências impeditivas do merge
-- [ ] Completar as solicitações de folga, deferimento e comunicação ao trabalhador; tratar ausências especiais e exceções legais.
+- [x] Implementada a solicitação de folga, análise com justificativa, notificação e registro de auditoria (pendente homologação real).
+- [ ] Tratar ausências especiais, exceções legais e conciliação entre folga aprovada e calendário publicado.
 - [ ] Validar regras de folgas e cobertura com a gerência (6x1, domingo mensal, cobertura de auxiliares e quatro pessoas como meta ou bloqueio). Testar bordas de mês, férias e escala parcial.
 - [ ] Testes de autorização por papel, isolamento de unidades, aprovações, concorrência, idempotência e notificações no ambiente Firebase isolado de homologação.
 - [ ] Configurar índices/regras Firebase e dados de homologação quando aplicáveis; verificar ausência de escrita em produção.
@@ -19,3 +20,8 @@
 - [ ] Aprovação funcional final; somente então realizar um squash merge e verificar o deploy.
 
 A PR deve continuar em **draft** e nunca ser mesclada enquanto qualquer item bloqueante permanecer.
+
+## Continuação de 18/10/2026
+- Inclusos endpoint `leaveRequest`, `leaveList`, `leaveDecision`, componente de solicitação e rota para todos os colaboradores.
+- Aprovar pedido não altera escala oficial, por segurança. Revisão gerencial e republicação continuam necessárias.
+- Gate final permanece bloqueado até validação funcional real, revisão sanitária e UX.
