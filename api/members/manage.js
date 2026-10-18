@@ -254,6 +254,7 @@ export default async function handler(req,res) {
     if (error.message === 'NOT_FOUND') return send(res,404,'Colaborador não encontrado nesta unidade.');
     if (error.message === 'TOO_MANY_MEMBERS') return send(res,409,'Unidade grande demais para esta operação; contacte o suporte.');
     if (error.message === 'LAST_ADMIN') return send(res,409,'Não é possível remover o último administrador ativo da unidade.');
+    if (error.message === 'SKILL_SECTOR') return send(res,400,'Novas habilidades devem corresponder ao setor selecionado.');
     if (error.message === 'NO_CHANGES') return send(res,409,'Nenhuma alteração foi feita.');
     if (error.message === 'INVALID_STATE') return send(res,409,'O vínculo atual está inconsistente.');
     console.error('Member management:',error.message);
