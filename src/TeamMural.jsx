@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';import {auth} from './firebase.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';
-async function call(module,action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');const r=await fetch('/api/operations/workflows',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...extra})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
+async function call(module,action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...extra})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
 const mural='mural',sc='schedules';
 const blank=()=>({kind:'preparation',title:'',body:'',yieldText:'',allergens:[],ingredients:[{name:'',amount:'',unit:'g'}]});
 export default function TeamMural({membership,onLabels}){
