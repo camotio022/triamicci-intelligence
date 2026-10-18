@@ -1,4 +1,4 @@
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
+import {getDb,getAuth,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 import {validDate,validateRosterSchedule} from '../../server/schedules/rules.js';
 const idOk=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 const yyyyMm=x=>typeof x==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(x);
@@ -15,7 +15,16 @@ export default async function handler(req,res){
   if(action==='list'){
    const snap=await schedules.limit(120).get();
    const manager=['admin','manager'].includes(m.role);
-   return send(res,200,'Escalas carregadas.',{schedules:snap.docs.filter(x=>manager||x.data().status==='published').map(clean).sort((a,b)=>String(b.period).localeCompare(String(a.period)))});
+   const records=snap.docs.filter(x=>manager||x.data().status==='published').map(clean).sort((a,b)=>String(b.period).localeCompare(String(a.period)));
+   const assigned=[...new Set(records.flatMap(r=>(r.entries||[]).map(e=>e.uid)))].slice(0,200);
+   const memberships=assigned.length?await db.getAll(...assigned.map(uid=>db.collection('memberships').doc(uid))):[];
+   const byId=new Map(memberships.filter(x=>x.exists&&x.data().unitId===m.unitId).map(x=>[x.id,x.data().name||'']));
+   const missing=assigned.filter(uid=>!byId.get(uid));
+   for(let i=0;i<missing.length;i+=100){
+    const batch=await getAuth().getUsers(missing.slice(i,i+100).map(uid=>({uid})));
+    for(const user of batch.users)if(!byId.has(user.uid)||!byId.get(user.uid))byId.set(user.uid,user.displayName||'Colaborador da unidade');
+   }
+   return send(res,200,'Escalas carregadas.',{schedules:records.map(r=>({...r,entries:r.entries.map(e=>({...e,name:byId.get(e.uid)||'Colaborador da unidade'}))}))});
   }
   if(action==='mine'){
    const snap=await schedules.where('status','==','published').limit(100).get();
