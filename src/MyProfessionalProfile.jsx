@@ -1,4 +1,4 @@
-import React,{useCallback,useEffect,useState} from 'react';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {auth} from './firebase.js';
 import {Award,Star,Sparkles,Clock3,CheckCircle2,UserRound,Pencil,Target,Send,ShieldCheck} from 'lucide-react';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -17,12 +17,15 @@ async function api(action,extra={}){
 export default function MyProfessionalProfile({membership}){
  const {notify}=useFeedback(),[profile,setProfile]=useState(null),[personal,setPersonal]=useState(blank),[recognition,setRecognition]=useState(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[editing,setEditing]=useState(false);
+ const editingRef=useRef(false);editingRef.current=editing;
+ const [syncedAt,setSyncedAt]=useState(null);
  const [error,setError]=useState(''),[skill,setSkill]=useState(''),[reason,setReason]=useState(''),[requesting,setRequesting]=useState(false);
- const load=useCallback(async()=>{setLoading(true);setError('');try{const data=await api('myProfile');
- setProfile(data.professional);setPersonal({...blank,...(data.personal||{})});setRecognition(data.recognition);
- }catch(e){setError(e.message)}finally{setLoading(false)}},[]);
- useEffect(()=>{load()},[load]);
- const save=async e=>{e.preventDefault();if(saving)return;setSaving(true);try{const d=await api('personalSave',{fields:personal});notify(d.message,'success');setEditing(false)}
+ const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const data=await api('myProfile');
+ setProfile(data.professional);if(!editingRef.current)setPersonal({...blank,...(data.personal||{})});setRecognition(data.recognition);setSyncedAt(new Date());
+ }catch(e){if(!silent)setError(e.message)}finally{if(!silent)setLoading(false)}},[]);
+ useEffect(()=>{load();const poll=()=>{if(document.visibilityState==='visible')load(true)};const timer=setInterval(poll,15000);
+ window.addEventListener('focus',poll);return()=>{clearInterval(timer);window.removeEventListener('focus',poll)}},[load]);
+ const save=async e=>{e.preventDefault();if(saving)return;setSaving(true);try{const d=await api('personalSave',{fields:personal});notify(d.message,'success');setEditing(false);await load(true)}
  catch(e){notify(e.message,'error')}finally{setSaving(false)}};
  const request=async e=>{e.preventDefault();if(requesting)return;setRequesting(true);try{const d=await api('skillReviewRequest',{skill,reason});
  notify(d.message,'success');setSkill('');setReason('')}catch(e){notify(e.message,'error')}finally{setRequesting(false)}};
@@ -30,6 +33,7 @@ export default function MyProfessionalProfile({membership}){
  const name=personal.displayName||auth.currentUser?.displayName||auth.currentUser?.email?.split('@')[0]||'Colaborador';
  return <section className="ti-premium team-page">
   <p className="eyebrow">MINHA JORNADA · {membership.unitId.toUpperCase()}</p>
+  <p className="ti-sync-status" role="status">{syncedAt?`Atualizada automaticamente · ${syncedAt.toLocaleTimeString("pt-BR")}`:"Buscando dados atualizados..."}</p>
   <div className="ti-premium-hero">
    <div className="ti-premium-avatar"><UserRound size={35}/></div>
    <div className="ti-premium-identity"><p>Meu espaço profissional <Sparkles size={17}/></p><h1>{name}</h1>
