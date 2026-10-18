@@ -42,7 +42,8 @@ export default async function handler(req,res) {
       const unit=db.collection('units').doc(actingMember.unitId),ref=unit.collection('staffRegistry').doc(id);
       const request=unit.collection('staffRegistryClaims').doc(id+'_'+actor.uid);
       const person=await ref.get();
-      if(!person.exists||person.data().status!=='active'||person.data().accountUid)return send(res,409,'Ficha indisponível para solicitação.');
+      const seed=staffSeed.find(p=>'staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40)===id);
+      if(person.exists&&(person.data().status!=='active'||person.data().accountUid)||!person.exists&&!seed)return send(res,409,'Ficha indisponível para solicitação.');
       await request.set({registryId:id,accountUid:actor.uid,status:'pending',createdAt:new Date(),requestedBy:actor.uid,unitId:actingMember.unitId});
       return send(res,200,'Solicitação enviada à gerência. O vínculo ainda não foi feito.');
     }
@@ -52,12 +53,14 @@ export default async function handler(req,res) {
       if(typeof id!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(id)||typeof uid!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(uid))return send(res,400,'Identificadores inválidos.');
       const unit=db.collection('units').doc(actingMember.unitId),ref=unit.collection('staffRegistry').doc(id),claim=unit.collection('staffRegistryClaims').doc(id+'_'+uid),account=db.collection('memberships').doc(uid);
       const other=await unit.collection('staffRegistry').where('accountUid','==',uid).limit(1).get();
+      const seed=staffSeed.find(p=>'staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40)===id);
       if(!other.empty&&other.docs[0].id!==id)return send(res,409,'Conta já vinculada a outra ficha.');
       const now=new Date();
       await db.runTransaction(async tx=>{
         const [p,q,a]=await Promise.all([tx.get(ref),tx.get(claim),tx.get(account)]);
-        if(!p.exists||p.data().status!=='active'||p.data().accountUid||!q.exists||q.data().status!=='pending'||q.data().accountUid!==uid||!a.exists||a.data().unitId!==actingMember.unitId||a.data().status!=='active')throw Error('CONFLICT');
-        tx.update(ref,{accountUid:uid,linkedAt:now,linkedBy:actor.uid,updatedAt:now});
+        if((!p.exists&&!seed)||(p.exists&&(p.data().status!=='active'||p.data().accountUid))||!q.exists||q.data().status!=='pending'||q.data().accountUid!==uid||!a.exists||a.data().unitId!==actingMember.unitId||a.data().status!=='active')throw Error('CONFLICT');
+        if(p.exists)tx.update(ref,{accountUid:uid,linkedAt:now,linkedBy:actor.uid,updatedAt:now});
+        else tx.create(ref,{...seed,normalizedName:normalizeStaffName(seed.name),status:'active',skills:[],certifications:[],accountUid:uid,linkedAt:now,linkedBy:actor.uid,createdAt:now,createdBy:actor.uid,updatedAt:now,source:'levantamento_escala_2026'});
         tx.update(claim,{status:'approved',reviewedAt:now,reviewedBy:actor.uid});
         tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_account_linked',unitId:actingMember.unitId,actorUid:actor.uid,targetUid:uid,registryId:id,at:now});
       });
@@ -102,7 +105,7 @@ export default async function handler(req,res) {
       if(staff.size>=200||accounts.size>200)return send(res,409,'Limite de conferência atingido; importação bloqueada.');
       const registry=staff.docs.map(d=>({id:d.id,...d.data()}));
       const existingAccounts=accounts.docs.map(d=>({uid:d.id,name:d.data().name||'',status:d.data().status||''}));
-      const preview=reconcileStaff(staffSeed,registry,existingAccounts);
+      const preview=reconcileStaff(staffSeed,registry,existingAccounts).map(p=>({...p,seedId:'staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40)}));
       if(action==='masterRegistryPreview')return send(res,200,'Prévia carregada; nenhuma conta será vinculada automaticamente.',{people:preview,registry,accounts:existingAccounts});
       if(req.body?.confirm!==true)return send(res,400,'Confirme a importação após revisar a prévia.');
       const selected=req.body?.names;
