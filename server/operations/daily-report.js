@@ -4,7 +4,7 @@ import {calculateDailyInventory} from './daily-inventory.js';
 
 const idPattern=/^[a-f0-9]{40}$/;
 const timestamp=value=>value?.toDate?.()?.toISOString?.()||null;
-const row=(doc,unit)=>({...doc.data(),at:timestamp(doc.data().at),unit:doc.data().unit||unit});
+const row=(doc,unit)=>({id:doc.id,...doc.data(),at:timestamp(doc.data().at),unit:doc.data().unit||unit});
 const LIMIT=501;
 export default async function dailyReport(req,res) {
  if(!checkRequest(req,res))return;
@@ -33,7 +33,7 @@ export default async function dailyReport(req,res) {
   if(!ordered.length)return send(res,200,'Sem contagem física.',{
    report:null,complete:true,reason:'NO_COUNT'});
   const current=ordered[0],previous=ordered[1]||null;
-  if(previous && (!current.at||!previous.at||current.at===previous.at))
+  if(previous && (!current.at||!previous.at||Date.parse(current.at)<=Date.parse(previous.at)))
    return send(res,200,'Contagens com datas ambíguas.',{report:null,complete:false,reason:'AMBIGUOUS_COUNT'});
   const between=r=>previous&&r.at&&Date.parse(r.at)>Date.parse(previous.at)&&Date.parse(r.at)<=Date.parse(current.at);
   const entries=receipts.docs.map(d=>row(d,unit)).filter(between).map(r=>({
