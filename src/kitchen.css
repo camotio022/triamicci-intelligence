@@ -45,3 +45,11 @@
  .team-profile-form .team-edit-actions button{width:100%}
 }
 @media(max-width:390px){.team-skills-grid{grid-template-columns:1fr}}
+
+/* Consistência P05 — escolhas densas sem controles desproporcionais */
+.team-profiles input[type="checkbox"]{width:17px!important;height:17px!important;min-width:17px!important;min-height:17px!important;max-width:17px!important;max-height:17px!important;flex:0 0 17px!important}
+.team-skills-grid label,.team-checkbox{padding:9px 11px;gap:8px;font-size:12px;line-height:1.4;border-radius:9px}
+.team-skills-grid label:has(input:checked),.team-checkbox:has(input:checked){background:#fff3f1;border-color:#ddaaa5}
+.team-profiles-tabs button{font-size:13px}
+@media(max-width:760px){.team-profiles-tabs{display:flex;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;gap:7px}.team-profiles-tabs button{width:auto;min-width:max-content;min-height:41px;flex:0 0 auto;scroll-snap-align:start;padding:9px 12px}.team-skills-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.team-skills-grid label{padding:9px 8px;font-size:11px}.team-profile-form{border-radius:13px;padding:13px}}
+@media(max-width:360px){.team-skills-grid{grid-template-columns:1fr}}
