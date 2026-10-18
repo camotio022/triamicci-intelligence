@@ -21,10 +21,14 @@ export default async function inventoryClosure(req,res) {
   const db=getDb(),unit=db.collection('units').doc(membershipData.unitId);
   if(action==='closeList'){
    if(!['admin','manager'].includes(membershipData.role))throw Error('FORBIDDEN');
-   const snap=await unit.collection('inventoryClosures').orderBy('submittedAt','desc').limit(40).get();
-   return send(res,200,'Fechamentos consultados.',{closures:snap.docs.map(d=>{
+   const before=req.body?.before;
+   if(before!==undefined&&(typeof before!=='string'||!Number.isFinite(Date.parse(before))))throw Error('INVALID');
+   let query=unit.collection('inventoryClosures').orderBy('submittedAt','desc');
+   if(before)query=query.where('submittedAt','<',new Date(before));
+   const snap=await query.limit(41).get();
+   return send(res,200,'Fechamentos consultados.',{closures:snap.docs.slice(0,40).map(d=>{
     const x=d.data();return {...x,id:d.id,submittedAt:toIso(x.submittedAt),decidedAt:toIso(x.decidedAt)};
-   }),hasMore:snap.size===40});
+   }),hasMore:snap.size>40});
   }
   if(!productPattern.test(productId||'')||!requestPattern.test(requestId||''))throw Error('INVALID');
   if(typeof reason!=='string'||reason.length>240)throw Error('INVALID');
