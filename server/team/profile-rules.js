@@ -10,7 +10,7 @@ export const skillsBySector={
 };
 export const eligibleSkills=sector=>skillsBySector[sector]||[];
 export function invalidNewSectorSkills(previous,next){
- const allowedSet=new Set(eligibleSkills(next.sector));
+ const allowedSet=new Set([...eligibleSkills(next.sector),...(next.sectorExceptions||[])]);
  const existing=new Set([...(previous?.skills||[]),...(previous?.certifications||[])]);
  return next.skills.filter(k=>!allowedSet.has(k)&&!existing.has(k));
 }
@@ -26,7 +26,9 @@ export function canManageProfessionalProfile(actor,target){
 export function validateProfessionalProfile(value){
  if(!value||typeof value!=='object'||Array.isArray(value))return null;
  const {sector,jobTitle,skills,certifications,shift,availability,notes}=value;
+ const sectorExceptions=value.sectorExceptions||[];
  if(!allowed(sector,sectors)||typeof jobTitle!=='string'||jobTitle.trim().length<2||jobTitle.trim().length>80||
+   !Array.isArray(sectorExceptions)||sectorExceptions.length>skillCatalog.length||!sectorExceptions.every(x=>allowed(x,skillCatalog))||new Set(sectorExceptions).size!==sectorExceptions.length||
    !Array.isArray(skills)||skills.length>skillCatalog.length||!skills.every(x=>allowed(x,skillCatalog))||new Set(skills).size!==skills.length||
    !Array.isArray(certifications)||certifications.length>skillCatalog.length||
    !certifications.every(x=>allowed(x,skillCatalog))||new Set(certifications).size!==certifications.length||
@@ -38,5 +40,5 @@ export function validateProfessionalProfile(value){
       item.start>=item.end||item.breakStart<item.start||item.breakEnd>item.end||item.breakStart>=item.breakEnd)return null;
  }
  return {sector,jobTitle:jobTitle.trim(),skills:[...skills],certifications:[...certifications],
-  shift,availability:availability.map(({day,start,end,breakStart,breakEnd})=>({day,start,end,breakStart,breakEnd})),notes:notes.trim()};
+  shift,sectorExceptions:[...sectorExceptions],availability:availability.map(({day,start,end,breakStart,breakEnd})=>({day,start,end,breakStart,breakEnd})),notes:notes.trim()};
 }
