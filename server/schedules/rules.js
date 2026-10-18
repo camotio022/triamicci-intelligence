@@ -11,6 +11,7 @@ export function monthDates(period){
 export function validateRosterSchedule({entries,members,minKitchen=4,period=null,complete=false}){
  const errors=[];if(!Array.isArray(entries)||entries.length>1000)return ['Quantidade inválida de lançamentos.'];
  const known=new Map((members||[]).map(m=>[m.uid,m]));
+ if(!Number.isInteger(minKitchen)||minKitchen<1||minKitchen>30)return ['Cobertura mínima inválida.'];
  const dates=new Map(),assigned=new Set();
  for(const entry of entries){
   if(!entry||!validDate(entry.date)||!known.has(entry.uid)||!['work','off','leave','monthly_sunday'].includes(entry.type)){errors.push('Registro de escala inválido.');continue}
@@ -43,8 +44,8 @@ export function validateRosterSchedule({entries,members,minKitchen=4,period=null
   const cooksOff=day.filter(e=>['off','monthly_sunday'].includes(e.type)&&known.get(e.uid)?.role==='cook');
   if(cooksOff.length>1)errors.push('Dois cozinheiros de folga em '+date);
   const kitchen=workers.filter(m=>m.professional?.sector==='cozinha');
-  if(day.length===known.size&&kitchen.length<minKitchen)errors.push('Cobertura de cozinha abaixo do mínimo em '+date);
-  if(sun&&day.length===known.size&&!kitchen.some(m=>m.role==='auxiliar'&&m.professional?.certifications?.includes('montagem')))errors.push('Domingo sem montagem confirmada em '+date);
+  if(complete&&day.length===known.size&&kitchen.length<minKitchen)errors.push('Cobertura de cozinha abaixo do mínimo em '+date);
+  if(complete&&sun&&day.length===known.size&&!kitchen.some(m=>m.role==='auxiliar'&&m.professional?.certifications?.includes('montagem')))errors.push('Domingo sem montagem confirmada em '+date);
  }
  return errors;
 }
