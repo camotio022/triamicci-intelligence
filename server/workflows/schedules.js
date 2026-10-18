@@ -43,6 +43,8 @@ export default async function handler(req,res){
     const batch=await getAuth().getUsers(missing.slice(i,i+100).map(uid=>({uid})));
     for(const user of batch.users)if(!byId.has(user.uid)||!byId.get(user.uid))byId.set(user.uid,user.displayName||'Colaborador da unidade');
    }
+   const registry=await unit.collection('staffRegistry').limit(200).get();
+   for(const doc of registry.docs)byId.set(doc.id,doc.data().name||'Colaborador');
    return send(res,200,'Escalas carregadas.',{schedules:records.map(r=>({...r,entries:r.entries.map(e=>({...e,name:byId.get(e.uid)||'Colaborador da unidade'}))}))});
   }
   if(action==='mine'){
@@ -91,7 +93,8 @@ export default async function handler(req,res){
    const ref=id?schedules.doc(id):schedules.doc();
    const membersSnap=await db.collection('memberships').where('unitId','==',m.unitId).limit(201).get();
    if(membersSnap.size>200)return send(res,409,'Equipe acima do limite de planejamento.');
-   const active=new Set(membersSnap.docs.filter(d=>d.data().status==='active').map(d=>d.id));
+   const staffSnap=await unit.collection('staffRegistry').limit(200).get();
+   const active=new Set([...membersSnap.docs.filter(d=>d.data().status==='active').map(d=>d.id),...staffSnap.docs.filter(d=>d.data().status==='active').map(d=>d.id)]);
    if(entries.some(e=>!active.has(e.uid)))return send(res,400,'A escala contém colaborador não ativo na unidade.');
    const now=new Date();
    await db.runTransaction(async tx=>{
@@ -114,10 +117,12 @@ export default async function handler(req,res){
    const memberSnap=await db.collection('memberships').where('unitId','==',m.unitId).limit(201).get();
    if(memberSnap.size>200)return send(res,409,'Equipe acima do limite.');
    const memberList=memberSnap.docs.filter(x=>x.data().status==='active').map(x=>({uid:x.id,...x.data()}));
+   const registrySnap=await unit.collection('staffRegistry').limit(200).get();
+   const registryList=registrySnap.docs.filter(d=>d.data().status==='active').map(d=>({uid:d.id,role:d.data().jobTitle==='Cozinheiro'?'cook':d.data().jobTitle==='Auxiliar de cozinha'?'auxiliar':'staff',status:'active',name:d.data().name,professional:{sector:d.data().sector,shift:d.data().shift,jobTitle:d.data().jobTitle,skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
    const profileRefs=memberList.map(x=>unit.collection('staffProfiles').doc(x.uid));
    const profiles=profileRefs.length?await db.getAll(...profileRefs):[];
    const members=memberList.map((x,i)=>({...x,professional:profiles[i]?.data()?.profile||null}));
-   const issues=validateRosterSchedule({entries:snap.data().entries||[],members,period:snap.data().period,complete:true});
+   const issues=validateRosterSchedule({entries:snap.data().entries||[],members:[...members,...registryList],period:snap.data().period,complete:true});
    if(issues.length)return send(res,409,'A escala contém conflitos de cobertura ou folgas.',{issues});
    const states={submit:'in_review',approve:'approved',publish:'published'},now=new Date();
    const lockRef=unit.collection('schedulePublicationState').doc(snap.data().period);
