@@ -270,3 +270,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .inventory-actions button[type=submit]{background:var(--brand-red);border-color:var(--brand-red)}
 .team-member-tags .team-status-active{background:var(--brand-green-soft);color:var(--brand-green)}
 .dashboard-chart-empty{min-height:210px;display:grid;place-items:center;text-align:center}
+
+
+/* PR40: hierarquia acessível do menu sem comprometer a navegação */
+.sidebar nav .ti-nav-group-label{color:#b9a7ad;font-size:10px;letter-spacing:1.2px;font-weight:800;margin:18px 10px 8px;line-height:1.4}
+.sidebar nav .nav-item{display:flex;align-items:center;gap:10px;min-height:46px;height:auto;line-height:1.35;white-space:normal;overflow-wrap:normal;word-break:normal;padding:11px 12px;border-radius:10px}
+.sidebar nav .nav-item svg{flex:0 0 18px}
+@media(max-width:900px){.sidebar nav .nav-item{min-height:48px}.sidebar nav .ti-nav-group-label{margin-top:14px}}
