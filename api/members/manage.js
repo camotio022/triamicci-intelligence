@@ -36,6 +36,38 @@ export default async function handler(req,res) {
 
     const { action } = req.body || {};
     const db = getDb();
+    if(action==='masterRegistryClaim'){
+      const id=req.body?.id;
+      if(typeof id!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(id))return send(res,400,'Ficha inválida.');
+      const unit=db.collection('units').doc(actingMember.unitId),ref=unit.collection('staffRegistry').doc(id);
+      const request=unit.collection('staffRegistryClaims').doc(id+'_'+actor.uid);
+      const person=await ref.get();
+      if(!person.exists||person.data().status!=='active'||person.data().accountUid)return send(res,409,'Ficha indisponível para solicitação.');
+      await request.set({registryId:id,accountUid:actor.uid,status:'pending',createdAt:new Date(),requestedBy:actor.uid,unitId:actingMember.unitId});
+      return send(res,200,'Solicitação enviada à gerência. O vínculo ainda não foi feito.');
+    }
+    if(action==='masterRegistryLink'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Somente gerência confirma vínculos.');
+      const {id,uid}=req.body||{};
+      if(typeof id!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(id)||typeof uid!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(uid))return send(res,400,'Identificadores inválidos.');
+      const unit=db.collection('units').doc(actingMember.unitId),ref=unit.collection('staffRegistry').doc(id),claim=unit.collection('staffRegistryClaims').doc(id+'_'+uid),account=db.collection('memberships').doc(uid);
+      const other=await unit.collection('staffRegistry').where('accountUid','==',uid).limit(1).get();
+      if(!other.empty&&other.docs[0].id!==id)return send(res,409,'Conta já vinculada a outra ficha.');
+      const now=new Date();
+      await db.runTransaction(async tx=>{
+        const [p,q,a]=await Promise.all([tx.get(ref),tx.get(claim),tx.get(account)]);
+        if(!p.exists||p.data().status!=='active'||p.data().accountUid||!q.exists||q.data().status!=='pending'||q.data().accountUid!==uid||!a.exists||a.data().unitId!==actingMember.unitId||a.data().status!=='active')throw Error('CONFLICT');
+        tx.update(ref,{accountUid:uid,linkedAt:now,linkedBy:actor.uid,updatedAt:now});
+        tx.update(claim,{status:'approved',reviewedAt:now,reviewedBy:actor.uid});
+        tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_account_linked',unitId:actingMember.unitId,actorUid:actor.uid,targetUid:uid,registryId:id,at:now});
+      });
+      return send(res,200,'Vínculo confirmado sem alterar permissões de acesso.');
+    }
+    if(action==='masterRegistryClaims'){
+      if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
+      const snap=await db.collection('units').doc(actingMember.unitId).collection('staffRegistryClaims').limit(200).get();
+      return send(res,200,'Solicitações de vínculo carregadas.',{claims:snap.docs.filter(d=>d.data().status==='pending').map(d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null}))});
+    }
     if(action==='masterRegistryUpdate'){
       if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Apenas gerência edita fichas.');
       const {id,changes}=req.body||{};
