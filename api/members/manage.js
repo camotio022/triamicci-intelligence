@@ -79,6 +79,13 @@ export default async function handler(req,res) {
     }
     if(!['admin','manager'].includes(actingMember.role))
       return send(res,403,'Sem permissão para gerir colaboradores.');
+    if(action==='skillReviewList'){
+      const snap=await db.collection('units').doc(actingMember.unitId).collection('skillReviewRequests').orderBy('createdAt','desc').limit(60).get();
+      return send(res,200,'Solicitações de habilidades consultadas.',{requests:snap.docs.map(d=>({
+       id:d.id,uid:d.data().uid,skill:d.data().skill,reason:d.data().reason,status:d.data().status,
+       createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null
+      }))});
+    }
     if (action === 'profiles') {
       const snap=await db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get();
       if(snap.size>200)return send(res,409,'Limite de equipe atingido.');
