@@ -16,6 +16,7 @@ async function api(action,payload={}) {
 }
 const fmt=n=>Number(n).toLocaleString('pt-BR',{maximumFractionDigits:3});
 export default function StockMovements({products,membership,onUpdated}) {
+  const {notify}=useFeedback();
   const [history,setHistory]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
@@ -33,8 +34,7 @@ export default function StockMovements({products,membership,onUpdated}) {
   const load=useCallback(async()=>{
     setLoading(true);setError('');
     try{const result=await api('list');setHistory(result.movements||[]);}
-    catch(e){
- const {notify}=useFeedback();setError(e.message);}
+    catch(e){setError(e.message);}
     finally{setLoading(false);}
   },[]);
   useEffect(()=>{load();},[load]);
@@ -93,8 +93,8 @@ export default function StockMovements({products,membership,onUpdated}) {
     </form>
     <div className="inventory-list-header"><h2>Últimas 50 movimentações</h2><button type="button" disabled={loading} onClick={load}>{loading?'Carregando...':'Atualizar histórico'}</button></div>
     {error&&<p role="alert">{error}</p>}
-    <div className="inventory-table-wrap"><table className="inventory-table"><thead><tr><th>DATA</th><th>INSUMO</th><th>TIPO</th><th>QUANTIDADE</th><th>SALDO ANTES</th><th>SALDO DEPOIS</th><th>RESPONSÁVEL (UID)</th><th>MOTIVO</th></tr></thead>
-      <tbody>{history.map(m=><tr key={m.id}><td>{m.at?new Date(m.at).toLocaleString('pt-BR'):'—'}</td><td>{m.productName}</td><td>{m.type==='entry'?'Entrada':'Saída'}</td><td>{fmt(m.amount)} {m.unit}</td><td>{fmt(m.before)} {m.unit}</td><td>{fmt(m.after)} {m.unit}</td><td title={m.actorUid}>{m.actorUid?.slice(0,10)}…</td><td>{m.note}</td></tr>)}</tbody></table>
+    <div className="inventory-table-wrap"><table className="inventory-table"><thead><tr><th>DATA</th><th>INSUMO</th><th>TIPO</th><th>QUANTIDADE</th><th>SALDO ANTES</th><th>SALDO DEPOIS</th><th>RESPONSÁVEL</th><th>MOTIVO</th></tr></thead>
+      <tbody>{history.map(m=><tr key={m.id}><td>{m.at?new Date(m.at).toLocaleString('pt-BR'):'—'}</td><td>{m.productName}</td><td>{m.type==='entry'?'Entrada':'Saída'}</td><td>{fmt(m.amount)} {m.unit}</td><td>{fmt(m.before)} {m.unit}</td><td>{fmt(m.after)} {m.unit}</td><td>{m.actorName||'Responsável não identificado'}</td><td>{m.note}</td></tr>)}</tbody></table>
       {!loading&&!error&&history.length===0&&<p>Nenhuma movimentação registrada.</p>}
     </div>
   </section>;

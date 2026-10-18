@@ -31,9 +31,9 @@ export default function MyProfessionalProfile({membership}){
   if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>15_000_000){notify('Escolha uma foto JPG, PNG ou WebP de até 15 MB.','error');return;}
   setPhotoFile(file);
  };
- const saveAvatar=async encoded=>{setUploading(true);try{const result=await api('avatarSave',{avatar:encoded});setAvatar(encoded);setPhotoFile(null);notify(result.message,'success')}
+ const saveAvatar=async encoded=>{setUploading(true);try{const result=await api('avatarSave',{avatar:encoded});setAvatar(encoded);window.dispatchEvent(new Event('ti-avatar-updated'));setPhotoFile(null);notify(result.message,'success')}
   catch(e){notify(e.message,'error')}finally{setUploading(false)}};
- const removeAvatar=async()=>{if(uploading)return;setUploading(true);try{const d=await api('avatarRemove');setAvatar(null);notify(d.message,'success')}catch(e){notify(e.message,'error')}finally{setUploading(false)}};
+ const removeAvatar=async()=>{if(uploading)return;setUploading(true);try{const d=await api('avatarRemove');setAvatar(null);window.dispatchEvent(new Event('ti-avatar-updated'));notify(d.message,'success')}catch(e){notify(e.message,'error')}finally{setUploading(false)}};
  const save=async e=>{e.preventDefault();if(saving)return;setSaving(true);try{const d=await api('personalSave',{fields:personal});notify(d.message,'success');setEditing(false);await load(true)}
  catch(e){notify(e.message,'error')}finally{setSaving(false)}};
  const request=async e=>{e.preventDefault();if(requesting)return;setRequesting(true);try{const d=await api('skillReviewRequest',{skill,reason});
