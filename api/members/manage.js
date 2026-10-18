@@ -1,4 +1,4 @@
-import {staffSeed,reconcileStaff,normalizeStaffName} from '../../server/team/master-registry.js';
+import {staffSeed,reconcileStaff,normalizeStaffName,defaultStaffAvailability} from '../../server/team/master-registry.js';
 import schedulesWorkflow from '../../server/workflows/schedules.js';
 import muralWorkflow from '../../server/workflows/mural.js';
 import labelsWorkflow from '../../server/workflows/labels.js';
@@ -78,7 +78,7 @@ export default async function handler(req,res) {
         const [p,q,a]=await Promise.all([tx.get(ref),tx.get(claim),tx.get(account)]);
         if((!p.exists&&!seed)||(p.exists&&(p.data().status!=='active'||p.data().accountUid))||!q.exists||q.data().status!=='pending'||q.data().accountUid!==uid||!a.exists||a.data().unitId!==actingMember.unitId||a.data().status!=='active')throw Error('CONFLICT');
         if(p.exists)tx.update(ref,{accountUid:uid,linkedAt:now,linkedBy:actor.uid,updatedAt:now});
-        else tx.create(ref,{...seed,normalizedName:normalizeStaffName(seed.name),status:'active',skills:[],certifications:[],accountUid:uid,linkedAt:now,linkedBy:actor.uid,createdAt:now,createdBy:actor.uid,updatedAt:now,source:'levantamento_escala_2026'});
+        else tx.create(ref,{...seed,availability:defaultStaffAvailability(seed.shift,seed.fixedWeekday),normalizedName:normalizeStaffName(seed.name),status:'active',skills:[],certifications:[],accountUid:uid,linkedAt:now,linkedBy:actor.uid,createdAt:now,createdBy:actor.uid,updatedAt:now,source:'levantamento_escala_2026'});
         tx.update(claim,{status:'approved',reviewedAt:now,reviewedBy:actor.uid});
         tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_account_linked',unitId:actingMember.unitId,actorUid:actor.uid,targetUid:uid,registryId:id,at:now});
       });
@@ -111,7 +111,7 @@ export default async function handler(req,res) {
         const before=snap.data();
         const sector=changes.sector||before.sector,skills=changes.skills||before.skills||[],certifications=changes.certifications||before.certifications||[];
         if(!skills.every(s=>eligibleSkills(sector).includes(s))||!certifications.every(s=>skills.includes(s)))throw Error('Habilidades incompatíveis com setor ou certificações.');
-        tx.update(ref,{...changes,updatedBy:actor.uid,updatedAt:now});
+        tx.update(ref,{...changes,...(changes.shift!==undefined||changes.fixedWeekday!==undefined?{availability:defaultStaffAvailability(changes.shift||before.shift,changes.fixedWeekday||before.fixedWeekday)}:{}),updatedBy:actor.uid,updatedAt:now});
         tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_updated',unitId:actingMember.unitId,actorUid:actor.uid,registryId:id,before:Object.fromEntries(Object.keys(changes).map(k=>[k,before[k]??null])),changes,at:now});
       });
       return found?send(res,200,'Ficha atualizada sem modificar conta de acesso.'):send(res,404,'Ficha não encontrada.');
@@ -135,7 +135,7 @@ export default async function handler(req,res) {
       const batch=db.batch();
       for(const p of chosen){
         const ref=registryRef.doc('staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40));
-        batch.create(ref,{name:p.name,normalizedName:normalizeStaffName(p.name),jobTitle:p.jobTitle,sector:p.sector,shift:p.shift,fixedWeekday:p.fixedWeekday,status:'active',accountUid:null,skills:[],createdBy:actor.uid,createdAt:now,updatedAt:now,source:'levantamento_escala_2026'});
+        batch.create(ref,{name:p.name,normalizedName:normalizeStaffName(p.name),jobTitle:p.jobTitle,sector:p.sector,shift:p.shift,fixedWeekday:p.fixedWeekday,availability:defaultStaffAvailability(p.shift,p.fixedWeekday),status:'active',accountUid:null,skills:[],createdBy:actor.uid,createdAt:now,updatedAt:now,source:'levantamento_escala_2026'});
       }
       await batch.commit();
       return send(res,201,'Fichas criadas sem contas de acesso. Nenhum perfil anterior foi modificado.',{created:chosen.length});
