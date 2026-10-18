@@ -3,6 +3,7 @@ import {auth} from './firebase.js';
 import {Award,Star,Sparkles,Clock3,CheckCircle2,UserRound,Pencil,Target,Send,ShieldCheck} from 'lucide-react';
 import {useFeedback} from './FeedbackProvider.jsx';
 import './profile-premium.css';
+import PhotoCropDialog from './PhotoCropDialog.jsx';
 const days={seg:'Segunda',ter:'Terça',qua:'Quarta',qui:'Quinta',sex:'Sexta',sab:'Sábado',dom:'Domingo'};
 const skills={preparo:'Preparo',montagem:'Montagem',chapa:'Chapa',vitrine:'Vitrine',vendas:'Vendas',ifood:'iFood',caixa:'Caixa',recebimento:'Recebimento',estoque:'Estoque',lideranca:'Liderança'};
 const shifts={manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variavel:'Variável'};
@@ -19,24 +20,19 @@ export default function MyProfessionalProfile({membership}){
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[editing,setEditing]=useState(false);
  const editingRef=useRef(false);editingRef.current=editing;
  const [syncedAt,setSyncedAt]=useState(null);const [avatar,setAvatar]=useState(null);const [uploading,setUploading]=useState(false);
+ const [photoFile,setPhotoFile]=useState(null);
  const [error,setError]=useState(''),[skill,setSkill]=useState(''),[reason,setReason]=useState(''),[requesting,setRequesting]=useState(false);
  const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const data=await api('myProfile');
  setProfile(data.professional);setAvatar(data.avatar||null);if(!editingRef.current)setPersonal({...blank,...(data.personal||{})});setRecognition(data.recognition);setSyncedAt(new Date());
  }catch(e){if(!silent)setError(e.message)}finally{if(!silent)setLoading(false)}},[]);
  useEffect(()=>{load();const poll=()=>{if(document.visibilityState==='visible')load(true)};const timer=setInterval(poll,15000);
  window.addEventListener('focus',poll);return()=>{clearInterval(timer);window.removeEventListener('focus',poll)}},[load]);
- const uploadAvatar=async event=>{const file=event.target.files?.[0];if(!file)return;
-  if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>5_000_000){notify('Escolha JPG, PNG ou WebP de até 5 MB.','error');return;}
-  setUploading(true);
-  try{
-   const image=await createImageBitmap(file);const ratio=Math.min(1,320/Math.max(image.width,image.height));const canvas=document.createElement('canvas');
-   canvas.width=Math.max(1,Math.round(image.width*ratio));canvas.height=Math.max(1,Math.round(image.height*ratio));
-   canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);image.close();
-   const encoded=canvas.toDataURL('image/webp',0.72);
-   if(encoded.length>180000)throw Error('Imagem ainda muito grande. Use uma foto menor.');
-   const result=await api('avatarSave',{avatar:encoded});setAvatar(encoded);notify(result.message,'success');
-  }catch(e){notify(e.message,'error')}finally{setUploading(false);event.target.value=''}
+ const uploadAvatar=event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>15_000_000){notify('Escolha uma foto JPG, PNG ou WebP de até 15 MB.','error');return;}
+  setPhotoFile(file);
  };
+ const saveAvatar=async encoded=>{setUploading(true);try{const result=await api('avatarSave',{avatar:encoded});setAvatar(encoded);setPhotoFile(null);notify(result.message,'success')}
+  catch(e){notify(e.message,'error')}finally{setUploading(false)}};
  const removeAvatar=async()=>{if(uploading)return;setUploading(true);try{const d=await api('avatarRemove');setAvatar(null);notify(d.message,'success')}catch(e){notify(e.message,'error')}finally{setUploading(false)}};
  const save=async e=>{e.preventDefault();if(saving)return;setSaving(true);try{const d=await api('personalSave',{fields:personal});notify(d.message,'success');setEditing(false);await load(true)}
  catch(e){notify(e.message,'error')}finally{setSaving(false)}};
@@ -45,7 +41,7 @@ export default function MyProfessionalProfile({membership}){
  const confirmed=new Set(profile?.certifications||[]);
  const name=personal.displayName||auth.currentUser?.displayName||auth.currentUser?.email?.split('@')[0]||'Colaborador';
  return <section className="ti-premium team-page">
-  <p className="eyebrow">MINHA JORNADA · {membership.unitId.toUpperCase()}</p>
+  <p className="eyebrow ti-premium-eyebrow">MINHA JORNADA · {membership.unitId.toUpperCase()}</p>
   <p className="ti-sync-status" role="status">{syncedAt?`Atualizada automaticamente · ${syncedAt.toLocaleTimeString("pt-BR")}`:"Buscando dados atualizados..."}</p>
   <div className="ti-premium-hero">
    <div className="ti-avatar-editor"><div className="ti-premium-avatar">{avatar?<img src={avatar} alt="Minha foto de perfil"/>:<UserRound size={35}/>}</div><label className="ti-avatar-change"> {uploading?'Enviando...':'Trocar foto'}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={uploadAvatar}/></label>{avatar&&<button type="button" className="ti-avatar-remove" onClick={removeAvatar} disabled={uploading}>Remover</button>}</div>
@@ -54,6 +50,7 @@ export default function MyProfessionalProfile({membership}){
    </div>
    <span className="ti-premium-unit">Triamicci Intelligence</span>
   </div>
+  {photoFile&&<PhotoCropDialog file={photoFile} busy={uploading} onCancel={()=>setPhotoFile(null)} onSave={saveAvatar}/>}
   {loading&&<p role="status">Preparando sua jornada profissional...</p>}
   {error&&<p role="alert" className="team-error">{error} <button type="button" onClick={load}>Tentar novamente</button></p>}
   {!loading&&!error&&<>
