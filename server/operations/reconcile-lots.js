@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
-import {getDb,authenticate,membership,checkRequest,send} from '../../api/_lib.js';
-import {countUnit,validQuantity} from '../../api/operations/logic.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {countUnit,validQuantity} from './logic.js';
 
 const idPattern=/^[a-f0-9]{40}$/;
 const reqPattern=/^[a-f0-9-]{36}$/i;

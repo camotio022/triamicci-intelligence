@@ -1,5 +1,5 @@
 import {readFileSync} from 'node:fs';
-import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 
 // Migração aditiva: não altera nomes, unidades legadas, estoque ou status de aprovação.
 const proposal=JSON.parse(readFileSync(new URL('../../data/triamicci-product-catalog-v2.proposal.json',import.meta.url),'utf8'));

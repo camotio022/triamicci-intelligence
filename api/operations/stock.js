@@ -2,8 +2,8 @@ import {createHash} from 'node:crypto';
 import dispatchHandler from '../../server/operations/dispatch.js';
 import transferHandler from '../../server/operations/transfer.js';
 import reconcileLotsHandler from '../../server/operations/reconcile-lots.js';
-import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
-import {countUnit,validQuantity,commercialDelivery} from './logic.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
+import {countUnit,validQuantity,commercialDelivery} from '../../server/operations/logic.js';
 
 // Ledger físico independente dos saldos legados até conciliação e migração homologadas.
 const idPattern=/^[a-f0-9]{40}$/;

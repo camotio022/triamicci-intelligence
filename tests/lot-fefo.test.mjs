@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {areaTotals,allocateFEFO} from '../api/operations/lot-logic.js';
+import {areaTotals,allocateFEFO} from '../server/operations/lot-logic.js';
 
 const lots=[
  {id:'new',expiryDate:'2027-02-01',reserva:5,giro:2},

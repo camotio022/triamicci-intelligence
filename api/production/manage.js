@@ -1,7 +1,7 @@
-import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
-import {countUnit,validQuantity} from '../operations/logic.js';
-import {areaTotals,allocateFEFO} from '../operations/lot-logic.js';
-import {validProductionSelection} from './logic.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
+import {countUnit,validQuantity} from '../../server/operations/logic.js';
+import {areaTotals,allocateFEFO} from '../../server/operations/lot-logic.js';
+import {validProductionSelection} from '../../server/production/logic.js';
 import {createHash} from 'node:crypto';
 
 const productIdPattern=/^[a-f0-9]{40}$/;

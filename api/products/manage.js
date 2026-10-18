@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { getDb, authenticate, membership, checkRequest, send } from '../_lib.js';
-import {countUnit} from '../operations/logic.js';
+import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
+import {countUnit} from '../../server/operations/logic.js';
 
 const units = ['kg','g','L','ml','un'];
 const normalize = value => typeof value === 'string' ? value.trim().replace(/\s+/g,' ') : '';
