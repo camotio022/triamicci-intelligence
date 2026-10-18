@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { getDb, authenticate, membership, checkRequest, send } from '../_lib.js';
+import {countUnit} from '../operations/logic.js';
 
 const units = ['kg','g','L','ml','un'];
 const normalize = value => typeof value === 'string' ? value.trim().replace(/\s+/g,' ') : '';
@@ -24,12 +25,13 @@ export default async function handler(req,res) {
     const db = getDb();
     const products = db.collection('units').doc(m.unitId).collection('products');
     if (action === 'list') {
-      const [snap,balanceSnap] = await Promise.all([products.limit(201).get(),db.collection('units').doc(m.unitId).collection('physicalBalances').limit(201).get()]);
+      const [snap,balanceSnap,catalogSnap] = await Promise.all([products.limit(201).get(),db.collection('units').doc(m.unitId).collection('physicalBalances').limit(201).get(),db.collection('productCatalog').limit(201).get()]);
       if (snap.size > 200) return send(res,409,'Catálogo acima do limite inicial de 200 itens. Paginação necessária.');
       const balances=new Map(balanceSnap.docs.map(doc=>[doc.id,doc.data()]));
+      const definitions=new Map(catalogSnap.docs.map(doc=>[doc.id,doc.data()]));
       return send(res,200,'Catálogo carregado.',{products:snap.docs.map(doc=>{
        const p=clean(doc),b=balances.get(doc.id);
-       return {...p,physicalBalance:b?{reserve:b.reserve,rotation:b.rotation,total:b.total,
+       return {...p,physicalUnit:countUnit(p,definitions.get(p.catalogId)),physicalBalance:b?{reserve:b.reserve,rotation:b.rotation,total:b.total,
         unit:b.unit,at:b.at?.toDate?.()?.toISOString?.()||null}:null};
       }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))});
     }
