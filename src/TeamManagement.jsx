@@ -13,8 +13,8 @@ const roleOptions = [
   { value: 'admin', label: 'Administrador' }
 ];
 
-export default function TeamManagement({
- const {notify}=useFeedback(); user, membership }) {
+export default function TeamManagement({ user, membership }) {
+ const {notify}=useFeedback();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('auxiliar');
   const [invitations, setInvitations] = useState([]);
