@@ -1,4 +1,4 @@
-import { getDb, authenticate, membership, checkRequest, send } from '../_lib.js';
+import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
 
 // Revogação definitiva de convite. Apenas administrador da unidade ou o emissor autorizado.
 export default async function handler(req, res) {
