@@ -93,7 +93,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
           </div>
           <p className="operational-note">Contagem registrada em {p.physicalBalance.unit} · {p.physicalBalance.at?new Date(p.physicalBalance.at).toLocaleString('pt-BR'):'Data indisponível'}</p>
         </> : <div className="operational-uncounted"><strong>Sem contagem física</strong><span>Saldo legado: {p.quantity} {p.unit} — ainda não conferido</span></div>}
-        <div className="operational-meta"><span>Unidade cadastrada: {p.unit}</span><span>Validade: {p.trackExpiry?'Exigida':'Não exigida'}</span></div>
+        <div className="operational-meta"><span>Unidade de contagem: {p.physicalUnit||p.unit}</span><span>Validade: {p.trackExpiry?'Exigida':'Não exigida'}</span></div>
       </article>)}
       {!loading && visible.length===0 && <p>Nenhum produto encontrado nesta unidade.</p>}
     </div>}

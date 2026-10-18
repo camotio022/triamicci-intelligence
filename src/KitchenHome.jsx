@@ -1,23 +1,23 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
-import {PackageCheck,ClipboardCheck,Boxes,History,RefreshCw,AlertCircle} from 'lucide-react';
+import {PackageCheck,ClipboardCheck,Boxes,History,RefreshCw,AlertCircle,CookingPot} from 'lucide-react';
 
 export default function KitchenHome({membership,navigate}){
- const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[]}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
+ const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[],productions:[]}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const load=useCallback(async()=>{
   setLoading(true);setError('');
   try{
    const token=await auth.currentUser.getIdToken();
    const call=async(url,action)=>{const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action})});const data=await res.json();if(!res.ok)throw Error(data.message||'Falha ao carregar a operação');return data};
    const [stock,ops]=await Promise.all([call('/api/products/manage','list'),call('/api/operations/stock','list')]);
-   setProducts(stock.products||[]);setHistory({receipts:ops.receipts||[],counts:ops.counts||[],outflows:ops.outflows||[],transfers:ops.transfers||[]});
+   setProducts(stock.products||[]);setHistory({receipts:ops.receipts||[],counts:ops.counts||[],outflows:ops.outflows||[],transfers:ops.transfers||[],productions:ops.productions||[]});
   }catch(e){setError(e.message)}finally{setLoading(false)}
  },[]);
  useEffect(()=>{load()},[load]);
  const counted=products.filter(p=>p.physicalBalance);
- const latest=[...history.receipts.map(x=>({...x,label:'Recebimento'})),...history.counts.map(x=>({...x,label:'Contagem'})),...history.outflows.map(x=>({...x,label:'Saída'})),...history.transfers.map(x=>({...x,label:'Transferência'}))]
+ const latest=[...history.receipts.map(x=>({...x,label:'Recebimento'})),...history.counts.map(x=>({...x,label:'Contagem'})),...history.outflows.map(x=>({...x,label:'Saída'})),...history.transfers.map(x=>({...x,label:'Transferência'})),...history.productions.map(x=>({...x,label:'Produção'}))]
    .sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,5);
- const actions=[{name:'Receber mercadoria',description:'Conferir fornecedor e entrega',page:'receiving',Icon:PackageCheck},
+ const actions=[{name:'Registrar produção',description:'Finalizar e descontar insumos do giro',page:'production',Icon:CookingPot},{name:'Receber mercadoria',description:'Conferir fornecedor e entrega',page:'receiving',Icon:PackageCheck},
   {name:'Contagem diária',description:'Registrar reserva e giro',page:'count',Icon:ClipboardCheck},
   {name:'Estoque físico',description:'Consultar produtos da cozinha',page:'inventory',Icon:Boxes},
   {name:'Histórico',description:'Consultar operações registradas',page:'history',Icon:History}];
@@ -27,6 +27,8 @@ export default function KitchenHome({membership,navigate}){
   <div className="kitchen-actions">{actions.map(({name,description,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong><span>{description}</span></button>)}</div>
   {error&&<p role="alert" className="receiving-notice"><AlertCircle size={16}/> {error}</p>}
   <div className="kitchen-summary"><div><strong>{products.length}</strong><span>Produtos vinculados</span></div><div><strong>{counted.length}</strong><span>Com contagem física</span></div><div><strong>{products.length-counted.length}</strong><span>Aguardam contagem</span></div></div>
+  <div className="inventory-list-header"><h2>Produção registrada</h2><button type="button" onClick={()=>navigate('production')}>Abrir produção</button></div>
+  <p>Últimas produções no Firebase: <strong>{history.productions.length}</strong> registros consultados. A baixa ocorre ao finalizar, não ao planejar.</p>
   <div className="inventory-list-header"><h2>Produtos conferidos</h2><button type="button" onClick={()=>navigate('inventory')}>Ver estoque</button></div>
   {loading?<p>Carregando dados do Firebase...</p>:counted.length===0?<p>Ainda não há contagens físicas para esta unidade. Registre a primeira contagem de reserva e giro para começar.</p>:
    <div className="operational-products">{counted.slice(0,6).map(p=><article key={p.id} className="operational-product"><div className="operational-product-head"><strong>{p.name}</strong><span>{p.physicalBalance.unit}</span></div><div className="operational-counts"><div><span>Reserva</span><strong>{p.physicalBalance.reserve}</strong></div><div><span>Giro</span><strong>{p.physicalBalance.rotation}</strong></div><div><span>Total</span><strong>{p.physicalBalance.total}</strong></div></div></article>)}</div>}

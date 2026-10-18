@@ -32,19 +32,21 @@ export default async function handler(req,res){
    if(!idPattern.test(id||''))throw Error('INVALID');
    const product=await unit.collection('products').doc(id).get();
    if(!product.exists)throw Error('NOT_FOUND');
-   const [receipts,counts,outflows,transfers]=await Promise.all([
+   const [receipts,counts,outflows,transfers,productions]=await Promise.all([
     unit.collection('physicalReceipts').where('productId','==',id).limit(100).get(),
     unit.collection('physicalCounts').where('productId','==',id).limit(100).get(),
     unit.collection('physicalOutflows').where('productId','==',id).limit(100).get(),
-    unit.collection('physicalTransfers').where('productId','==',id).limit(100).get()
+    unit.collection('physicalTransfers').where('productId','==',id).limit(100).get(),
+    unit.collection('productionRuns').orderBy('at','desc').limit(100).get()
    ]);
    const records=[...receipts.docs.map(d=>({...clean(d),kind:'receive'})),
      ...counts.docs.map(d=>({...clean(d),kind:'count'})),
      ...outflows.docs.map(d=>({...clean(d),kind:'dispatch'})),
-     ...transfers.docs.map(d=>({...clean(d),kind:'transfer'}))]
+     ...transfers.docs.map(d=>({...clean(d),kind:'transfer'})),
+     ...productions.docs.filter(d=>d.data().items?.some(i=>i.productId===id)).map(d=>({...clean(d),kind:'production'}))]
      .sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,30);
    return send(res,200,'Atividade deste produto.',{records,
-    limited:[receipts,counts,outflows,transfers].some(x=>x.size===100)});
+    limited:[receipts,counts,outflows,transfers,productions].some(x=>x.size===100)});
   }
   if(action==='lots'){
    const id=req.body?.productId;
@@ -107,7 +109,7 @@ export default async function handler(req,res){
   if(action==='list'){
    const size=30;
    const types=[['receipts','physicalReceipts'],['counts','physicalCounts'],
-    ['outflows','physicalOutflows'],['transfers','physicalTransfers']];
+    ['outflows','physicalOutflows'],['transfers','physicalTransfers'],['productions','productionRuns']];
    const result={};
    await Promise.all(types.map(async([key,col])=>{
     if(req.body?.['skip'+key]){result[key]=[];result['hasMore_'+key]=false;return}
