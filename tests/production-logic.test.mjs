@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validProductionSelection,suggestedQuantity} from '../api/production/logic.js';
+import {validProductionSelection,suggestedQuantity} from '../server/production/logic.js';
 const a='a'.repeat(40),b='b'.repeat(40),c='c'.repeat(40);
 const recipe=[{productId:a,substitutes:[b]},{productId:c,substitutes:[]}];
 test('permite somente substituições autorizadas na linha correta',()=>{
