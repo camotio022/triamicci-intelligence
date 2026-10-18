@@ -32,7 +32,12 @@ export default async function handler(req,res) {
     if(action==='rosterList'){
       if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
       const snap=await db.collection('units').doc(actingMember.unitId).collection('rosterEntries').limit(200).get();
-      return send(res,200,'Pré-cadastros consultados.',{entries:snap.docs.map(d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null}))});
+      const active=await db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get();
+      const connected=new Set(active.docs.filter(d=>d.data().status==='active').map(d=>String(d.data().email||'').trim().toLowerCase()));
+      return send(res,200,'Pré-cadastros consultados.',{entries:snap.docs.map(d=>({
+       id:d.id,...d.data(),status:connected.has(d.data().email)?'linked':'pending_invite',
+       createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null
+      }))});
     }
     if(action==='rosterCreate'){
       if(!['admin','manager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
