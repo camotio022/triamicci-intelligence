@@ -76,7 +76,7 @@ export default async function handler(req,res) {
       const now=new Date();
       const batch=db.batch();
       for(const p of chosen){
-        const ref=registryRef.doc();
+        const ref=registryRef.doc('staff_'+createHash('sha256').update(normalizeStaffName(p.name)).digest('hex').slice(0,40));
         batch.create(ref,{name:p.name,normalizedName:normalizeStaffName(p.name),jobTitle:p.jobTitle,sector:p.sector,shift:p.shift,fixedWeekday:p.fixedWeekday,status:'active',accountUid:null,skills:[],createdBy:actor.uid,createdAt:now,updatedAt:now,source:'levantamento_escala_2026'});
       }
       await batch.commit();
