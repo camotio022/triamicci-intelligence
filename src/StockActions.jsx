@@ -36,14 +36,14 @@ export default function StockActions({product,lots,membership,onUpdated}){
   try{
    let response;
    if(mode==='dispatch'){
-    response=await api('/api/operations/dispatch','dispatch',{
+    response=await api('/api/operations/stock','dispatch',{
      productId:product.id,requestId,quantity:Number(quantity),location,reason,notes:notes.trim()});
    }else if(mode==='transfer'){
-    response=await api('/api/operations/transfer','transfer',{
+    response=await api('/api/operations/stock','transfer',{
      productId:product.id,requestId,quantity:Number(quantity),from:location,
      to:location==='reserva'?'giro':'reserva',notes:notes.trim()});
    }else{
-    response=await api('/api/operations/reconcile-lots','reconcile',{
+    response=await api('/api/operations/stock','reconcile',{
      productId:product.id,requestId,lots:rows.map(l=>({
       lot:l.lot,expiryDate:l.expiryDate,reserva:Number(l.reserva),giro:Number(l.giro)
      }))});
