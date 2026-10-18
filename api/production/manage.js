@@ -76,6 +76,7 @@ export default async function handler(req,res){
    if(!recipe.exists||recipe.data().active!==true)throw Error('RECIPE_NOT_FOUND');
    const recipeData=recipe.data(),productDocs=docs.slice(0,items.length),balanceDocs=docs.slice(items.length);
    if(productDocs.some(p=>!p.exists||p.data().status!=='active')||balanceDocs.some(b=>!b.exists))throw Error('MISSING_STOCK');
+   if(productDocs.some(p=>p.data().catalogId==='alcatra'))throw Error('LEGACY_CUT');
    if(!validProductionSelection(recipeData.lines,items))
       throw Error('UNAUTHORIZED_SUBSTITUTE');
    // Fetch all lot snapshots and catalog definitions BEFORE any transaction writes.
@@ -126,6 +127,7 @@ export default async function handler(req,res){
   return send(res,200,duplicate?'Produção já registrada.':'Produção finalizada, estoque de giro atualizado.',{duplicate});
  }catch(e){
   const errors={FORBIDDEN:[403,'Sem permissão.'],PRODUCT_NOT_FOUND:[409,'Produto da receita não está ativo.'],
+   LEGACY_CUT:[409,'Alcatra genérica é cadastro legado; selecione bife ou cubos de alcatra com contagem própria.'],
    RECIPE_NOT_FOUND:[404,'Preparação não encontrada.'],MISSING_STOCK:[409,'Faça a contagem física antes de produzir.'],
    UNAUTHORIZED_SUBSTITUTE:[409,'Produto não autorizado nesta ficha técnica.'],
    INSUFFICIENT:[409,'Saldo de giro insuficiente ou unidade incompatível.'],
