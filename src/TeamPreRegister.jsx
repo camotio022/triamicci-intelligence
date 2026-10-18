@@ -25,9 +25,9 @@ export default function TeamPreRegister({membership,onInvite}){
    <label>Permissão sugerida<select value={form.role} onChange={e=>setForm(x=>({...x,role:e.target.value}))}><option value="auxiliar">Auxiliar</option><option value="cook">Cozinheiro</option>{membership.role==='admin'&&<><option value="manager">Gerente</option><option value="admin">Administrador</option></>}</select></label>
    <button type="submit" disabled={busy}>{busy?'Cadastrando...':'Cadastrar sem conceder acesso'}</button>
   </form>
-  <div className="ti-roster-heading"><h3>Cadastros aguardando convite</h3><button type="button" disabled={loading} onClick={load}>Atualizar</button></div>
+  <div className="ti-roster-heading"><h3>Cadastros da equipe</h3><button type="button" disabled={loading} onClick={load}>Atualizar</button></div>
   {loading?<p role="status">Carregando pré-cadastros...</p>:items.length===0?<p>Nenhum cadastro antecipado nesta unidade.</p>:<div className="ti-roster-grid">{items.map(x=><article key={x.id} className="ti-roster-item">
-   <strong>{x.name}</strong><span>{x.jobTitle} · {x.sector}</span><small>{x.email}</small><button type="button" onClick={()=>onInvite(x.email,x.role)}>Preparar convite</button>
+   <strong>{x.name}</strong><span>{x.jobTitle} · {x.sector}</span><small>{x.email}</small><small>{x.status==='linked'?'Conta vinculada e ativa':'Aguardando convite ou aceitação'}</small>{x.status!=='linked'&&<button type="button" onClick={()=>onInvite(x.email,x.role)}>Preparar convite</button>}
   </article>)}</div>}
  </section>;
 }
