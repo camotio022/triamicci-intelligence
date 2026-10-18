@@ -27,8 +27,8 @@ jobs:
           node --check server/team/roster-rules.js
           node --check server/schedules/rules.js
           node --check server/labels/rules.js
-          node --check api/schedules/manage.js
-          node --check api/mural/manage.js
-          node --check api/labels/manage.js
+          node --check server/workflows/schedules.js
+          node --check server/workflows/mural.js
+          node --check server/workflows/labels.js
       - name: Build
         run: npm run build

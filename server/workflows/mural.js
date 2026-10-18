@@ -1,4 +1,4 @@
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 const txt=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.trim().length<=max;
 const serialize=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,updatedAt:d.data().updatedAt?.toDate?.()?.toISOString?.()||null});

@@ -1,5 +1,5 @@
-import {getDb,getAuth,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
-import {dateOk,cappedExpiry,canReplaceLabel} from '../../server/labels/rules.js';
+import {getDb,getAuth,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {dateOk,cappedExpiry,canReplaceLabel} from '../labels/rules.js';
 const idOk=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 const textOk=(x,max)=>typeof x==='string'&&x.trim().length>0&&x.length<=max;
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;

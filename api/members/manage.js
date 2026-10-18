@@ -1,3 +1,6 @@
+import schedulesWorkflow from '../../server/workflows/schedules.js';
+import muralWorkflow from '../../server/workflows/mural.js';
+import labelsWorkflow from '../../server/workflows/labels.js';
 import {createHash,randomUUID} from 'node:crypto';
 import {validateRosterEntry} from '../../server/team/roster-rules.js';
 import {validatePersonalProfile,earnedRecognition} from '../../server/team/personal-rules.js';
@@ -20,6 +23,9 @@ const cleanMember = (doc) => {
 };
 
 export default async function handler(req,res) {
+  if(req.body?.module==='schedules')return schedulesWorkflow(req,res);
+  if(req.body?.module==='mural')return muralWorkflow(req,res);
+  if(req.body?.module==='labels')return labelsWorkflow(req,res);
   if (!checkRequest(req,res)) return;
   res.setHeader('Cache-Control','no-store');
   try {

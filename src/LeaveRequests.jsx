@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useState} from 'react';import {auth} from './firebase.js';import './operations-planning.css';
-async function api(action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');const res=await fetch('/api/schedules/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});const body=await res.json();if(!res.ok)throw Error(body.message||'Falha na solicitação.');return body;}
+async function api(action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');const res=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action,...extra})});const body=await res.json();if(!res.ok)throw Error(body.message||'Falha na solicitação.');return body;}
 const statuses={pending:'Pendente',approved:'Aprovada',rejected:'Recusada'};
 export default function LeaveRequests({membership}){
  const [requests,setRequests]=useState([]),[date,setDate]=useState(''),[reason,setReason]=useState(''),[notes,setNotes]=useState({}),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[notice,setNotice]=useState('');

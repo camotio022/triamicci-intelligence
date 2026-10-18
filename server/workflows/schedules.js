@@ -1,5 +1,5 @@
-import {getDb,getAuth,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
-import {validDate,validateRosterSchedule} from '../../server/schedules/rules.js';
+import {getDb,getAuth,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {validDate,validateRosterSchedule} from '../schedules/rules.js';
 const idOk=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 const yyyyMm=x=>typeof x==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(x);
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
