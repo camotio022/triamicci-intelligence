@@ -27,3 +27,10 @@ test('mínimo de cobertura fora dos limites é rejeitado',()=>{
  const issues=validateRosterSchedule({entries:[],members:m,minKitchen:-1});
  assert(issues.some(x=>x.includes('Cobertura mínima inválida')));
 });
+
+test('sem política P07 aprovada não aplica mínimo provisório de cozinha',()=>{
+ const entries=[{uid:'a',date:'2026-10-19',type:'off'},{uid:'b',date:'2026-10-19',type:'off'}];
+ const issues=validateRosterSchedule({entries,members:m,enforceCoverage:false});
+ assert(!issues.some(x=>x.includes('Dois cozinheiros')));
+ assert(!issues.some(x=>x.includes('Cobertura de cozinha')));
+});
