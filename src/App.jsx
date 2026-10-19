@@ -72,17 +72,17 @@ function Workspace({ user, membership, logout }) {
     <div className="workspace workspace-unit-card" aria-label={"Unidade atual: "+membership.unitId}><div className="workspace-unit-icon"><span className="workspace-dot"/></div><div className="workspace-unit-info"><small>UNIDADE ATUAL</small><strong>{membership.unitId}</strong></div><span className="workspace-unit-status">Ativa</span></div>
     <p className="nav-caption">ÁREA DE TRABALHO</p>
     <nav>
-      <button data-mentor="mentor-profile" type="button" className={page=== ? "nav-item active" : "nav-item"} onClick={()=>navigate("my-profile")}><Users size={18}/> Minha ficha profissional</button>
+      <button data-mentor="mentor-profile" type="button" className={page==="my-profile" ? "nav-item active" : "nav-item"} onClick={()=>navigate("my-profile")}><Users size={18}/> Minha ficha profissional</button>
       <button type="button" className={page==="leave-requests"?"nav-item active":"nav-item"} onClick={()=>navigate("leave-requests")}><Clock3 size={18}/> Solicitar folga</button>
-      <button data-mentor="mentor-mural" type="button" className={page===?"nav-item active":"nav-item"} onClick={()=>navigate("mural")}><Boxes size={18}/> Mural da equipe</button>
+      <button data-mentor="mentor-mural" type="button" className={page==="mural"?"nav-item active":"nav-item"} onClick={()=>navigate("mural")}><Boxes size={18}/> Mural da equipe</button>
       <p className="ti-nav-group-label">OPERAÇÃO</p>
       <button data-mentor="mentor-kitchen" type="button" className={page === "kitchen" ? "nav-item active" : "nav-item"} onClick={() => navigate("kitchen")}><LayoutDashboard size={18}/> Operação da cozinha</button>
-      <button data-mentor="mentor-receiving" type="button" className={page=== ? "nav-item active" : "nav-item"} onClick={() => navigate("receiving")}><Package size={18}/> Recebimento</button>
-      <button data-mentor="mentor-inventory" type="button" className={page=== ? "nav-item active" : "nav-item"} onClick={() => navigate("inventory")}><Package size={18}/> Estoque</button>
+      <button data-mentor="mentor-receiving" type="button" className={page==="receiving" ? "nav-item active" : "nav-item"} onClick={() => navigate("receiving")}><Package size={18}/> Recebimento</button>
+      <button data-mentor="mentor-inventory" type="button" className={page==="inventory" ? "nav-item active" : "nav-item"} onClick={() => navigate("inventory")}><Package size={18}/> Estoque</button>
       <button type="button" className={page === "production" ? "nav-item active" : "nav-item"} onClick={() => navigate("production")}><Boxes size={18}/> Produção</button>
       <button type="button" className={page === "count" ? "nav-item active" : "nav-item"} onClick={() => navigate("count")}><Boxes size={18}/> Contagem diária</button>
       <button type="button" className={page === "daily-inventory" ? "nav-item active" : "nav-item"} onClick={() => navigate("daily-inventory")}><Boxes size={18}/> Inventário inteligente</button>
-      <button data-mentor="mentor-history" type="button" className={page===?"nav-item active":"nav-item"} onClick={()=>navigate("history")}><Clock3 size={18}/> Histórico</button>
+      <button data-mentor="mentor-history" type="button" className={page==="history"?"nav-item active":"nav-item"} onClick={()=>navigate("history")}><Clock3 size={18}/> Histórico</button>
       {["admin","manager"].includes(membership.role)&&<p className="ti-nav-group-label">ADMINISTRAÇÃO</p>}
       {["admin","manager"].includes(membership.role)&&<button type="button" className={page==="catalog"?"nav-item active":"nav-item"} onClick={()=>navigate("catalog")}><Boxes size={18}/> Administração · Catálogo</button>}
       {["admin","manager"].includes(membership.role)&&<button data-mentor="mentor-people" type="button" className={["people","team","master-registry","skills","shifts","schedule-planning"].includes(page)?"nav-item active":"nav-item"} onClick={()=>navigate("people")}><Users size={18}/> Gestão de pessoas</button>}
