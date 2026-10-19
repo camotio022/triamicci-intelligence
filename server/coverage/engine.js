@@ -33,14 +33,27 @@ export function checkDoubleShift({first,second,minRestMinutes=660,maxDailyMinute
   reasons.push('Conferir descanso entre jornadas, intervalos, acordo coletivo e cálculo de folha');
   return {state:overlap||gap<0||total>maxDailyMinutes?'blocked':'review',minutesWorked:total,reasons,legalValidated:false};
 }
-export function evaluateCoverage({people=[],entries=[],date,sector='cozinha',requiredSkill='',required=1}){
+export function coversWindow(person,date,windowStart,windowEnd){
+ const start=minutes(windowStart),end=minutes(windowEnd);
+ if(start===null||end===null||end<=start)return false;
+ const day=['dom','seg','ter','qua','qui','sex','sab'][new Date(date+'T12:00:00Z').getUTCDay()];
+ const slot=(person.professional?.availability||person.availability||[]).find(x=>x.day===day);
+ if(!slot)return false;
+ const a=minutes(slot.start),b=minutes(slot.end),restStart=minutes(slot.breakStart),restEnd=minutes(slot.breakEnd);
+ if(a===null||b===null||start<a||end>b)return false;
+ if(restStart!==null&&restEnd!==null&&start<restEnd&&end>restStart)return false;
+ return true;
+}
+export function evaluateCoverage({people=[],entries=[],date,sector='cozinha',requiredSkill='',required=1,windowStart='',windowEnd=''}){
  const active=people.filter(p=>p.status==='active');
  const scheduled=new Set(entries.filter(e=>e.date===date&&e.type==='work').map(e=>e.uid));
- const workers=active.filter(p=>scheduled.has(p.uid)&&p.professional?.sector===sector&&(!requiredSkill||p.professional?.certifications?.includes(requiredSkill)));
+ const windowed=Boolean(windowStart||windowEnd);
+ const workers=active.filter(p=>scheduled.has(p.uid)&&p.professional?.sector===sector&&(!requiredSkill||p.professional?.certifications?.includes(requiredSkill))&&(!windowed||coversWindow(p,date,windowStart,windowEnd)));
+ const pendingTiming=active.filter(p=>scheduled.has(p.uid)&&p.professional?.sector===sector&&windowed&&!coversWindow(p,date,windowStart,windowEnd)).length;
  const shortage=Math.max(0,Math.max(0,required)-workers.length);
  const candidates=active.filter(p=>!scheduled.has(p.uid)&&p.professional?.sector===sector)
  .map(p=>({uid:p.uid,name:p.name||'Colaborador',skillConfirmed:!requiredSkill||!!p.professional?.certifications?.includes(requiredSkill),
    estimatedPracticePayment:paymentFor({paymentRole:rateRoleFor(p)}),eligibility:'review',reason:'Fora da escala: validar jornada, consentimento e disponibilidade'}))
  .sort((a,b)=>Number(b.skillConfirmed)-Number(a.skillConfirmed)||a.estimatedPracticePayment-b.estimatedPracticePayment);
- return {date,sector,requiredSkill,required,covered:workers.length,shortage,candidates,legalValidated:false};
+ return {date,sector,requiredSkill,required,windowStart,windowEnd,covered:workers.length,unverifiedOrUnavailable:pendingTiming,shortage,candidates,legalValidated:false};
 }
