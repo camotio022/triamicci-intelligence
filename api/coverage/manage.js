@@ -41,8 +41,8 @@ export default async function handler(req,res){
     const [m,p]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(ref)]);
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!p.exists||p.data().status!=='pending_acceptance')throw Error('CONFLICT');
     const person=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
-    if(!person.exists||person.data().accountUid!==actor.uid)throw Error('FORBIDDEN');
-    tx.update(ref,{status:decision==='accepted'?'pending_approval':'declined',acceptedAt:now,updatedAt:now,respondedBy:actor.uid});
+    if(!person.exists||person.data().status!=='active'||person.data().accountUid!==actor.uid)throw Error('FORBIDDEN');
+    tx.update(ref,{status:decision==='accepted'?'pending_approval':'declined',...(decision==='accepted'?{acceptedAt:now}:{declinedAt:now}),updatedAt:now,respondedBy:actor.uid});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.'+decision,proposalId:id,unitId:member.unitId,actorUid:actor.uid,at:now});
    });
    return send(res,200,'Resposta registrada. A escala publicada não foi alterada.');
@@ -118,7 +118,13 @@ export default async function handler(req,res){
     const [m,p]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(ref)]);
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!roles.has(m.data().role))throw Error('FORBIDDEN');
     if(!p.exists||!['pending_approval','pending_acceptance'].includes(p.data().status)||decision==='approved'&&p.data().status!=='pending_approval')throw Error('CONFLICT');
-    tx.update(ref,{status:decision,decisionNote:note.trim(),legalValidated:decision==='approved',consentVerified:decision==='approved',decidedBy:actor.uid,decidedAt:now,updatedAt:now});
+    if(decision==='approved'&&p.data().createdBy===actor.uid)throw Error('SELF_APPROVAL');
+    if(decision==='approved'&&p.data().consentPending!==true&&!p.data().acceptedAt)throw Error('CONSENT_REQUIRED');
+    if(decision==='approved'){
+     const currentPerson=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
+     if(!currentPerson.exists||currentPerson.data().status!=='active')throw Error('CONFLICT');
+    }
+    tx.update(ref,{status:decision,decisionNote:note.trim(),legalValidated:false,legalReviewConfirmed:decision==='approved',consentVerified:decision==='approved',decidedBy:actor.uid,decidedAt:now,updatedAt:now});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.'+decision,unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,note:note.trim()});
    });
    return send(res,200,'Decisão registrada. Aprovação não altera automaticamente a escala oficial.');
@@ -128,6 +134,8 @@ export default async function handler(req,res){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
   if(e.message==='FORBIDDEN')return send(res,403,'Operação não autorizada.');
   if(e.message==='CONFLICT')return send(res,409,'A proposta foi alterada ou está indisponível.');
+  if(e.message==='SELF_APPROVAL')return send(res,403,'Quem criou a proposta não pode aprová-la.');
+  if(e.message==='CONSENT_REQUIRED')return send(res,409,'A proposta exige aceite registrado pelo colaborador.');
   console.error('Coverage workflow:',e.message);return send(res,500,'Não foi possível concluir a operação.');
  }
 }
