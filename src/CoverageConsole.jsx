@@ -11,8 +11,8 @@ export default function CoverageConsole({membership}){
  const [planId,setPlanId]=useState(''),[date,setDate]=useState(''),[windowStart,setWindowStart]=useState('12:00'),[windowEnd,setWindowEnd]=useState('14:00'),[sector,setSector]=useState('cozinha'),[requiredSkill,setRequiredSkill]=useState(''),[required,setRequired]=useState(4),[simulation,setSimulation]=useState(null);
  const [staffId,setStaffId]=useState(''),[first,setFirst]=useState({start:'08:00',end:'14:00'}),[second,setSecond]=useState({start:'15:00',end:'19:00'}),[rateRole,setRateRole]=useState('other'),[external,setExternal]=useState(false),[reason,setReason]=useState('');
  const [note,setNote]=useState(''),[legalChecked,setLegalChecked]=useState(false),[consentVerified,setConsentVerified]=useState(false);
- const [ratesEdit,setRatesEdit]=useState(null);
- const load=useCallback(async()=>{try{const result=await request('dashboard');setData(result);setRatesEdit(result.rates);setRateRole(old=>old==='other'?rateRoleFor(result.people.find(p=>p.status==='active')):old);setPlanId(id=>id||result.plans[0]?.id||'');setStaffId(id=>id||result.people.find(p=>p.status==='active')?.uid||'');setError('')}catch(e){setError(e.message)}},[]);
+ const [ratesEdit,setRatesEdit]=useState(null),[requirements,setRequirements]=useState([]),[newRequirement,setNewRequirement]=useState({sector:'cozinha',weekday:6,start:'12:00',end:'14:00',minimum:4,skill:''});
+ const load=useCallback(async()=>{try{const result=await request('dashboard');setData(result);setRatesEdit(result.rates);setRequirements(result.requirements||[]);setRateRole(old=>old==='other'?rateRoleFor(result.people.find(p=>p.status==='active')):old);setPlanId(id=>id||result.plans[0]?.id||'');setStaffId(id=>id||result.people.find(p=>p.status==='active')?.uid||'');setError('')}catch(e){setError(e.message)}},[]);
  useEffect(()=>{load()},[load]);
  const plan=useMemo(()=>data?.plans.find(p=>p.id===planId),[data,planId]);
  const run=async(fn)=>{setBusy(true);setError('');setNotice('');try{const d=await fn();setNotice(d.message);await load();return d}catch(e){setError(e.message)}finally{setBusy(false)}};
@@ -22,7 +22,8 @@ export default function CoverageConsole({membership}){
  <div className="ti-cov-intro"><h2>Cobertura e dobras</h2><p>Simule reforços com habilidades confirmadas e controle o pagamento praticado. Nenhuma recomendação libera horas extras automaticamente.</p></div>
  {error&&<p role="alert" className="team-error">{error}</p>}{notice&&<p role="status" className="team-notice">{notice}</p>}
  <div className="ti-cov-grid">
-  <section className="ti-cov-panel"><h3>1 · Simular cobertura</h3><label>Escala<select value={planId} onChange={e=>{setPlanId(e.target.value);setSimulation(null)}}><option value="">Selecione</option>{(data?.plans||[]).map(p=><option value={p.id} key={p.id}>{p.title} · {p.period} ({p.status})</option>)}</select></label>
+  <section className="ti-cov-panel"><h3>1 · Simular cobertura</h3>
+   {(data?.requirements||[]).length>0&&<label>Usar regra salva<select defaultValue="" onChange={e=>{const x=data.requirements[Number(e.target.value)];if(x){setSector(x.sector);setRequiredSkill(x.skill);setRequired(x.minimum);setWindowStart(x.start);setWindowEnd(x.end)}}}><option value="">Selecione uma regra de cobertura</option>{data.requirements.map((x,i)=><option value={i} key={i}>{sectors[x.sector]} · {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][x.weekday]} · {x.start}–{x.end} · {x.minimum} pessoas</option>)}</select></label>}<label>Escala<select value={planId} onChange={e=>{setPlanId(e.target.value);setSimulation(null)}}><option value="">Selecione</option>{(data?.plans||[]).map(p=><option value={p.id} key={p.id}>{p.title} · {p.period} ({p.status})</option>)}</select></label>
    <label>Data<input type="date" value={date} min={plan?.period+'-01'||undefined} max={plan?.period+'-31'||undefined} onChange={e=>setDate(e.target.value)}/></label>
    <div className="ti-cov-fields"><label>Início da cobertura<input type="time" value={windowStart} onChange={e=>setWindowStart(e.target.value)}/></label><label>Fim da cobertura<input type="time" value={windowEnd} onChange={e=>setWindowEnd(e.target.value)}/></label></div>
    <label>Setor<select value={sector} onChange={e=>setSector(e.target.value)}>{Object.entries(sectors).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
@@ -45,6 +46,19 @@ export default function CoverageConsole({membership}){
  {(data?.proposals||[]).length===0&&<p>Nenhuma proposta registrada.</p>}
  {(data?.proposals||[]).map(p=><article className="ti-cov-proposal" key={p.id}><div><strong>{p.name}</strong><span>{p.date} · {p.first?.start}–{p.first?.end} + {p.second?.start}–{p.second?.end}</span><span>{money(p.practicePayment)} (praticado) · {p.status.replaceAll('_',' ')}</span><small>{p.reason}</small></div><div className="ti-cov-actions">{['pending_approval','pending_acceptance'].includes(p.status)&&<button disabled={busy||note.trim().length<10} type="button" onClick={()=>run(()=>request('decide',{id:p.id,decision:'rejected',note}))}>Recusar</button>}{p.status==='pending_approval'&&<button type="button" disabled={busy||note.trim().length<10||!legalChecked||!consentVerified} onClick={()=>run(()=>request('decide',{id:p.id,decision:'approved',note,legalChecked,consentVerified}))}>Aprovar após conferência</button>}</div></article>)}
  </section>
+ {membership.role==='admin'&&<section className="ti-cov-panel"><h3>Regras de cobertura da unidade</h3><p>Defina o mínimo por setor, dia da semana e horário. A alteração não modifica escalas já publicadas.</p>
+ <div className="ti-cov-fields">
+  <label>Setor<select value={newRequirement.sector} onChange={e=>setNewRequirement(x=>({...x,sector:e.target.value}))}>{Object.entries(sectors).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
+  <label>Dia<select value={newRequirement.weekday} onChange={e=>setNewRequirement(x=>({...x,weekday:Number(e.target.value)}))}>{['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'].map((v,i)=><option key={i} value={i}>{v}</option>)}</select></label>
+  <label>Das<input type="time" value={newRequirement.start} onChange={e=>setNewRequirement(x=>({...x,start:e.target.value}))}/></label>
+  <label>Até<input type="time" value={newRequirement.end} onChange={e=>setNewRequirement(x=>({...x,end:e.target.value}))}/></label>
+  <label>Mínimo<input type="number" min="1" max="30" value={newRequirement.minimum} onChange={e=>setNewRequirement(x=>({...x,minimum:Number(e.target.value)}))}/></label>
+  <label>Habilidade obrigatória (opcional)<input value={newRequirement.skill} onChange={e=>setNewRequirement(x=>({...x,skill:e.target.value.toLowerCase()}))} placeholder="Ex.: chapa"/></label>
+ </div>
+ <button type="button" disabled={busy||newRequirement.end<=newRequirement.start||newRequirement.minimum<1} onClick={()=>setRequirements(v=>[...v,newRequirement])}>Adicionar regra à lista</button>
+ {requirements.map((x,i)=><article className="ti-cov-proposal" key={i}><span>{sectors[x.sector]} · {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][x.weekday]} {x.start}–{x.end} · mínimo {x.minimum} · {x.skill||'qualquer habilidade'}</span><button type="button" disabled={busy} onClick={()=>setRequirements(v=>v.filter((_,j)=>j!==i))}>Remover</button></article>)}
+ <button type="button" disabled={busy||requirements.length>84} onClick={()=>run(()=>request('requirementsSet',{requirements}))}>Salvar regras da unidade</button>
+ </section>}
  {membership.role==='admin'&&ratesEdit&&<section className="ti-cov-panel"><h3>4 · Tabela de valores praticados</h3><p>Não representa automaticamente o custo legal da dobra. Alterações só valem para novas propostas.</p><div className="ti-cov-fields">{Object.entries(roleNames).map(([key,label])=><label key={key}>{label}<input type="number" min="0" max="10000" value={ratesEdit[key]??0} onChange={e=>setRatesEdit(v=>({...v,[key]:Number(e.target.value)}))}/></label>)}</div><button type="button" disabled={busy} onClick={()=>run(()=>request('rates',{rates:ratesEdit}))}>Salvar tabela operacional</button></section>}
  </section>;
 }
