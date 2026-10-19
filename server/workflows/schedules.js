@@ -125,7 +125,7 @@ export default async function handler(req,res){
    const profileRefs=memberList.map(x=>unit.collection('staffProfiles').doc(x.uid));
    const profiles=profileRefs.length?await db.getAll(...profileRefs):[];
    const members=memberList.map((x,i)=>({...x,professional:profiles[i]?.data()?.profile||null}));
-   const issues=validateRosterSchedule({entries:snap.data().entries||[],members:masterActive?registryList:members,period:snap.data().period,complete:true});
+   const issues=validateRosterSchedule({entries:snap.data().entries||[],members:masterActive?registryList:members,period:snap.data().period,complete:true,enforceCoverage:!masterActive});
    if(issues.length)return send(res,409,'A escala contém conflitos de cobertura ou folgas.',{issues});
    const states={submit:'in_review',approve:'approved',publish:'published'},now=new Date();
    const lockRef=unit.collection('schedulePublicationState').doc(snap.data().period);
