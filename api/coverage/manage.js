@@ -14,16 +14,16 @@ export default async function handler(req,res){
   const actor=await authenticate(req),member=await membership(actor.uid);
   if(!member)return send(res,403,'Sem vínculo ativo.');
   const db=getDb(),unit=db.collection('units').doc(member.unitId),manager=roles.has(member.role),action=req.body?.action;
-  const proposals=unit.collection('coverageProposals'),settings=unit.collection('configuration').doc('coverageRates');
+  const proposals=unit.collection('coverageProposals'),settings=unit.collection('configuration').doc('coverageRates'),policyRef=unit.collection('configuration').doc('coverageRequirements');
   if(action==='dashboard'){
    if(!manager)return send(res,403,'Apenas gerência.');
-   const [peopleSnap,plansSnap,rateSnap,proposalSnap]=await Promise.all([
-    unit.collection('staffRegistry').limit(200).get(),unit.collection('schedules').limit(120).get(),settings.get(),proposals.limit(100).get()
+   const [peopleSnap,plansSnap,rateSnap,proposalSnap,policySnap]=await Promise.all([
+    unit.collection('staffRegistry').limit(200).get(),unit.collection('schedules').limit(120).get(),settings.get(),proposals.limit(100).get(),policyRef.get()
    ]);
    const people=peopleSnap.docs.map(d=>({uid:d.id,...d.data(),professional:{sector:d.data().sector,jobTitle:d.data().jobTitle,shift:d.data().shift,skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
    const plans=plansSnap.docs.map(d=>({id:d.id,...d.data()}));
    return send(res,200,'Painel de cobertura carregado.',{people,plans:plans.map(p=>({id:p.id,title:p.title,period:p.period,status:p.status,entries:p.entries||[]})),
-    rates:{...DEFAULT_RATES,...(rateSnap.data()?.rates||{})},
+    rates:{...DEFAULT_RATES,...(rateSnap.data()?.rates||{})},requirements:policySnap.data()?.requirements||[],
     proposals:proposalSnap.docs.map(clean).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))),
     note:'Simulação não substitui validação de jornada e folha.'});
   }
@@ -48,6 +48,21 @@ export default async function handler(req,res){
    return send(res,200,'Resposta registrada. A escala publicada não foi alterada.');
   }
   if(!manager)return send(res,403,'Somente gerência.');
+  if(action==='requirementsSet'){
+   if(member.role!=='admin')return send(res,403,'Somente administradores configuram mínimos de cobertura.');
+   const requirements=req.body?.requirements;
+   const valid=r=>r&&['cozinha','frente','caixa','apoio','gestao'].includes(r.sector)&&Number.isInteger(r.weekday)&&r.weekday>=0&&r.weekday<=6&&validTime(r.start)&&validTime(r.end)&&r.start<r.end&&Number.isInteger(r.minimum)&&r.minimum>=1&&r.minimum<=30&&typeof r.skill==='string'&&r.skill.length<=40;
+   if(!Array.isArray(requirements)||requirements.length>84||!requirements.every(valid))return send(res,400,'Regras de cobertura inválidas.');
+   const clean=requirements.map(r=>({sector:r.sector,weekday:r.weekday,start:r.start,end:r.end,minimum:r.minimum,skill:r.skill.trim().toLowerCase()}));
+   const now=new Date();
+   await db.runTransaction(async tx=>{
+    const m=await tx.get(db.collection('memberships').doc(actor.uid));
+    if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||m.data().role!=='admin')throw Error('FORBIDDEN');
+    tx.set(policyRef,{requirements:clean,updatedAt:now,updatedBy:actor.uid});
+    tx.create(db.collection('auditLogs').doc(),{event:'coverage.requirements_updated',actorUid:actor.uid,unitId:member.unitId,count:clean.length,at:now});
+   });
+   return send(res,200,'Regras de cobertura salvas. Escalas publicadas preservadas.');
+  }
   if(action==='rates'){
    if(member.role!=='admin')return send(res,403,'Somente administradores alteram valores.');
    const rates=req.body?.rates;
