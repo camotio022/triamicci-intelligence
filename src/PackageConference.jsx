@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {convertPackage,packageState} from '../server/operations/unit-engine.js';
 import {reconcilePackageCount} from '../server/operations/package-reconciliation.js';
+import ManagerPackageReview from './ManagerPackageReview.jsx';
 async function load(productId){
  const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');
  const res=await fetch('/api/products/measurements',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'get',productId})});
@@ -9,11 +10,12 @@ async function load(productId){
 }
 export default function PackageConference({productId,physicalUnit,mode}){
  const [profile,setProfile]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState('');
+ const [conferenceId,setConferenceId]=useState('');
  const [saveBusy,setSaveBusy]=useState(false),[saved,setSaved]=useState(''),[saveError,setSaveError]=useState(''),[pendingId,setPendingId]=useState(null);
  const [remainders,setRemainders]=useState([]);
  const [area,setArea]=useState('giro');
  const [presentation,setPresentation]=useState(''),[packages,setPackages]=useState(''),[opened,setOpened]=useState('0');
- useEffect(()=>{let active=true;setProfile(null);setPresentation('');setPackages('');setOpened('0');setRemainders([]);setArea('giro');setSaved('');setSaveError('');setPendingId(null);setError('');if(!productId)return;
+ useEffect(()=>{let active=true;setProfile(null);setPresentation('');setPackages('');setOpened('0');setRemainders([]);setConferenceId('');setArea('giro');setSaved('');setSaveError('');setPendingId(null);setError('');if(!productId)return;
  setLoading(true);load(productId).then(p=>{if(active){setProfile(p);setPresentation(p?.packages?.[0]?.presentation||'')}}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});
  return()=>{active=false}},[productId]);
  if(!productId)return null;
@@ -40,7 +42,7 @@ export default function PackageConference({productId,physicalUnit,mode}){
    const res=await fetch('/api/operations/package-conference',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({action:'record',productId,requestId:id,area,presentation:activePresentation,profileVersion:profile.version,closed:state.sealed,opened:state.opened})});
    const data=await res.json();if(!res.ok)throw Error(data.message||'Falha ao registrar conferência.');
-   setSaved(data.message);setPendingId(null);
+   setSaved(data.message);setConferenceId(data.conferenceId||'');setPendingId(null);
   }catch(e){setSaveError(e.message)}finally{setSaveBusy(false)}
  };
  if(mode==='count'&&!loading&&!error&&!countByPackage)return null;
@@ -66,6 +68,7 @@ export default function PackageConference({productId,physicalUnit,mode}){
    {mode==='count'&&state?.ok&&<button type="button" disabled={saveBusy||!positiveInteger} onClick={save}>{saveBusy?'Registrando...':'Registrar conferência de embalagens'}</button>}
    {saved&&<p role="status">{saved}</p>}
    {saveError&&<p role="alert">{saveError}</p>}
+   {mode==='count'&&conferenceId&&<ManagerPackageReview key={conferenceId} productId={productId} conferenceId={conferenceId} opened={state?.opened||0} physicalUnit={physicalUnit}/>}
   </>}
  </section>;
 }
