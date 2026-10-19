@@ -45,12 +45,12 @@ export default function MasterRegistry(){
   <h3>Vínculos solicitados pelos próprios usuários</h3>
   {!claims.length&&<p>Nenhuma solicitação pendente.</p>}
   {claims.map(claim=><article className="ti-master-claim" key={claim.id}><strong>{data?.registry?.find(p=>p.id===claim.registryId)?.name||data?.people?.find(p=>p.seedId===claim.registryId)?.name||'Ficha '+claim.registryId}</strong> · Conta {data?.accounts?.find(x=>x.uid===claim.accountUid)?.name||claim.accountUid}<p>Confirme a identidade do colaborador antes de vincular. Nome parecido não é comprovação.</p><button type="button" disabled={busy} onClick={()=>linkAccount(claim)}>Confirmar vínculo</button></article>)}
-  <h3>Fichas já criadas</h3>
+  <h3>Equipe cadastrada</h3>
   {!data?.registry?.length&&<p>Nenhuma ficha cadastrada nesta unidade.</p>}
   <div className="ti-master-cards">
    {(data?.registry||[]).map(p=><article className="ti-master-person" key={p.id}>
     <strong>{p.name}</strong> · {p.jobTitle||'Cargo pendente'} · {p.status==='inactive'?'Desligado':'Ativo'}
-    <div><small>{p.sector} · {p.shift} · {days[p.fixedWeekday]||'Folga pendente'} · {p.accountUid?'Conta vinculada':'Sem conta vinculada'}</small></div><div><small>Código da ficha: <code>{p.id}</code></small> <button type="button" onClick={()=>navigator.clipboard?.writeText(p.id)}>Copiar código</button></div>
+    <div><small>{p.sector} · {p.shift} · {days[p.fixedWeekday]||'Folga pendente'} · {p.accountUid?'Conta vinculada':'Sem conta vinculada'}</small></div><details className="ti-master-technical"><summary>Vincular conta existente</summary><p>Compartilhe este código apenas com o próprio colaborador.</p><code>{p.id}</code><button type="button" onClick={()=>navigator.clipboard?.writeText(p.id)}>Copiar código</button></details>
     <button type="button" disabled={busy} onClick={()=>openEdit(p)}>Abrir ficha</button>
    </article>)}
   </div>
@@ -69,7 +69,7 @@ export default function MasterRegistry(){
   </form>}
   <p>Para pessoas com conta existente, compartilhe o código da ficha mostrado na prévia. O colaborador solicita o vínculo em Minha ficha; a gerência verifica a identidade e confirma aqui.</p>
   <p>Colaboradores com correspondência ficam bloqueados para importação até conferirmos identidade e vínculo. Daniel e Geraldo não participam desta importação.</p>
-  <button type="button" className="ti-master-primary" onClick={importSelected} disabled={busy||selected.length===0}>Criar {selected.length} ficha(s) selecionada(s)</button>
+  {selectable.length>0&&<button type="button" className="ti-master-primary" onClick={importSelected} disabled={busy||selected.length===0}>Criar {selected.length} ficha(s) selecionada(s)</button>}
   
  </section>;
 }
