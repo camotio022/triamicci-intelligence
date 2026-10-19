@@ -4,6 +4,7 @@ import {Award,Star,Sparkles,Clock3,CheckCircle2,UserRound,Pencil,Target,Send,Shi
 import {useFeedback} from './FeedbackProvider.jsx';
 import './profile-premium.css';
 import PhotoCropDialog from './PhotoCropDialog.jsx';
+import MyCoverageProposals from './MyCoverageProposals.jsx';
 const days={seg:'Segunda',ter:'Terça',qua:'Quarta',qui:'Quinta',sex:'Sexta',sab:'Sábado',dom:'Domingo'};
 const skills={preparo:'Preparo',montagem:'Montagem',chapa:'Chapa',vitrine:'Vitrine',vendas:'Vendas',ifood:'iFood',caixa:'Caixa',recebimento:'Recebimento',estoque:'Estoque',lideranca:'Liderança'};
 const shifts={manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variavel:'Variável'};
@@ -86,6 +87,7 @@ export default function MyProfessionalProfile({membership}){
      {profile?.availability?.length?<div className="ti-premium-schedule">{profile.availability.map(d=><div key={d.day}>
       <strong>{days[d.day]||d.day}</strong><span>{d.start}–{d.end}</span><small>Pausa {d.breakStart}–{d.breakEnd}</small></div>)}</div>:<p>Jornada ainda não cadastrada pela gerência.</p>}
     </section>
+    <MyCoverageProposals/>
     <section className="ti-premium-card"><h2><UserRound size={21}/> Vincular minha ficha ao Cadastro Mestre</h2><p>Peça à gerência o código da sua ficha. A vinculação somente ocorrerá após confirmação da identidade pela gerência; suas permissões não mudam.</p><form className="ti-premium-form" onSubmit={requestRegistryLink}><label>Código da ficha<input required maxLength={128} pattern="[A-Za-z0-9_-]+" value={registryCode} onChange={e=>setRegistryCode(e.target.value)} placeholder="Código fornecido pela gerência"/></label><button type="submit" disabled={claiming||!registryCode.trim()}>Solicitar vínculo</button></form></section>
     <section className="ti-premium-card"><h2><Send size={21}/> Quero desenvolver uma habilidade</h2>
      <p>Conte à gerência qual habilidade gostaria de ter revisada. O pedido não confirma a habilidade automaticamente.</p>
