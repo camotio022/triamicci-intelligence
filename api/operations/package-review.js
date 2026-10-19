@@ -23,6 +23,7 @@ export default async function handler(req,res){
   if(!conference.exists||conference.data().productId!==productId||conference.data().unitId!==m.unitId||!product.exists||!profile.exists)
    return send(res,404,'Conferência ou configuração não encontrada.');
   const data=conference.data(),cfg=profile.data(),p=product.data(),method=cfg.countingMethod;
+  if(!['reserva','giro'].includes(data.area))return send(res,409,'Conferência antiga sem área física; faça nova conferência por Reserva/Giro.');
   if(p.status!=='active'||method?.kind!=='packages'||method.presentation!==data.presentation||data.profileVersion!==cfg.version)
    return send(res,409,'Produto, método ou configuração foram alterados. Faça nova conferência.');
   const catalog=p.catalogId?await db.collection('productCatalog').doc(p.catalogId).get():null;
@@ -34,7 +35,7 @@ export default async function handler(req,res){
    closed:data.closed,opened:data.opened,presentation:data.presentation,
    rule,profileVersion:cfg.version,stockUnit:physicalUnit,openedMeasurements
   });
-  const result={...computed,conferenceId,productId,referenceBalance:base.total,referenceUnit:base.unit,
+  const result={...computed,conferenceId,productId,area:data.area,referenceBalance:base[data.area==='reserva'?'reserve':'rotation'],referenceUnit:base.unit,
    requiresReview:true,stockEffect:'NONE'};
   return send(res,200,computed.ok?'Prévia calculada para avaliação gerencial.':'Prévia não conciliável.',{review:result});
  }catch(e){
