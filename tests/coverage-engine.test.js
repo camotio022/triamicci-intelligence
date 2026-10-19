@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DEFAULT_RATES,paymentFor,rateRoleFor,checkDoubleShift,evaluateCoverage,coversWindow} from '../server/coverage/engine.js';
+import {DEFAULT_RATES,paymentFor,rateRoleFor,checkDoubleShift,evaluateCoverage,coversWindow,approvalGate} from '../server/coverage/engine.js';
 test('tabela pratica: cargos e convocacao externa tem prioridade',()=>{
  assert.equal(paymentFor({role:'manager'}),150);
  assert.equal(paymentFor({role:'submanager'}),120);
@@ -35,4 +35,15 @@ test('faixa horaria nao conta pausa como cobertura',()=>{
  assert.equal(coversWindow(p,'2026-10-20','09:00','11:00'),true);
  assert.equal(coversWindow(p,'2026-10-20','12:00','13:00'),false);
  assert.equal(coversWindow(p,'2026-10-20','17:00','19:00'),false);
+});
+
+test('aprovação exige aceite registrado, segundo gestor e pessoa ativa',()=>{
+ const base={status:'pending_approval',createdBy:'admin-a',actorUid:'admin-b',consentPending:false,acceptedAt:'2026-10-19T12:00:00Z',staffActive:true,legalChecked:true,consentVerified:true};
+ assert.equal(approvalGate(base),null);
+ assert.equal(approvalGate({...base,actorUid:'admin-a'}),'SELF_APPROVAL');
+ assert.equal(approvalGate({...base,acceptedAt:null}),'CONSENT_REQUIRED');
+ assert.equal(approvalGate({...base,staffActive:false}),'INACTIVE_STAFF');
+ assert.equal(approvalGate({...base,status:'pending_acceptance'}),'INVALID_STATE');
+ assert.equal(approvalGate({...base,legalChecked:false}),'REVIEW_REQUIRED');
+ assert.equal(approvalGate({...base,consentPending:true,acceptedAt:null}),null);
 });
