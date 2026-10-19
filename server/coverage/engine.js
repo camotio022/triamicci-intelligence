@@ -6,7 +6,7 @@ export function paymentFor(candidate,rates=DEFAULT_RATES){
   return Number(rates[role]??rates.other);
 }
 export function minutes(time){
-  if(typeof time!=='string'||!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(time))return null;
+  if(typeof time!=='string'||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return null;
   const [h,m]=time.split(':').map(Number);return h*60+m;
 }
 export function checkDoubleShift({first,second,minRestMinutes=660,maxDailyMinutes=600}){
