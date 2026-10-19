@@ -7,14 +7,17 @@ export default function TriamicciMentor({membership,user,onOpenStep}){
  const key=progressKey(membership.unitId,user.uid);
  const lessons=useMemo(()=>lessonsForRole(membership.role),[membership.role]);
  const [progress,setProgress]=useState(()=>readProgress(key));
- const [selected,setSelected]=useState(null),[step,setStep]=useState(0),[spotlight,setSpotlight]=useState(false);
- useEffect(()=>{setProgress(readProgress(key));setSelected(null);setStep(0);setSpotlight(false)},[key]);
+ const resumeKey=key+':active';
+ const saved=useMemo(()=>{try{return JSON.parse(sessionStorage.getItem(resumeKey)||'null')}catch{return null}},[resumeKey]);
+ const [selected,setSelected]=useState(()=>saved?.id||null),[step,setStep]=useState(()=>Number.isInteger(saved?.step)?saved.step:0),[spotlight,setSpotlight]=useState(false);
+ useEffect(()=>{if(selected&&lessons.some(l=>l.id===selected)){try{sessionStorage.setItem(resumeKey,JSON.stringify({id:selected,step}))}catch{}}else{try{sessionStorage.removeItem(resumeKey)}catch{}}},[selected,step,lessons,resumeKey]);
+ useEffect(()=>{setProgress(readProgress(key));setSelected(saved?.id||null);setStep(Number.isInteger(saved?.step)?saved.step:0);setSpotlight(false)},[key,saved]);
  const lesson=lessons.find(l=>l.id===selected);
  const completed=lessons.filter(l=>progress[l.id]).length;
  function saveLesson(id,value){const next={...progress,[id]:value};setProgress(next);try{localStorage.setItem(key,JSON.stringify(next))}catch{}}
  function begin(id){setSelected(id);setStep(0);setSpotlight(false)}
  function next(){if(!lesson)return;if(step===lesson.steps.length-1){saveLesson(lesson.id,true);setSelected(null);setSpotlight(false)}else{setStep(n=>n+1);setSpotlight(false)}}
- const current=lesson?.steps[step];
+ const current=lesson?.steps[step]||lesson?.steps[0];
  return <section className="ti-mentor" aria-label="Central de aprendizagem">
   <header className="ti-mentor-hero"><div className="ti-mentor-eyebrow"><GraduationCap size={20}/> TRIAMICCI MENTOR</div><h1>Aprenda a usar o Triamicci Intelligence</h1><p>Um passo de cada vez, com orientações nas próprias telas. Explore com segurança: os tutoriais não registram operações.</p><div className="ti-mentor-progress"><span>{completed} de {lessons.length} trilhas concluídas</span><progress max={lessons.length} value={completed}/></div></header>
   {!lesson?<div className="ti-mentor-grid">{lessons.map((l,i)=><article className="ti-mentor-card" key={l.id}><div className="ti-mentor-card-top"><span className="ti-mentor-number">{String(i+1).padStart(2,'0')}</span>{progress[l.id]&&<span className="ti-mentor-done"><CheckCircle2 size={16}/> Concluída</span>}</div><h2>{l.title}</h2><p>{l.description}</p><small>{l.steps.length} etapas · {l.roles.includes('auxiliar')?'Equipe':'Gerência'}</small><button type="button" onClick={()=>begin(l.id)}><PlayCircle size={17}/>{progress[l.id]?'Revisar treinamento':'Começar treinamento'}</button></article>)}</div>
