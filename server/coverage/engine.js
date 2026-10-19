@@ -1,5 +1,13 @@
 // Pacote 07: estimativas operacionais, nunca folha de pagamento nem autorização de jornada.
 export const DEFAULT_RATES=Object.freeze({manager:150,submanager:120,head_cook:150,cook:120,other:100,external:100});
+export function rateRoleFor(person){
+ const title=String(person?.jobTitle||person?.professional?.jobTitle||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ if(/gerente/.test(title)&&!/sub/.test(title))return 'manager';
+ if(/subgerente/.test(title))return 'submanager';
+ if(/cozinheiro/.test(title)&&/(chefe|lider)/.test(title))return 'head_cook';
+ if(/cozinheiro/.test(title))return 'cook';
+ return 'other';
+}
 export function paymentFor(candidate,rates=DEFAULT_RATES){
   if(candidate?.external)return Number(rates.external);
   const role=candidate?.paymentRole||candidate?.role;
@@ -11,9 +19,9 @@ export function minutes(time){
 }
 export function checkDoubleShift({first,second,minRestMinutes=660,maxDailyMinutes=600}){
   const a=first&&[minutes(first.start),minutes(first.end)],b=second&&[minutes(second.start),minutes(second.end)];
-  if(!a||!b||[...a,...b].some(x=>x===null))return {state:'review',reasons:['Horários insuficientes para confirmar jornada']};
+  if(!a||!b||[...a,...b].some(x=>x===null))return {state:'blocked',reasons:['Horários inválidos; corrija antes de propor uma dobra']};
   // Shift ordering and overnight cases require a full dated schedule and must not be inferred.
-  if(a[1]<=a[0]||b[1]<=b[0])return {state:'review',reasons:['Turno noturno ou horário inválido exige conferência']};
+  if(a[1]<=a[0]||b[1]<=b[0])return {state:'blocked',reasons:['Turno noturno ou horário inválido exige planejamento com datas completas']};
   const total=(a[1]-a[0])+(b[1]-b[0]);
   const overlap=a[0]<b[1]&&b[0]<a[1];
   const gap=b[0]-a[1];
@@ -32,7 +40,7 @@ export function evaluateCoverage({people=[],entries=[],date,sector='cozinha',req
  const shortage=Math.max(0,Math.max(0,required)-workers.length);
  const candidates=active.filter(p=>!scheduled.has(p.uid)&&p.professional?.sector===sector)
  .map(p=>({uid:p.uid,name:p.name||'Colaborador',skillConfirmed:!requiredSkill||!!p.professional?.certifications?.includes(requiredSkill),
-   estimatedPracticePayment:paymentFor(p),eligibility:'review',reason:'Fora da escala: validar jornada, consentimento e disponibilidade'}))
+   estimatedPracticePayment:paymentFor({paymentRole:rateRoleFor(p)}),eligibility:'review',reason:'Fora da escala: validar jornada, consentimento e disponibilidade'}))
  .sort((a,b)=>Number(b.skillConfirmed)-Number(a.skillConfirmed)||a.estimatedPracticePayment-b.estimatedPracticePayment);
  return {date,sector,requiredSkill,required,covered:workers.length,shortage,candidates,legalValidated:false};
 }
