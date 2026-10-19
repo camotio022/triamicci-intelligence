@@ -51,9 +51,9 @@ export function evaluateCoverage({people=[],entries=[],date,sector='cozinha',req
  const workers=active.filter(p=>scheduled.has(p.uid)&&p.professional?.sector===sector&&(!requiredSkill||p.professional?.certifications?.includes(requiredSkill))&&(!windowed||coversWindow(p,date,windowStart,windowEnd)));
  const pendingTiming=active.filter(p=>scheduled.has(p.uid)&&p.professional?.sector===sector&&windowed&&!coversWindow(p,date,windowStart,windowEnd)).length;
  const shortage=Math.max(0,Math.max(0,required)-workers.length);
- const candidates=active.filter(p=>!scheduled.has(p.uid)&&p.professional?.sector===sector)
+ const candidates=active.filter(p=>p.professional?.sector===sector&&!workers.some(w=>w.uid===p.uid))
  .map(p=>({uid:p.uid,name:p.name||'Colaborador',skillConfirmed:!requiredSkill||!!p.professional?.certifications?.includes(requiredSkill),
-   estimatedPracticePayment:paymentFor({paymentRole:rateRoleFor(p)}),eligibility:'review',reason:'Fora da escala: validar jornada, consentimento e disponibilidade'}))
+   estimatedPracticePayment:paymentFor({paymentRole:rateRoleFor(p)}),alreadyScheduled:scheduled.has(p.uid),eligibility:'review',reason:scheduled.has(p.uid)?'Já escalado: possível complemento de turno, sujeito a validação completa':'Fora da escala: verificar convocação, jornada e disponibilidade'}))
  .sort((a,b)=>Number(b.skillConfirmed)-Number(a.skillConfirmed)||a.estimatedPracticePayment-b.estimatedPracticePayment);
  return {date,sector,requiredSkill,required,windowStart,windowEnd,covered:workers.length,unverifiedOrUnavailable:pendingTiming,shortage,candidates,legalValidated:false};
 }
