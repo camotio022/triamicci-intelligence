@@ -12,7 +12,7 @@ test('folgas fixas por dia e domingos mensais não incluem trabalho',()=>{
  {uid:'a',name:'Patrícia',date:'2026-11-08',type:'monthly_sunday'},
  {uid:'b',name:'Judson',date:'2026-11-08',type:'work'}
  ]};
- const data=paperRoster(s,weeksForMonth(s.period)[1]);
+ const data=paperRoster(s,weeksForMonth(s.period)[0]);
  assert.deepEqual(data.offByDay[0].people.map(x=>x.name),['Judson','Patrícia']);
  assert.deepEqual(data.sundays.find(x=>x.date==='2026-11-08').people.map(x=>x.name),['Patrícia']);
 });
