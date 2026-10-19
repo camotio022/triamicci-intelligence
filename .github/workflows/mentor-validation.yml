@@ -1,0 +1,22 @@
+name: Mentor - validacao sem deploy
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Regras das trilhas
+        run: node --test tests/mentor-lessons.test.js
+      - name: Instalar dependencias
+        run: |
+          if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
+      - name: Build
+        run: npm run build
