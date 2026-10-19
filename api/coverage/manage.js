@@ -20,7 +20,7 @@ export default async function handler(req,res){
    const [peopleSnap,plansSnap,rateSnap,proposalSnap,policySnap]=await Promise.all([
     unit.collection('staffRegistry').limit(200).get(),unit.collection('schedules').limit(120).get(),settings.get(),proposals.limit(100).get(),policyRef.get()
    ]);
-   const people=peopleSnap.docs.map(d=>({uid:d.id,...d.data(),professional:{sector:d.data().sector,jobTitle:d.data().jobTitle,shift:d.data().shift,skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
+   const people=peopleSnap.docs.map(d=>({uid:d.id,name:d.data().name||'',status:d.data().status||'inactive',jobTitle:d.data().jobTitle||'',professional:{sector:d.data().sector,jobTitle:d.data().jobTitle,shift:d.data().shift,skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
    const plans=plansSnap.docs.map(d=>({id:d.id,...d.data()}));
    return send(res,200,'Painel de cobertura carregado.',{people,plans:plans.map(p=>({id:p.id,title:p.title,period:p.period,status:p.status,entries:p.entries||[]})),
     rates:{...DEFAULT_RATES,...(rateSnap.data()?.rates||{})},requirements:policySnap.data()?.requirements||[],
@@ -112,7 +112,7 @@ export default async function handler(req,res){
   if(action==='decide'){
    const {id,decision,note,legalChecked,consentVerified}=req.body||{};
    if(!idOk(id)||!['approved','rejected','cancelled'].includes(decision)||typeof note!=='string'||note.trim().length<10||note.length>500)return send(res,400,'Decisão e justificativa obrigatórias.');
-   if(decision==='approved'&&(legalChecked!==true||consentVerified!==true))return send(res,409,'Confirme validação trabalhista e consentimento antes de aprovar.');
+   if(decision==='approved'&&(legalChecked!==true||consentVerified!==true||typeof req.body?.consentEvidence!=='string'||req.body.consentEvidence.trim().length<10||req.body.consentEvidence.length>500))return send(res,409,'Confirme a revisão trabalhista e descreva como o aceite foi comprovado (mínimo de 10 caracteres).');
    const ref=proposals.doc(id),now=new Date();
    await db.runTransaction(async tx=>{
     const [m,p]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(ref)]);
@@ -125,7 +125,7 @@ export default async function handler(req,res){
       legalChecked,consentVerified});
      if(gate)throw Error(gate);
     }
-    tx.update(ref,{status:decision,decisionNote:note.trim(),legalValidated:false,legalReviewConfirmed:decision==='approved',consentVerified:decision==='approved',decidedBy:actor.uid,decidedAt:now,updatedAt:now});
+    tx.update(ref,{status:decision,decisionNote:note.trim(),legalValidated:false,legalReviewConfirmed:decision==='approved',consentVerified:decision==='approved',consentEvidence:decision==='approved'?req.body.consentEvidence.trim():null,decidedBy:actor.uid,decidedAt:now,updatedAt:now});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.'+decision,unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,note:note.trim()});
    });
    return send(res,200,'Decisão registrada. Aprovação não altera automaticamente a escala oficial.');
