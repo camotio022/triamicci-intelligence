@@ -13,6 +13,8 @@ const stamp=x=>x?.toMillis?.()??null;
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
+ // Liberação exige homologação isolada e habilitação administrativa explícita.
+ if(process.env.ENABLE_PACKAGE_BALANCE_APPLY!=='true')return send(res,503,'Aplicação de ajustes ainda não habilitada. Use apenas a prévia.');
  try{
   const user=await authenticate(req),m=await membership(user.uid);
   if(!m?.unitId||m.role!=='admin')return send(res,403,'Somente administrador pode aplicar ajustes.');
