@@ -53,3 +53,11 @@
 .ti-master-technical p{font-size:11px;color:var(--ti-muted);margin:8px 0}
 .ti-master-technical code{display:block;overflow-wrap:anywhere;background:#f6f5f5;padding:7px 8px;border-radius:7px;font-size:10px;margin-bottom:8px}
 .ti-master-technical button{min-height:34px;padding:6px 10px}
+
+/* Gestão de Pessoas: localizar fichas em segundos, inclusive no celular. */
+.ti-master-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(140px,1fr);gap:10px;margin:14px 0 4px}
+.ti-master-filters label{display:grid;gap:5px;font-size:12px;font-weight:700;color:#334155;min-width:0}
+.ti-master-filters input,.ti-master-filters select{width:100%;min-height:42px;padding:9px 11px;border:1px solid #d9dce4;border-radius:10px;background:#fff;color:#253045;font-size:13px}
+.ti-master-filters :is(input,select):focus-visible{outline:2px solid #a71916;outline-offset:2px}
+.ti-master-result-count{font-size:12px;color:#667085;margin:4px 0 12px}
+@media(max-width:520px){.ti-master-filters{grid-template-columns:1fr}.ti-master-filters input,.ti-master-filters select{min-height:44px}}

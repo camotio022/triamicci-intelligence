@@ -93,3 +93,7 @@
 .team-shift-hour:last-child{border-bottom:0}.team-shift-hour>span{font-size:11px;color:#667085}.team-shift-hour strong{font-size:12px;font-variant-numeric:tabular-nums}.team-shift-hour small{grid-column:2;color:#667085;font-size:11px}
 .team-shift-empty{font-size:12px;color:#667085;margin:0}.team-shift-card .team-member-edit{align-self:flex-start;margin-top:auto}
 @media(max-width:640px){.team-shift-list{grid-template-columns:1fr;gap:9px}.team-shift-card{padding:12px}.team-shift-hour{padding:8px 10px}}
+
+/* Matriz: cartões por pessoa em telas compactas, mantendo tabela no desktop. */
+.ti-skill-mobile{display:none}
+@media(max-width:700px){.team-profiles .team-matrix-scroll{display:none}.ti-skill-mobile{display:grid;gap:9px}.ti-skill-person{padding:13px;border:1px solid #e4e6ec;border-radius:13px;background:#fff;min-width:0}.ti-skill-person-head{display:grid;gap:3px}.ti-skill-person-head strong{font-size:14px;color:#23191b}.ti-skill-person-head small{font-size:11px;color:#677083}.ti-skill-person-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.ti-skill-person-tags>span{display:flex;align-items:center;gap:5px;padding:6px 8px;border-radius:9px;font-size:11px}.ti-skill-person-tags>span.confirmed{color:#176340;background:#e6f5ee}.ti-skill-person-tags>span.declared{color:#83521e;background:#fff2e0}.ti-skill-person-tags>span small{font-size:9px;opacity:.85}.ti-skill-person p{font-size:12px;color:#677083;margin:9px 0 0}}
