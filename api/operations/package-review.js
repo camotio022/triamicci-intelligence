@@ -4,6 +4,7 @@ import {reconcilePackageCount} from '../../server/operations/package-reconciliat
 import {countUnit} from '../../server/operations/logic.js';
 import {areaTotals} from '../../server/operations/lot-logic.js';
 import {reviewReadiness} from '../../server/operations/package-review-rules.js';
+import {validateLotAllocation} from '../../server/operations/package-lot-allocation.js';
 const productPattern=/^[a-f0-9]{40}$/;
 const requestPattern=/^[a-f0-9-]{36}$/i;
 export default async function handler(req,res){
@@ -12,8 +13,8 @@ export default async function handler(req,res){
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!m?.unitId||!['admin','manager'].includes(m.role))return send(res,403,'Somente gerência pode revisar conciliações.');
-  const {productId,conferenceId,openedMeasurements=[]}=req.body||{};
-  if(req.body?.action!=='preview'||!productPattern.test(productId||'')||!requestPattern.test(conferenceId||'')||!Array.isArray(openedMeasurements)||openedMeasurements.length>100)
+  const {productId,conferenceId,openedMeasurements=[],lotAllocations=[]}=req.body||{};
+  if(req.body?.action!=='preview'||!productPattern.test(productId||'')||!requestPattern.test(conferenceId||'')||!Array.isArray(openedMeasurements)||openedMeasurements.length>100||!Array.isArray(lotAllocations)||lotAllocations.length>100)
    return send(res,400,'Revisão inválida.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId);
   const [conference,profile,product,balance]=await Promise.all([
@@ -37,16 +38,21 @@ export default async function handler(req,res){
    closed:data.closed,opened:data.opened,presentation:data.presentation,
    rule,profileVersion:cfg.version,stockUnit:physicalUnit,openedMeasurements
   });
-  let lotStatus='NOT_TRACKED';
+  let lotStatus='NOT_TRACKED',lotAllocation=null;
   if(p.trackExpiry===true){
    const snap=await unit.collection('physicalLots').doc(productId).collection('lots').limit(101).get();
    const totals=snap.size<=100?areaTotals(snap.docs.map(d=>d.data())):null;
    lotStatus=totals&&totals.reserva===base.reserve&&totals.giro===base.rotation?'BALANCED':'NEEDS_LOT_RECONCILIATION';
+   if(computed.ok&&lotStatus==='BALANCED'&&lotAllocations.length){
+    lotAllocation=validateLotAllocation({area:data.area,quantity:computed.quantity,unit:physicalUnit,
+     allocations:lotAllocations,lots:snap.docs.map(d=>({id:d.id,...d.data()}))});
+   }
+   if(!lotAllocation?.ok)lotStatus='NEEDS_EXPLICIT_LOT_ALLOCATION';
   }
   const readiness=reviewReadiness({review:computed,area:data.area,
    referenceBalance:base[data.area==='reserva'?'reserve':'rotation'],lotStatus,
    profileVersion:cfg.version,conferenceProfileVersion:data.profileVersion});
-  const result={...computed,...readiness,lotStatus,conferenceId,productId,area:data.area,referenceBalance:base[data.area==='reserva'?'reserve':'rotation'],referenceUnit:base.unit,
+  const result={...computed,...readiness,lotStatus,lotAllocation,conferenceId,productId,area:data.area,referenceBalance:base[data.area==='reserva'?'reserve':'rotation'],referenceUnit:base.unit,
    requiresReview:true,stockEffect:'NONE'};
   return send(res,200,computed.ok?'Prévia calculada para avaliação gerencial.':'Prévia não conciliável.',{review:result});
  }catch(e){
