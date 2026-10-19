@@ -10,7 +10,8 @@ export default async function handler(req,res){
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!m?.unitId)return send(res,403,'Vínculo ativo necessário.');
   if(req.body?.action!=='record'||!id.test(req.body?.productId||'')||!requestId.test(req.body?.requestId||''))return send(res,400,'Conferência inválida.');
-  const {productId,requestId:rid}=req.body;
+  const {productId,requestId:rid,area}=req.body;
+  if(!['reserva','giro'].includes(area))return send(res,400,'Selecione Reserva ou Giro para a conferência.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId);
   const product=unit.collection('products').doc(productId),profile=unit.collection('measurementProfiles').doc(productId);
   const count=unit.collection('packageConferences').doc(rid),actorRef=db.doc('memberships/'+actor.uid);
@@ -29,11 +30,11 @@ export default async function handler(req,res){
    if(existing.exists){
     const old=existing.data();
     if(old.actorUid!==actor.uid||old.productId!==productId||old.profileVersion!==config.data().version||
-      old.closed!==result.closed||old.opened!==result.opened||old.presentation!==result.presentation)throw Error('CONFLICT');
+      old.closed!==result.closed||old.opened!==result.opened||old.presentation!==result.presentation||old.area!==area)throw Error('CONFLICT');
     duplicate=true;return;
    }
    const now=new Date(),record={productId,productName:p.data().name,unitId:m.unitId,actorUid:actor.uid,
-    profileVersion:config.data().version,presentation:result.presentation,closed:result.closed,opened:result.opened,
+    profileVersion:config.data().version,area,presentation:result.presentation,closed:result.closed,opened:result.opened,
     remainderStatus:result.opened>0?'UNKNOWN':'NONE',stockEffect:'NONE',at:now};
    tx.create(count,record);
    tx.create(db.collection('auditLogs').doc(),{event:'physical.package_conference_recorded',unitId:m.unitId,
