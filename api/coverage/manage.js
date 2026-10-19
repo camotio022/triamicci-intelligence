@@ -62,12 +62,12 @@ export default async function handler(req,res){
    return send(res,200,'Tabela operacional atualizada; históricos preservados.');
   }
   if(action==='simulate'){
-   const {planId,date,sector,requiredSkill,required}=req.body||{};
-   if(!idOk(planId)||!validDate(date)||typeof sector!=='string'||!['cozinha','frente','caixa','apoio','gestao'].includes(sector)||typeof requiredSkill!=='string'||requiredSkill.length>40||!Number.isInteger(required)||required<1||required>30)return send(res,400,'Parâmetros inválidos.');
+   const {planId,date,sector,requiredSkill,required,windowStart='',windowEnd=''}=req.body||{};
+   if(!idOk(planId)||!validDate(date)||typeof sector!=='string'||!['cozinha','frente','caixa','apoio','gestao'].includes(sector)||typeof requiredSkill!=='string'||requiredSkill.length>40||!Number.isInteger(required)||required<1||required>30||!validTime(windowStart)||!validTime(windowEnd)||windowEnd<=windowStart)return send(res,400,'Parâmetros ou faixa de horário inválidos.');
    const [plan,peopleSnap,rateSnap]=await Promise.all([unit.collection('schedules').doc(planId).get(),unit.collection('staffRegistry').limit(200).get(),settings.get()]);
    if(!plan.exists||!date.startsWith(plan.data().period))return send(res,404,'Escala não encontrada para esta data.');
-   const people=peopleSnap.docs.map(d=>({uid:d.id,...d.data(),professional:{sector:d.data().sector,certifications:d.data().certifications||[]}}));
-   const result=evaluateCoverage({people,entries:plan.data().entries||[],date,sector,requiredSkill,required});
+   const people=peopleSnap.docs.map(d=>({uid:d.id,...d.data(),professional:{sector:d.data().sector,availability:d.data().availability||[],certifications:d.data().certifications||[]}}));
+   const result=evaluateCoverage({people,entries:plan.data().entries||[],date,sector,requiredSkill,required,windowStart,windowEnd});
    const rates={...DEFAULT_RATES,...(rateSnap.data()?.rates||{})};
    result.candidates=result.candidates.map(p=>{const person=people.find(x=>x.uid===p.uid);return {...p,estimatedPracticePayment:paymentFor({paymentRole:rateRoleFor(person)},rates)}});
    return send(res,200,'Simulação produzida sem alterar a escala.',{simulation:result});
