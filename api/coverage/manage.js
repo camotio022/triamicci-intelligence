@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
-import {evaluateCoverage,paymentFor,checkDoubleShift,DEFAULT_RATES} from '../../server/coverage/engine.js';
+import {evaluateCoverage,paymentFor,rateRoleFor,checkDoubleShift,DEFAULT_RATES} from '../../server/coverage/engine.js';
 import {validDate} from '../../server/schedules/rules.js';
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 const roles=new Set(['admin','manager']);
@@ -69,7 +69,7 @@ export default async function handler(req,res){
    const people=peopleSnap.docs.map(d=>({uid:d.id,...d.data(),professional:{sector:d.data().sector,certifications:d.data().certifications||[]}}));
    const result=evaluateCoverage({people,entries:plan.data().entries||[],date,sector,requiredSkill,required});
    const rates={...DEFAULT_RATES,...(rateSnap.data()?.rates||{})};
-   result.candidates=result.candidates.map(p=>{const person=people.find(x=>x.uid===p.uid);return {...p,estimatedPracticePayment:paymentFor({role:person?.role,paymentRole:person?.paymentRole},rates)}});
+   result.candidates=result.candidates.map(p=>{const person=people.find(x=>x.uid===p.uid);return {...p,estimatedPracticePayment:paymentFor({paymentRole:rateRoleFor(person)},rates)}});
    return send(res,200,'Simulação produzida sem alterar a escala.',{simulation:result});
   }
   if(action==='propose'){
@@ -80,6 +80,7 @@ export default async function handler(req,res){
    const ref=unit.collection('staffRegistry').doc(staffId),person=await ref.get();
    if(!person.exists||person.data().status!=='active')return send(res,404,'Colaborador inativo ou não encontrado.');
    if(external&&rateRole!=='external'||!external&&rateRole==='external')return send(res,400,'Categoria externa inconsistente.');
+   if(!external&&rateRole!==rateRoleFor(person.data()))return send(res,409,'Categoria divergente do cargo cadastrado. Atualize a ficha do colaborador antes de calcular a dobra.');
    const ratesSnap=await settings.get(),rates={...DEFAULT_RATES,...(ratesSnap.data()?.rates||{})};
    const payment=paymentFor({paymentRole:rateRole,external},rates);
    const now=new Date(),id=randomUUID(),proposal=proposals.doc(id);
