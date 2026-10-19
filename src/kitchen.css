@@ -78,3 +78,18 @@
  .team-profiles .team-profiles-search label{flex:1;min-width:0}
  .team-profiles .team-profiles-search button{min-height:40px}
 }
+
+/* Jornadas por pessoa: leitura progressiva e espaçamento mobile-first. */
+.team-shift-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.team-shift-card{display:flex;flex-direction:column;gap:12px;min-width:0;background:white;border:1px solid #e3e5eb;border-radius:14px;padding:15px}
+.team-shift-card-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px}
+.team-shift-card-head>div{display:grid;gap:4px;min-width:0;flex:1}
+.team-shift-card-head strong{font-size:14px;color:#252c40;overflow-wrap:anywhere}
+.team-shift-card-head span:not(.team-shift-pill){font-size:12px;color:#667085}
+.team-shift-pill{background:#fff1ee;color:#87211d;font-size:11px;font-weight:700;border-radius:20px;padding:5px 9px}
+.team-shift-details summary{cursor:pointer;font-size:12px;font-weight:700;color:#87211d;padding:8px 0;min-height:38px}
+.team-shift-hours{display:grid;gap:0;border:1px solid #e7e7ed;border-radius:10px;overflow:hidden}
+.team-shift-hour{display:grid;grid-template-columns:minmax(75px,.8fr) minmax(0,1.4fr);gap:5px 9px;padding:9px;background:#fff;border-bottom:1px solid #eef0f4;align-items:center}
+.team-shift-hour:last-child{border-bottom:0}.team-shift-hour>span{font-size:11px;color:#667085}.team-shift-hour strong{font-size:12px;font-variant-numeric:tabular-nums}.team-shift-hour small{grid-column:2;color:#667085;font-size:11px}
+.team-shift-empty{font-size:12px;color:#667085;margin:0}.team-shift-card .team-member-edit{align-self:flex-start;margin-top:auto}
+@media(max-width:640px){.team-shift-list{grid-template-columns:1fr;gap:9px}.team-shift-card{padding:12px}.team-shift-hour{padding:8px 10px}}
