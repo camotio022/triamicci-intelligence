@@ -46,3 +46,10 @@
 /* O título do hero não pode herdar a cor escura da regra global de cartões. */
 .ti-master .ti-master-hero h2{color:#fff!important;font-weight:800}
 .ti-master .ti-master-hero p{color:#f7dedd}
+
+/* Informações técnicas sob demanda; cartões funcionais primeiro. */
+.ti-master-technical{border-top:1px solid var(--ti-line);padding-top:9px;margin-top:2px}
+.ti-master-technical summary{font-size:12px;color:var(--ti-wine-deep);font-weight:750;cursor:pointer}
+.ti-master-technical p{font-size:11px;color:var(--ti-muted);margin:8px 0}
+.ti-master-technical code{display:block;overflow-wrap:anywhere;background:#f6f5f5;padding:7px 8px;border-radius:7px;font-size:10px;margin-bottom:8px}
+.ti-master-technical button{min-height:34px;padding:6px 10px}
