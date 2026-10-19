@@ -16,7 +16,7 @@ export function validatePackageConfiguration(input){
   if(p.validated&&!fixedRule(p))return {ok:false,reason:'MISSING_EVIDENCE_OR_CONTENT'};
   if(!p.validated&&(p.contentQuantity!==null&&p.contentQuantity!==undefined||p.contentUnit!==null&&p.contentUnit!==undefined))return {ok:false,reason:'UNVERIFIED_CONTENT'};
   if(!p.validated&&p.fixed)return {ok:false,reason:'UNVERIFIED_FIXED'};
-  if(p.evidence!==undefined&&(typeof p.evidence!=='string'||p.evidence.length>240))return {ok:false,reason:'INVALID_EVIDENCE'};
+  if(p.evidence!==undefined&&p.evidence!==null&&(typeof p.evidence!=='string'||p.evidence.length>240))return {ok:false,reason:'INVALID_EVIDENCE'};
  }
  return {ok:true,packages:input.packages.map(p=>({presentation:p.presentation,fixed:p.fixed,validated:p.validated,contentQuantity:p.validated?p.contentQuantity:null,contentUnit:p.validated?p.contentUnit:null,evidence:p.validated?p.evidence.trim():null}))};
 }
