@@ -57,3 +57,12 @@ export function evaluateCoverage({people=[],entries=[],date,sector='cozinha',req
  .sort((a,b)=>Number(b.skillConfirmed)-Number(a.skillConfirmed)||a.estimatedPracticePayment-b.estimatedPracticePayment);
  return {date,sector,requiredSkill,required,windowStart,windowEnd,covered:workers.length,unverifiedOrUnavailable:pendingTiming,shortage,candidates,legalValidated:false};
 }
+
+export function approvalGate({status,createdBy,actorUid,consentPending,acceptedAt,staffActive,legalChecked,consentVerified}){
+ if(status!=='pending_approval')return 'INVALID_STATE';
+ if(createdBy===actorUid)return 'SELF_APPROVAL';
+ if(!consentPending&&!acceptedAt)return 'CONSENT_REQUIRED';
+ if(!staffActive)return 'INACTIVE_STAFF';
+ if(!legalChecked||!consentVerified)return 'REVIEW_REQUIRED';
+ return null;
+}
