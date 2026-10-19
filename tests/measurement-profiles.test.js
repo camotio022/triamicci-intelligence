@@ -17,7 +17,7 @@ test('recusa conversões não homologadas e conteúdo incompleto',()=>{
  ])assert.equal(validatePackageConfiguration({packages:[value]}).ok,false);
 });
 test('peso variável permanece sem valor presumido',()=>{
- const r=validatePackageConfiguration({packages:[{presentation:'pacote',fixed:false,validated:false,contentQuantity:null,contentUnit:null}]});
+ const r=validatePackageConfiguration({packages:[{presentation:'pacote',fixed:false,validated:false,contentQuantity:null,contentUnit:null,evidence:null}]});
  assert.equal(r.ok,true);assert.equal(r.packages[0].contentQuantity,null);
 });
 test('não aceita apresentação duplicada',()=>{
