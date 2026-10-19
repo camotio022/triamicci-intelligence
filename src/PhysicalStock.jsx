@@ -1,6 +1,7 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
+import './receiving-experience.css';
 
 async function api(path,action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Sessão expirada.');
@@ -102,38 +103,50 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
     'Informe o estoque físico encontrado em cada área; confira o histórico antes de salvar.'}</p>
   <div className="receiving-notice">Operações auditadas no Firebase. Após a primeira contagem, entregas e saídas atualizam o saldo físico; o saldo legado permanece separado. Para lotes antigos, a conciliação é necessária antes da baixa.</div>
   {mode==='history'?null:mode==='receive'&&!canReceive?<p>Somente administrador ou gerente pode registrar recebimentos.</p>:
-  <form className="receiving-card" onSubmit={submit}>
-   <h2>{mode==='receive'?'Conferir entrega':'Registrar contagem'}</h2>
-   {p&&weightToPieces&&<div className="receiving-notice"><strong>Conferência por peso → contagem por peças:</strong> registre o peso pedido e o peso efetivamente entregue em kg. Após porcionar, informe a quantidade real de peças encontradas. Não calculamos peças automaticamente a partir dos quilos.</div>}
-   {p&&proteinMismatch&&<div className="receiving-notice" role="alert"><strong>Unidade operacional a conferir:</strong> este produto está configurado para {physicalUnit}. Se for carne porcionada, um administrador deve corrigir a unidade operacional para un e realizar nova contagem; saldos antigos não serão convertidos automaticamente.</div>}
-   <div className="inventory-fields">
-    <label>Produto<select required value={productId} onChange={e=>{setProductId(e.target.value);setPendingId(null);setStatus('')}}>
-     <option value="">Selecione o produto da unidade</option>{products.filter(x=>x.status==='active').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
-    </select></label>
-    {mode==='receive'?<>
+  <form className={mode==='receive'?'ti-receive-form':'receiving-card'} onSubmit={submit}>
+   {mode==='receive'?<>
+    <div className="ti-receive-hero"><div><small>RECEBIMENTO · PASSO A PASSO</small><h2>Conferir mercadoria</h2><p>Selecione o produto e registre a quantidade real. O sistema nunca deve presumir o conteúdo de uma caixa ou pacote.</p></div><span className="ti-receive-progress">3 etapas</span></div>
+    <section className="ti-receive-stage">
+     <h3><span>1</span> Qual mercadoria chegou?</h3>
+     <label>Produto recebido<select required value={productId} onChange={e=>{setProductId(e.target.value);setPendingId(null);setStatus('')}}><option value="">Escolher produto da unidade</option>{products.filter(x=>x.status==='active').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+     {p&&<p>Unidade do saldo atualmente configurada: <strong>{physicalUnit}</strong>. Unidade comercial registrada: <strong>{receivingUnit}</strong>.</p>}
      <label>Fornecedor<input required minLength={1} maxLength={160} value={supplier} onChange={e=>{setSupplier(e.target.value);setPendingId(null)}} /></label>
-     <label>{weightToPieces?'Peças obtidas após porcionamento (un)':'Quantidade física recebida ('+physicalUnit+')'}<input required type="number" min="0.001" step={physicalUnit==='un'?'1':'0.001'} value={amount} onChange={e=>{setAmount(e.target.value);setPendingId(null)}}/></label>
-     <label>Quantidade solicitada ({receivingUnit})<input required type="number" min={receivingUnit==='un'?'1':'0.001'} step={receivingUnit==='un'?'1':'0.001'} value={orderedQuantity} onChange={e=>{setOrderedQuantity(e.target.value);setPendingId(null)}}/></label>
-     <label>{receivingUnit==='kg'&&physicalUnit==='un'?'Peso efetivamente entregue (kg) — obrigatório':'Peso entregue (kg), quando houver'}<input required={receivingUnit==='kg'&&physicalUnit==='un'} type="number" min="0.001" step="0.001" value={weight} onChange={e=>{setWeight(e.target.value);setPendingId(null)}}/></label>
-     {p?.trackExpiry&&<>
-      <label>Lote<input required maxLength={80} value={lot} onChange={e=>{setLot(e.target.value);setPendingId(null)}}/></label>
-      <label>Validade<input required type="date" value={expiry} onChange={e=>{setExpiry(e.target.value);setPendingId(null)}}/></label>
-     </>}
-    </>:<>
+    </section>
+    <section className="ti-receive-stage">
+     <h3><span>2</span> Quanto foi entregue?</h3>
+     {p&&weightToPieces&&<div className="ti-receive-warning" role="status">Pedido em kg e estoque por peças: registre o peso realmente entregue e a contagem efetiva de peças. Não calculamos peças automaticamente a partir de kg.</div>}
+     {p&&proteinMismatch&&<div className="ti-receive-warning" role="status">Confira a unidade configurada neste produto. Não modificaremos saldos antigos automaticamente.</div>}
+     {p&&receivingUnit!==physicalUnit&&!weightToPieces&&<div className="ti-receive-warning" role="alert">As unidades de compra e estoque são diferentes. A versão atual ainda não possui uma conversão homologada entre elas. Não informe caixas ou pacotes como se fossem kg ou unidades; solicite conferência da unidade antes de registrar.</div>}
+     <div className="inventory-fields">
+      <label>Quantidade solicitada ({receivingUnit})<input required type="number" min={receivingUnit==='un'?'1':'0.001'} step={receivingUnit==='un'?'1':'0.001'} value={orderedQuantity} onChange={e=>{setOrderedQuantity(e.target.value);setPendingId(null)}}/></label>
+      <label>{weightToPieces?'Peças efetivamente recebidas (un)':'Quantidade física recebida ('+physicalUnit+')'}<input required type="number" min={physicalUnit==='un'?'1':'0.001'} step={physicalUnit==='un'?'1':'0.001'} value={amount} onChange={e=>{setAmount(e.target.value);setPendingId(null)}}/></label>
+      <label>{weightToPieces?'Peso entregue (kg) — obrigatório':'Peso entregue (kg), se medido'}<input required={weightToPieces} type="number" min="0.001" step="0.001" value={weight} onChange={e=>{setWeight(e.target.value);setPendingId(null)}}/></label>
+     </div>
+     {deliveredCommercial!==null&&orderedQuantity!==''&&amount!==''&&(receivingUnit===physicalUnit||weight!=='')&&<p>Diferença do pedido: <strong>{qty(deliveredCommercial-Number(orderedQuantity))} {receivingUnit}</strong>.</p>}
+    </section>
+    <section className="ti-receive-stage">
+     <h3><span>3</span> Conferir e registrar</h3>
+     {p?.trackExpiry&&<div className="inventory-fields"><label>Lote<input required maxLength={80} value={lot} onChange={e=>{setLot(e.target.value);setPendingId(null)}}/></label><label>Validade<input required type="date" value={expiry} onChange={e=>{setExpiry(e.target.value);setPendingId(null)}}/></label></div>}
+     <label>Observações (opcional)<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setPendingId(null)}} placeholder="Ex.: caixas conferidas com fornecedor"/></label>
+     {p&&<div className="ti-receive-summary"><span>Resumo da entrega</span><b>{p.name}</b><span>{amount||'—'} {physicalUnit} recebidos · pedido de {orderedQuantity||'—'} {receivingUnit}</span><span>Registro vinculado ao responsável e à unidade atual.</span></div>}
+     <button className="ti-receive-primary" type="submit" disabled={busy||!productId||(receivingUnit!==physicalUnit&&!weightToPieces)}>{busy?'Registrando...':'Confirmar recebimento'}</button>
+     {status&&<p role="status">{status}</p>}
+    </section>
+   </>:<>
+    <h2>Registrar contagem</h2>
+    <div className="inventory-fields">
+     <label>Produto<select required value={productId} onChange={e=>{setProductId(e.target.value);setPendingId(null);setStatus('')}}><option value="">Selecione o produto da unidade</option>{products.filter(x=>x.status==='active').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
      <label>Reserva ({physicalUnit})<input required type="number" min="0" step={physicalUnit==='un'?'1':'0.001'} value={reserve} onChange={e=>{setReserve(e.target.value);setPendingId(null)}}/></label>
      <label>Giro ({physicalUnit})<input required type="number" min="0" step={physicalUnit==='un'?'1':'0.001'} value={rotation} onChange={e=>{setRotation(e.target.value);setPendingId(null)}}/></label>
-    </>}
-    <label>Observação<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setPendingId(null)}}/></label>
-   </div>
-   {mode==='receive'&&orderedQuantity!==''&&amount!==''&&deliveredCommercial!==null&&(receivingUnit===physicalUnit||weight!=='')&&<p><strong>Diferença do pedido:</strong> {qty(deliveredCommercial-Number(orderedQuantity))} {receivingUnit}.</p>}
-   {mode==='count'&&summary&&<p><strong>Última entrega:</strong> {summary.lastDelivery?qty(summary.lastDelivery.physicalQuantity)+' '+summary.lastDelivery.unit+' · '+fmt(summary.lastDelivery.at):'Nenhuma registrada'}.
-   <strong> Entradas desde a contagem anterior:</strong> {summary.entriesSincePrevious===null?'Indisponível':qty(summary.entriesSincePrevious)+' '+summary.unit}. <strong>Saídas registradas:</strong> {summary.exitsSincePrevious===null?'Indisponível':qty(summary.exitsSincePrevious)+' '+summary.unit}.</p>}
-   {mode==='count'&&summary?.complete&&previous&&total!==null&&<p><strong>Diferença física estimada:</strong> {qty(previous.total+summary.entriesSincePrevious-(summary.exitsSincePrevious||0)-total)} {summary.unit}.
-   Diferença entre contagens; não significa necessariamente venda ou consumo.</p>}
-   {mode==='count'&&summary&&!summary.complete&&<p role="alert">{summary.reason}</p>}
-   {mode==='count'&&<p><strong>Total agora:</strong> {total===null?'—':qty(total)+' '+physicalUnit}. <strong>Última contagem:</strong> {previous?qty(previous.total)+' '+summary.unit+' em '+fmt(previous.at):'Não registrada'}</p>}
-   <button type="submit" disabled={busy||!productId}>{busy?'Salvando...':mode==='receive'?'Salvar recebimento':'Salvar contagem'}</button>
-   {status&&<p role="status">{status}</p>}
+     <label>Observação<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setPendingId(null)}}/></label>
+    </div>
+    {summary&&<p><strong>Última entrega:</strong> {summary.lastDelivery?qty(summary.lastDelivery.physicalQuantity)+' '+summary.lastDelivery.unit+' · '+fmt(summary.lastDelivery.at):'Nenhuma registrada'}. <strong>Entradas desde a contagem anterior:</strong> {summary.entriesSincePrevious===null?'Indisponível':qty(summary.entriesSincePrevious)+' '+summary.unit}. <strong>Saídas registradas:</strong> {summary.exitsSincePrevious===null?'Indisponível':qty(summary.exitsSincePrevious)+' '+summary.unit}.</p>}
+    {summary?.complete&&previous&&total!==null&&<p><strong>Diferença física estimada:</strong> {qty(previous.total+summary.entriesSincePrevious-(summary.exitsSincePrevious||0)-total)} {summary.unit}. Essa diferença não é automaticamente venda ou consumo.</p>}
+    {summary&&!summary.complete&&<p role="alert">{summary.reason}</p>}
+    <p><strong>Total agora:</strong> {total===null?'—':qty(total)+' '+physicalUnit}. <strong>Última contagem:</strong> {previous?qty(previous.total)+' '+summary.unit+' em '+fmt(previous.at):'Não registrada'}</p>
+    <button type="submit" disabled={busy||!productId}>{busy?'Salvando...':'Salvar contagem'}</button>
+    {status&&<p role="status">{status}</p>}
+   </>}
   </form>}
   {mode==='receive'&&p?.trackExpiry&&lots.length>0&&<section className="receiving-card">
    <h2>Lotes recebidos — ordem de validade</h2>
