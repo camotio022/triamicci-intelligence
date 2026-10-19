@@ -118,7 +118,7 @@ export default function TeamManagement({ user, membership }) {
     <div className="team-warning"><strong>Convites por link:</strong> gera um link único e envia manualmente pelo WhatsApp, sem precisar de domínio próprio. O destinatário deve entrar com o e-mail Google informado. Nunca publiques o link em grupos ou capturas de tela.</div>
     <TeamPreRegister membership={membership} onInvite={(targetEmail,targetRole)=>{setEmail(targetEmail);setRole(targetRole);setFeedback('Convite preparado. Escolha a forma de envio e confirme abaixo.');}} />
     <MemberDirectory user={user} membership={membership} />
-    <TeamProfiles membership={membership} />
+    {!accessOnly&&<TeamProfiles membership={membership} />}
     <div className="team-grid">
       <section className="team-panel">
         <h2>Novo convite</h2>
