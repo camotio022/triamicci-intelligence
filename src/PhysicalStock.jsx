@@ -2,6 +2,7 @@ import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import './receiving-experience.css';
+import PackageConference from './PackageConference.jsx';
 
 async function api(path,action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Sessão expirada.');
@@ -148,6 +149,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
     {status&&<p role="status">{status}</p>}
    </>}
   </form>}
+  {(mode==='receive'||mode==='count')&&p&&<PackageConference key={mode+':'+productId} productId={productId} physicalUnit={physicalUnit} mode={mode}/>}
   {mode==='receive'&&p?.trackExpiry&&lots.length>0&&<section className="receiving-card">
    <h2>Lotes recebidos — ordem de validade</h2>
    <p>Recebimentos e saldos disponíveis por lote. Lotes antigos precisam de conciliação administrativa antes da baixa FEFO.</p>
