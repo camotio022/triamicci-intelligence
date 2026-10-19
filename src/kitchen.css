@@ -53,3 +53,13 @@
 .team-profiles-tabs button{font-size:13px}
 @media(max-width:760px){.team-profiles-tabs{display:flex;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;gap:7px}.team-profiles-tabs button{width:auto;min-width:max-content;min-height:41px;flex:0 0 auto;scroll-snap-align:start;padding:9px 12px}.team-skills-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.team-skills-grid label{padding:9px 8px;font-size:11px}.team-profile-form{border-radius:13px;padding:13px}}
 @media(max-width:360px){.team-skills-grid{grid-template-columns:1fr}}
+
+/* Matriz de habilidades: leitura de alta densidade e legenda acessível */
+.team-matrix-scroll .inventory-table td:not(:first-child):not(:nth-child(2)){text-align:center;min-width:74px}
+.team-matrix-scroll .inventory-table th:not(:first-child):not(:nth-child(2)){font-size:11px;text-align:center}
+.ti-skill-status{display:inline-flex;justify-content:center;align-items:center;min-width:25px;height:25px;border-radius:7px;font-weight:800;font-size:13px}
+.ti-skill-status.confirmed{background:#e8f5ee;color:#186b43}
+.ti-skill-status.declared{background:#fff2e3;color:#995513}
+.ti-skill-status.missing{color:#9ba3b0}
+.ti-skill-legend{display:flex;gap:16px;flex-wrap:wrap;position:sticky;left:0;margin:10px 0 2px;font-size:11px;color:#667085}
+@media(max-width:640px){.team-matrix-scroll .inventory-table td:first-child,.team-matrix-scroll .inventory-table th:first-child{position:sticky;left:0;z-index:2;background:#fff;min-width:142px;max-width:142px;box-shadow:1px 0 0 #e9e5e8}.team-matrix-scroll .inventory-table td{padding:9px 7px}}
