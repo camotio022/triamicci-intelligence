@@ -3,6 +3,7 @@ import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib
 import {reconcilePackageCount} from '../../server/operations/package-reconciliation.js';
 import {countUnit} from '../../server/operations/logic.js';
 import {areaTotals} from '../../server/operations/lot-logic.js';
+import {reviewReadiness} from '../../server/operations/package-review-rules.js';
 const productPattern=/^[a-f0-9]{40}$/;
 const requestPattern=/^[a-f0-9-]{36}$/i;
 export default async function handler(req,res){
@@ -42,7 +43,10 @@ export default async function handler(req,res){
    const totals=snap.size<=100?areaTotals(snap.docs.map(d=>d.data())):null;
    lotStatus=totals&&totals.reserva===base.reserve&&totals.giro===base.rotation?'BALANCED':'NEEDS_LOT_RECONCILIATION';
   }
-  const result={...computed,lotStatus,readyForBalanceApproval:false,conferenceId,productId,area:data.area,referenceBalance:base[data.area==='reserva'?'reserve':'rotation'],referenceUnit:base.unit,
+  const readiness=reviewReadiness({review:computed,area:data.area,
+   referenceBalance:base[data.area==='reserva'?'reserve':'rotation'],lotStatus,
+   profileVersion:cfg.version,conferenceProfileVersion:data.profileVersion});
+  const result={...computed,...readiness,lotStatus,conferenceId,productId,area:data.area,referenceBalance:base[data.area==='reserva'?'reserve':'rotation'],referenceUnit:base.unit,
    requiresReview:true,stockEffect:'NONE'};
   return send(res,200,computed.ok?'Prévia calculada para avaliação gerencial.':'Prévia não conciliável.',{review:result});
  }catch(e){
