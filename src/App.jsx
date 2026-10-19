@@ -65,7 +65,7 @@ function Workspace({ user, membership, logout }) {
  React.useEffect(()=>{const go=e=>{if(e.detail==='master-registry')setPage('master-registry')};window.addEventListener('ti-navigate',go);return()=>window.removeEventListener('ti-navigate',go)},[]);
  const navigate = nextPage => { setActionProductId(null);setPage(nextPage); setMenuOpen(false); setProfileOpen(false); };
  const openMentorStep = item => {navigate(item.page);setMentorHint({title:item.title,body:item.body,target:item.target})};
- return <div className="app-shell">
+ return <div className="app-shell" data-mentor-current={mentorHint?.target||""}>
   {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
   <aside className={menuOpen ? "sidebar sidebar-open" : "sidebar"} id="primary-sidebar" aria-label="Menu principal">
     <div className="brand-mark brand-mark-official brand-signature"><div className="brand-logo-stack"><TriamicciLogo className="triamicci-logo"/><div className="brand-signature-bottom"><span className="brand-signature-line"/><span className="brand-product-name">INTELLIGENCE</span><span className="brand-signature-line"/></div></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setMenuOpen(false)}><X size={20}/></button></div>
