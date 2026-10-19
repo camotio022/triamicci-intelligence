@@ -12,7 +12,11 @@ export function weeksForMonth(period){
   if(!groups.has(key))groups.set(key,[]);
   groups.get(key).push(date);
  }
- return [...groups.values()];
+ const weeks=[...groups.values()];
+ // Mês que começa no domingo ou sábado: evitar tela inicial quase vazia.
+ // Agregamos a semana parcial à primeira semana completa apenas para exibição.
+ if(weeks.length>1&&weeks[0].length<=2)weeks.splice(0,2,[...weeks[0],...weeks[1]]);
+ return weeks;
 }
 export function paperRoster(schedule,week){
  const entries=Array.isArray(schedule?.entries)?schedule.entries:[];
