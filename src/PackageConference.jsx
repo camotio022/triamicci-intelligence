@@ -8,7 +8,7 @@ async function load(productId){
  const res=await fetch('/api/products/measurements',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'get',productId})});
  const data=await res.json();if(!res.ok)throw Error(data.message||'Falha ao consultar apresentações.');return data.profile;
 }
-export default function PackageConference({productId,physicalUnit,mode}){
+export default function PackageConference({productId,physicalUnit,mode,canReview=false}){
  const [profile,setProfile]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const [conferenceId,setConferenceId]=useState('');
  const [saveBusy,setSaveBusy]=useState(false),[saved,setSaved]=useState(''),[saveError,setSaveError]=useState(''),[pendingId,setPendingId]=useState(null);
@@ -68,7 +68,7 @@ export default function PackageConference({productId,physicalUnit,mode}){
    {mode==='count'&&state?.ok&&<button type="button" disabled={saveBusy||!positiveInteger} onClick={save}>{saveBusy?'Registrando...':'Registrar conferência de embalagens'}</button>}
    {saved&&<p role="status">{saved}</p>}
    {saveError&&<p role="alert">{saveError}</p>}
-   {mode==='count'&&conferenceId&&<ManagerPackageReview key={conferenceId} productId={productId} conferenceId={conferenceId} opened={state?.opened||0} physicalUnit={physicalUnit}/>}
+   {mode==='count'&&canReview&&conferenceId&&<ManagerPackageReview key={conferenceId} productId={productId} conferenceId={conferenceId} opened={state?.opened||0} physicalUnit={physicalUnit}/>}
   </>}
  </section>;
 }
