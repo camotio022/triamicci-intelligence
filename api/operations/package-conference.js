@@ -40,7 +40,7 @@ export default async function handler(req,res){
    tx.create(db.collection('auditLogs').doc(),{event:'physical.package_conference_recorded',unitId:m.unitId,
      productId,operationId:rid,actorUid:actor.uid,details:record,at:now});
   });
-  return send(res,200,duplicate?'Conferência já registrada.':'Conferência registrada sem movimentar saldos.',{duplicate});
+  return send(res,200,duplicate?'Conferência já registrada.':'Conferência registrada sem movimentar saldos.',{duplicate,conferenceId:rid});
  }catch(e){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Acesso negado.');
