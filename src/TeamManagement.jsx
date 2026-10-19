@@ -116,7 +116,7 @@ export default function TeamManagement({ user, membership }) {
     <h1>Gestão de colaboradores</h1>
     <p>Prepare os convites e acompanhe os registos da sua unidade.</p>
     <div className="team-warning"><strong>Convites por link:</strong> gera um link único e envia manualmente pelo WhatsApp, sem precisar de domínio próprio. O destinatário deve entrar com o e-mail Google informado. Nunca publiques o link em grupos ou capturas de tela.</div>
-    <TeamPreRegister membership={membership} onInvite={(targetEmail,targetRole)=>{setEmail(targetEmail);setRole(targetRole);setFeedback('Convite preparado. Escolha a forma de envio e confirme abaixo.');}} />
+    {!accessOnly&&<TeamPreRegister membership={membership} onInvite={(targetEmail,targetRole)=>{setEmail(targetEmail);setRole(targetRole);setFeedback('Convite preparado. Escolha a forma de envio e confirme abaixo.');}} />}
     <MemberDirectory user={user} membership={membership} />
     {!accessOnly&&<TeamProfiles membership={membership} />}
     <div className="team-grid">
