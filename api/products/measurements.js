@@ -5,6 +5,11 @@ const productPattern=/^[a-f0-9]{40}$/;
 const fixedRule=r=>r&&isPresentation(r.presentation)&&r.fixed===true&&r.validated===true&&
  typeof r.contentQuantity==='number'&&Number.isFinite(r.contentQuantity)&&r.contentQuantity>0&&r.contentQuantity<=1e6&&
  !!unitInfo(r.contentUnit)&&typeof r.evidence==='string'&&r.evidence.trim().length>=8&&r.evidence.length<=240;
+export function validateCountingMethod(method,packages){
+ if(!method||method.kind==='base')return {ok:true,method:{kind:'base'}};
+ if(method.kind!=='packages'||!isPresentation(method.presentation)||!Array.isArray(packages)||!packages.some(p=>p.presentation===method.presentation))return {ok:false,reason:'INVALID_COUNTING_METHOD'};
+ return {ok:true,method:{kind:'packages',presentation:method.presentation,trackOpen:method.trackOpen===true}};
+}
 const cleanText=s=>typeof s==='string'?s.trim():'';
 export function validatePackageConfiguration(input){
  if(!input||!Array.isArray(input.packages)||input.packages.length>12)return {ok:false,reason:'INVALID_PACKAGES'};
@@ -39,6 +44,8 @@ export default async function handler(req,res){
   if(!['admin','manager'].includes(member.role))return send(res,403,'Somente gerência pode configurar apresentações.');
   const validated=validatePackageConfiguration(req.body);
   if(!validated.ok)return send(res,400,'Confira apresentações e evidências: '+validated.reason);
+  const countValidation=validateCountingMethod(req.body.countingMethod,validated.packages);
+  if(!countValidation.ok)return send(res,400,'Método de contagem incompatível com as apresentações cadastradas.');
   const note=cleanText(req.body.note);
   if(note.length>240)return send(res,400,'Observação muito longa.');
   let version;
@@ -51,11 +58,11 @@ export default async function handler(req,res){
    if(req.body.expectedVersion!==oldVersion)throw Error('CONFLICT');
    version=oldVersion+1;
    const now=new Date();
-   const record={version,packages:validated.packages,note,updatedAt:now,updatedBy:actor.uid,
+   const record={version,packages:validated.packages,countingMethod:countValidation.method,note,updatedAt:now,updatedBy:actor.uid,
     stockUnitAtReview:product.data().operationalUnitOverride||product.data().operationalUnit||product.data().unit};
    tx.set(profileRef,record);
    tx.create(db.collection('auditLogs').doc(),{event:'product.measurement_profile_saved',unitId:member.unitId,productId,actorUid:actor.uid,at:now,
-     before:old.exists?{version:oldVersion,packages:old.data().packages||[]}:null,after:{version,packages:validated.packages},note});
+     before:old.exists?{version:oldVersion,packages:old.data().packages||[]}:null,after:{version,packages:validated.packages,countingMethod:countValidation.method},note});
   });
   return send(res,200,'Apresentações salvas sem alterar o estoque.',{version});
  }catch(e){
