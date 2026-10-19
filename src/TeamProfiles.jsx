@@ -23,6 +23,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
   try{const [d,reg,q]=await Promise.all([api('profiles'),api('masterRegistryPreview'),api('skillReviewList')]);const registered=(reg.registry||[]).map(p=>({uid:p.id,name:p.name,status:p.status,registry:true,role:p.jobTitle==='Cozinheiro'?'cook':p.jobTitle==='Auxiliar de cozinha'?'auxiliar':'staff',professional:{sector:p.sector,jobTitle:p.jobTitle,shift:p.shift,availability:p.availability||[],skills:p.skills||[],certifications:p.certifications||[],notes:p.notes||'',sectorExceptions:[]}}));setMembers(registered.length?registered:(d.members||[]));setRequests(q.requests||[])}
   catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useEffect(()=>{load()},[load]);
+ useEffect(()=>{setTab(initialTab);setSelected('');setError('')},[initialTab]);
  const filtered=useMemo(()=>members.filter(m=>(m.name+' '+m.email+' '+(m.professional?.jobTitle||'')).toLowerCase().includes(search.toLowerCase())),[members,search]);
  const current=members.find(x=>x.uid===selected);
  const editable=current&&(current.registry||membership.role==='admin'||['cook','auxiliar'].includes(current.role));
