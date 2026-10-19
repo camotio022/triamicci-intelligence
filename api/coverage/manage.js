@@ -4,7 +4,7 @@ import {evaluateCoverage,paymentFor,checkDoubleShift,DEFAULT_RATES} from '../../
 import {validDate} from '../../server/schedules/rules.js';
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 const roles=new Set(['admin','manager']);
-const validTime=s=>typeof s==='string'&&/^([01]\\d|2[0-3]):[0-5]\\d$/.test(s);
+const validTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 const clean=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,updatedAt:d.data().updatedAt?.toDate?.()?.toISOString?.()||null});
 const rateKeys=Object.keys(DEFAULT_RATES);
 export default async function handler(req,res){
