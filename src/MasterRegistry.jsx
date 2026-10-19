@@ -10,10 +10,12 @@ async function api(action,extra={}){
  const data=await r.json();if(!r.ok)throw Error(data.message||'Erro ao consultar cadastro.');return data;
 }
 export default function MasterRegistry(){
+ const [query,setQuery]=useState(''),[statusFilter,setStatusFilter]=useState('active');
  const [claims,setClaims]=useState([]),[editing,setEditing]=useState(null),[form,setForm]=useState({}),[data,setData]=useState(null),[selected,setSelected]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const refresh=useCallback(async()=>{setBusy(true);setError('');try{const v=await api('masterRegistryPreview');setData(v);const claimsData=await api('masterRegistryClaims');setClaims(claimsData.claims||[]);setSelected([])}catch(e){setError(e.message)}finally{setBusy(false)}},[]);
  useEffect(()=>{refresh()},[refresh]);
  const selectable=(data?.people||[]).filter(p=>p.state==='new');
+ const filteredRegistry=(data?.registry||[]).filter(p=>(statusFilter==='all'||p.status===statusFilter)&&[p.name,p.jobTitle,p.sector,p.shift].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'))));
  const activate=async()=>{if(!window.confirm('Confirmou os 12 colaboradores, cargos, folgas e vínculos? Ativar esta base como fonte de novas escalas?'))return;setBusy(true);setError('');try{const d=await api('masterRegistryActivate',{confirm:true});setNotice(d.message);await refresh()}catch(err){setError(err.message);notifyLocal(err.message)}finally{setBusy(false)}};
  const notifyLocal=message=>setError(message);
  const linkAccount=async(claim)=>{if(!window.confirm('Confirmou pessoalmente que esta conta pertence ao colaborador?'))return;setBusy(true);try{const d=await api('masterRegistryLink',{id:claim.registryId,uid:claim.accountUid});setNotice(d.message);await refresh()}catch(e){setError(e.message)}finally{setBusy(false)}};
@@ -46,14 +48,17 @@ export default function MasterRegistry(){
   {!claims.length&&<p>Nenhuma solicitação pendente.</p>}
   {claims.map(claim=><article className="ti-master-claim" key={claim.id}><strong>{data?.registry?.find(p=>p.id===claim.registryId)?.name||data?.people?.find(p=>p.seedId===claim.registryId)?.name||'Ficha '+claim.registryId}</strong> · Conta {data?.accounts?.find(x=>x.uid===claim.accountUid)?.name||claim.accountUid}<p>Confirme a identidade do colaborador antes de vincular. Nome parecido não é comprovação.</p><button type="button" disabled={busy} onClick={()=>linkAccount(claim)}>Confirmar vínculo</button></article>)}
   <h3>Equipe cadastrada</h3>
+  <div className="ti-master-filters"><label>Buscar na equipe<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Nome, cargo, setor ou turno"/></label><label>Situação<select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="active">Ativos</option><option value="inactive">Inativos</option><option value="all">Todos</option></select></label></div>
+  <p className="ti-master-result-count" role="status">{filteredRegistry.length} de {data?.registry?.length||0} colaboradores</p>
   {!data?.registry?.length&&<p>Nenhuma ficha cadastrada nesta unidade.</p>}
   <div className="ti-master-cards">
-   {(data?.registry||[]).map(p=><article className="ti-master-person" key={p.id}>
+   {filteredRegistry.map(p=><article className="ti-master-person" key={p.id}>
     <strong>{p.name}</strong> · {p.jobTitle||'Cargo pendente'} · {p.status==='inactive'?'Desligado':'Ativo'}
     <div><small>{p.sector} · {p.shift} · {days[p.fixedWeekday]||'Folga pendente'} · {p.accountUid?'Conta vinculada':'Sem conta vinculada'}</small></div><details className="ti-master-technical"><summary>Vincular conta existente</summary><p>Compartilhe este código apenas com o próprio colaborador.</p><code>{p.id}</code><button type="button" onClick={()=>navigator.clipboard?.writeText(p.id)}>Copiar código</button></details>
     <button type="button" disabled={busy} onClick={()=>openEdit(p)}>Abrir ficha</button>
    </article>)}
   </div>
+  {data?.registry?.length>0&&filteredRegistry.length===0&&<p>Nenhum colaborador encontrado com os filtros selecionados.</p>}
   {editing&&<form onSubmit={saveEdit} className="ti-master-editor">
    <h3>Editar ficha · {data.registry.find(p=>p.id===editing)?.name}</h3>
    <label>Cargo <input required maxLength={80} value={form.jobTitle} onChange={e=>setForm(old=>({...old,jobTitle:e.target.value}))}/></label>
