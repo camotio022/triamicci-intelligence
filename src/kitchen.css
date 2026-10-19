@@ -63,3 +63,18 @@
 .ti-skill-status.missing{color:#9ba3b0}
 .ti-skill-legend{display:flex;gap:16px;flex-wrap:wrap;position:sticky;left:0;margin:10px 0 2px;font-size:11px;color:#667085}
 @media(max-width:640px){.team-matrix-scroll .inventory-table td:first-child,.team-matrix-scroll .inventory-table th:first-child{position:sticky;left:0;z-index:2;background:#fff;min-width:142px;max-width:142px;box-shadow:1px 0 0 #e9e5e8}.team-matrix-scroll .inventory-table td{padding:9px 7px}}
+
+/* Auditoria mobile: densidade correta na equipe, sem cartões intermináveis. */
+@media(max-width:640px){
+ .team-profiles .team-profiles-list{display:grid;gap:6px}
+ .team-profiles .team-profiles-list .team-member{display:flex;flex-direction:row;align-items:center;gap:10px;padding:11px 12px;min-height:70px}
+ .team-profiles .team-profiles-list .team-member-info{flex:1;min-width:0;gap:3px}
+ .team-profiles .team-profiles-list .team-member-info strong{font-size:13px;line-height:1.35}
+ .team-profiles .team-profiles-list .team-member-info>span{font-size:11px}
+ .team-profiles .team-profiles-list .team-member-tags{gap:4px}
+ .team-profiles .team-profiles-list .team-member-tags span{padding:3px 7px;font-size:10px}
+ .team-profiles .team-profiles-list .team-member-edit{flex:0 0 auto;width:auto;min-height:40px;padding:8px 10px;font-size:11px}
+ .team-profiles .team-profiles-search{gap:8px}
+ .team-profiles .team-profiles-search label{flex:1;min-width:0}
+ .team-profiles .team-profiles-search button{min-height:40px}
+}
