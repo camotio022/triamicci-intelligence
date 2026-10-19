@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
-import {evaluateCoverage,paymentFor,rateRoleFor,checkDoubleShift,DEFAULT_RATES} from '../../server/coverage/engine.js';
+import {evaluateCoverage,paymentFor,rateRoleFor,checkDoubleShift,approvalGate,DEFAULT_RATES} from '../../server/coverage/engine.js';
 import {validDate} from '../../server/schedules/rules.js';
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 const roles=new Set(['admin','manager']);
@@ -118,11 +118,12 @@ export default async function handler(req,res){
     const [m,p]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(ref)]);
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!roles.has(m.data().role))throw Error('FORBIDDEN');
     if(!p.exists||!['pending_approval','pending_acceptance'].includes(p.data().status)||decision==='approved'&&p.data().status!=='pending_approval')throw Error('CONFLICT');
-    if(decision==='approved'&&p.data().createdBy===actor.uid)throw Error('SELF_APPROVAL');
-    if(decision==='approved'&&p.data().consentPending!==true&&!p.data().acceptedAt)throw Error('CONSENT_REQUIRED');
     if(decision==='approved'){
      const currentPerson=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
-     if(!currentPerson.exists||currentPerson.data().status!=='active')throw Error('CONFLICT');
+     const gate=approvalGate({status:p.data().status,createdBy:p.data().createdBy,actorUid:actor.uid,
+      consentPending:p.data().consentPending,acceptedAt:p.data().acceptedAt,staffActive:currentPerson.exists&&currentPerson.data().status==='active',
+      legalChecked,consentVerified});
+     if(gate)throw Error(gate);
     }
     tx.update(ref,{status:decision,decisionNote:note.trim(),legalValidated:false,legalReviewConfirmed:decision==='approved',consentVerified:decision==='approved',decidedBy:actor.uid,decidedAt:now,updatedAt:now});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.'+decision,unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,note:note.trim()});
@@ -135,6 +136,8 @@ export default async function handler(req,res){
   if(e.message==='FORBIDDEN')return send(res,403,'Operação não autorizada.');
   if(e.message==='CONFLICT')return send(res,409,'A proposta foi alterada ou está indisponível.');
   if(e.message==='SELF_APPROVAL')return send(res,403,'Quem criou a proposta não pode aprová-la.');
+  if(e.message==='INACTIVE_STAFF')return send(res,409,'Colaborador não está ativo.');
+  if(e.message==='REVIEW_REQUIRED')return send(res,409,'É necessário confirmar as verificações.');
   if(e.message==='CONSENT_REQUIRED')return send(res,409,'A proposta exige aceite registrado pelo colaborador.');
   console.error('Coverage workflow:',e.message);return send(res,500,'Não foi possível concluir a operação.');
  }
