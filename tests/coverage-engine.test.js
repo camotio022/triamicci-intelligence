@@ -47,3 +47,11 @@ test('aprovação exige aceite registrado, segundo gestor e pessoa ativa',()=>{
  assert.equal(approvalGate({...base,legalChecked:false}),'REVIEW_REQUIRED');
  assert.equal(approvalGate({...base,consentPending:true,acceptedAt:null}),null);
 });
+
+test('colaborador escalado de manhã permanece candidato a reforço de outro turno',()=>{
+ const people=[{uid:'manha',name:'Cozinheiro manhã',status:'active',jobTitle:'Cozinheiro',professional:{sector:'cozinha',certifications:['chapa'],availability:[]}},{uid:'noite',name:'Cozinheiro noite',status:'active',professional:{sector:'cozinha',certifications:['chapa'],availability:[{day:'ter',start:'18:00',end:'23:00'}]}}];
+ const result=evaluateCoverage({people,entries:[{uid:'manha',date:'2026-10-20',type:'work'},{uid:'noite',date:'2026-10-20',type:'work'}],date:'2026-10-20',sector:'cozinha',required:2,windowStart:'18:00',windowEnd:'20:00'});
+ assert.equal(result.covered,1);
+ assert.equal(result.shortage,1);
+ assert.equal(result.candidates.some(x=>x.uid==='manha'&&x.alreadyScheduled===true),true);
+});
