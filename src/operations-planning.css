@@ -39,3 +39,11 @@
 .ti-schedule-matrix-table tbody tr:hover td{outline:1px solid #f0dfde}
 @media(max-width:760px){.ti-schedule-person{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:11px 0}.ti-schedule-person-name{grid-column:1/-1}.ti-planning .ti-schedule-subcard{padding:12px;gap:12px}.ti-schedule-person label{font-size:11px}.ti-schedule-person select{width:100%;max-width:100%}}
 @media(max-width:390px){.ti-schedule-person{grid-template-columns:1fr}.ti-schedule-person-name{grid-column:auto}}
+
+/* Bloqueio explicativo da transição entre contas de acesso e equipe operacional. */
+.ti-roster-attention{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:18px 0 4px;padding:15px 17px;background:#fff9f2;border:1px solid #f3ddbe;border-left:4px solid #a71916;border-radius:14px;color:#493a37}
+.ti-roster-attention strong{font-size:14px;flex:1 1 100%}
+.ti-roster-attention span{font-size:13px;line-height:1.5;flex:1 1 380px}
+.ti-roster-attention button{border:1px solid #a71916;background:#a71916;color:white;font-weight:700;font-size:13px;padding:10px 14px;border-radius:10px;min-height:42px}
+.ti-roster-attention button:hover{background:#84221e}
+@media(max-width:640px){.ti-roster-attention{align-items:stretch;padding:13px}.ti-roster-attention span{flex-basis:100%}.ti-roster-attention button{width:100%}}
