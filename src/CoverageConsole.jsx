@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
+import {rateRoleFor} from '../server/coverage/engine.js';
 import './coverage.css';
 const sectors={cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'};
 const roleNames={manager:'Gerente',submanager:'Subgerente',head_cook:'Cozinheiro-chefe',cook:'Cozinheiro',other:'Outros funcionários',external:'Convocado de fora'};
@@ -11,7 +12,7 @@ export default function CoverageConsole({membership}){
  const [staffId,setStaffId]=useState(''),[first,setFirst]=useState({start:'08:00',end:'14:00'}),[second,setSecond]=useState({start:'15:00',end:'19:00'}),[rateRole,setRateRole]=useState('other'),[external,setExternal]=useState(false),[reason,setReason]=useState('');
  const [note,setNote]=useState(''),[legalChecked,setLegalChecked]=useState(false),[consentVerified,setConsentVerified]=useState(false);
  const [ratesEdit,setRatesEdit]=useState(null);
- const load=useCallback(async()=>{try{const result=await request('dashboard');setData(result);setRatesEdit(result.rates);setPlanId(id=>id||result.plans[0]?.id||'');setStaffId(id=>id||result.people.find(p=>p.status==='active')?.uid||'');setError('')}catch(e){setError(e.message)}},[]);
+ const load=useCallback(async()=>{try{const result=await request('dashboard');setData(result);setRatesEdit(result.rates);setRateRole(old=>old==='other'?rateRoleFor(result.people.find(p=>p.status==='active')):old);setPlanId(id=>id||result.plans[0]?.id||'');setStaffId(id=>id||result.people.find(p=>p.status==='active')?.uid||'');setError('')}catch(e){setError(e.message)}},[]);
  useEffect(()=>{load()},[load]);
  const plan=useMemo(()=>data?.plans.find(p=>p.id===planId),[data,planId]);
  const run=async(fn)=>{setBusy(true);setError('');setNotice('');try{const d=await fn();setNotice(d.message);await load();return d}catch(e){setError(e.message)}finally{setBusy(false)}};
@@ -27,10 +28,10 @@ export default function CoverageConsole({membership}){
    <label>Habilidade confirmada (opcional)<input placeholder="Ex.: chapa, montagem, preparo" value={requiredSkill} onChange={e=>setRequiredSkill(e.target.value.trim().toLowerCase())}/></label>
    <label>Mínimo de pessoas<input type="number" min="1" max="30" value={required} onChange={e=>setRequired(e.target.value)}/></label>
    <button type="button" disabled={busy||!planId||!date} onClick={simulate}>Analisar cobertura</button>
-   {simulation&&<div className="ti-cov-result"><strong>{simulation.covered} escalados · {simulation.required} necessários</strong><p>{simulation.shortage?'Faltam '+simulation.shortage+' pessoa(s) para o mínimo informado.':'Quantidade mínima atendida.'}</p><h4>Candidatos fora da escala</h4>{simulation.candidates.map(p=><article key={p.uid}><strong>{p.name}</strong><span>{p.skillConfirmed?'Habilidade confirmada ou não exigida':'Habilidade não confirmada'} · {money(p.estimatedPracticePayment)} · Exige análise de jornada</span><button type="button" onClick={()=>{setStaffId(p.uid);setRateRole('other')}}>Preparar proposta</button></article>)}</div>}
+   {simulation&&<div className="ti-cov-result"><strong>{simulation.covered} escalados · {simulation.required} necessários</strong><p>{simulation.shortage?'Faltam '+simulation.shortage+' pessoa(s) para o mínimo informado.':'Quantidade mínima atendida.'}</p><h4>Candidatos fora da escala</h4>{simulation.candidates.map(p=><article key={p.uid}><strong>{p.name}</strong><span>{p.skillConfirmed?'Habilidade confirmada ou não exigida':'Habilidade não confirmada'} · {money(p.estimatedPracticePayment)} · Exige análise de jornada</span><button type="button" onClick={()=>{setStaffId(p.uid);setRateRole(rateRoleFor(data.people.find(x=>x.uid===p.uid)));setExternal(false)}}>Preparar proposta</button></article>)}</div>}
   </section>
   <section className="ti-cov-panel"><h3>2 · Propor cobertura</h3><p>Informe os horários reais. Dobras com conflito são bloqueadas; as demais exigem análise humana.</p>
-   <label>Colaborador<select value={staffId} onChange={e=>setStaffId(e.target.value)}>{(data?.people||[]).filter(p=>p.status==='active').map(p=><option key={p.uid} value={p.uid}>{p.name} · {p.jobTitle||'Cargo pendente'}</option>)}</select></label>
+   <label>Colaborador<select value={staffId} onChange={e=>{setStaffId(e.target.value);setRateRole(rateRoleFor(data?.people.find(p=>p.uid===e.target.value)));setExternal(false)}}>{(data?.people||[]).filter(p=>p.status==='active').map(p=><option key={p.uid} value={p.uid}>{p.name} · {p.jobTitle||'Cargo pendente'}</option>)}</select></label>
    <div className="ti-cov-fields"><label>Data<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label><label>Categoria de pagamento<select value={rateRole} onChange={e=>{setRateRole(e.target.value);setExternal(e.target.value==='external')}}>{Object.entries(roleNames).map(([k,v])=><option key={k} value={k}>{v} ({money(data?.rates?.[k])})</option>)}</select></label></div>
    <div className="ti-cov-fields"><label>1º turno — entrada<input type="time" value={first.start} onChange={e=>setFirst(v=>({...v,start:e.target.value}))}/></label><label>1º turno — saída<input type="time" value={first.end} onChange={e=>setFirst(v=>({...v,end:e.target.value}))}/></label><label>2º turno — entrada<input type="time" value={second.start} onChange={e=>setSecond(v=>({...v,start:e.target.value}))}/></label><label>2º turno — saída<input type="time" value={second.end} onChange={e=>setSecond(v=>({...v,end:e.target.value}))}/></label></div>
    <label>Justificativa<textarea minLength={10} maxLength={500} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Qual necessidade operacional esta dobra atende?"/></label>
