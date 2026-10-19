@@ -5,6 +5,7 @@ import StockMovements from './StockMovements.jsx';
 import CatalogPicker from './CatalogPicker.jsx';
 import CatalogV2Review from './CatalogV2Review.jsx';
 import ProductDetails from './ProductDetails.jsx';
+import MeasurementEditor from './MeasurementEditor.jsx';
 
 const categories = ['Preparações','Proteínas','Hortifruti','Laticínios','Mercearia','Congelados','Bebidas','Limpeza','Descartáveis','Outros'];
 const units = ['kg','g','L','ml','un'];
@@ -66,6 +67,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
     <h1>{administration?'Administração · Catálogo':'Estoque físico da cozinha'}</h1>
     <p>{administration?'Revise cadastros, aprovações e configurações sem misturar essas tarefas com a rotina de estoque.':'Consulte a última contagem de reserva e giro. Sem contagem, mostramos o saldo legado identificado, não uma quantidade física confirmada.'}</p>
     <div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>
+    {administration&&canEdit&&<MeasurementEditor products={products}/>}
     {administration && membership.role === 'admin' && <CatalogV2Review />}
     {administration && canEdit && <CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} />}
     {administration && canEdit && editing && <form className="inventory-form" onSubmit={save}>

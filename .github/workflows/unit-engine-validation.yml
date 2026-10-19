@@ -1,0 +1,24 @@
+name: Fase 2 - motor de unidades (sem deploy)
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Instalar dependências
+        run: |
+          if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
+      - name: Testes do motor de unidades
+        run: node --test tests/unit-engine.test.js tests/measurement-profiles.test.js tests/package-conference.test.js tests/package-reconciliation.test.js tests/package-review-rules.test.js tests/package-lot-allocation.test.js tests/package-commit-guards.test.js tests/package-adjustment-plan.test.js
+      - name: Regressões de operações e produção
+        run: node --test tests/production-logic.test.mjs tests/physical-operations.test.mjs tests/daily-inventory.test.js
+      - name: Build
+        run: npm run build
