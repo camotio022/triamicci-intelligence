@@ -2,7 +2,7 @@
 // Não cria, retira ou ajusta saldo algum.
 const round=n=>Math.round(n*1000)/1000;
 export function validateLotAllocation({area,quantity,unit,allocations,lots}={}){
- if(!['reserva','giro'].includes(area)||!Number.isFinite(quantity)||quantity<0||!Array.isArray(allocations)||!Array.isArray(lots)||allocations.length>100)return {ok:false,reason:'INVALID_INPUT'};
+ if(!['reserva','giro'].includes(area)||!Number.isFinite(quantity)||quantity<0||typeof unit!=='string'||!Array.isArray(allocations)||!Array.isArray(lots)||allocations.length>100)return {ok:false,reason:'INVALID_INPUT'};
  const byId=new Map(lots.map(x=>[x.id,x]));
  const seen=new Set();let sum=0;
  for(const entry of allocations){
