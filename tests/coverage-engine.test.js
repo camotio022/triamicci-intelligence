@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DEFAULT_RATES,paymentFor,rateRoleFor,checkDoubleShift,evaluateCoverage} from '../server/coverage/engine.js';
+import {DEFAULT_RATES,paymentFor,rateRoleFor,checkDoubleShift,evaluateCoverage,coversWindow} from '../server/coverage/engine.js';
 test('tabela pratica: cargos e convocacao externa tem prioridade',()=>{
  assert.equal(paymentFor({role:'manager'}),150);
  assert.equal(paymentFor({role:'submanager'}),120);
@@ -28,4 +28,11 @@ test('categoria de pagamento deriva do cargo real',()=>{
  assert.equal(rateRoleFor({jobTitle:'Cozinheiro-chefe'}),'head_cook');
  assert.equal(rateRoleFor({jobTitle:'Cozinheiro'}),'cook');
  assert.equal(rateRoleFor({jobTitle:'Auxiliar de cozinha'}),'other');
+});
+
+test('faixa horaria nao conta pausa como cobertura',()=>{
+ const p={professional:{availability:[{day:'ter',start:'08:00',end:'18:00',breakStart:'12:00',breakEnd:'13:00'}]}};
+ assert.equal(coversWindow(p,'2026-10-20','09:00','11:00'),true);
+ assert.equal(coversWindow(p,'2026-10-20','12:00','13:00'),false);
+ assert.equal(coversWindow(p,'2026-10-20','17:00','19:00'),false);
 });
