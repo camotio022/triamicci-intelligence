@@ -20,3 +20,16 @@ Esta implementação **não atualiza o estoque**. O servidor expõe `POST /api/o
 
 ## Próxima entrega
 Desenhar fluxo de alocação por reserva/giro e lote no fechamento gerencial e validação da loja antes de habilitar qualquer escrita nos saldos.
+
+## Limite da implementação de aplicação transacional (outubro de 2026)
+
+Existe agora `/api/operations/package-apply`, mas **o endpoint responde 503 por padrão**. Somente uma habilitação explícita de `ENABLE_PACKAGE_BALANCE_APPLY=true`, após homologação em ambiente isolado, permitirá executá-lo.
+
+O caminho implementado permite apenas administração, produtos ativos sem rastreamento de lotes, embalagens fechadas, conversão fixa validada, referência atual de saldo e mesma versão do perfil, com idempotência e auditoria na transação. **Não há interface liberada para chamar essa aplicação**.
+
+Não habilitar a chave em produção sem antes:
+- Testar com Firebase de homologação, incluindo concorrência e duplicidade;
+- Avaliar cada operação que lê e escreve `physicalBalances` após ajustes (contagem, movimentos, produção, transferência e relatórios);
+- Reconciliar todos os fluxos que usam `countId`, `lastMovementAt`, `entriesSinceCount` e `exitsSinceCount`;
+- Desenvolver caminho transacional para produtos rastreados por lotes, incluindo evidência da contagem individual;
+- Homologar uso da interface com equipe da cozinha e aprovar o plano de deploy.
