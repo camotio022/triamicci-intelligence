@@ -1,0 +1,48 @@
+import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import {auth} from './firebase.js';
+import './coverage.css';
+const sectors={cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'};
+const roleNames={manager:'Gerente',submanager:'Subgerente',head_cook:'Cozinheiro-chefe',cook:'Cozinheiro',other:'Outros funcionários',external:'Convocado de fora'};
+const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+async function request(action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');const r=await fetch('/api/coverage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});const d=await r.json();if(!r.ok)throw Error([d.message,...(d.issues||[])].join(' · '));return d;}
+export default function CoverageConsole({membership}){
+ const [data,setData]=useState(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
+ const [planId,setPlanId]=useState(''),[date,setDate]=useState(''),[sector,setSector]=useState('cozinha'),[requiredSkill,setRequiredSkill]=useState(''),[required,setRequired]=useState(4),[simulation,setSimulation]=useState(null);
+ const [staffId,setStaffId]=useState(''),[first,setFirst]=useState({start:'08:00',end:'14:00'}),[second,setSecond]=useState({start:'15:00',end:'19:00'}),[rateRole,setRateRole]=useState('other'),[external,setExternal]=useState(false),[reason,setReason]=useState('');
+ const [note,setNote]=useState(''),[legalChecked,setLegalChecked]=useState(false),[consentVerified,setConsentVerified]=useState(false);
+ const [ratesEdit,setRatesEdit]=useState(null);
+ const load=useCallback(async()=>{try{const result=await request('dashboard');setData(result);setRatesEdit(result.rates);setPlanId(id=>id||result.plans[0]?.id||'');setStaffId(id=>id||result.people.find(p=>p.status==='active')?.uid||'');setError('')}catch(e){setError(e.message)}},[]);
+ useEffect(()=>{load()},[load]);
+ const plan=useMemo(()=>data?.plans.find(p=>p.id===planId),[data,planId]);
+ const run=async(fn)=>{setBusy(true);setError('');setNotice('');try{const d=await fn();setNotice(d.message);await load();return d}catch(e){setError(e.message)}finally{setBusy(false)}};
+ const simulate=async()=>{setBusy(true);setError('');try{const d=await request('simulate',{planId,date,sector,requiredSkill,required:Number(required)});setSimulation(d.simulation)}catch(e){setError(e.message)}finally{setBusy(false)}};
+ if(!['admin','manager'].includes(membership.role))return <p>Somente a gerência consulta esta área.</p>;
+ return <section className="ti-coverage">
+ <div className="ti-cov-intro"><h2>Cobertura e dobras</h2><p>Simule reforços com habilidades confirmadas e controle o pagamento praticado. Nenhuma recomendação libera horas extras automaticamente.</p></div>
+ {error&&<p role="alert" className="team-error">{error}</p>}{notice&&<p role="status" className="team-notice">{notice}</p>}
+ <div className="ti-cov-grid">
+  <section className="ti-cov-panel"><h3>1 · Simular cobertura</h3><label>Escala<select value={planId} onChange={e=>{setPlanId(e.target.value);setSimulation(null)}}><option value="">Selecione</option>{(data?.plans||[]).map(p=><option value={p.id} key={p.id}>{p.title} · {p.period} ({p.status})</option>)}</select></label>
+   <label>Data<input type="date" value={date} min={plan?.period+'-01'||undefined} max={plan?.period+'-31'||undefined} onChange={e=>setDate(e.target.value)}/></label>
+   <label>Setor<select value={sector} onChange={e=>setSector(e.target.value)}>{Object.entries(sectors).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
+   <label>Habilidade confirmada (opcional)<input placeholder="Ex.: chapa, montagem, preparo" value={requiredSkill} onChange={e=>setRequiredSkill(e.target.value.trim().toLowerCase())}/></label>
+   <label>Mínimo de pessoas<input type="number" min="1" max="30" value={required} onChange={e=>setRequired(e.target.value)}/></label>
+   <button type="button" disabled={busy||!planId||!date} onClick={simulate}>Analisar cobertura</button>
+   {simulation&&<div className="ti-cov-result"><strong>{simulation.covered} escalados · {simulation.required} necessários</strong><p>{simulation.shortage?'Faltam '+simulation.shortage+' pessoa(s) para o mínimo informado.':'Quantidade mínima atendida.'}</p><h4>Candidatos fora da escala</h4>{simulation.candidates.map(p=><article key={p.uid}><strong>{p.name}</strong><span>{p.skillConfirmed?'Habilidade confirmada ou não exigida':'Habilidade não confirmada'} · {money(p.estimatedPracticePayment)} · Exige análise de jornada</span><button type="button" onClick={()=>{setStaffId(p.uid);setRateRole('other')}}>Preparar proposta</button></article>)}</div>}
+  </section>
+  <section className="ti-cov-panel"><h3>2 · Propor cobertura</h3><p>Informe os horários reais. Dobras com conflito são bloqueadas; as demais exigem análise humana.</p>
+   <label>Colaborador<select value={staffId} onChange={e=>setStaffId(e.target.value)}>{(data?.people||[]).filter(p=>p.status==='active').map(p=><option key={p.uid} value={p.uid}>{p.name} · {p.jobTitle||'Cargo pendente'}</option>)}</select></label>
+   <div className="ti-cov-fields"><label>Data<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label><label>Categoria de pagamento<select value={rateRole} onChange={e=>{setRateRole(e.target.value);setExternal(e.target.value==='external')}}>{Object.entries(roleNames).map(([k,v])=><option key={k} value={k}>{v} ({money(data?.rates?.[k])})</option>)}</select></label></div>
+   <div className="ti-cov-fields"><label>1º turno — entrada<input type="time" value={first.start} onChange={e=>setFirst(v=>({...v,start:e.target.value}))}/></label><label>1º turno — saída<input type="time" value={first.end} onChange={e=>setFirst(v=>({...v,end:e.target.value}))}/></label><label>2º turno — entrada<input type="time" value={second.start} onChange={e=>setSecond(v=>({...v,start:e.target.value}))}/></label><label>2º turno — saída<input type="time" value={second.end} onChange={e=>setSecond(v=>({...v,end:e.target.value}))}/></label></div>
+   <label>Justificativa<textarea minLength={10} maxLength={500} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Qual necessidade operacional esta dobra atende?"/></label>
+   <p className="ti-cov-warning">Valor praticado estimado: <b>{money(data?.rates?.[rateRole])}</b>. Custo trabalhista: pendente. Não há aprovação automática nem edição da escala oficial.</p>
+   <button type="button" disabled={busy||!staffId||!date||reason.trim().length<10} onClick={()=>run(()=>request('propose',{staffId,date,first,second,external,rateRole,reason}))}>Registrar proposta para avaliação</button>
+  </section>
+ </div>
+ <section className="ti-cov-panel"><h3>3 · Solicitações e aprovações</h3><p>Para aprovar, confira jornada, intervalos, descanso, pagamento legal e aceite efetivo. O sistema registra a confirmação, mas não substitui o responsável pela folha.</p>
+ <div className="ti-cov-fields"><label>Justificativa da decisão<textarea value={note} minLength={10} maxLength={500} onChange={e=>setNote(e.target.value)} placeholder="Informe a verificação e o motivo"/></label><div><label className="ti-cov-check"><input type="checkbox" checked={legalChecked} onChange={e=>setLegalChecked(e.target.checked)}/>Jornada e obrigações trabalhistas conferidas</label><label className="ti-cov-check"><input type="checkbox" checked={consentVerified} onChange={e=>setConsentVerified(e.target.checked)}/>Aceite do colaborador verificado</label></div></div>
+ {(data?.proposals||[]).length===0&&<p>Nenhuma proposta registrada.</p>}
+ {(data?.proposals||[]).map(p=><article className="ti-cov-proposal" key={p.id}><div><strong>{p.name}</strong><span>{p.date} · {p.first?.start}–{p.first?.end} + {p.second?.start}–{p.second?.end}</span><span>{money(p.practicePayment)} (praticado) · {p.status.replaceAll('_',' ')}</span><small>{p.reason}</small></div><div className="ti-cov-actions">{['pending_approval','pending_acceptance'].includes(p.status)&&<button disabled={busy||note.trim().length<10} type="button" onClick={()=>run(()=>request('decide',{id:p.id,decision:'rejected',note}))}>Recusar</button>}{p.status==='pending_approval'&&<button type="button" disabled={busy||note.trim().length<10||!legalChecked||!consentVerified} onClick={()=>run(()=>request('decide',{id:p.id,decision:'approved',note,legalChecked,consentVerified}))}>Aprovar após conferência</button>}</div></article>)}
+ </section>
+ {membership.role==='admin'&&ratesEdit&&<section className="ti-cov-panel"><h3>4 · Tabela de valores praticados</h3><p>Não representa automaticamente o custo legal da dobra. Alterações só valem para novas propostas.</p><div className="ti-cov-fields">{Object.entries(roleNames).map(([key,label])=><label key={key}>{label}<input type="number" min="0" max="10000" value={ratesEdit[key]??0} onChange={e=>setRatesEdit(v=>({...v,[key]:Number(e.target.value)}))}/></label>)}</div><button type="button" disabled={busy} onClick={()=>run(()=>request('rates',{rates:ratesEdit}))}>Salvar tabela operacional</button></section>}
+ </section>;
+}
