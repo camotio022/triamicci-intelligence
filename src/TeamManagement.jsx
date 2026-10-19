@@ -15,7 +15,7 @@ const roleOptions = [
   { value: 'admin', label: 'Administrador' }
 ];
 
-export default function TeamManagement({ user, membership }) {
+export default function TeamManagement({ user, membership, accessOnly = false }) {
  const {notify}=useFeedback();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('auxiliar');
