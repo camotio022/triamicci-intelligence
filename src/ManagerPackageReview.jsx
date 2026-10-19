@@ -16,7 +16,7 @@ export default function ManagerPackageReview({productId,conferenceId,opened=0,ph
   try{
    const openedMeasurements=measurements.some(v=>v===''||!Number.isFinite(Number(v))||Number(v)<=0)?[]:measurements.map(v=>({quantity:Number(v),unit:physicalUnit}));
    const lotAllocations=Object.entries(allot).filter(([,v])=>v!==''&&Number(v)>0).map(([id,v])=>({id,quantity:Number(v)}));
-   const response=await call('/api/operations/package-review','preview',{productId,conferenceId,openedMeasurements,lotAllocations});
+   const response=await call('/api/operations/stock','packagePreview',{productId,conferenceId,openedMeasurements,lotAllocations});
    setReview(response.review);
   }catch(e){setError(e.message)}finally{setBusy(false)}
  };

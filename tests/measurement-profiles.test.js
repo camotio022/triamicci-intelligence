@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validatePackageConfiguration,validateCountingMethod} from '../api/products/measurements.js';
+import {validatePackageConfiguration,validateCountingMethod} from '../server/operations/handlers/measurements.js';
 const good={presentation:'caixa',fixed:true,validated:true,contentQuantity:12,contentUnit:'un',evidence:'Etiqueta do fornecedor: 12 unidades'};
 test('salva somente embalagens com dados comprovados',()=>{
  const result=validatePackageConfiguration({packages:[good]});

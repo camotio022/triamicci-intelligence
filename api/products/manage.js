@@ -1,3 +1,4 @@
+import measurementsHandler from '../../server/operations/handlers/measurements.js';
 import { createHash } from 'node:crypto';
 import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
 import {countUnit} from '../../server/operations/logic.js';
@@ -15,6 +16,10 @@ const clean = snap => {
     createdAt:d.createdAt?.toDate?.()?.toISOString?.() || null};
 };
 export default async function handler(req,res) {
+ if(req.body?.action==='measurementGet'||req.body?.action==='measurementSave'){
+  req.body.action=req.body.action==='measurementGet'?'get':'save';
+  return measurementsHandler(req,res);
+ }
   if (!checkRequest(req,res)) return;
   res.setHeader('Cache-Control','no-store');
   try {

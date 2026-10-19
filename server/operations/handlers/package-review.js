@@ -1,10 +1,10 @@
 // Prévia de homologação: leitura e cálculo apenas. Nunca altera physicalBalances ou physicalLots.
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
-import {reconcilePackageCount} from '../../server/operations/package-reconciliation.js';
-import {countUnit} from '../../server/operations/logic.js';
-import {areaTotals} from '../../server/operations/lot-logic.js';
-import {reviewReadiness} from '../../server/operations/package-review-rules.js';
-import {validateLotAllocation} from '../../server/operations/package-lot-allocation.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../../_lib.js';
+import {reconcilePackageCount} from '../package-reconciliation.js';
+import {countUnit} from '../logic.js';
+import {areaTotals} from '../lot-logic.js';
+import {reviewReadiness} from '../package-review-rules.js';
+import {validateLotAllocation} from '../package-lot-allocation.js';
 const productPattern=/^[a-f0-9]{40}$/;
 const requestPattern=/^[a-f0-9-]{36}$/i;
 export default async function handler(req,res){

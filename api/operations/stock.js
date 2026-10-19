@@ -1,3 +1,6 @@
+import packageConferenceHandler from '../../server/operations/handlers/package-conference.js';
+import packageReviewHandler from '../../server/operations/handlers/package-review.js';
+import packageApplyHandler from '../../server/operations/handlers/package-apply.js';
 import {createHash} from 'node:crypto';
 import dispatchHandler from '../../server/operations/dispatch.js';
 import dailyReport from '../../server/operations/daily-report.js';
@@ -26,6 +29,11 @@ function error(res,e){
 }
 export default async function handler(req,res){
  const subaction=req.body?.action;
+ if(subaction==='packageRecord'||subaction==='packagePreview'||subaction==='packageApply'){
+  req.body.action=({packageRecord:'record',packagePreview:'preview',packageApply:'apply'})[subaction];
+  return ({packageRecord:packageConferenceHandler,packagePreview:packageReviewHandler,packageApply:packageApplyHandler})[subaction](req,res);
+ }
+
  if(['closeSubmit','closeApprove','closeReject','closeList'].includes(subaction))return inventoryClosure(req,res);
  if(subaction==='dailyReport')return dailyReport(req,res);
  if(subaction==='dispatch')return dispatchHandler(req,res);

@@ -2,11 +2,11 @@
 // Por segurança, somente produtos sem controle de lotes e sem embalagens abertas
 // podem ser ajustados aqui. Casos complexos permanecem bloqueados.
 import {createHash} from 'node:crypto';
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
-import {countUnit} from '../../server/operations/logic.js';
-import {reconcilePackageCount} from '../../server/operations/package-reconciliation.js';
-import {planPackageAdjustment} from '../../server/operations/package-adjustment-plan.js';
-import {canCommitPackageAdjustment} from '../../server/operations/package-commit-guards.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../../_lib.js';
+import {countUnit} from '../logic.js';
+import {reconcilePackageCount} from '../package-reconciliation.js';
+import {planPackageAdjustment} from '../package-adjustment-plan.js';
+import {canCommitPackageAdjustment} from '../package-commit-guards.js';
 const productPattern=/^[a-f0-9]{40}$/;
 const requestPattern=/^[a-f0-9-]{36}$/i;
 const stamp=x=>x?.toMillis?.()??null;

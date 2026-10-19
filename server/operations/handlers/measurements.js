@@ -1,6 +1,6 @@
 // Cadastro de apresentações por unidade. Não altera saldo, lote ou histórico.
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
-import {isPresentation,unitInfo} from '../../server/operations/unit-engine.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../../_lib.js';
+import {isPresentation,unitInfo} from '../unit-engine.js';
 const productPattern=/^[a-f0-9]{40}$/;
 const fixedRule=r=>r&&isPresentation(r.presentation)&&r.fixed===true&&r.validated===true&&
  typeof r.contentQuantity==='number'&&Number.isFinite(r.contentQuantity)&&r.contentQuantity>0&&r.contentQuantity<=1e6&&

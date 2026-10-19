@@ -5,7 +5,7 @@ import {reconcilePackageCount} from '../server/operations/package-reconciliation
 import ManagerPackageReview from './ManagerPackageReview.jsx';
 async function load(productId){
  const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');
- const res=await fetch('/api/products/measurements',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'get',productId})});
+ const res=await fetch('/api/products/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'measurementGet',productId})});
  const data=await res.json();if(!res.ok)throw Error(data.message||'Falha ao consultar apresentações.');return data.profile;
 }
 export default function PackageConference({productId,physicalUnit,mode,canReview=false}){
@@ -39,8 +39,8 @@ export default function PackageConference({productId,physicalUnit,mode,canReview
   const id=pendingId||crypto.randomUUID();setPendingId(id);
   try{
    const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Entre novamente.');
-   const res=await fetch('/api/operations/package-conference',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({action:'record',productId,requestId:id,area,presentation:activePresentation,profileVersion:profile.version,closed:state.sealed,opened:state.opened})});
+   const res=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({action:'packageRecord',productId,requestId:id,area,presentation:activePresentation,profileVersion:profile.version,closed:state.sealed,opened:state.opened})});
    const data=await res.json();if(!res.ok)throw Error(data.message||'Falha ao registrar conferência.');
    setSaved(data.message);setConferenceId(data.conferenceId||'');setPendingId(null);
   }catch(e){setSaveError(e.message)}finally{setSaveBusy(false)}

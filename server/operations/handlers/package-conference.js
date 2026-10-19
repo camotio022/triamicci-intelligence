@@ -1,6 +1,6 @@
 // Registro auditável de conferência por apresentação. Não modifica saldos físicos.
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
-import {validateConference} from '../../server/operations/package-conference.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../../_lib.js';
+import {validateConference} from '../package-conference.js';
 const id=/^[a-f0-9]{40}$/;
 const requestId=/^[a-f0-9-]{36}$/i;
 export default async function handler(req,res){
