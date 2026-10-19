@@ -11,8 +11,9 @@ export default function PackageConference({productId,physicalUnit,mode}){
  const [profile,setProfile]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState('');
  const [saveBusy,setSaveBusy]=useState(false),[saved,setSaved]=useState(''),[saveError,setSaveError]=useState(''),[pendingId,setPendingId]=useState(null);
  const [remainders,setRemainders]=useState([]);
+ const [area,setArea]=useState('giro');
  const [presentation,setPresentation]=useState(''),[packages,setPackages]=useState(''),[opened,setOpened]=useState('0');
- useEffect(()=>{let active=true;setProfile(null);setPresentation('');setPackages('');setOpened('0');setRemainders([]);setSaved('');setSaveError('');setPendingId(null);setError('');if(!productId)return;
+ useEffect(()=>{let active=true;setProfile(null);setPresentation('');setPackages('');setOpened('0');setRemainders([]);setArea('giro');setSaved('');setSaveError('');setPendingId(null);setError('');if(!productId)return;
  setLoading(true);load(productId).then(p=>{if(active){setProfile(p);setPresentation(p?.packages?.[0]?.presentation||'')}}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});
  return()=>{active=false}},[productId]);
  if(!productId)return null;
@@ -37,7 +38,7 @@ export default function PackageConference({productId,physicalUnit,mode}){
   try{
    const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Entre novamente.');
    const res=await fetch('/api/operations/package-conference',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({action:'record',productId,requestId:id,presentation:activePresentation,profileVersion:profile.version,closed:state.sealed,opened:state.opened})});
+    body:JSON.stringify({action:'record',productId,requestId:id,area,presentation:activePresentation,profileVersion:profile.version,closed:state.sealed,opened:state.opened})});
    const data=await res.json();if(!res.ok)throw Error(data.message||'Falha ao registrar conferência.');
    setSaved(data.message);setPendingId(null);
   }catch(e){setSaveError(e.message)}finally{setSaveBusy(false)}
@@ -47,6 +48,7 @@ export default function PackageConference({productId,physicalUnit,mode}){
   <h3>{mode==='receive'?'Conferir apresentação da entrega':'Contar embalagens fechadas e abertas'}</h3>
   <p>A conferência de embalagens é registrada separadamente, sem alterar o saldo físico. Não substitui a contagem em unidade operacional.</p>
   {loading?<p>Carregando configurações...</p>:error?<p role="alert">{error}</p>:!profile?.packages?.length?<p>Este produto ainda não possui apresentações cadastradas pela gerência.</p>:<>
+   {mode==='count'&&<label>Local da contagem<select value={area} onChange={e=>{setArea(e.target.value);setPendingId(null);setSaved('')}}><option value="reserva">Reserva</option><option value="giro">Giro</option></select></label>}
    <label>Apresentação<select disabled={countByPackage} value={activePresentation} onChange={e=>{setPresentation(e.target.value);setPackages('');setPendingId(null);setSaved('')}}>{profile.packages.map(x=><option key={x.presentation} value={x.presentation}>{x.presentation}</option>)}</select></label>
    <label>{mode==='receive'?'Quantidade de embalagens entregues':method.trackOpen?'Embalagens fechadas':'Embalagens contadas'}<input type="number" min={mode==='receive'?'1':'0'} step="1" value={packages} onChange={e=>{setPackages(e.target.value);setPendingId(null);setSaved('')}}/></label>
    {mode==='count'&&method.trackOpen&&<label>Embalagens abertas<input type="number" min="0" step="1" value={opened} onChange={e=>{setOpened(e.target.value);setRemainders(Array.from({length:Math.min(Math.max(0,Number(e.target.value)||0),30)},()=>''));setPendingId(null);setSaved('')}}/></label>}
