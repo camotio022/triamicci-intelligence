@@ -260,3 +260,6 @@ button:disabled{cursor:not-allowed;opacity:.58}
 @media(prefers-reduced-motion:reduce){
  :is(.receiving-page,.inventory-page,.production-page) :is(button,input,select,textarea){transition:none!important}
 }
+
+/* Atalhos essenciais, com acesso garantido ao menu completo */
+@media(max-width:800px){.ti-mobile-quicknav{display:flex;gap:7px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:8px;-webkit-overflow-scrolling:touch}.ti-mobile-quicknav>button{flex:0 0 auto;min-height:40px;white-space:nowrap;scroll-snap-align:start}.ti-mobile-quicknav .ti-mobile-more{border:1px solid #b88d88;background:#fff5f3;color:#8c251f;font-weight:700}}
