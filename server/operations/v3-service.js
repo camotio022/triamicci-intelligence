@@ -1,3 +1,4 @@
+import v3Ledger from './v3-ledger.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {validateOperationalProfile,reportShortage,transitionOrder} from './v3-catalog-policy.js';
@@ -17,6 +18,7 @@ const productPath=(unit,id)=>unit.collection('products').doc(id);
 const limitText=(x,max=240)=>typeof x==='string'&&x.length<=max;
 const round=x=>Math.round(x*1000)/1000;
 export default async function kitchenV3(req,res){
+ if(['v3Receive','v3Count','v3Transfer','v3Lots','v3LedgerHistory'].includes(req.body?.action))return v3Ledger(req,res);
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
  try{
