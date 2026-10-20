@@ -13,8 +13,8 @@ test('controle exige unidade e proibe relacao de peso inventada',()=>{
 });
 test('contagem so soma duas areas com referencia compativel',()=>{
  const b={mode:'quantitative',reserve:{quantity:20,unit:'un'},giro:{quantity:10,unit:'un'}};
- assert.equal(stockVisibility({...b,reserveAt:'2026-10-20T12:00:00Z',giroAt:'2026-10-20T12:03:00Z'}).quantity,30);
- assert.equal(stockVisibility({...b,reserveAt:'2026-10-19T12:00:00Z',giroAt:'2026-10-20T12:00:00Z'}).quantity,null);
+ assert.equal(stockVisibility({...b,reserveAt:'2026-10-20T12:00:00Z',giroAt:'2026-10-20T12:03:00Z',reserveSessionId:'s1',giroSessionId:'s1'}).quantity,30);
+ assert.equal(stockVisibility({...b,reserveAt:'2026-10-19T12:00:00Z',giroAt:'2026-10-20T12:00:00Z',reserveSessionId:'s1',giroSessionId:'s2'}).quantity,null);
 });
 test('sacos e porcoes nao sao duplicados',()=>{
  assert.equal(countGroupedPackages({complete:2,perGroup:5,loose:3}).quantity,13);
