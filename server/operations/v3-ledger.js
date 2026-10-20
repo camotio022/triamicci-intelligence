@@ -248,7 +248,7 @@ export default async function v3Ledger(req,res){
    CONFLICT:[409,'Operação já registrada ou identificador repetido.'],UNIT:[409,'Unidades incompatíveis; revisão necessária.'],
    QUANTITY:[409,'Quantidade inválida ou saldo insuficiente.'],LOT:[409,'Lotes e validade precisam ser reconciliados.'],
    LOCATION:[409,'Local não permitido para este item.'],ORDER:[409,'Pedido não corresponde ao item recebido.'],
-   ORDER_UNIT:[409,'Unidade do pedido não corresponde à conferência.']};
+   ORDER_UNIT:[409,'Unidade do pedido não corresponde à conferência.'],SOURCE:[409,'Matéria-prima não autorizada nesta preparação.'],ALTERNATIVE:[409,'Explique a substituição antes de produzir.']};
   if(errors[e.message])return send(res,...errors[e.message]);
   console.error('V3 ledger:',e.message);return send(res,500,'Erro ao registrar operação V3.');
  }
