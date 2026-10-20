@@ -48,11 +48,15 @@ export default async function kitchenV3(req,res){
     const [actor,p,prior]=await Promise.all([tx.get(actorRef),tx.get(pref),tx.get(ref)]);
     if(!verify(actor,unitId,roles))throw Error('FORBIDDEN');
     if(!p.exists)throw Error('NOT_FOUND');
+    const sourceIds=[...(profile.sourceProductIds||[]),...(profile.alternativeProductIds||[])];
+    if(sourceIds.includes(productId))throw Error('INVALID_SOURCE');
+    if(sourceIds.length){const sourceDocs=await Promise.all(sourceIds.map(id=>tx.get(products.doc(id))));if(sourceDocs.some(d=>!d.exists||d.data().status!=='active'))throw Error('INVALID_SOURCE');}
     if(prior.exists&&prior.data().version!==expectedVersion||!prior.exists&&expectedVersion!==null)throw Error('STALE');
     if(p.data().status!=='active')throw Error('INACTIVE');
     // A configuração NÃO altera saldo legado nem unidades de movimentos já gravados.
     const next={displayName:profile.displayName.trim(),controlMode:profile.controlMode,origin:profile.origin,
       countUnit:profile.countUnit||null,locations:profile.locations,receivingPresentation:profile.receivingPresentation||null,
+      sourceProductIds:profile.sourceProductIds||[],alternativeProductIds:profile.alternativeProductIds||[],
       trackingNote:(profile.trackingNote||'').slice(0,240),version:(prior.data()?.version||0)+1,updatedAt:now(),updatedBy:user.uid};
     version=next.version;tx.set(ref,next);
     newAudit(tx,db,'v3.profile_saved',unitId,user.uid,{productId,before:prior.data()||null,after:next});
@@ -127,7 +131,7 @@ export default async function kitchenV3(req,res){
   return send(res,400,'Ação desconhecida.');
  }catch(e){
   const errors={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem autorização.'],NOT_FOUND:[404,'Insumo ou pedido inexistente.'],
-   STALE:[409,'Configuração alterada por outra pessoa. Recarregue antes de salvar.'],INACTIVE:[409,'Insumo arquivado.'],
+   STALE:[409,'Configuração alterada por outra pessoa. Recarregue antes de salvar.'],INACTIVE:[409,'Insumo arquivado.'],INVALID_SOURCE:[409,'Origem de preparação inválida ou indisponível.'],
    ALREADY_REPORTED:[409,'Sua sinalização já está aberta para este produto e local.'],CONFLICT:[409,'Identificador do pedido já utilizado.'],
    INVALID_TRANSITION:[409,'Transição de pedido incompatível com a situação atual.']};
   if(errors[e.message])return send(res,...errors[e.message]);
