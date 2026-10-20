@@ -1,3 +1,4 @@
+import kitchenV3 from '../../server/operations/v3-service.js';
 import packageConferenceHandler from '../../server/operations/handlers/package-conference.js';
 import packageReviewHandler from '../../server/operations/handlers/package-review.js';
 import packageApplyHandler from '../../server/operations/handlers/package-apply.js';
@@ -28,6 +29,7 @@ function error(res,e){
  console.error('Physical operations:',e.message);return send(res,500,'Não foi possível completar a operação.');
 }
 export default async function handler(req,res){
+ if(typeof req.body?.action==='string'&&req.body.action.startsWith('v3'))return kitchenV3(req,res);
  const subaction=req.body?.action;
  if(subaction==='packageRecord'||subaction==='packagePreview'||subaction==='packageApply'){
   req.body.action=({packageRecord:'record',packagePreview:'preview',packageApply:'apply'})[subaction];
