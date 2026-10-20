@@ -13,7 +13,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  const [productId,setProductId]=useState(''),[location,setLocation]=useState('reserva'),[supplier,setSupplier]=useState(''),
  [commercialUnit,setCommercialUnit]=useState('kg'),[commercialQuantity,setCommercialQuantity]=useState(''),
  [stockQuantity,setStockQuantity]=useState(''),[orderId,setOrderId]=useState(''),[lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),
- [notes,setNotes]=useState(''),[quantity,setQuantity]=useState(''),[sessionId,setSessionId]=useState(''),
+ [notes,setNotes]=useState(''),[quantity,setQuantity]=useState(''),[sessionId,setSessionId]=useState(()=>crypto.randomUUID()),
  [lotCounts,setLotCounts]=useState({}),[lots,setLots]=useState([]),[loadingLots,setLoadingLots]=useState(false),
  [from,setFrom]=useState('reserva'),[to,setTo]=useState('giro'),
  [outputId,setOutputId]=useState(''),[outputQty,setOutputQty]=useState(''),[outputLocation,setOutputLocation]=useState('reserva'),
@@ -48,8 +48,10 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
   if(kind==='receive')return commit('v3Receive',{productId,orderId:orderId||null,supplier,
    commercialQuantity:Number(commercialQuantity),commercialUnit,stockQuantity:Number(stockQuantity||0),location,lot,expiryDate:expiry,notes},'Mercadoria recebida e conferida.');
   if(kind==='count'){
+   if(!/^[a-f0-9-]{36}$/i.test(sessionId)){setError('Identificador da rodada inválido. Gere um novo identificador.');return;}
+   if(chosen?.trackExpiry&&lots.some(l=>lotCounts[l.id]==='')){setError('Informe a contagem de cada lote, inclusive zero quando estiver vazio.');return;}
    const counts=lots.map(l=>({id:l.id,quantity:Number(lotCounts[l.id])}));
-   return commit('v3Count',{productId,location,sessionId:sessionId||crypto.randomUUID(),quantity:Number(quantity),lotCounts:counts,notes},'Contagem física registrada.');
+   return commit('v3Count',{productId,location,sessionId,quantity:Number(quantity),lotCounts:counts,notes},'Contagem física registrada.');
   }
   if(kind==='transfer')return commit('v3Transfer',{productId,from,to,quantity:Number(quantity)},'Transferência registrada.');
   if(kind==='produce')return commit('v3Produce',{outputProductId:outputId,outputQuantity:Number(outputQty),outputLocation,inputs:sources.map(i=>({...i,quantity:Number(i.quantity)})),
@@ -79,7 +81,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    {kind==='count'&&<>
     <Field name="Onde está contando?"><select value={location} onChange={e=>setLocation(e.target.value)}>{locations.map(x=><option value={x} key={x}>{x==='reserva'?'Reserva · 2º piso':'Giro · 1º piso'}</option>)}</select></Field>
     <Field name={'Quantidade encontrada ('+(expected||'sem unidade de contagem')+')'}><input required type="number" min="0" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={quantity} onChange={e=>setQuantity(e.target.value)}/></Field>
-    <Field name="Identificador da mesma rodada de contagem (opcional)"><input value={sessionId} onChange={e=>setSessionId(e.target.value)} placeholder="Compartilhe o ID ao contar Reserva e Giro"/></Field>
+    <Field name="Identificador da rodada de contagem"><input required value={sessionId} onChange={e=>setSessionId(e.target.value)} aria-describedby="v3-session-help"/></Field><p id="v3-session-help" className="v3-info">Use o mesmo identificador para contar Reserva e Giro na mesma rodada. Uma nova rodada deve ter um identificador diferente.</p><button type="button" className="v3-secondary" onClick={()=>setSessionId(crypto.randomUUID())}>Iniciar nova rodada</button>
     {chosen?.trackExpiry&&<fieldset><legend>Contagem de lotes no local</legend><p>Para preservar validade e rastreabilidade, informe cada lote; sem lotes cadastrados é necessário primeiro regularizar o recebimento.</p>
       {loadingLots?<p>Carregando lotes…</p>:lots.length?lots.map(l=><Field key={l.id} name={(l.lot||'Lote')+' · vence '+l.expiryDate}><input required type="number" min="0" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={lotCounts[l.id]??''} onChange={e=>setLotCounts(old=>({...old,[l.id]:e.target.value}))}/></Field>):<p role="status">Nenhum lote ativo para esse produto; contagem quantitativa não será aplicada sem regularização.</p>}
      </fieldset>}
