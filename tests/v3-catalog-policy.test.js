@@ -29,3 +29,11 @@ test('aviso de falta nao mexe em quantidade',()=>{
  const r=reportShortage({productId:'tomate',location:'reserva',reporterUid:'u'});
  assert.equal(r.ok,true);assert.equal(r.changesBalance,false);
 });
+
+test('status recebido e parcial dependem de conferencia fisica, nao de selecao manual',()=>{
+ for(const status of ['requested','confirmed','overdue','partially_received']){
+  for(const next of ['received','partially_received']){
+   assert.equal(transitionOrder({status,etaDate:'2026-10-23'},next).ok,false,`${status} -> ${next}`);
+  }
+ }
+});
