@@ -1,6 +1,7 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
+import KitchenV3Workflows from './KitchenV3Workflows.jsx';
 import './v3-kitchen.css';
 async function api(action,payload={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
@@ -22,7 +23,7 @@ export default function KitchenV3({membership}){
  const [observation,setObservation]=useState('missing'),[note,setNote]=useState('');
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [editId,setEditId]=useState(''),[step,setStep]=useState(0),[mode,setMode]=useState('availability'),
-  [origin,setOrigin]=useState('supplier'),[countUnit,setCountUnit]=useState('un'),[locs,setLocs]=useState(['reserva']),[presentation,setPresentation]=useState(''),[trackingNote,setTrackingNote]=useState('');
+  [origin,setOrigin]=useState('supplier'),[countUnit,setCountUnit]=useState('un'),[locs,setLocs]=useState(['reserva']),[presentation,setPresentation]=useState(''),[trackingNote,setTrackingNote]=useState(''),[sourceIds,setSourceIds]=useState([]),[altIds,setAltIds]=useState([]);
  const [supplier,setSupplier]=useState(''),[eta,setEta]=useState(''),[orderLines,setOrderLines]=useState([{productId:'',quantity:'',unit:'kg'}]),[orderNote,setOrderNote]=useState('');
  const load=useCallback(async()=>{
   setLoading(true);setError('');
@@ -40,12 +41,12 @@ export default function KitchenV3({membership}){
   catch(e){setError(e.message);notify(e.message,'error');return false;}
   finally{setBusy(false);}
  };
- const begin=p=>{const c=p.profile;setEditId(p.id);setStep(0);setMode(c?.controlMode||'availability');setOrigin(c?.origin||'supplier');setCountUnit(c?.countUnit||'un');setLocs(c?.locations||['reserva']);setPresentation(c?.receivingPresentation||'');setTrackingNote(c?.trackingNote||'');setTab('catalog');};
+ const begin=p=>{const c=p.profile;setEditId(p.id);setStep(0);setMode(c?.controlMode||'availability');setOrigin(c?.origin||'supplier');setCountUnit(c?.countUnit||'un');setLocs(c?.locations||['reserva']);setPresentation(c?.receivingPresentation||'');setTrackingNote(c?.trackingNote||'');setSourceIds(c?.sourceProductIds||[]);setAltIds(c?.alternativeProductIds||[]);setTab('catalog');};
  const saveProfile=async()=>{
   if(!current)return;
   const ok=await update('v3ProfileSave',{productId:editId,expectedVersion:current.profile?.version||null,
    profile:{displayName:current.name,controlMode:mode,origin,countUnit:mode==='quantitative'?countUnit:null,locations:locs,
-   receivingPresentation:presentation||null,trackingNote}},'Configuração operacional atualizada.');
+   receivingPresentation:presentation||null,sourceProductIds:sourceIds,alternativeProductIds:altIds,trackingNote}},'Configuração operacional atualizada.');
   if(ok){setEditId('');setStep(0);}
  };
  const addOrderLine=()=>setOrderLines(old=>[...old,{productId:'',quantity:'',unit:'kg'}]);
@@ -59,10 +60,11 @@ export default function KitchenV3({membership}){
  return <section className="v3-page">
   <header className="v3-head"><div><p className="eyebrow">OPERAÇÃO DA COZINHA · V3</p><h1>Central de insumos</h1><p>O que temos, o que falta e o que está previsto para chegar.</p></div><button type="button" className="v3-secondary" onClick={load} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></header>
   <nav className="v3-tabs" aria-label="Seções de insumos">
-   {[['overview','Visão geral'],['availability','Avisar falta'],['orders','Entregas'],...(canManage?[['catalog','Configurar catálogo']]:[])].map(([key,label])=><button type="button" key={key} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
+   {[['overview','Visão geral'],['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['count','Contagem'],...(canManage?[['catalog','Configurar catálogo']]:[])].map(([key,label])=><button type="button" key={key} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
   </nav>
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {loading?<p role="status">Carregando dados reais da unidade…</p>:<>
+   {['receive','produce','transfer','count'].includes(tab)&&<KitchenV3Workflows key={tab} kind={tab} products={products} orders={orders} membership={membership} onChange={load}/>}
    {tab==='overview'&&<div className="v3-columns">
     <section className="v3-card"><h2>Avisos da equipe</h2>{signals.length===0?<p>Nenhuma falta em aberto.</p>:signals.map(s=><article className="v3-row" key={s.id}><div><strong>{s.productName}</strong><p>{s.location==='giro'?'Giro · 1º piso':'Reserva · 2º piso'} · {s.observation==='missing'?'Possível falta':'Estoque baixo'}</p><small>{s.reports?.length||1} relato(s) · {longDate(s.updatedAt?.seconds?s.updatedAt.seconds*1000:s.updatedAt)}</small></div>{canManage&&<button className="v3-secondary" type="button" disabled={busy} onClick={()=>{const reason=window.prompt('Como essa pendência foi resolvida?');if(reason?.trim())update('v3ResolveSignal',{productId:s.productId,location:s.location,resolution:reason},'Aviso resolvido.')}}>Resolver</button>}</article>)}</section>
     <section className="v3-card"><h2>Próximas entregas</h2>{orders.length===0?<p>Não há pedidos registrados.</p>:orders.slice(0,10).map(o=><article className="v3-row" key={o.id}><div><strong>{date(o.etaDate)} · {o.supplier}</strong><p>{o.items.map(i=>i.name+' '+i.quantity+' '+i.unit).join(' · ')}</p><small>{status[o.status]||o.status}</small></div></article>)}</section>
@@ -99,8 +101,8 @@ export default function KitchenV3({membership}){
     <div className="v3-wizard"><div className="v3-row"><h3>{current?.name}</h3><button type="button" className="v3-secondary" onClick={()=>setEditId('')}>Voltar</button></div><p className="v3-info">Etapa {step+1} de 4 · Alteração versionada e auditável</p>
      {step===0&&<div className="v3-form"><label>Como o insumo entra na cozinha?<select value={origin} onChange={e=>setOrigin(e.target.value)}>{sources.map(([value,title])=><option key={value} value={value}>{title}</option>)}</select></label><label>Como chega? (embalagem ou apresentação)<input maxLength={80} value={presentation} onChange={e=>setPresentation(e.target.value)} placeholder="Ex.: fardo pesado em kg"/></label></div>}
      {step===1&&<div className="v3-form"><label>Como controlar?<select value={mode} onChange={e=>setMode(e.target.value)}>{kinds.map(([value,title])=><option key={value} value={value}>{title}</option>)}</select></label>{mode==='quantitative'&&<label>Como contar?<select value={countUnit} onChange={e=>setCountUnit(e.target.value)}>{units.map(u=><option key={u} value={u}>{u}</option>)}</select></label>}</div>}
-     {step===2&&<div className="v3-form"><fieldset><legend>Onde pode ficar armazenado?</legend>{[['reserva','Reserva · 2º piso'],['giro','Giro · 1º piso']].map(([v,label])=><label className="v3-checkbox" key={v}><input type="checkbox" checked={locs.includes(v)} onChange={e=>setLocs(old=>e.target.checked?[...old,v]:old.filter(x=>x!==v))}/>{label}</label>)}</fieldset><label>Observações de preparo e armazenamento<textarea maxLength={240} value={trackingNote} onChange={e=>setTrackingNote(e.target.value)}/></label></div>}
-     {step===3&&<div className="v3-review"><p><strong>Origem:</strong> {sources.find(x=>x[0]===origin)?.[1]}</p><p><strong>Recebimento:</strong> {presentation||'Conforme entrada aferida'}</p><p><strong>Controle:</strong> {kinds.find(x=>x[0]===mode)?.[1]} {mode==='quantitative'?'· '+countUnit:''}</p><p><strong>Locais:</strong> {locs.join(', ')}</p><p>O histórico e a unidade dos saldos existentes permanecerão inalterados.</p></div>}
+     {step===2&&<div className="v3-form"><fieldset><legend>Onde pode ficar armazenado?</legend>{[['reserva','Reserva · 2º piso'],['giro','Giro · 1º piso']].map(([v,label])=><label className="v3-checkbox" key={v}><input type="checkbox" checked={locs.includes(v)} onChange={e=>setLocs(old=>e.target.checked?[...old,v]:old.filter(x=>x!==v))}/>{label}</label>)}</fieldset>{['internal','both'].includes(origin)&&<fieldset><legend>Matérias-primas permitidas na produção</legend><p>Marque as origens normais e as alternativas usadas só quando faltar a principal.</p>{products.filter(p=>p.id!==editId&&p.status==='active').map(p=><div key={p.id} className="v3-source"><strong>{p.name}</strong><select aria-label={'Relação de '+p.name} value={sourceIds.includes(p.id)?'primary':altIds.includes(p.id)?'alternative':'none'} onChange={e=>{setSourceIds(old=>old.filter(x=>x!==p.id).concat(e.target.value==='primary'?[p.id]:[]));setAltIds(old=>old.filter(x=>x!==p.id).concat(e.target.value==='alternative'?[p.id]:[]))}}><option value="none">Não utiliza</option><option value="primary">Origem principal</option><option value="alternative">Alternativa</option></select></div>)}</fieldset>}<label>Observações de preparo e armazenamento<textarea maxLength={240} value={trackingNote} onChange={e=>setTrackingNote(e.target.value)}/></label></div>}
+     {step===3&&<div className="v3-review"><p><strong>Origem:</strong> {sources.find(x=>x[0]===origin)?.[1]}</p><p><strong>Recebimento:</strong> {presentation||'Conforme entrada aferida'}</p><p><strong>Controle:</strong> {kinds.find(x=>x[0]===mode)?.[1]} {mode==='quantitative'?'· '+countUnit:''}</p><p><strong>Locais:</strong> {locs.join(', ')}</p><p><strong>Matérias-primas:</strong> {sourceIds.length} principais, {altIds.length} alternativas</p><p>O histórico e a unidade dos saldos existentes permanecerão inalterados.</p></div>}
      <div className="v3-actions"><button type="button" className="v3-secondary" onClick={()=>setStep(x=>Math.max(0,x-1))} disabled={step===0}>Anterior</button>{step<3?<button type="button" disabled={step===2&&locs.length===0} onClick={()=>setStep(x=>x+1)}>Próximo</button>:<button type="button" disabled={busy} onClick={saveProfile}>{busy?'Salvando…':'Confirmar configuração'}</button>}</div>
     </div>}</div>}
   </>}
