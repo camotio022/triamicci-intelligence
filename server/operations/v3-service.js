@@ -45,9 +45,13 @@ export default async function kitchenV3(req,res){
    const ref=profiles.doc(productId),pref=products.doc(productId);
    let version=0;
    await db.runTransaction(async tx=>{
-    const [actor,p,prior,balance]=await Promise.all([tx.get(actorRef),tx.get(pref),tx.get(ref),tx.get(balances.doc(productId))]);
+    const [actor,p,prior,balance,allProfiles,allProducts]=await Promise.all([tx.get(actorRef),tx.get(pref),tx.get(ref),tx.get(balances.doc(productId)),tx.get(profiles.limit(201)),tx.get(products.limit(201))]);
     if(!verify(actor,unitId,roles))throw Error('FORBIDDEN');
     if(!p.exists)throw Error('NOT_FOUND');
+    if(allProfiles.size>200||allProducts.size>200)throw Error('TOO_MANY');
+    const candidateNames=[profile.displayName,...(profile.aliases||[])].map(x=>x.trim().toLocaleLowerCase('pt-BR'));
+    if(allProfiles.docs.some(d=>d.id!==productId&&[d.data().displayName,...(d.data().aliases||[])].some(x=>candidateNames.includes((x||'').trim().toLocaleLowerCase('pt-BR'))))||
+       allProducts.docs.some(d=>d.id!==productId&&!allProfiles.docs.find(p=>p.id===d.id)&&candidateNames.includes((d.data().name||'').trim().toLocaleLowerCase('pt-BR'))))throw Error('DUPLICATE_NAME');
     const sourceIds=[...(profile.sourceProductIds||[]),...(profile.alternativeProductIds||[])];
     if(sourceIds.includes(productId))throw Error('INVALID_SOURCE');
     if(sourceIds.length){const sourceDocs=await Promise.all(sourceIds.map(id=>tx.get(products.doc(id))));if(sourceDocs.some(d=>!d.exists||d.data().status!=='active'))throw Error('INVALID_SOURCE');}
@@ -55,7 +59,7 @@ export default async function kitchenV3(req,res){
     if(p.data().status!=='active')throw Error('INACTIVE');
     if(balance.exists&&balance.data().total>0&&prior.exists&&prior.data().countUnit!==profile.countUnit)throw Error('UNIT_LOCKED');
     // A configuração NÃO altera saldo legado nem unidades de movimentos já gravados.
-    const next={displayName:profile.displayName.trim(),controlMode:profile.controlMode,origin:profile.origin,
+    const next={displayName:profile.displayName.trim(),aliases:(profile.aliases||[]).map(x=>x.trim()),controlMode:profile.controlMode,origin:profile.origin,
       countUnit:profile.countUnit||null,locations:profile.locations,receivingPresentation:profile.receivingPresentation||null,
       sourceProductIds:profile.sourceProductIds||[],alternativeProductIds:profile.alternativeProductIds||[],
       trackingNote:(profile.trackingNote||'').slice(0,240),version:(prior.data()?.version||0)+1,updatedAt:now(),updatedBy:user.uid};
@@ -154,7 +158,7 @@ export default async function kitchenV3(req,res){
  }catch(e){
   const errors={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem autorização.'],NOT_FOUND:[404,'Insumo ou pedido inexistente.'],
    STALE:[409,'Configuração alterada por outra pessoa. Recarregue antes de salvar.'],INACTIVE:[409,'Insumo arquivado.'],UNIT_LOCKED:[409,'Existe saldo no novo controle. Recontagem e migração supervisionada são necessárias antes de trocar unidade.'],INVALID_SOURCE:[409,'Origem de preparação inválida ou indisponível.'],
-   TOO_MANY:[409,'Há muitos registros para validar o arquivamento.'],PRODUCT_HAS_STOCK:[409,'Insumo com estoque registrado: reconcilie antes de arquivar.'],PRODUCT_HAS_PENDING:[409,'Há faltas ou pedidos em aberto para esse insumo. Resolva antes de arquivar.'],
+   TOO_MANY:[409,'Há muitos registros para validar a operação.'],DUPLICATE_NAME:[409,'Esse nome ou sinônimo já identifica outro insumo. Revise para evitar duplicidade.'],PRODUCT_HAS_STOCK:[409,'Insumo com estoque registrado: reconcilie antes de arquivar.'],PRODUCT_HAS_PENDING:[409,'Há faltas ou pedidos em aberto para esse insumo. Resolva antes de arquivar.'],
    ALREADY_REPORTED:[409,'Sua sinalização já está aberta para este produto e local.'],CONFLICT:[409,'Identificador do pedido já utilizado.'],
    INVALID_TRANSITION:[409,'Transição de pedido incompatível com a situação atual.']};
   if(errors[e.message])return send(res,...errors[e.message]);
