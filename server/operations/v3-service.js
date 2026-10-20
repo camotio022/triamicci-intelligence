@@ -64,6 +64,27 @@ export default async function kitchenV3(req,res){
    });
    return send(res,200,'Configuração operacional salva.',{version});
   }
+  if(action==='v3ArchiveProduct'){
+   if(!roles.includes(member.role))return send(res,403,'Somente gerência administra o catálogo.');
+   const {productId,active:restore}=req.body||{};
+   if(!idOk(productId)||typeof restore!=='boolean')return send(res,400,'Selecione produto e ação.');
+   const pref=products.doc(productId),physical=unit.collection('physicalBalances').doc(productId),v3=balances.doc(productId);
+   await db.runTransaction(async tx=>{
+    const [a,p,oldPhysical,newPhysical,pendingOrders,openSignals]=await Promise.all([
+     tx.get(actorRef),tx.get(pref),tx.get(physical),tx.get(v3),tx.get(orders.limit(201)),tx.get(issues.limit(201))]);
+    if(!verify(a,unitId,roles))throw Error('FORBIDDEN');
+    if(!p.exists)throw Error('NOT_FOUND');
+    if(!restore){
+     if(pendingOrders.size>200||openSignals.size>200)throw Error('TOO_MANY');
+     if((p.data().quantity||0)>0||(oldPhysical.data()?.total||0)>0||(newPhysical.data()?.total||0)>0)throw Error('PRODUCT_HAS_STOCK');
+     if(pendingOrders.docs.some(d=>!['received','cancelled'].includes(d.data().status)&&d.data().items?.some(i=>i.productId===productId))||
+       openSignals.docs.some(d=>d.data().productId===productId&&d.data().status!=='resolved'))throw Error('PRODUCT_HAS_PENDING');
+    }
+    tx.update(pref,{status:restore?'active':'inactive',updatedAt:now(),updatedBy:user.uid});
+    newAudit(tx,db,restore?'v3.product_restored':'v3.product_archived',unitId,user.uid,{productId});
+   });
+   return send(res,200,restore?'Insumo reativado.':'Insumo arquivado sem apagar o histórico.');
+  }
   if(action==='v3Signal'){
    const {productId,location,observation='missing',note=''}=req.body||{};
    if(!idOk(productId)||!['missing','low','available'].includes(observation)||!reportShortage({productId,location,reporterUid:user.uid,note}).ok)return send(res,400,'Revise produto, local e observação.');
@@ -133,6 +154,7 @@ export default async function kitchenV3(req,res){
  }catch(e){
   const errors={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem autorização.'],NOT_FOUND:[404,'Insumo ou pedido inexistente.'],
    STALE:[409,'Configuração alterada por outra pessoa. Recarregue antes de salvar.'],INACTIVE:[409,'Insumo arquivado.'],UNIT_LOCKED:[409,'Existe saldo no novo controle. Recontagem e migração supervisionada são necessárias antes de trocar unidade.'],INVALID_SOURCE:[409,'Origem de preparação inválida ou indisponível.'],
+   TOO_MANY:[409,'Há muitos registros para validar o arquivamento.'],PRODUCT_HAS_STOCK:[409,'Insumo com estoque registrado: reconcilie antes de arquivar.'],PRODUCT_HAS_PENDING:[409,'Há faltas ou pedidos em aberto para esse insumo. Resolva antes de arquivar.'],
    ALREADY_REPORTED:[409,'Sua sinalização já está aberta para este produto e local.'],CONFLICT:[409,'Identificador do pedido já utilizado.'],
    INVALID_TRANSITION:[409,'Transição de pedido incompatível com a situação atual.']};
   if(errors[e.message])return send(res,...errors[e.message]);
