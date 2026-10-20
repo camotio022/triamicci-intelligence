@@ -108,7 +108,7 @@ export default async function v3Ledger(req,res){
    return send(res,200,duplicate?'Recebimento já registrado.':'Recebimento salvo.',{duplicate,id:requestId});
   }
   if(action==='v3Count'){
-   const {requestId,sessionId,productId,location,quantity,lotCounts=[],notes=''}=req.body||{};
+   const {requestId,sessionId,productId,location,quantity,lotCounts=[],initialLot=null,notes=''}=req.body||{};
    if(!reqOk(requestId)||!reqOk(sessionId)||!idOk(productId)||!locations.includes(location)||
     typeof notes!=='string'||notes.length>240||!Array.isArray(lotCounts)||lotCounts.length>100)return send(res,400,'Contagem incompleta.');
    const pr=products.doc(productId),cfgRef=profiles.doc(productId),balanceRef=balances.doc(productId),ref=unit.collection('v3Operations').doc(requestId);
@@ -125,6 +125,13 @@ export default async function v3Ledger(req,res){
     if(lotQuery?.size>100)throw Error('LOT');
     if(lotQuery){
      const lots=lotQuery.docs;
+     if(lots.length===0&&quantity>0){
+      if(!['admin','manager'].includes(a.data().role)||!initialLot||typeof initialLot.lot!=='string'||!initialLot.lot.trim()||initialLot.lot.length>80||!isoDay(initialLot.expiryDate)||initialLot.expiryDate<today)throw Error('LOT');
+      const newRef=lotRoots.doc(productId).collection('lots').doc(hashed(initialLot.lot.trim()+'|'+initialLot.expiryDate));
+      tx.create(newRef,{productId,lot:initialLot.lot.trim(),expiryDate:initialLot.expiryDate,unit:u,
+       reserva:location==='reserva'?quantity:0,giro:location==='giro'?quantity:0,availableQuantity:quantity,
+       initializedBy:actor.uid,initializedAt:now(),updatedAt:now()});
+     }else{
      const mapped=new Map(lotCounts.map(x=>[x.id,x.quantity]));
      if(mapped.size!==lotCounts.length||lots.length!==mapped.size||
        lots.some(l=>!mapped.has(l.id)||!number(mapped.get(l.id),u,true)||l.data().unit!==u)||
@@ -133,9 +140,10 @@ export default async function v3Ledger(req,res){
       const d=doc.data(),newLoc=mapped.get(doc.id);
       tx.update(doc.ref,{[location]:newLoc,availableQuantity:round(newLoc+(d[location==='reserva'?'giro':'reserva']||0)),updatedAt:now()});
      }
+     }
     }
     const after=round(quantity+(prior[location==='reserva'?'giro':'reserva']||0));
-    tx.set(balanceRef,{productId,unit:u,[location]:quantity,total:after,updatedAt:now(),
+    tx.set(balanceRef,{productId,unit:u,[location]:quantity,[location==='reserva'?'giro':'reserva']:prior[location==='reserva'?'giro':'reserva']||0,total:after,updatedAt:now(),
       lastCountAtByArea:{...(prior.lastCountAtByArea||{}),[location]:now()},
       countSessions:{...(prior.countSessions||{}),[location]:sessionId},
       quality:'PARTIAL_LOCATION_COUNT',lastOperationId:requestId},{merge:true});
