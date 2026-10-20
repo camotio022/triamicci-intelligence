@@ -15,12 +15,12 @@ export function validateOperationalProfile(p){
  if(p.unitConversion&&p.unitConversion.fixed!==true)errors.push('NO_ASSUMED_CONVERSION');
  return {ok:errors.length===0,errors};
 }
-export function stockVisibility({mode,signal='unknown',reserve=null,giro=null,reserveAt=null,giroAt=null,estimated=false}){
+export function stockVisibility({mode,signal='unknown',reserve=null,giro=null,reserveAt=null,giroAt=null,reserveSessionId=null,giroSessionId=null,estimated=false}){
  if(mode!=='quantitative')return {status:signal,quantity:null,unit:null,confidence:'OBSERVATION'};
  if(!reserve||!giro||reserve.unit!==giro.unit)return {status:'unverified',quantity:null,confidence:'INCOMPLETE'};
  if(!Number.isFinite(reserve.quantity)||!Number.isFinite(giro.quantity)||reserve.quantity<0||giro.quantity<0)return {status:'unverified',quantity:null,confidence:'INVALID'};
  if(!reserveAt||!giroAt)return {status:'unverified',quantity:null,confidence:'MISSING_TIMESTAMP'};
- const sync=Math.abs(Date.parse(reserveAt)-Date.parse(giroAt))<=3600000;
+ const sync=Boolean(reserveSessionId&&giroSessionId&&reserveSessionId===giroSessionId);
  return {status:sync?'counted':'mixed_snapshots',quantity:sync?reserve.quantity+giro.quantity:null,unit:reserve.unit,confidence:estimated?'ESTIMATED':sync?'OBSERVED':'OUTDATED'};
 }
 export function countGroupedPackages({complete=0,perGroup=0,loose=0}){
