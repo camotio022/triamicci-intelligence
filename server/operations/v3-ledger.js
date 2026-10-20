@@ -167,6 +167,81 @@ export default async function v3Ledger(req,res){
    });
    return send(res,200,'Transferência registrada. O total não mudou.');
   }
+  if(action==='v3Produce'){
+   const {requestId,outputProductId,outputQuantity,outputLocation='reserva',inputs,lot='',expiryDate='',notes='',alternativeReason=''}=req.body||{};
+   if(!reqOk(requestId)||!idOk(outputProductId)||!locations.includes(outputLocation)||!Array.isArray(inputs)||!inputs.length||inputs.length>12||
+      inputs.some(i=>!idOk(i?.productId)||!locations.includes(i.location)||typeof i.quantity!=='number')||
+      new Set(inputs.map(i=>i.productId)).size!==inputs.length||typeof notes!=='string'||notes.length>240||
+      typeof alternativeReason!=='string'||alternativeReason.length>240)return send(res,400,'Revise a produção.');
+   const outputRef=products.doc(outputProductId),outputProfileRef=profiles.doc(outputProductId),outputBalanceRef=balances.doc(outputProductId);
+   const recordRef=unit.collection('v3Operations').doc(requestId);
+   const sourceRefs=inputs.map(i=>products.doc(i.productId)),sourceProfiles=inputs.map(i=>profiles.doc(i.productId)),sourceBalances=inputs.map(i=>balances.doc(i.productId));
+   const fingerprint=hashed(JSON.stringify({outputProductId,outputQuantity,outputLocation,inputs,lot,expiryDate,notes,alternativeReason}));
+   let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const snaps=await Promise.all([tx.get(actorRef),tx.get(recordRef),tx.get(outputRef),tx.get(outputProfileRef),tx.get(outputBalanceRef),
+     ...sourceRefs.map(r=>tx.get(r)),...sourceProfiles.map(r=>tx.get(r)),...sourceBalances.map(r=>tx.get(r))]);
+    const [a,existing,outProduct,outProfile,outBalance]=snaps;
+    if(!active(a,m.unitId,['admin','manager','cook']))throw Error('FORBIDDEN');
+    if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
+    if(!outProduct.exists||outProduct.data().status!=='active'||!outProfile.exists||!['internal','both'].includes(outProfile.data().origin)||
+      outProfile.data().controlMode!=='quantitative'||!outProfile.data().locations.includes(outputLocation))throw Error('MISSING');
+    const ocfg=outProfile.data(),outUnit=ocfg.countUnit;
+    if(!number(outputQuantity,outUnit))throw Error('QUANTITY');
+    if(outProduct.data().trackExpiry&&(!lot.trim()||lot.length>80||!isoDay(expiryDate)||expiryDate<new Date().toISOString().slice(0,10)))throw Error('LOT');
+    const n=inputs.length,sP=snaps.slice(5,5+n),sCfg=snaps.slice(5+n,5+2*n),sBal=snaps.slice(5+2*n,5+3*n);
+    if(sP.some(x=>!x.exists||x.data().status!=='active')||sCfg.some(x=>!x.exists)||sBal.some(x=>!x.exists))throw Error('MISSING');
+    let usesAlternative=false;
+    for(let i=0;i<n;i++){
+     const item=inputs[i],cfg=sCfg[i].data(),b=sBal[i].data();
+     if(!['supplier','internal','both'].includes(cfg.origin)||cfg.controlMode!=='quantitative'||!cfg.locations.includes(item.location)||
+       !number(item.quantity,cfg.countUnit)||b.unit!==cfg.countUnit||b[item.location]<item.quantity)throw Error('QUANTITY');
+     if(ocfg.sourceProductIds?.includes(item.productId))continue;
+     if(ocfg.alternativeProductIds?.includes(item.productId)){usesAlternative=true;continue;}
+     throw Error('SOURCE');
+    }
+    if(usesAlternative&&alternativeReason.trim().length<8)throw Error('ALTERNATIVE');
+    const outputLotRef=outProduct.data().trackExpiry?lotRoots.doc(outputProductId).collection('lots').doc(hashed(lot.trim()+'|'+expiryDate)):null;
+    const inputLots=await Promise.all(inputs.map((i,index)=>sP[index].data().trackExpiry?
+      tx.get(lotRoots.doc(i.productId).collection('lots').orderBy('expiryDate').limit(101)):Promise.resolve(null)));
+    const destLot=outputLotRef?await tx.get(outputLotRef):null;
+    const sourceLotUpdates=[];
+    for(let i=0;i<n;i++){
+     if(!inputLots[i])continue;
+     if(inputLots[i].size>100)throw Error('LOT');
+     const matching=debitLotDocs(inputLots[i].docs,inputs[i].location,inputs[i].quantity,new Date().toISOString().slice(0,10));
+     if(!matching)throw Error('LOT');
+     for(const upd of matching)sourceLotUpdates.push(upd);
+    }
+    if(outBalance.exists&&outBalance.data().unit!==outUnit)throw Error('UNIT');
+    if(destLot?.exists&&destLot.data().unit!==outUnit)throw Error('UNIT');
+    const before=outBalance.data()||{unit:outUnit,reserva:0,giro:0,total:0};
+    const newLoc=round((before[outputLocation]||0)+outputQuantity);
+    for(let i=0;i<n;i++){
+     const b=sBal[i].data(),item=inputs[i];
+     tx.update(sourceBalances[i],{[item.location]:round(b[item.location]-item.quantity),
+      total:round(b.total-item.quantity),lastOperationId:requestId,updatedAt:now()});
+    }
+    for(const upd of sourceLotUpdates){
+     tx.update(upd.ref,{[inputs.find(i=>upd.ref.path.includes('/'+i.productId+'/'))?.location||'giro']:upd.value,
+      availableQuantity:upd.total,updatedAt:now()});
+    }
+    tx.set(outputBalanceRef,{productId:outputProductId,unit:outUnit,
+     [outputLocation]:newLoc,[outputLocation==='reserva'?'giro':'reserva']:before[outputLocation==='reserva'?'giro':'reserva']||0,
+     total:round(before.total+outputQuantity),lastOperationId:requestId,updatedAt:now(),quality:'ESTIMATED_BY_MOVEMENTS'},{merge:true});
+    if(outputLotRef){
+     const old=destLot.data()||{},updated=round((old[outputLocation]||0)+outputQuantity);
+     const other=old[outputLocation==='reserva'?'giro':'reserva']||0;
+     tx.set(outputLotRef,{productId:outputProductId,lot:lot.trim(),expiryDate,unit:outUnit,
+      [outputLocation]:updated,[outputLocation==='reserva'?'giro':'reserva']:other,availableQuantity:round(updated+other),updatedAt:now()},{merge:true});
+    }
+    tx.create(recordRef,{kind:'production',actorUid:actor.uid,at:now(),productId:outputProductId,
+     outputQuantity,outputUnit:outUnit,outputLocation,inputs:inputs.map((i,k)=>({...i,unit:sCfg[k].data().countUnit})),
+     lot,expiryDate,alternativeReason:alternativeReason.trim(),notes,fingerprint,recipeProfileVersion:ocfg.version});
+    audit(tx,db,'v3.produced',m.unitId,actor.uid,{requestId,outputProductId,inputs,outputQuantity,outputUnit:outUnit});
+   });
+   return send(res,200,duplicate?'Produção já registrada.':'Produção concluída e saldos atualizados.',{duplicate,id:requestId});
+  }
   return send(res,400,'Ação não suportada.');
  }catch(e){
   const errors={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem permissão.'],MISSING:[409,'Produto não configurado ou saldo indisponível.'],
