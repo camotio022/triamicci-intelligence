@@ -78,7 +78,18 @@ export default function KitchenV3({membership}){
     <section className="v3-card"><h2>Avisos da equipe</h2>{signals.length===0?<p>Nenhuma falta em aberto.</p>:signals.map(s=><article className="v3-row" key={s.id}><div><strong>{s.productName}</strong><p>{s.location==='giro'?'Giro · 1º piso':'Reserva · 2º piso'} · {s.observation==='missing'?'Possível falta':'Estoque baixo'}</p><small>{s.reports?.length||1} relato(s)</small></div>{canManage&&<form className="v3-inline-resolve" onSubmit={e=>{e.preventDefault();update('v3ResolveSignal',{productId:s.productId,location:s.location,resolution:resolutionById[s.id]||''},'Aviso resolvido.')}}><label>Decisão<input required maxLength={240} value={resolutionById[s.id]||''} onChange={e=>setResolutionById(old=>({...old,[s.id]:e.target.value}))} placeholder="Ex.: conferido e localizado"/></label><button type="submit" disabled={busy}>Resolver</button></form>}</article>)}</section>
     <section className="v3-card"><h2>Próximas entregas</h2>{orders.length===0?<p>Não há pedidos registrados.</p>:orders.slice(0,10).map(o=><article className="v3-row" key={o.id}><div><strong>{date(o.etaDate)} · {o.supplier}</strong><p>{o.items.map(i=>i.name+' '+i.quantity+' '+i.unit).join(' · ')}</p><small>{status[o.status]||o.status}</small></div></article>)}</section>
     <section className="v3-card v3-span"><h2>Disponibilidade por insumo</h2><p>Quantidade mostrada com a origem correta. Sem conferência recente, não declaramos estoque confirmado.</p>
-     <div className="v3-tiles">{active.map(p=><article key={p.id} className="v3-tile"><strong>{p.profile?.displayName||p.name}</strong><small>{p.profile?.controlMode==='quantitative'?'Contagem':p.profile?.controlMode==='on_demand'?'Sob demanda':'Disponibilidade'} · {p.profile?'Configurado':'Configuração pendente'}</small><span>{p.profile?.controlMode==='quantitative'?'Conferir locais':'Consultar sinais da equipe'}</span></article>)}</div>
+     <div className="v3-tiles">{active.map(p=>{
+      const balance=p.v3Balance,sessions=balance?.countSessions||{};
+      const sameSession=Boolean(sessions.reserva&&sessions.giro&&sessions.reserva===sessions.giro&&balance.quality==='COUNTED_AT_LOCATION');
+      const reported=signals.filter(x=>x.productId===p.id);
+      return <article key={p.id} className="v3-tile">
+       <strong>{p.profile?.displayName||p.name}</strong>
+       <small>{p.profile?.controlMode==='quantitative'?'Contagem':p.profile?.controlMode==='on_demand'?'Sob demanda':'Disponibilidade'} · {p.profile?'Configurado':'Configuração pendente'}</small>
+       {p.profile?.controlMode==='quantitative'&&balance?<><div className="v3-stock-numbers"><span>Reserva <b>{balance.reserva??'—'}</b></span><span>Giro <b>{balance.giro??'—'}</b></span></div>
+        <strong>{balance.total} {balance.unit}</strong><small>{sameSession?'Conferido em uma rodada':'Saldo estimado / locais sem conferência conjunta'}</small></>:
+        <span>{reported.length?reported.some(x=>x.observation==='missing')?'Possível falta sinalizada':'Estoque baixo sinalizado':'Disponibilidade não verificada'}</span>}
+      </article>;
+    })}</div>
     </section>
    </div>}
    {tab==='availability'&&<div className="v3-card v3-narrow"><h2>Sinalizar falta ou estoque baixo</h2><p>Qualquer membro da equipe pode avisar. O aviso não zera nem altera o saldo.</p>
