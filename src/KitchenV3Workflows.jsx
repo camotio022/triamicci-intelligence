@@ -51,7 +51,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    if(!/^[a-f0-9-]{36}$/i.test(sessionId)){setError('Identificador da rodada inválido. Gere um novo identificador.');return;}
    if(chosen?.trackExpiry&&lots.some(l=>lotCounts[l.id]==='')){setError('Informe a contagem de cada lote, inclusive zero quando estiver vazio.');return;}
    const counts=lots.map(l=>({id:l.id,quantity:Number(lotCounts[l.id])}));
-   return commit('v3Count',{productId,location,sessionId,quantity:Number(quantity),lotCounts:counts,notes},'Contagem física registrada.');
+   return commit('v3Count',{productId,location,sessionId,quantity:Number(quantity),lotCounts:counts,initialLot:chosen?.trackExpiry&&!lots.length&&Number(quantity)>0?{lot:initialLotName.trim(),expiryDate:initialLotExpiry}:null,notes},'Contagem física registrada.');
   }
   if(kind==='transfer')return commit('v3Transfer',{productId,from,to,quantity:Number(quantity)},'Transferência registrada.');
   if(kind==='produce')return commit('v3Produce',{outputProductId:outputId,outputQuantity:Number(outputQty),outputLocation,inputs:sources.map(i=>({...i,quantity:Number(i.quantity)})),
