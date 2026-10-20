@@ -20,5 +20,7 @@ jobs:
         run: node --test tests/unit-engine.test.js tests/measurement-profiles.test.js tests/package-conference.test.js tests/package-reconciliation.test.js tests/package-review-rules.test.js tests/package-lot-allocation.test.js tests/package-commit-guards.test.js tests/package-adjustment-plan.test.js tests/v3-catalog-policy.test.js
       - name: Regressões de operações e produção
         run: node --test tests/production-logic.test.mjs tests/physical-operations.test.mjs tests/daily-inventory.test.js
+      - name: Sintaxe da API V3 e dos motores
+        run: node --check server/operations/v3-service.js && node --check server/operations/v3-ledger.js && node --check server/operations/v3-catalog-policy.js
       - name: Build
         run: npm run build
