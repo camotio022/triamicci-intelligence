@@ -115,6 +115,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
     </section>
     <section className="ti-receive-stage">
      <h3><span>2</span> Quanto foi entregue?</h3>
+     {p&&summary&&!summary.previous&&<div className="ti-receive-warning" role="status">Ainda não existe uma contagem física inicial deste produto. O recebimento será registrado no histórico, mas não criará automaticamente um saldo físico disponível. Faça a contagem de Reserva e Giro para estabelecer o saldo inicial antes de depender dele nas saídas.</div>}
      {p&&weightToPieces&&<div className="ti-receive-warning" role="status">Pedido em kg e estoque por peças: registre o peso realmente entregue e a contagem efetiva de peças. Não calculamos peças automaticamente a partir de kg.</div>}
      {p&&proteinMismatch&&<div className="ti-receive-warning" role="status">Confira a unidade configurada neste produto. Não modificaremos saldos antigos automaticamente.</div>}
      {p&&receivingUnit!==physicalUnit&&!weightToPieces&&<div className="ti-receive-warning" role="alert">As unidades de compra e estoque são diferentes. A versão atual ainda não possui uma conversão homologada entre elas. Não informe caixas ou pacotes como se fossem kg ou unidades; solicite conferência da unidade antes de registrar.</div>}
