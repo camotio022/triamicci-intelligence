@@ -31,8 +31,8 @@ export default async function kitchenV3(req,res){
    const [s,o]=await Promise.all([issues.limit(201).get(),orders.limit(201).get()]);
    if(s.size>200||o.size>200)return send(res,409,'Há muitos avisos. Paginação necessária.');
    const today=new Date().toISOString().slice(0,10);
-   return send(res,200,'Alertas operacionais carregados.',{signals:s.docs.map(obj).filter(x=>x.status!==\'resolved\'),
-    deliveries:o.docs.map(obj).filter(x=>![\'received\',\'cancelled\'].includes(x.status)).sort((a,b)=>a.etaDate.localeCompare(b.etaDate)),today});
+   return send(res,200,'Alertas operacionais carregados.',{signals:s.docs.map(obj).filter(x=>x.status!=='resolved'),
+    deliveries:o.docs.map(obj).filter(x=>!['received','cancelled'].includes(x.status)).sort((a,b)=>a.etaDate.localeCompare(b.etaDate)),today});
   }
   if(action==='v3Dashboard'){
    const [a,b,c,d,e]=await Promise.all([products.limit(201).get(),profiles.limit(201).get(),issues.limit(201).get(),orders.limit(201).get(),balances.limit(201).get()]);
