@@ -19,7 +19,7 @@ export default function KitchenV3({membership}){
  const {notify}=useFeedback();
  const canManage=['admin','manager'].includes(membership.role);
  const [tab,setTab]=useState('overview'),[products,setProducts]=useState([]),[signals,setSignals]=useState([]),[orders,setOrders]=useState([]);
- const [selected,setSelected]=useState(''),[search,setSearch]=useState(''),[location,setLocation]=useState('reserva');
+ const [selected,setSelected]=useState(''),[search,setSearch]=useState(''),[location,setLocation]=useState('reserva'),[showArchived,setShowArchived]=useState(false),[newName,setNewName]=useState(''),[newCategory,setNewCategory]=useState('Proteínas'),[newUnit,setNewUnit]=useState('kg'),[newExpiry,setNewExpiry]=useState(false),[resolutionById,setResolutionById]=useState({});
  const [observation,setObservation]=useState('missing'),[note,setNote]=useState('');
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [editId,setEditId]=useState(''),[step,setStep]=useState(0),[mode,setMode]=useState('availability'),
@@ -32,7 +32,7 @@ export default function KitchenV3({membership}){
   finally{setLoading(false);}
  },[]);
  useEffect(()=>{load();},[load]);
- const active=useMemo(()=>products.filter(p=>p.status==='active'&&(p.name+' '+(p.profile?.displayName||'')).toLowerCase().includes(search.trim().toLowerCase())),[products,search]);
+ const active=useMemo(()=>products.filter(p=>(showArchived||p.status==='active')&&(p.name+' '+(p.profile?.displayName||'')).toLowerCase().includes(search.trim().toLowerCase())),[products,search,showArchived]);
  const chosen=products.find(p=>p.id===selected);
  const current=products.find(p=>p.id===editId);
  const update=async(action,payload,success)=>{
@@ -40,6 +40,15 @@ export default function KitchenV3({membership}){
   try{await api(action,payload);notify(success,'success');await load();return true;}
   catch(e){setError(e.message);notify(e.message,'error');return false;}
   finally{setBusy(false);}
+ };
+ const addProduct=async e=>{
+  e.preventDefault();setBusy(true);setError('');
+  try{const user=auth.currentUser;const token=await user?.getIdToken();if(!token)throw Error('Faça login.');
+   const response=await fetch('/api/products/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({action:'create',name:newName.trim(),category:newCategory,unit:newUnit,minStock:0,trackExpiry:newExpiry})});
+   const d=await response.json();if(!response.ok)throw Error(d.message||'Não foi possível cadastrar.');
+   notify('Insumo cadastrado. Configure seu fluxo antes de usar.','success');setNewName('');await load();
+  }catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const begin=p=>{const c=p.profile;setEditId(p.id);setStep(0);setMode(c?.controlMode||'availability');setOrigin(c?.origin||'supplier');setCountUnit(c?.countUnit||'un');setLocs(c?.locations||['reserva']);setPresentation(c?.receivingPresentation||'');setTrackingNote(c?.trackingNote||'');setSourceIds(c?.sourceProductIds||[]);setAltIds(c?.alternativeProductIds||[]);setTab('catalog');};
  const saveProfile=async()=>{
@@ -66,7 +75,7 @@ export default function KitchenV3({membership}){
   {loading?<p role="status">Carregando dados reais da unidade…</p>:<>
    {['receive','produce','transfer','count'].includes(tab)&&<KitchenV3Workflows key={tab} kind={tab} products={products} orders={orders} membership={membership} onChange={load}/>}
    {tab==='overview'&&<div className="v3-columns">
-    <section className="v3-card"><h2>Avisos da equipe</h2>{signals.length===0?<p>Nenhuma falta em aberto.</p>:signals.map(s=><article className="v3-row" key={s.id}><div><strong>{s.productName}</strong><p>{s.location==='giro'?'Giro · 1º piso':'Reserva · 2º piso'} · {s.observation==='missing'?'Possível falta':'Estoque baixo'}</p><small>{s.reports?.length||1} relato(s) · {longDate(s.updatedAt?.seconds?s.updatedAt.seconds*1000:s.updatedAt)}</small></div>{canManage&&<button className="v3-secondary" type="button" disabled={busy} onClick={()=>{const reason=window.prompt('Como essa pendência foi resolvida?');if(reason?.trim())update('v3ResolveSignal',{productId:s.productId,location:s.location,resolution:reason},'Aviso resolvido.')}}>Resolver</button>}</article>)}</section>
+    <section className="v3-card"><h2>Avisos da equipe</h2>{signals.length===0?<p>Nenhuma falta em aberto.</p>:signals.map(s=><article className="v3-row" key={s.id}><div><strong>{s.productName}</strong><p>{s.location==='giro'?'Giro · 1º piso':'Reserva · 2º piso'} · {s.observation==='missing'?'Possível falta':'Estoque baixo'}</p><small>{s.reports?.length||1} relato(s)</small></div>{canManage&&<form className="v3-inline-resolve" onSubmit={e=>{e.preventDefault();update('v3ResolveSignal',{productId:s.productId,location:s.location,resolution:resolutionById[s.id]||''},'Aviso resolvido.')}}><label>Decisão<input required maxLength={240} value={resolutionById[s.id]||''} onChange={e=>setResolutionById(old=>({...old,[s.id]:e.target.value}))} placeholder="Ex.: conferido e localizado"/></label><button type="submit" disabled={busy}>Resolver</button></form>}</article>)}</section>
     <section className="v3-card"><h2>Próximas entregas</h2>{orders.length===0?<p>Não há pedidos registrados.</p>:orders.slice(0,10).map(o=><article className="v3-row" key={o.id}><div><strong>{date(o.etaDate)} · {o.supplier}</strong><p>{o.items.map(i=>i.name+' '+i.quantity+' '+i.unit).join(' · ')}</p><small>{status[o.status]||o.status}</small></div></article>)}</section>
     <section className="v3-card v3-span"><h2>Disponibilidade por insumo</h2><p>Quantidade mostrada com a origem correta. Sem conferência recente, não declaramos estoque confirmado.</p>
      <div className="v3-tiles">{active.map(p=><article key={p.id} className="v3-tile"><strong>{p.profile?.displayName||p.name}</strong><small>{p.profile?.controlMode==='quantitative'?'Contagem':p.profile?.controlMode==='on_demand'?'Sob demanda':'Disponibilidade'} · {p.profile?'Configurado':'Configuração pendente'}</small><span>{p.profile?.controlMode==='quantitative'?'Conferir locais':'Consultar sinais da equipe'}</span></article>)}</div>
@@ -97,8 +106,8 @@ export default function KitchenV3({membership}){
    </div>}
 
    {tab==='catalog'&&canManage&&<div className="v3-card"><h2>Catálogo operacional configurável</h2><p>As mudanças não convertem saldos antigos. Arquivar e renomear insumos serão tratados com preservação do histórico.</p>
-    <label className="v3-search">Buscar insumo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome do insumo"/></label>
-    {!editId?<div className="v3-tiles">{active.map(p=><article key={p.id} className="v3-tile"><strong>{p.name}</strong><small>{p.profile?.controlMode||'Não configurado'}</small><button className="v3-secondary" type="button" onClick={()=>begin(p)}>Configurar</button></article>)}</div>:
+    <form className="v3-form v3-new-product" onSubmit={addProduct}><h3>Cadastrar novo insumo</h3><div className="v3-line"><label>Nome<input required minLength={2} maxLength={100} value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Ex.: Rúcula"/></label><label>Categoria<select value={newCategory} onChange={e=>setNewCategory(e.target.value)}>{['Proteínas','Preparações','Hortifruti','Laticínios','Mercearia','Congelados','Bebidas','Limpeza','Descartáveis','Outros'].map(x=><option key={x}>{x}</option>)}</select></label><label>Unidade inicial<select value={newUnit} onChange={e=>setNewUnit(e.target.value)}>{['kg','g','L','ml','un'].map(x=><option key={x}>{x}</option>)}</select></label></div><label className="v3-checkbox"><input type="checkbox" checked={newExpiry} onChange={e=>setNewExpiry(e.target.checked)}/>Exigir lote e validade</label><button disabled={busy} type="submit">Criar e depois configurar</button></form><label className="v3-search">Buscar insumo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome do insumo"/></label><label className="v3-checkbox"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar insumos arquivados</label>
+    {!editId?<div className="v3-tiles">{active.map(p=><article key={p.id} className="v3-tile"><strong>{p.name}</strong><small>{p.profile?.controlMode||'Não configurado'}</small><button className="v3-secondary" type="button" onClick={()=>begin(p)} disabled={p.status!=='active'}>Configurar</button><button className="v3-secondary" type="button" disabled={busy} onClick={()=>update('v3ArchiveProduct',{productId:p.id,active:p.status!=='active'},p.status==='active'?'Insumo arquivado.':'Insumo reativado.')}>{p.status==='active'?'Arquivar':'Reativar'}</button></article>)}</div>:
     <div className="v3-wizard"><div className="v3-row"><h3>{current?.name}</h3><button type="button" className="v3-secondary" onClick={()=>setEditId('')}>Voltar</button></div><p className="v3-info">Etapa {step+1} de 4 · Alteração versionada e auditável</p>
      {step===0&&<div className="v3-form"><label>Como o insumo entra na cozinha?<select value={origin} onChange={e=>setOrigin(e.target.value)}>{sources.map(([value,title])=><option key={value} value={value}>{title}</option>)}</select></label><label>Como chega? (embalagem ou apresentação)<input maxLength={80} value={presentation} onChange={e=>setPresentation(e.target.value)} placeholder="Ex.: fardo pesado em kg"/></label></div>}
      {step===1&&<div className="v3-form"><label>Como controlar?<select value={mode} onChange={e=>setMode(e.target.value)}>{kinds.map(([value,title])=><option key={value} value={value}>{title}</option>)}</select></label>{mode==='quantitative'&&<label>Como contar?<select value={countUnit} onChange={e=>setCountUnit(e.target.value)}>{units.map(u=><option key={u} value={u}>{u}</option>)}</select></label>}</div>}
