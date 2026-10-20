@@ -109,9 +109,9 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
     <div className="ti-receive-hero"><div><small>RECEBIMENTO · PASSO A PASSO</small><h2>Conferir mercadoria</h2><p>Selecione o produto e registre a quantidade real. O sistema nunca deve presumir o conteúdo de uma caixa ou pacote.</p></div><span className="ti-receive-progress">3 etapas</span></div>
     <section className="ti-receive-stage">
      <h3><span>1</span> Qual mercadoria chegou?</h3>
-     <label>Produto recebido<select required value={productId} onChange={e=>{setProductId(e.target.value);setPendingId(null);setStatus('')}}><option value="">Escolher produto da unidade</option>{products.filter(x=>x.status==='active').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+     <label className="ti-receive-field">Produto recebido<select required value={productId} onChange={e=>{setProductId(e.target.value);setPendingId(null);setStatus('')}}><option value="">Escolher produto da unidade</option>{products.filter(x=>x.status==='active').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
      {p&&<p>Unidade do saldo atualmente configurada: <strong>{physicalUnit}</strong>. Unidade comercial registrada: <strong>{receivingUnit}</strong>.</p>}
-     <label>Fornecedor<input required minLength={1} maxLength={160} value={supplier} onChange={e=>{setSupplier(e.target.value);setPendingId(null)}} /></label>
+     <label className="ti-receive-field">Fornecedor<input required minLength={1} maxLength={160} value={supplier} onChange={e=>{setSupplier(e.target.value);setPendingId(null)}} /></label>
     </section>
     <section className="ti-receive-stage">
      <h3><span>2</span> Quanto foi entregue?</h3>
@@ -128,7 +128,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
     <section className="ti-receive-stage">
      <h3><span>3</span> Conferir e registrar</h3>
      {p?.trackExpiry&&<div className="inventory-fields"><label>Lote<input required maxLength={80} value={lot} onChange={e=>{setLot(e.target.value);setPendingId(null)}}/></label><label>Validade<input required type="date" value={expiry} onChange={e=>{setExpiry(e.target.value);setPendingId(null)}}/></label></div>}
-     <label>Observações (opcional)<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setPendingId(null)}} placeholder="Ex.: caixas conferidas com fornecedor"/></label>
+     <label className="ti-receive-field ti-receive-notes">Observações (opcional)<textarea rows={3} maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setPendingId(null)}} placeholder="Ex.: caixas conferidas com fornecedor"/></label>
      {p&&<div className="ti-receive-summary"><span>Resumo da entrega</span><b>{p.name}</b><span>{amount||'—'} {physicalUnit} recebidos · pedido de {orderedQuantity||'—'} {receivingUnit}</span><span>Registro vinculado ao responsável e à unidade atual.</span></div>}
      <button className="ti-receive-primary" type="submit" disabled={busy||!productId||(receivingUnit!==physicalUnit&&!weightToPieces)}>{busy?'Registrando...':'Confirmar recebimento'}</button>
      {status&&<p role="status">{status}</p>}
