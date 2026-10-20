@@ -24,6 +24,8 @@ export default function KitchenV3({membership}){
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [editId,setEditId]=useState(''),[step,setStep]=useState(0),[mode,setMode]=useState('availability'),
   [origin,setOrigin]=useState('supplier'),[countUnit,setCountUnit]=useState('un'),[locs,setLocs]=useState(['reserva']),[presentation,setPresentation]=useState(''),[trackingNote,setTrackingNote]=useState(''),[sourceIds,setSourceIds]=useState([]),[altIds,setAltIds]=useState([]);
+ const [receipt,setReceipt]=useState({productId:'',orderId:'',commercialQuantity:'',commercialUnit:'kg',stockQuantity:'',location:'reserva',lot:'',expiryDate:'',supplier:'',notes:''});
+ const [count,setCount]=useState({productId:'',location:'reserva',quantity:'',notes:''});
  const [supplier,setSupplier]=useState(''),[eta,setEta]=useState(''),[orderLines,setOrderLines]=useState([{productId:'',quantity:'',unit:'kg'}]),[orderNote,setOrderNote]=useState('');
  const load=useCallback(async()=>{
   setLoading(true);setError('');
@@ -49,6 +51,24 @@ export default function KitchenV3({membership}){
    receivingPresentation:presentation||null,sourceProductIds:sourceIds,alternativeProductIds:altIds,trackingNote}},'Configuração operacional atualizada.');
   if(ok){setEditId('');setStep(0);}
  };
+ const receive=async e=>{
+  e.preventDefault();const product=products.find(p=>p.id===receipt.productId);
+  if(!product?.profile){setError('Configure o produto antes do recebimento.');return;}
+  const isCounted=product.profile.controlMode==='quantitative';
+  if(isCounted&&!receipt.stockQuantity.trim()){setError('Informe a quantidade física conferida; não calculamos a partir da embalagem.');return;}
+  if(product.trackExpiry&&(!receipt.lot.trim()||!receipt.expiryDate)){setError('Informe lote e validade para este insumo.');return;}
+  const payload={...receipt,requestId:crypto.randomUUID(),orderId:receipt.orderId||null,
+   commercialQuantity:Number(receipt.commercialQuantity),stockQuantity:isCounted?Number(receipt.stockQuantity):0};
+  const ok=await update('v3Receive',payload,'Recebimento conferido e registrado.');
+  if(ok)setReceipt(x=>({...x,commercialQuantity:'',stockQuantity:'',lot:'',expiryDate:'',notes:''}));
+ };
+ const countStock=async e=>{
+  e.preventDefault();
+  const product=products.find(p=>p.id===count.productId);
+  if(product?.trackExpiry){setError('Este produto exige contagem detalhada por lote, ainda indisponível nesta tela. Nenhum saldo foi alterado.');return;}
+  const ok=await update('v3Count',{...count,requestId:crypto.randomUUID(),sessionId:crypto.randomUUID(),quantity:Number(count.quantity)},'Contagem registrada para o local.');
+  if(ok)setCount(x=>({...x,quantity:'',notes:''}));
+ };
  const addOrderLine=()=>setOrderLines(old=>[...old,{productId:'',quantity:'',unit:'kg'}]);
  const saveOrder=async e=>{
   e.preventDefault();
@@ -60,7 +80,7 @@ export default function KitchenV3({membership}){
  return <section className="v3-page">
   <header className="v3-head"><div><p className="eyebrow">OPERAÇÃO DA COZINHA · V3</p><h1>Central de insumos</h1><p>O que temos, o que falta e o que está previsto para chegar.</p></div><button type="button" className="v3-secondary" onClick={load} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></header>
   <nav className="v3-tabs" aria-label="Seções de insumos">
-   {[['overview','Visão geral'],['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['count','Contagem'],...(canManage?[['catalog','Configurar catálogo']]:[])].map(([key,label])=><button type="button" key={key} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
+   {[['overview','Visão geral'],['availability','Avisar falta'],['orders','Entregas'],['counts','Contagens'],...(canManage?[['receiving','Recebimento']]:[]),['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['count','Contagem'],...(canManage?[['catalog','Configurar catálogo']]:[])].map(([key,label])=><button type="button" key={key} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
   </nav>
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {loading?<p role="status">Carregando dados reais da unidade…</p>:<>
@@ -95,6 +115,31 @@ export default function KitchenV3({membership}){
     </section>}
     <section className="v3-card"><h2>Agenda compartilhada de entregas</h2>{orders.length===0?<p>Não há pedidos cadastrados.</p>:orders.map(o=><article key={o.id} className="v3-order"><div className="v3-row"><div><strong>{date(o.etaDate)} · {o.supplier}</strong><p>{status[o.status]||o.status}</p></div></div>{o.items.map((i,k)=><p key={k}>{i.name} — {i.quantity} {i.unit}</p>)}{canManage&&['requested','confirmed','overdue','partially_received'].includes(o.status)&&<label>Situação<select value={o.status} disabled={busy} onChange={e=>update('v3OrderStatus',{orderId:o.id,status:e.target.value},'Pedido atualizado.')}><option value={o.status}>{status[o.status]}</option>{({requested:['confirmed','overdue','cancelled'],confirmed:['overdue','cancelled'],overdue:['confirmed','cancelled'],partially_received:['cancelled']})[o.status]?.map(x=><option value={x} key={x}>{status[x]}</option>)}</select></label>}</article>)}</section>
    </div>}
+
+   {tab==='receiving'&&canManage&&<section className="v3-card v3-narrow"><h2>Conferir recebimento</h2><p>Informe separadamente a quantidade comercial entregue e o saldo físico realmente aferido. Nunca converter kg em porções presumidas.</p>
+    <form className="v3-form" onSubmit={receive}>
+     <label>Produto<select required value={receipt.productId} onChange={e=>setReceipt(x=>({...x,productId:e.target.value}))}><option value="">Selecione o insumo</option>{products.filter(p=>p.status==='active').map(p=><option key={p.id} value={p.id}>{p.profile?.displayName||p.name}</option>)}</select></label>
+     <label>Pedido correspondente (opcional)<select value={receipt.orderId} onChange={e=>setReceipt(x=>({...x,orderId:e.target.value}))}><option value="">Recebimento sem pedido cadastrado</option>{orders.filter(o=>!['received','cancelled'].includes(o.status)&&o.items.some(i=>i.productId===receipt.productId)).map(o=><option key={o.id} value={o.id}>{date(o.etaDate)} · {o.supplier}</option>)}</select></label>
+     <div className="v3-line"><label>Quantidade recebida<input required type="number" min="0.001" step="0.001" value={receipt.commercialQuantity} onChange={e=>setReceipt(x=>({...x,commercialQuantity:e.target.value}))}/></label><label>Unidade comercial<select value={receipt.commercialUnit} onChange={e=>setReceipt(x=>({...x,commercialUnit:e.target.value}))}>{units.map(u=><option key={u} value={u}>{u}</option>)}</select></label></div>
+     {products.find(p=>p.id===receipt.productId)?.profile?.controlMode==='quantitative'&&<label>Quantidade física aferida ({products.find(p=>p.id===receipt.productId)?.profile?.countUnit})<input required type="number" min="0.001" step="0.001" value={receipt.stockQuantity} onChange={e=>setReceipt(x=>({...x,stockQuantity:e.target.value}))}/></label>}
+     <label>Local de entrada<select value={receipt.location} onChange={e=>setReceipt(x=>({...x,location:e.target.value}))}><option value="reserva">Reserva · 2º piso</option><option value="giro">Giro · 1º piso</option></select></label>
+     <label>Fornecedor<input maxLength={100} value={receipt.supplier} onChange={e=>setReceipt(x=>({...x,supplier:e.target.value}))}/></label>
+     <label>Lote<input maxLength={80} value={receipt.lot} onChange={e=>setReceipt(x=>({...x,lot:e.target.value}))}/></label>
+     <label>Validade<input type="date" value={receipt.expiryDate} onChange={e=>setReceipt(x=>({...x,expiryDate:e.target.value}))}/></label>
+     <label>Observações<textarea maxLength={240} value={receipt.notes} onChange={e=>setReceipt(x=>({...x,notes:e.target.value}))}/></label>
+     <button type="submit" disabled={busy}>{busy?'Registrando…':'Confirmar conferência física'}</button>
+    </form>
+   </section>}
+   {tab==='counts'&&<section className="v3-card v3-narrow"><h2>Contagem por localização</h2><p>Registrar uma contagem não confirma automaticamente a quantidade total. Reserva e Giro têm referências independentes.</p>
+    <form className="v3-form" onSubmit={countStock}>
+     <label>Insumo com controle quantitativo<select required value={count.productId} onChange={e=>setCount(x=>({...x,productId:e.target.value}))}><option value="">Selecione</option>{products.filter(p=>p.status==='active'&&p.profile?.controlMode==='quantitative').map(p=><option key={p.id} value={p.id}>{p.profile?.displayName||p.name}</option>)}</select></label>
+     <label>Local<select value={count.location} onChange={e=>setCount(x=>({...x,location:e.target.value}))}><option value="reserva">Reserva · 2º piso</option><option value="giro">Giro · 1º piso</option></select></label>
+     <label>Quantidade conferida {products.find(p=>p.id===count.productId)?.profile?.countUnit&&'('+products.find(p=>p.id===count.productId).profile.countUnit+')'}<input type="number" required min="0" step={['un','porcao','pacote','duzia'].includes(products.find(p=>p.id===count.productId)?.profile?.countUnit)?'1':'0.001'} value={count.quantity} onChange={e=>setCount(x=>({...x,quantity:e.target.value}))}/></label>
+     <label>Observações<textarea maxLength={240} value={count.notes} onChange={e=>setCount(x=>({...x,notes:e.target.value}))}/></label>
+     <button type="submit" disabled={busy}>{busy?'Registrando…':'Salvar contagem deste local'}</button>
+    </form>
+    <p className="v3-info">Produtos com controle de validade exigem contagem discriminada por lote; esta tela não permite ajuste sem essa conferência.</p>
+   </section>}
    {tab==='catalog'&&canManage&&<div className="v3-card"><h2>Catálogo operacional configurável</h2><p>As mudanças não convertem saldos antigos. Arquivar e renomear insumos serão tratados com preservação do histórico.</p>
     <label className="v3-search">Buscar insumo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome do insumo"/></label>
     {!editId?<div className="v3-tiles">{active.map(p=><article key={p.id} className="v3-tile"><strong>{p.name}</strong><small>{p.profile?.controlMode||'Não configurado'}</small><button className="v3-secondary" type="button" onClick={()=>begin(p)}>Configurar</button></article>)}</div>:
