@@ -104,7 +104,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
     <div className="v3-line"><Field name="Lote de armazenamento"><input required maxLength={80} value={lot} onChange={e=>setLot(e.target.value)} placeholder="Identificação real"/></Field><Field name="Validade"><input required type="date" value={expiry} onChange={e=>setExpiry(e.target.value)}/></Field></div>
    </>}
    {kind!=='transfer'&&<Field name="Observações (opcional)"><textarea maxLength={240} value={notes} onChange={e=>setNotes(e.target.value)}/></Field>}
-   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='receive'&&!managers||kind==='count'&&chosen?.profile?.controlMode!=='quantitative'||kind==='count'&&chosen?.trackExpiry&&!lots.length||kind==='transfer'&&from===to||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative}>
+   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='receive'&&!managers||kind==='count'&&chosen?.profile?.controlMode!=='quantitative'||kind==='count'&&chosen?.trackExpiry&&!lots.length||kind==='transfer'&&from===to||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
     {busy?'Registrando…':({receive:'Confirmar recebimento',count:'Salvar contagem',transfer:'Confirmar transferência',produce:'Concluir produção'})[kind]}
    </button>
   </form>
