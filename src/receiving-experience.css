@@ -21,7 +21,7 @@
  display:block;width:100%;min-width:0;max-width:100%;
  border:1px solid #cbd5e1;border-radius:12px;
  padding:13px 15px;min-height:50px;
- font:500 16px/1.4 inherit;color:#1d2939;background:#fff;
+ font-family:inherit;font-weight:500;font-size:16px;line-height:1.4;color:#1d2939;background:#fff;
  outline:none;transition:border-color .15s ease,box-shadow .15s ease,background-color .15s ease;
 }
 .ti-receive-stage :is(input,select,textarea):focus-visible,
