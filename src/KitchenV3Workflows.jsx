@@ -14,7 +14,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  [commercialUnit,setCommercialUnit]=useState('kg'),[commercialQuantity,setCommercialQuantity]=useState(''),
  [stockQuantity,setStockQuantity]=useState(''),[orderId,setOrderId]=useState(''),[lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),
  [notes,setNotes]=useState(''),[quantity,setQuantity]=useState(''),[sessionId,setSessionId]=useState(()=>crypto.randomUUID()),
- [lotCounts,setLotCounts]=useState({}),[lots,setLots]=useState([]),[loadingLots,setLoadingLots]=useState(false),
+ [lotCounts,setLotCounts]=useState({}),[initialLotName,setInitialLotName]=useState(''),[initialLotExpiry,setInitialLotExpiry]=useState(''),[lots,setLots]=useState([]),[loadingLots,setLoadingLots]=useState(false),
  [from,setFrom]=useState('reserva'),[to,setTo]=useState('giro'),
  [outputId,setOutputId]=useState(''),[outputQty,setOutputQty]=useState(''),[outputLocation,setOutputLocation]=useState('reserva'),
  [sources,setSources]=useState([{productId:'',location:'reserva',quantity:''}]),[alternativeReason,setAlternativeReason]=useState(''),
@@ -83,7 +83,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
     <Field name={'Quantidade encontrada ('+(expected||'sem unidade de contagem')+')'}><input required type="number" min="0" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={quantity} onChange={e=>setQuantity(e.target.value)}/></Field>
     <Field name="Identificador da rodada de contagem"><input required value={sessionId} onChange={e=>setSessionId(e.target.value)} aria-describedby="v3-session-help"/></Field><p id="v3-session-help" className="v3-info">Use o mesmo identificador para contar Reserva e Giro na mesma rodada. Uma nova rodada deve ter um identificador diferente.</p><button type="button" className="v3-secondary" onClick={()=>setSessionId(crypto.randomUUID())}>Iniciar nova rodada</button>
     {chosen?.trackExpiry&&<fieldset><legend>Contagem de lotes no local</legend><p>Para preservar validade e rastreabilidade, informe cada lote; sem lotes cadastrados é necessário primeiro regularizar o recebimento.</p>
-      {loadingLots?<p>Carregando lotes…</p>:lots.length?lots.map(l=><Field key={l.id} name={(l.lot||'Lote')+' · vence '+l.expiryDate}><input required type="number" min="0" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={lotCounts[l.id]??''} onChange={e=>setLotCounts(old=>({...old,[l.id]:e.target.value}))}/></Field>):<p role="status">Nenhum lote ativo para esse produto; contagem quantitativa não será aplicada sem regularização.</p>}
+      {loadingLots?<p>Carregando lotes…</p>:lots.length?lots.map(l=><Field key={l.id} name={(l.lot||'Lote')+' · vence '+l.expiryDate}><input required type="number" min="0" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={lotCounts[l.id]??''} onChange={e=>setLotCounts(old=>({...old,[l.id]:e.target.value}))}/></Field>):<div className="v3-form"><p role="status">Primeira contagem: gerente ou administrador deve identificar o lote existente antes de estabelecer o saldo.</p>{managers&&<><Field name="Lote físico inicial"><input required maxLength={80} value={initialLotName} onChange={e=>setInitialLotName(e.target.value)}/></Field><Field name="Validade do lote"><input required type="date" value={initialLotExpiry} onChange={e=>setInitialLotExpiry(e.target.value)}/></Field></>}</div>}
      </fieldset>}
    </>}
    {kind==='transfer'&&<>
@@ -106,7 +106,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
     <div className="v3-line"><Field name="Lote de armazenamento"><input required maxLength={80} value={lot} onChange={e=>setLot(e.target.value)} placeholder="Identificação real"/></Field><Field name="Validade"><input required type="date" value={expiry} onChange={e=>setExpiry(e.target.value)}/></Field></div>
    </>}
    {kind!=='transfer'&&<Field name="Observações (opcional)"><textarea maxLength={240} value={notes} onChange={e=>setNotes(e.target.value)}/></Field>}
-   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='receive'&&!managers||kind==='count'&&chosen?.profile?.controlMode!=='quantitative'||kind==='count'&&chosen?.trackExpiry&&!lots.length||kind==='transfer'&&from===to||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
+   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='receive'&&!managers||kind==='count'&&chosen?.profile?.controlMode!=='quantitative'||kind==='count'&&chosen?.trackExpiry&&!lots.length&&!managers||kind==='transfer'&&from===to||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
     {busy?'Registrando…':({receive:'Confirmar recebimento',count:'Salvar contagem',transfer:'Confirmar transferência',produce:'Concluir produção'})[kind]}
    </button>
   </form>
