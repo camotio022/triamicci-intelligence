@@ -71,10 +71,10 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    {kind==='receive'&&<>
     <Field name="Pedido relacionado (opcional)"><select value={orderId} onChange={e=>setOrderId(e.target.value)}><option value="">Entrega sem pedido cadastrado</option>{relatedOrders.map(o=><option value={o.id} key={o.id}>{o.supplier} · {o.etaDate}</option>)}</select></Field>
     <Field name="Fornecedor"><input required maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)}/></Field>
-    <div className="v3-line"><Field name="Quanto chegou?"><input type="number" required min=".001" step=".001" value={commercialQuantity} onChange={e=>setCommercialQuantity(e.target.value)}/></Field>
+    <div className="v3-line"><Field name="Quanto chegou?"><input type="number" required min={['un','pacote','porcao','duzia'].includes(commercialUnit)?'1':'0.001'} step={['un','pacote','porcao','duzia'].includes(commercialUnit)?'1':'0.001'} value={commercialQuantity} onChange={e=>setCommercialQuantity(e.target.value)}/></Field>
      <Field name="Conferido em"><select value={commercialUnit} onChange={e=>setCommercialUnit(e.target.value)}>{listUnits.map(x=><option key={x}>{x}</option>)}</select></Field></div>
     {chosen?.profile?.controlMode==='quantitative'?
-    <Field name={'Quantidade realmente contada para estoque ('+(expected||'não configurada')+')'}><input type="number" required min=".001" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={stockQuantity} onChange={e=>setStockQuantity(e.target.value)} placeholder="Valor aferido, nunca convertido por suposição"/></Field>:
+    <Field name={'Quantidade realmente contada para estoque ('+(expected||'não configurada')+')'}><input type="number" required min={['un','pacote','porcao','duzia'].includes(expected)?'1':'0.001'} step={['un','pacote','porcao','duzia'].includes(expected)?'1':'0.001'} value={stockQuantity} onChange={e=>setStockQuantity(e.target.value)} placeholder="Valor aferido, nunca convertido por suposição"/></Field>:
     <p className="v3-info">Este insumo usa disponibilidade. Registraremos o recebimento sem criar uma quantidade física presumida.</p>}
     <Field name="Armazenar em"><select value={location} onChange={e=>setLocation(e.target.value)}>{(chosen?.profile?.locations||['reserva']).map(x=><option key={x} value={x}>{x==='giro'?'Giro · 1º piso':'Reserva · 2º piso'}</option>)}</select></Field>
    </>}
@@ -89,14 +89,14 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    {kind==='transfer'&&<>
     <Field name="De"><select value={from} onChange={e=>setFrom(e.target.value)}><option value="reserva">Reserva · 2º piso</option><option value="giro">Giro · 1º piso</option></select></Field>
     <Field name="Para"><select value={to} onChange={e=>setTo(e.target.value)}><option value="giro">Giro · 1º piso</option><option value="reserva">Reserva · 2º piso</option></select></Field>
-    <Field name={'Quantidade ('+(expected||'não configurada')+')'}><input required type="number" min=".001" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={quantity} onChange={e=>setQuantity(e.target.value)}/></Field>
+    <Field name={'Quantidade ('+(expected||'não configurada')+')'}><input required type="number" min={['un','pacote','porcao','duzia'].includes(expected)?'1':'0.001'} step={['un','pacote','porcao','duzia'].includes(expected)?'1':'0.001'} value={quantity} onChange={e=>setQuantity(e.target.value)}/></Field>
    </>}
    {prepared&&<>
-    <Field name={'Quantidade preparada ('+(out?.profile?.countUnit||'não configurada')+')'}><input required type="number" min=".001" step={['un','pacote','porcao','duzia'].includes(out?.profile?.countUnit)?'1':'.001'} value={outputQty} onChange={e=>setOutputQty(e.target.value)}/></Field>
+    <Field name={'Quantidade preparada ('+(out?.profile?.countUnit||'não configurada')+')'}><input required type="number" min={['un','pacote','porcao','duzia'].includes(out?.profile?.countUnit)?'1':'0.001'} step={['un','pacote','porcao','duzia'].includes(out?.profile?.countUnit)?'1':'0.001'} value={outputQty} onChange={e=>setOutputQty(e.target.value)}/></Field>
     <Field name="Onde será armazenado?"><select value={outputLocation} onChange={e=>setOutputLocation(e.target.value)}>{locations.map(x=><option value={x} key={x}>{x==='reserva'?'Reserva · 2º piso':'Giro · 1º piso'}</option>)}</select></Field>
     <fieldset><legend>Matérias-primas realmente utilizadas</legend>{sources.map((source,i)=><div className="v3-line" key={i}><Field name="Origem"><select required value={source.productId} onChange={e=>setSources(old=>old.map((x,k)=>k===i?{...x,productId:e.target.value}:x))}><option value="">Selecione</option>{configuredSources.map(x=><option value={x.id} key={x.id}>{x.profile?.displayName||x.name}</option>)}</select></Field>
       <Field name="Local"><select value={source.location} onChange={e=>setSources(old=>old.map((x,k)=>k===i?{...x,location:e.target.value}:x))}><option value="reserva">Reserva</option><option value="giro">Giro</option></select></Field>
-      <Field name={'Utilizado ('+(products.find(p=>p.id===source.productId)?.profile?.countUnit||'?')+')'}><input required type="number" min=".001" step=".001" value={source.quantity} onChange={e=>setSources(old=>old.map((x,k)=>k===i?{...x,quantity:e.target.value}:x))}/></Field>
+      <Field name={'Utilizado ('+(products.find(p=>p.id===source.productId)?.profile?.countUnit||'?')+')'}><input required type="number" min={['un','pacote','porcao','duzia'].includes(products.find(p=>p.id===source.productId)?.profile?.countUnit)?'1':'0.001'} step={['un','pacote','porcao','duzia'].includes(products.find(p=>p.id===source.productId)?.profile?.countUnit)?'1':'0.001'} value={source.quantity} onChange={e=>setSources(old=>old.map((x,k)=>k===i?{...x,quantity:e.target.value}:x))}/></Field>
     </div>)}
      <button className="v3-secondary" type="button" onClick={()=>setSources(s=>[...s,{productId:'',quantity:'',location:'reserva'}])} disabled={sources.length>=12}>Adicionar matéria-prima</button>
     </fieldset>
