@@ -13,6 +13,10 @@ export function validateOperationalProfile(p){
  if(p.countUnit&&!UNITS.includes(p.countUnit))errors.push('COUNT_UNIT_INVALID');
  if(p.receivingPresentation&&!safeText(p.receivingPresentation))errors.push('RECEIVING_PRESENTATION_INVALID');
  if(p.unitConversion&&p.unitConversion.fixed!==true)errors.push('NO_ASSUMED_CONVERSION');
+ for(const key of ['sourceProductIds','alternativeProductIds']){
+  if(p[key]!==undefined&&(!Array.isArray(p[key])||p[key].length>20||p[key].some(id=>typeof id!=='string'||!/^[a-f0-9]{40}$/.test(id))||new Set(p[key]).size!==p[key].length))errors.push('INVALID_'+key.toUpperCase());
+ }
+ if(p.sourceProductIds?.some(x=>p.alternativeProductIds?.includes(x)))errors.push('DUPLICATE_SOURCE');
  return {ok:errors.length===0,errors};
 }
 export function stockVisibility({mode,signal='unknown',reserve=null,giro=null,reserveAt=null,giroAt=null,reserveSessionId=null,giroSessionId=null,estimated=false}){
