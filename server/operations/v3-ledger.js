@@ -175,7 +175,7 @@ export default async function v3Ledger(req,res){
      });
     }
     for(const c of changes)tx.update(c.ref,c.after);
-    tx.update(balRef,{[from]:round(prior[from]-quantity),[to]:round(prior[to]+quantity),lastOperationId:requestId,updatedAt:now()});
+    tx.update(balRef,{[from]:round(prior[from]-quantity),[to]:round(prior[to]+quantity),lastOperationId:requestId,updatedAt:now(),quality:'ESTIMATED_BY_MOVEMENTS'});
     tx.create(ref,{kind:'transfer',actorUid:actor.uid,at:now(),productId,from,to,quantity,unit:u});
     audit(tx,db,'v3.transferred',m.unitId,actor.uid,{requestId,productId,from,to,quantity});
    });
@@ -234,7 +234,7 @@ export default async function v3Ledger(req,res){
     for(let i=0;i<n;i++){
      const b=sBal[i].data(),item=inputs[i];
      tx.update(sourceBalances[i],{[item.location]:round(b[item.location]-item.quantity),
-      total:round(b.total-item.quantity),lastOperationId:requestId,updatedAt:now()});
+      total:round(b.total-item.quantity),lastOperationId:requestId,updatedAt:now(),quality:'ESTIMATED_BY_MOVEMENTS'});
     }
     for(const upd of sourceLotUpdates){
      tx.update(upd.ref,{[inputs.find(i=>upd.ref.path.includes('/'+i.productId+'/'))?.location||'giro']:upd.value,
