@@ -37,18 +37,23 @@ export default async function v3Ledger(req,res){
    actorRef=db.doc('memberships/'+actor.uid),action=req.body?.action;
   if(action==='v3Lots'){
    const {productId}=req.body||{};if(!idOk(productId))return send(res,400,'Insumo inválido.');
+   const [a,p]=await Promise.all([actorRef.get(),products.doc(productId).get()]);
+   if(!active(a,m.unitId,['admin','manager','cook','auxiliar']))return send(res,403,'Sem permissão.');
+   if(!p.exists||p.data().status!=='active')return send(res,404,'Insumo não encontrado.');
    const lots=await lotRoots.doc(productId).collection('lots').limit(101).get();
    if(lots.size>100)return send(res,409,'Muitos lotes: conferir paginação.');
    return send(res,200,'Lotes carregados.',{lots:lots.docs.map(snapMap)});
   }
   if(action==='v3LedgerHistory'){
+   const a=await actorRef.get();
+   if(!active(a,m.unitId,['admin','manager','cook','auxiliar']))return send(res,403,'Sem permissão.');
    const h=await unit.collection('v3Operations').orderBy('at','desc').limit(60).get();
    return send(res,200,'Movimentações recentes.',{operations:h.docs.map(snapMap)});
   }
   if(action==='v3Receive'){
    if(!['admin','manager'].includes(m.role))return send(res,403,'Somente gerência recebe mercadorias.');
    const {requestId,productId,commercialQuantity,commercialUnit,stockQuantity,location='reserva',orderId=null,lot='',expiryDate='',supplier='',notes=''}=req.body||{};
-   if(!reqOk(requestId)||!idOk(productId)||!locations.includes(location)||!['kg','g','L','mL','un','porcao','pacote','duzia'].includes(commercialUnit)||
+   if(!reqOk(requestId)||!idOk(productId)||!locations.includes(location)||typeof lot!=='string'||typeof expiryDate!=='string'||!['kg','g','L','mL','un','porcao','pacote','duzia'].includes(commercialUnit)||
       !number(commercialQuantity,commercialUnit)||!number(stockQuantity,'kg',true)||!Number.isFinite(stockQuantity)||stockQuantity<0||
       orderId!==null&&!reqOk(orderId)||typeof supplier!=='string'||supplier.length>100||typeof notes!=='string'||notes.length>240)
       return send(res,400,'Recebimento incompleto.');
@@ -67,6 +72,7 @@ export default async function v3Ledger(req,res){
     if(isCounted&&!cfg.locations.includes(location))throw Error('LOCATION');
     if(product.data().trackExpiry&&(!lot.trim()||lot.length>80||!isoDay(expiryDate)||expiryDate<new Date().toISOString().slice(0,10)))throw Error('LOT');
     if(orderRef&&(!order?.exists||!order.data().items.some(i=>i.productId===productId)))throw Error('ORDER');
+    if(orderRef&&['cancelled','received'].includes(order.data().status))throw Error('ORDER');
     const old=balance.exists?balance.data():{unit:cfg.countUnit,reserva:0,giro:0,total:0};
     if(isCounted&&old.unit!==cfg.countUnit)throw Error('UNIT');
     // Aferição e contagem explícitas: nunca kg -> peças por peso nominal.
@@ -79,7 +85,7 @@ export default async function v3Ledger(req,res){
       giro:location==='giro'?newLoc:old.giro||0,total:round((old.total||0)+stockQuantity),
       updatedAt:now(),lastOperationId:requestId,quality:'ESTIMATED_BY_MOVEMENTS'},{merge:true});
      if(lotRef){
-      const oldLot=batch.data()||{};
+      const oldLot=batch?.data()||{};
       const lo=round((oldLot[location]||0)+stockQuantity);
       const values={reserva:location==='reserva'?lo:oldLot.reserva||0,giro:location==='giro'?lo:oldLot.giro||0};
       tx.set(lotRef,{productId,lot:lot.trim(),expiryDate,unit:cfg.countUnit,...values,availableQuantity:round(values.reserva+values.giro),updatedAt:now()},{merge:true});
@@ -109,7 +115,7 @@ export default async function v3Ledger(req,res){
    await db.runTransaction(async tx=>{
     const [a,p,cfg,balance,record]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),tx.get(balanceRef),tx.get(ref)]);
     if(!active(a,m.unitId,['admin','manager','cook','auxiliar']))throw Error('FORBIDDEN');
-    if(record.exists)throw Error('CONFLICT');
+    if(record.exists){const old=record.data();if(old.kind==='count'&&old.actorUid===actor.uid&&old.sessionId===sessionId&&old.productId===productId&&old.location===location&&old.quantity===quantity&&old.notes===notes)return;throw Error('CONFLICT');}
     if(!p.exists||!cfg.exists||cfg.data().controlMode!=='quantitative'||!cfg.data().locations.includes(location))throw Error('MISSING');
     const u=cfg.data().countUnit;if(!number(quantity,u,true))throw Error('QUANTITY');
     const prior=balance.data()||{reserva:0,giro:0,total:0,unit:u};
@@ -132,7 +138,7 @@ export default async function v3Ledger(req,res){
     tx.set(balanceRef,{productId,unit:u,[location]:quantity,total:after,updatedAt:now(),
       lastCountAtByArea:{...(prior.lastCountAtByArea||{}),[location]:now()},
       countSessions:{...(prior.countSessions||{}),[location]:sessionId},
-      quality:'COUNTED_AT_LOCATION',lastOperationId:requestId},{merge:true});
+      quality:'PARTIAL_LOCATION_COUNT',lastOperationId:requestId},{merge:true});
     tx.create(ref,{kind:'count',actorUid:actor.uid,at:now(),productId,location,sessionId,quantity,unit:u,
       before:prior[location]||0,difference:round(quantity-(prior[location]||0)),notes});
     audit(tx,db,'v3.counted',m.unitId,actor.uid,{requestId,productId,location,quantity,sessionId});
