@@ -116,7 +116,7 @@ export default async function kitchenV3(req,res){
   if(action==='v3OrderStatus'){
    if(!roles.includes(member.role))return send(res,403,'Somente gerência altera pedidos.');
    const {orderId,status,etaDate=null}=req.body||{};
-   if(!requestOk(orderId)||!['confirmed','partially_received','received','overdue','cancelled'].includes(status)||etaDate!==null&&!dateOk(etaDate))return send(res,400,'Pedido ou situação inválida.');
+   if(!requestOk(orderId)||!['confirmed','overdue','cancelled'].includes(status)||etaDate!==null&&!dateOk(etaDate))return send(res,400,'Pedido ou situação inválida.');
    const ref=orders.doc(orderId);
    await db.runTransaction(async tx=>{
     const [actor,p]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
