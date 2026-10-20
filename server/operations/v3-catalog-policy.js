@@ -32,7 +32,7 @@ export function countGroupedPackages({complete=0,perGroup=0,loose=0}){
  return {ok:true,quantity:complete*perGroup+loose,unit:'porcao'};
 }
 export function transitionOrder(order,next){
- const allowed={requested:['confirmed','cancelled','overdue'],confirmed:['partially_received','received','cancelled','overdue'],overdue:['confirmed','partially_received','received','cancelled'],partially_received:['partially_received','received','cancelled'],received:[],cancelled:[]};
+ const allowed={requested:['confirmed','cancelled','overdue'],confirmed:['cancelled','overdue'],overdue:['confirmed','cancelled'],partially_received:['cancelled'],received:[],cancelled:[]};
  if(!order||!allowed[order.status]?.includes(next))return {ok:false,reason:'INVALID_TRANSITION'};
  if(!/^\d{4}-\d{2}-\d{2}$/.test(order.etaDate||'')||Number.isNaN(Date.parse(order.etaDate+'T12:00:00Z')))return {ok:false,reason:'ETA_REQUIRED'};
  return {ok:true,status:next};
