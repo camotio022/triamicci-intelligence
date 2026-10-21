@@ -22,9 +22,9 @@ export default async function attendanceWorkflow(req,res){
   if(action==='teamToday'){
    const [records,previous]=await Promise.all([attendance.where('day','==',day).limit(201).get(),attendance.where('day','==',previousDay).limit(201).get()]);
    if(records.size>200||previous.size>200)return send(res,409,'Muitos registros. Filtragem por unidade necessária.');
-   const current=records.docs.map(doc=>({uid:doc.data().uid,status:doc.data().status,updatedAt:doc.data().updatedAt?.toDate?.()?.toISOString?.()||null}));
+   const current=records.docs.map(doc=>({uid:doc.data().uid,status:doc.data().status,lastAction:doc.data().events?.at(-1)?.action||null,updatedAt:doc.data().updatedAt?.toDate?.()?.toISOString?.()||null}));
    const found=new Set(current.map(x=>x.uid));
-   const overnightTeam=previous.docs.filter(doc=>!found.has(doc.data().uid)&&['working','on_break'].includes(doc.data().status)).map(doc=>({uid:doc.data().uid,status:doc.data().status,overnight:true}));
+   const overnightTeam=previous.docs.filter(doc=>!found.has(doc.data().uid)&&['working','on_break'].includes(doc.data().status)).map(doc=>({uid:doc.data().uid,status:doc.data().status,lastAction:doc.data().events?.at(-1)?.action||null,overnight:true}));
    return send(res,200,'Situação operacional registrada hoje.',{day,presence:[...current,...overnightTeam]});
   }
   if(action==='correct'){
