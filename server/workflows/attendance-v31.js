@@ -41,7 +41,7 @@ export default async function attendanceWorkflow(req,res){
     const seen=(old.events||[]).find(e=>e.requestId===requestId);
     if(seen){if(seen.action!=='correct'||seen.status!==status)throw Error('CONFLICT');duplicate=true;return;}
     const at=new Date(),event={action:'correct',status,requestId,at,by:user.uid};
-    tx.set(target,{uid:targetUid,unitId:m.unitId,day:workDay,status,events:[...old.events,event],updatedAt:at,lastCorrection:{by:user.uid,at,reason:reason.trim()}},{merge:true});
+    tx.set(target,{uid:targetUid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at,lastCorrection:{by:user.uid,at,reason:reason.trim()}},{merge:true});
     tx.create(db.collection('auditLogs').doc(),{event:'attendance.correct',unitId:m.unitId,actorUid:user.uid,at,details:{targetUid,workDay,from:old.status,to:status,requestId,reason:reason.trim()}});
    });
    return send(res,200,duplicate?'Correção já registrada.':'Correção auditada e registrada.',{duplicate});
@@ -60,8 +60,8 @@ export default async function attendanceWorkflow(req,res){
    const [actor,prior]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
    if(!actor.exists||actor.data().status!=='active'||actor.data().unitId!==m.unitId||!TEAM_ROLES.includes(actor.data().role))throw Error('FORBIDDEN');
    const old=prior.data()||{status:'not_started',events:[]};
-   if(old.events.some(e=>e.requestId===requestId)){
-    if(old.events.find(e=>e.requestId===requestId).action!==action)throw Error('CONFLICT');
+   if((old.events||[]).some(e=>e.requestId===requestId)){
+    if((old.events||[]).find(e=>e.requestId===requestId).action!==action)throw Error('CONFLICT');
     result=old.status;duplicate=true;return;
    }
    const status=attendanceTransition(old.status,action);
