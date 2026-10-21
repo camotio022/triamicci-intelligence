@@ -11,11 +11,21 @@ export default async function attendanceWorkflow(req,res){
   if(!m?.unitId||!TEAM_ROLES.includes(m.role))return send(res,403,'Vínculo ativo necessário.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId),actorRef=db.doc('memberships/'+user.uid),day=restaurantDay(),action=req.body?.action;
   const attendance=unit.collection('attendanceV31');
-  const ref=attendance.doc(day+'_'+user.uid);
+  let workDay=day;
+  const previousDay=new Date(Date.parse(day+'T12:00:00Z')-86400000).toISOString().slice(0,10);
+  const priorRef=attendance.doc(previousDay+'_'+user.uid);
+  const refToday=attendance.doc(day+'_'+user.uid);
+  const yesterday=await priorRef.get();
+  const overnight=yesterday.exists&&['working','on_break'].includes(yesterday.data().status);
+  if(overnight&&action!=='clock_in')workDay=previousDay;
+  const ref=attendance.doc(workDay+'_'+user.uid);
   if(action==='teamToday'){
-   const records=await unit.collection('attendanceV31').where('day','==',day).limit(201).get();
-   if(records.size>200)return send(res,409,'Muitos registros. Filtragem por unidade necessária.');
-   return send(res,200,'Situação operacional registrada hoje.',{day,presence:records.docs.map(doc=>({uid:doc.data().uid,status:doc.data().status,updatedAt:doc.data().updatedAt?.toDate?.()?.toISOString?.()||null}))});
+   const [records,previous]=await Promise.all([attendance.where('day','==',day).limit(201).get(),attendance.where('day','==',previousDay).limit(201).get()]);
+   if(records.size>200||previous.size>200)return send(res,409,'Muitos registros. Filtragem por unidade necessária.');
+   const current=records.docs.map(doc=>({uid:doc.data().uid,status:doc.data().status,updatedAt:doc.data().updatedAt?.toDate?.()?.toISOString?.()||null}));
+   const found=new Set(current.map(x=>x.uid));
+   const overnightTeam=previous.docs.filter(doc=>!found.has(doc.data().uid)&&['working','on_break'].includes(doc.data().status)).map(doc=>({uid:doc.data().uid,status:doc.data().status,overnight:true}));
+   return send(res,200,'Situação operacional registrada hoje.',{day,presence:[...current,...overnightTeam]});
   }
   if(action==='correct'){
    if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerência pode corrigir registros.');
@@ -37,12 +47,14 @@ export default async function attendanceWorkflow(req,res){
    return send(res,200,duplicate?'Correção já registrada.':'Correção auditada e registrada.',{duplicate});
   }
   if(action==='today'){
-   const snap=await ref.get(),record=snap.data()||null;
-   return send(res,200,'Sua presença de hoje.',{day,record:record?{status:record.status,events:record.events||[],day}:null});
+   const selected=overnight?priorRef:refToday;
+   const snap=await selected.get(),record=snap.data()||null;
+   return send(res,200,'Sua presença de hoje.',{day,workDay:overnight?previousDay:day,record:record?{status:record.status,events:record.events||[],day:record.day}:null});
   }
   if(!['clock_in','break_start','break_end','clock_out'].includes(action))return send(res,400,'Ação de presença desconhecida.');
   const requestId=req.body?.requestId;
   if(typeof requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(requestId))return send(res,400,'Identificador inválido.');
+  if(action==='clock_in'&&overnight)return send(res,409,'Há uma jornada anterior em aberto. Registre a saída antes de iniciar outra.');
   let result,duplicate=false;
   await db.runTransaction(async tx=>{
    const [actor,prior]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
@@ -55,11 +67,11 @@ export default async function attendanceWorkflow(req,res){
    const status=attendanceTransition(old.status,action);
    if(!status)throw Error('INVALID_TRANSITION');
    const at=new Date(),event={action,requestId,at,by:user.uid};
-   tx.set(ref,{uid:user.uid,unitId:m.unitId,day,status,events:[...old.events,event],updatedAt:at},{merge:true});
-   tx.create(db.collection('auditLogs').doc(),{event:'attendance.'+action,unitId:m.unitId,actorUid:user.uid,at,details:{day,requestId}});
+   tx.set(ref,{uid:user.uid,unitId:m.unitId,day:workDay,status,events:[...old.events,event],updatedAt:at},{merge:true});
+   tx.create(db.collection('auditLogs').doc(),{event:'attendance.'+action,unitId:m.unitId,actorUid:user.uid,at,details:{day:workDay,requestId}});
    result=status;
   });
-  return send(res,200,duplicate?'Registro já confirmado.':'Registro de presença confirmado.',{day,status:result,duplicate});
+  return send(res,200,duplicate?'Registro já confirmado.':'Registro de presença confirmado.',{day:workDay,status:result,duplicate});
  }catch(e){
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='INVALID_TRANSITION')return send(res,409,'Esta ação não corresponde à sua situação atual.');
