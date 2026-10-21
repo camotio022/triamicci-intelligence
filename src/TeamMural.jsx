@@ -1,5 +1,6 @@
+import {doc,onSnapshot} from 'firebase/firestore';
 import PublishedRoster from './PublishedRoster.jsx';
-import React,{useCallback,useEffect,useMemo,useState} from 'react';import {auth} from './firebase.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';
+import React,{useCallback,useEffect,useMemo,useState} from 'react';import {auth,db} from './firebase.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';
 async function call(module,action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...extra})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
 const mural='mural',sc='schedules';
 const blank=()=>({kind:'preparation',title:'',body:'',yieldText:'',allergens:[],ingredients:[{name:'',amount:'',unit:'g'}]});
@@ -10,6 +11,7 @@ export default function TeamMural({membership,onLabels}){
  const load=useCallback(async()=>{setLoading(true);setError('');try{const [a,b]=await Promise.all([call(mural,'list'),call(sc,'list')]);setItems(a.items||[]);setSchedules((b.schedules||[]).filter(x=>x.status==='published'))}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useEffect(()=>{let live=true;const refresh=async()=>{try{const d=await call('attendanceV31','teamToday');if(live)setTodayPresence(Object.fromEntries((d.presence||[]).map(x=>[x.uid,x.status])))}catch{}};refresh();const interval=setInterval(refresh,60000);return()=>{live=false;clearInterval(interval)}},[]);
  useEffect(()=>{load()},[load]);
+ useEffect(()=>{if(!membership?.unitId)return;let initial=true;return onSnapshot(doc(db,'units',membership.unitId,'live','attendance'),()=>{if(initial){initial=false;return;}call('attendanceV31','teamToday').then(d=>setTodayPresence(Object.fromEntries((d.presence||[]).map(x=>[x.uid,x.status])))).catch(()=>{});},()=>{});},[membership?.unitId]);
  const visible=useMemo(()=>items.filter(x=>admin||x.status==='published').filter(x=>(x.title+' '+x.body).toLowerCase().includes(search.trim().toLowerCase())),[items,admin,search]);
  const changeIngredient=(i,key,val)=>setDraft(x=>({...x,ingredients:x.ingredients.map((r,j)=>j===i?{...r,[key]:val}:r)}));
  const save=async e=>{e.preventDefault();setSaving(true);try{const item={...draft,ingredients:draft.kind==='preparation'?draft.ingredients.map(x=>({...x,amount:Number(x.amount)})):[],allergens:draft.kind==='preparation'?draft.allergens:[]};const r=await call(mural,'saveDraft',{item,supersedesId});notify(r.message,'success');setEditing(false);setDraft(blank());setSupersedesId(null);await load()}catch(e){setError(e.message);notify(e.message,'error')}finally{setSaving(false)}};
