@@ -111,3 +111,18 @@
 .ti-attendance-v31 button{min-height:44px;min-width:130px;border-radius:10px;padding:10px 14px}
 .ti-attendance-v31 [role="alert"]{color:#b53434;width:100%}
 @media(max-width:480px){.ti-attendance-v31{padding:12px;gap:10px}.ti-attendance-v31 button{width:100%}}
+
+/* Jornada: controles consistentes com a identidade visual e leitura mobile. */
+.ti-attendance-v31{box-shadow:0 8px 28px rgba(30,30,40,.045);border-radius:18px;padding:20px;gap:14px}
+.ti-attendance-v31-content{flex:1 1 290px;min-width:0}
+.ti-attendance-v31 .ti-attendance-eyebrow{font-size:10px;letter-spacing:.065em;font-weight:800;color:#932c25}
+.ti-attendance-v31 h2{margin:6px 0;color:#273044;font-size:clamp(17px,2.5vw,22px);letter-spacing:-.025em}
+.ti-attendance-v31 p{font-size:13px;line-height:1.5;color:#627085}
+.ti-attendance-actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.ti-attendance-v31 button{font:inherit;font-weight:750;cursor:pointer;border:1px solid #a71916;border-radius:11px;transition:background .15s,box-shadow .15s}
+.ti-attendance-v31 button.ti-attendance-primary{background:#a71916;color:white}
+.ti-attendance-v31 button.ti-attendance-secondary{background:#fff;color:#8c2823}
+.ti-attendance-v31 button:focus-visible{outline:3px solid #bd7772;outline-offset:2px}
+.ti-attendance-v31 button:disabled{opacity:.55;cursor:wait}
+.ti-attendance-notice{flex-basis:100%;color:#176b4b!important}
+@media(max-width:480px){.ti-attendance-actions{width:100%;flex-direction:column}.ti-attendance-actions button{width:100%}}
