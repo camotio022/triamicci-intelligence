@@ -6,7 +6,7 @@ export function restaurantDay(value=new Date()){
 }
 export function dayKind(day,today=restaurantDay()){
  if(day===today)return 'today';
- if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(day))return 'invalid';
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return 'invalid';
  return day<today?'past':'future';
 }
 export function rosterToday(schedule,today=restaurantDay()){
