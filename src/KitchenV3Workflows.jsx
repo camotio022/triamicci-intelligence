@@ -72,7 +72,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    {kind==='receive'&&<>
     <Field name="Pedido relacionado (opcional)"><select value={orderId} onChange={e=>setOrderId(e.target.value)}><option value="">Entrega sem pedido cadastrado</option>{relatedOrders.map(o=><option value={o.id} key={o.id}>{o.supplier} · {o.etaDate}</option>)}</select></Field>
     <Field name="Fornecedor"><input required maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)}/></Field>
-    <div className="v3-line"><Field name="Quanto chegou?"><input type="number" required min=".001" step=".001" value={commercialQuantity} onChange={e=>setCommercialQuantity(e.target.value)}/></Field>
+    <div className="v3-line"><Field name="Quanto chegou?"><input type="number" required min={["un","porcao","pacote","duzia"].includes(commercialUnit)?"1":".001"} step={["un","porcao","pacote","duzia"].includes(commercialUnit)?"1":".001"} value={commercialQuantity} onChange={e=>setCommercialQuantity(e.target.value)}/></Field>
      <Field name="Conferido em"><select value={commercialUnit} onChange={e=>setCommercialUnit(e.target.value)}>{listUnits.map(x=><option key={x}>{x}</option>)}</select></Field></div>
     {chosen?.profile?.controlMode==='quantitative'?
     <Field name={'Quantidade realmente contada para estoque ('+(expected||'não configurada')+')'}><input type="number" required min=".001" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={stockQuantity} onChange={e=>setStockQuantity(e.target.value)} placeholder="Valor aferido, nunca convertido por suposição"/></Field>:
