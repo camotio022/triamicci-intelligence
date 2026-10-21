@@ -46,8 +46,8 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  const configuredSources=sourceOptions.map(id=>products.find(p=>p.id===id)).filter(Boolean);
  const submit=e=>{
   e.preventDefault();
-  if(kind==='receive')return commit('v3Receive',{productId,orderId:orderId||null,supplier,
-   commercialQuantity:Number(commercialQuantity),commercialUnit,stockQuantity:Number(stockQuantity||0),location,lot,expiryDate:expiry,notes},'Mercadoria recebida e conferida.');
+  if(kind==='receive')return commit('v3InspectReceive',{productId,orderId:orderId||null,supplier,
+   commercialQuantity:Number(commercialQuantity),commercialUnit,stockQuantity:Number(stockQuantity||0),location,lot,expiryDate:expiry,notes},'Conferência enviada. A entrada depende da aprovação gerencial.');
   if(kind==='count'){
    if(!/^[a-f0-9-]{36}$/i.test(sessionId)){setError('Identificador da rodada inválido. Gere um novo identificador.');return;}
    if(chosen?.trackExpiry&&lots.some(l=>lotCounts[l.id]==='')){setError('Informe a contagem de cada lote, inclusive zero quando estiver vazio.');return;}
@@ -107,9 +107,10 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
     <div className="v3-line"><Field name="Lote de armazenamento"><input required maxLength={80} value={lot} onChange={e=>setLot(e.target.value)} placeholder="Identificação real"/></Field><Field name="Validade"><input required type="date" value={expiry} onChange={e=>setExpiry(e.target.value)}/></Field></div>
    </>}
    {kind!=='transfer'&&<Field name="Observações (opcional)"><textarea maxLength={240} value={notes} onChange={e=>setNotes(e.target.value)}/></Field>}
-   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='receive'&&!managers||kind==='count'&&(!managers||chosen?.profile?.controlMode!=='quantitative')||kind==='count'&&chosen?.trackExpiry&&!lots.length&&!managers||kind==='transfer'&&from===to||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
-    {busy?'Registrando…':({receive:'Confirmar recebimento',count:'Salvar contagem',transfer:'Confirmar transferência',produce:'Concluir produção'})[kind]}
+   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='count'&&(!managers||chosen?.profile?.controlMode!=='quantitative')||kind==='count'&&chosen?.trackExpiry&&!lots.length&&!managers||kind==='transfer'&&from===to||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
+    {busy?'Registrando…':({receive:'Enviar conferência',count:'Salvar contagem',transfer:'Confirmar transferência',produce:'Concluir produção'})[kind]}
    </button>
   </form>
+  {kind==='receive'&&managers&&<section className="v3-approval-list" aria-label="Conferências aguardando aprovação"><h3>Aguardando aprovação gerencial</h3><p>Somente aprovar após verificar os dados conferidos. O estoque ainda não foi atualizado.</p><button type="button" className="v3-secondary" onClick={loadPending}>Atualizar pendências</button>{pendingError&&<p role="alert">{pendingError}</p>}{inspections.length===0?<p>Nenhuma conferência pendente encontrada.</p>:inspections.map(item=><article key={item.id} className="v3-card"><strong>{products.find(p=>p.id===item.productId)?.name||"Insumo"} · {item.supplier}</strong><p>Recebido: {item.commercialQuantity} {item.commercialUnit} · Saldo aferido: {item.stockQuantity} · {item.location}</p>{item.lot&&<p>Lote: {item.lot} · validade: {item.expiryDate}</p>}{item.notes&&<p>{item.notes}</p>}<button type="button" disabled={busy} onClick={()=>approve(item.id)}>{busy?"Processando…":"Aprovar entrada no estoque"}</button></article>)}</section>}
  </section>;
 }
