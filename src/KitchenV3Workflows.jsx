@@ -9,7 +9,7 @@ async function invoke(action,payload={}){
  const d=await r.json();if(!r.ok)throw Error(d.message||'Operação não realizada.');return d;
 }
 function Field({name,children}){return <label>{name}{children}</label>}
-export default function KitchenV3Workflows({kind,products,orders,membership,onChange}){
+export default function KitchenV3Workflows({kind,products,orders,membership,onChange,onConfigure}){
  const {notify}=useFeedback();const managers=isManagement(membership.role);
  const [productId,setProductId]=useState(''),[location,setLocation]=useState('reserva'),[supplier,setSupplier]=useState(''),
  [commercialUnit,setCommercialUnit]=useState('kg'),[commercialQuantity,setCommercialQuantity]=useState(''),
@@ -86,14 +86,14 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
   <form className="v3-form" onSubmit={submit}>
    {prepared?<Field name="O que foi preparado?"><select required value={outputId} onChange={e=>{setOutputId(e.target.value);setSources([{productId:'',location:'reserva',quantity:''}]);}}><option value="">Selecione um preparo</option>{productionCandidates.map(p=><option key={p.id} value={p.id}>{p.profile?.displayName||p.name}</option>)}</select></Field>:
     kind==='receive'?null:<Field name="Insumo"><select required value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Selecione um insumo</option>{productOptions}</select></Field>}
-   {prepared&&productionCandidates.length===0&&<p className="v3-error" role="alert">Nenhuma preparação operacional configurada. A gestão deve cadastrar a origem interna, unidade de contagem e matérias-primas em Configurar catálogo. Isso não apaga fichas técnicas existentes.</p>}
-   {prepared&&out&&configuredSources.length===0&&<p className="v3-error" role="alert">Esta preparação ainda não possui matérias-primas vinculadas no catálogo operacional. Configure-as antes de registrar produção.</p>}
+   {prepared&&productionCandidates.length===0&&<p className="v3-error" role="alert">Nenhuma preparação operacional configurada. A gestão deve cadastrar a origem interna, unidade de contagem e matérias-primas em Configurar catálogo. Isso não apaga fichas técnicas existentes. {managers&&<button type="button" className="v3-secondary" onClick={()=>onConfigure?.()}>Configurar preparação</button>}</p>}
+   {prepared&&out&&configuredSources.length===0&&<p className="v3-error" role="alert">Esta preparação ainda não possui matérias-primas vinculadas no catálogo operacional. Configure-as antes de registrar produção. {managers&&<button type="button" className="v3-secondary" onClick={()=>onConfigure?.(out)}>Configurar matérias-primas</button>}</p>}
    {kind==='receive'&&<>
     <Field name="Tipo de entrega"><select value={orderId} onChange={e=>{setOrderId(e.target.value);setProductId('');setSupplier(orders.find(o=>o.id===e.target.value)?.supplier||'');setCommercialQuantity('');setStockQuantity('');}}><option value="">Entrega não prevista · exige justificativa</option>{receiptOrders.map(o=><option value={o.id} key={o.id}>{formatOrder(o)} — {o.supplier} · {o.etaDate||'sem data prevista'}</option>)}</select></Field>
     {orderId&&<p className="v3-info"><strong>Entrega esperada:</strong> {order?formatOrder(order):'Pedido indisponível'}. Quantidades acima do previsto exigem justificativa.</p>}
     {!orderId&&<p className="v3-info">Entrega não prevista: informe o motivo nas observações. A gestão deverá aprovar antes de alterar o estoque.</p>}
     <Field name="Produto recebido"><select required value={productId} onChange={e=>{setProductId(e.target.value);setStockQuantity('');setCommercialQuantity('')}}><option value="">Selecione o produto</option>{productOptions}</select></Field>
-    {unconfiguredOrderProducts.length>0&&<p className="v3-error" role="alert">Configuração pendente: {unconfiguredOrderProducts.map(p=>p.name).join(', ')}. A gestão precisa definir se esses produtos são comprados de fornecedor em Estoque e insumos → Configurar catálogo. O pedido permanece preservado.</p>}
+    {unconfiguredOrderProducts.length>0&&<p className="v3-error" role="alert">Configuração pendente: {unconfiguredOrderProducts.map(p=>p.name).join(', ')}. A gestão precisa definir se esses produtos são comprados de fornecedor em Estoque e insumos → Configurar catálogo. O pedido permanece preservado. {managers&&<button type="button" className="v3-secondary" onClick={()=>onConfigure?.(unconfiguredOrderProducts[0])}>Configurar produto</button>}</p>}
     {allowedProducts.length===0&&<p className="v3-info">Nenhum produto disponível para conferir neste pedido. Confira o cadastro operacional com a gestão.</p>}
     <Field name="Fornecedor"><input required readOnly={Boolean(orderId)} maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)}/></Field>
     {orderId&&chosenLine&&<p className="v3-info">Quantidade pendente: {Math.max(0,Number(chosenLine.quantity)-Number(order?.received?.[productId]||0))} {chosenLine.unit}. Confira e informe somente o que chegou.</p>}
