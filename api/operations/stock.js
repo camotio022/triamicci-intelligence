@@ -147,7 +147,7 @@ export default async function handler(req,res){
   if(!['receive','count'].includes(action))return send(res,400,'Ação inválida.');
   const {productId,requestId}=req.body||{};
   if(!idPattern.test(productId||'')||!reqPattern.test(requestId||''))throw Error('INVALID');
-  if(action==='receive'&&!['admin','manager'].includes(m.role))throw Error('FORBIDDEN');
+  if(action==='receive'&&!['admin','manager','submanager'].includes(m.role))throw Error('FORBIDDEN');
   const productRef=unit.collection('products').doc(productId);
   const ref=unit.collection(action==='receive'?'physicalReceipts':'physicalCounts').doc(requestId);
   const auditRef=db.collection('auditLogs').doc();
@@ -168,7 +168,7 @@ export default async function handler(req,res){
    const [actorSnap,pSnap,existing,balanceSnap,lotSnap]=await Promise.all([tx.get(actorRef),tx.get(productRef),tx.get(ref),tx.get(balanceRef),batchRef?tx.get(batchRef):Promise.resolve(null)]);
    const current=actorSnap.data();
    if(!current||current.status!=='active'||current.unitId!==m.unitId||
-    (action==='receive'&&!['admin','manager'].includes(current.role)))throw Error('FORBIDDEN');
+    (action==='receive'&&!['admin','manager','submanager'].includes(current.role)))throw Error('FORBIDDEN');
    if(!pSnap.exists)throw Error('NOT_FOUND');
    const p=pSnap.data();if(p.status!=='active')throw Error('INACTIVE');
    const central=p.catalogId?await tx.get(db.collection('productCatalog').doc(p.catalogId)):null;
