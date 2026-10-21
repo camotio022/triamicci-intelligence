@@ -79,11 +79,13 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
   {error&&<p role="alert" className="v3-error">{error}</p>}
   <form className="v3-form" onSubmit={submit}>
    {prepared?<Field name="O que foi preparado?"><select required value={outputId} onChange={e=>{setOutputId(e.target.value);setSources([{productId:'',location:'reserva',quantity:''}]);}}><option value="">Selecione um preparo</option>{productsActive.filter(p=>['internal','both'].includes(p.profile?.origin)&&p.profile?.controlMode==='quantitative').map(p=><option key={p.id} value={p.id}>{p.profile?.displayName||p.name}</option>)}</select></Field>:
-    <Field name="Insumo"><select required value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Selecione um insumo</option>{productOptions}</select></Field>}
+    kind==='receive'?null:<Field name="Insumo"><select required value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Selecione um insumo</option>{productOptions}</select></Field>}
    {kind==='receive'&&<>
     <Field name="Tipo de entrega"><select value={orderId} onChange={e=>{setOrderId(e.target.value);setProductId('');setSupplier('');}}><option value="">Entrega não prevista · exige justificativa</option>{receiptOrders.map(o=><option value={o.id} key={o.id}>Pedido de {o.supplier} · {o.etaDate||'sem data prevista'}</option>)}</select></Field>
     {orderId&&<p className="v3-info">Selecione apenas os itens deste pedido. Quantidades acima do previsto exigem justificativa.</p>}
     {!orderId&&<p className="v3-info">Entrega não prevista: informe o motivo nas observações. A gestão deverá aprovar antes de alterar o estoque.</p>}
+    <Field name="Produto recebido"><select required value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Selecione o produto</option>{productOptions}</select></Field>
+    {allowedProducts.length===0&&<p className="v3-info">Não existem produtos elegíveis neste pedido. Verifique a origem e o cadastro do insumo.</p>}
     <Field name="Fornecedor"><input required maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)}/></Field>
     <div className="v3-line"><Field name="Quanto chegou?"><input type="number" required min={["un","porcao","pacote","duzia"].includes(commercialUnit)?"1":".001"} step={["un","porcao","pacote","duzia"].includes(commercialUnit)?"1":".001"} value={commercialQuantity} onChange={e=>setCommercialQuantity(e.target.value)}/></Field>
      <Field name="Conferido em"><select value={commercialUnit} onChange={e=>setCommercialUnit(e.target.value)}>{listUnits.map(x=><option key={x}>{x}</option>)}</select></Field></div>
