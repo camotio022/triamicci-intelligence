@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import { auth } from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import StockMovements from './StockMovements.jsx';
@@ -27,6 +28,9 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const [error,setError] = useState('');
   const [notice,setNotice] = useState('');
   const [search,setSearch] = useState('');
+  const [countFilter,setCountFilter]=useState('all');
+  const [today,setToday]=useState(()=>restaurantDay());
+  useEffect(()=>{const timer=setInterval(()=>setToday(restaurantDay()),60000);return()=>clearInterval(timer)},[]);
   const [form,setForm] = useState(blank);
   const [editing,setEditing] = useState(null);
   const [saving,setSaving] = useState(false);
@@ -40,8 +44,13 @@ export default function Inventory({membership,mode='stock',onAction}) {
     finally {setLoading(false);}
   },[]);
   useEffect(()=>{load();},[load]);
-  const visible = useMemo(()=>products.filter(p =>
-    (p.name+' '+p.category).toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR'))),[products,search]);
+  const countDay=p=>{const at=p.physicalBalance?.at;if(!at)return null;const date=new Date(at);return Number.isNaN(date.getTime())?null:restaurantDay(date)};
+  const todays=products.filter(p=>countDay(p)===today);
+  const visible=useMemo(()=>products.filter(p=>{
+   if(!(p.name+' '+p.category).toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR')))return false;
+   const day=countDay(p);
+   return countFilter==='all'||countFilter==='today'&&day===today||countFilter==='previous'&&Boolean(day)&&day!==today||countFilter==='uncounted'&&!day;
+  }).sort((a,b)=>countFilter==='all'?String(b.physicalBalance?.at||'').localeCompare(String(a.physicalBalance?.at||''))||a.name.localeCompare(b.name,'pt-BR'):a.name.localeCompare(b.name,'pt-BR')),[products,search,countFilter,today]);
   const edit = p => {setEditing(p);setForm({name:p.name,category:p.category,unit:p.unit,minStock:String(p.minStock),trackExpiry:p.trackExpiry,status:p.status});setNotice('');};
   const cancel = () => {setEditing(null);setForm(blank);};
   const save = async event => {
@@ -67,6 +76,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
     <h1>{administration?'Administração · Catálogo':'Estoque físico da cozinha'}</h1>
     <p>{administration?'Revise cadastros, aprovações e configurações sem misturar essas tarefas com a rotina de estoque.':'Consulte a última contagem de reserva e giro. Sem contagem, mostramos o saldo legado identificado, não uma quantidade física confirmada.'}</p>
     <div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>
+    {!administration&&<div className="ti-stock-today"><strong>Hoje · {new Date(today+"T12:00:00Z").toLocaleDateString("pt-BR",{timeZone:"UTC"})}</strong><span>{todays.length} insumo(s) cuja última contagem foi hoje</span><p>Contagem registrada não é sinônimo de saldo atualizado após as movimentações.</p></div>}
     {administration&&canEdit&&<MeasurementEditor products={products}/>}
     {administration && membership.role === 'admin' && <CatalogV2Review />}
     {administration && canEdit && <CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} />}
@@ -85,21 +95,23 @@ export default function Inventory({membership,mode='stock',onAction}) {
     </form>}
     <div className="inventory-list-header"><h2>{administration?'Produtos vinculados à unidade':'Produtos da cozinha'}</h2><button type="button" onClick={load} disabled={loading}>{loading?'Carregando...':'Atualizar'}</button></div>
     <label className="inventory-search">Buscar insumo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome ou categoria"/></label>
+    {!administration&&<div className="ti-stock-filters" role="group" aria-label="Filtrar contagens">{[["all","Todos"],["today","Contados hoje"],["previous","Contados antes"],["uncounted","Sem contagem"]].map(([id,label])=><button key={id} type="button" className={countFilter===id?"active":""} aria-pressed={countFilter===id} onClick={()=>setCountFilter(id)}>{label}</button>)}</div>}
     {error && <p role="alert">{error}</p>}
     {!administration && <div className="operational-products" aria-label="Estoque por produto">
-      {visible.map(p=><article className="operational-product operational-product-clickable" key={p.id} role="button" tabIndex={0} aria-label={"Abrir ficha operacional de "+p.name} onClick={()=>setDetailId(p.id)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setDetailId(p.id)}}}>
-        <div className="operational-product-head"><div><strong>{p.name}</strong><span>{p.category}</span></div><span className="operational-product-state">{p.status==='active'?'Ativo':'Inativo'}</span></div>
+      {visible.map(p=><article className={"operational-product operational-product-clickable"+(countDay(p)===today?" ti-stock-counted-today":"")} key={p.id} role="button" tabIndex={0} aria-label={"Abrir ficha operacional de "+p.name} onClick={()=>setDetailId(p.id)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setDetailId(p.id)}}}>
+        <div className="operational-product-head"><div><strong>{p.name}</strong><span>{p.category}</span></div><span className="operational-product-state">{countDay(p)===today?"Contado hoje":p.status==="active"?"Ativo":"Inativo"}</span></div>
         {p.physicalBalance ? <>
           <div className="operational-counts">
-            <div><span>Reserva</span><strong>{p.physicalBalance.reserve}</strong></div>
-            <div><span>Giro</span><strong>{p.physicalBalance.rotation}</strong></div>
-            <div><span>Total físico</span><strong>{p.physicalBalance.total}</strong></div>
+            <div><span>Reserva</span><strong>{p.physicalBalance.reserve} <small>{p.physicalBalance.unit||p.physicalUnit||p.unit}</small></strong></div>
+            <div><span>Giro</span><strong>{p.physicalBalance.rotation} <small>{p.physicalBalance.unit||p.physicalUnit||p.unit}</small></strong></div>
+            <div><span>Total físico</span><strong>{p.physicalBalance.total} <small>{p.physicalBalance.unit||p.physicalUnit||p.unit}</small></strong></div>
           </div>
-          <p className="operational-note">Contagem registrada em {p.physicalBalance.unit} · {p.physicalBalance.at?new Date(p.physicalBalance.at).toLocaleString('pt-BR'):'Data indisponível'}</p>
+          <p className="operational-note">{countDay(p)===today?'Contado hoje':'Última contagem'} · {p.physicalBalance.at?new Date(p.physicalBalance.at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'Data indisponível'}</p>
         </> : <div className="operational-uncounted"><strong>Sem contagem física</strong><span>Saldo legado: {p.quantity} {p.unit} — ainda não conferido</span></div>}
-        <div className="operational-meta"><span>Unidade de contagem: {p.physicalUnit||p.unit}</span><span>Validade: {p.trackExpiry?'Exigida':'Não exigida'}</span></div>
+        {p.physicalBalance?.unit&&p.physicalUnit&&p.physicalBalance.unit!==p.physicalUnit&&<p className="ti-stock-unit-warning" role="status">Unidade da última contagem ({p.physicalBalance.unit}) diferente da cadastrada ({p.physicalUnit}). Confira antes de comparar.</p>}
+        <div className="operational-meta"><span>Unidade cadastrada: {p.physicalUnit||p.unit}</span><span>Validade: {p.trackExpiry?'Exigida':'Não exigida'}</span></div>
       </article>)}
-      {!loading && visible.length===0 && <p>Nenhum produto encontrado nesta unidade.</p>}
+      {!loading && visible.length===0 && <p>Nenhum insumo corresponde a estes filtros.</p>}
     </div>}
     {administration && <div className="inventory-table-wrap"><table className="inventory-table"><thead><tr><th>INSUMO</th><th>CATEGORIA</th><th>CONTAGEM FÍSICA / SALDO LEGADO</th><th>MÍNIMO</th><th>VALIDADE</th><th>SITUAÇÃO</th>{canEdit && <th>AÇÃO</th>}</tr></thead><tbody>
       {visible.map(p=><tr key={p.id}><td><strong>{p.name}</strong></td><td>{p.category}</td><td>{p.physicalBalance?<><strong>{p.physicalBalance.total} {p.physicalBalance.unit}</strong><small> Última contagem: {p.physicalBalance.reserve} reserva + {p.physicalBalance.rotation} giro</small></>:<><span>{p.quantity} {p.unit}</span><small> Saldo legado; sem contagem física registrada</small></>}</td><td>{p.minStock} {p.unit}</td><td>{p.trackExpiry?'Controlada':'Não exigida'}</td><td>{p.status==='active'?'Ativo':'Inativo'}</td>{canEdit && <td><button type="button" onClick={()=>edit(p)}>Editar</button></td>}</tr>)}
