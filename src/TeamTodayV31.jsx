@@ -13,7 +13,7 @@ export default function TeamTodayV31(){
  const refresh=useCallback(async()=>{setBusy(true);try{
   const [a,b,c]=await Promise.all([request('schedules','list'),request('attendanceV31','teamToday'),request(undefined,'masterRegistryPreview')]);
   setToday(b.day);setSchedules((a.schedules||[]).filter(x=>x.status==='published'&&x.period===b.day.slice(0,7)));
-  setPresence(Object.fromEntries((b.presence||[]).map(x=>[x.uid,x.status])));
+  setPresence(Object.fromEntries((b.presence||[]).map(x=>[x.uid,x])));
   setStaff((c.registry||[]).filter(x=>x.status==='active'));
   setError('');
  }catch(e){setError(e.message)}finally{setBusy(false)}},[]);
@@ -29,8 +29,9 @@ export default function TeamTodayV31(){
   return all.map(x=>{
    const profile=staff.find(y=>y.id===x.uid||y.accountUid===x.uid);
    const key=profile?.accountUid||x.uid;
-   const presenceStatus=presence[key];
-   const confirmed=({working:'Em serviço',on_break:'Em intervalo',finished:'Turno encerrado',absent:'Ausência confirmada'})[presenceStatus];
+   const attendance=presence[key];
+   const presenceStatus=attendance?.status;
+   const confirmed=presenceStatus==='working'&&attendance?.lastAction==='break_end'?'Retornou do intervalo':({working:'Em serviço',on_break:'Em intervalo',finished:'Turno encerrado',absent:'Ausência confirmada'})[presenceStatus];
    const status=confirmed|| (x.operationalStatus==='day_off'?'Folga prevista':x.operationalStatus==='absence_recorded'?'Ausência na escala':x.operationalStatus==='not_scheduled'?'Sem lançamento na escala':'Escalado · presença não confirmada');
    return {key:x.uid,name:profile?.name||x.name||'Colaborador',status};
   });
