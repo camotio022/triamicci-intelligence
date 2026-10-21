@@ -140,7 +140,7 @@ export default async function handler(req,res){
       return send(res,200,'Produto aprovado no catálogo central.');
     }
     if(req.body?.action!=='attach')return send(res,400,'Ação inválida.');
-    if(!['admin','manager'].includes(m.role))return send(res,403,'Acesso restrito à administração.');
+    if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Acesso restrito à administração.');
     const {catalogId,minStock}=req.body;
     if(typeof catalogId!=='string'||!/^[a-z0-9-]{2,80}$/.test(catalogId)||
        typeof minStock!=='number'||!Number.isFinite(minStock)||minStock<0||minStock>100000000)
@@ -154,7 +154,7 @@ export default async function handler(req,res){
       const [memberSnap,catSnap]=await Promise.all([tx.get(actorRef),tx.get(catalogRef)]);
       const current=memberSnap.data();
       if(!current||current.status!=='active'||current.unitId!==m.unitId||
-         !['admin','manager'].includes(current.role))throw new Error('FORBIDDEN');
+         !['admin','manager','submanager'].includes(current.role))throw new Error('FORBIDDEN');
       if(!catSnap.exists)throw new Error('NOT_FOUND');
       const p=catSnap.data();
       if(p.active!==true||genericIds.has(catalogId))throw new Error('NOT_APPROVED');
