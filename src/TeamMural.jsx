@@ -40,7 +40,7 @@ export default function TeamMural({membership}){
  const roster=useMemo(()=>rosterToday(current,today).filter(x=>x.operationalStatus==='scheduled_unconfirmed').map(entry=>{
   const employee=staff.find(x=>x.id===entry.uid||x.accountUid===entry.uid);
   const hours=String(employee?.shift||entry.shift||'');
-  const match=hours.match(/([01]\\d|2[0-3]):[0-5]\\d/);
+  const match=hours.match(/([01]\d|2[0-3]):[0-5]\d/);
   const start=match?.[0]||null;
   const h=start?Number(start.slice(0,2)):null;
   const shift=/manh[aã]/i.test(hours)?'Manhã':/tarde/i.test(hours)?'Tarde':/noite/i.test(hours)?'Noite':h===null?'Turno a definir':h<12?'Manhã':h<18?'Tarde':'Noite';
@@ -51,7 +51,8 @@ export default function TeamMural({membership}){
   return {uid:entry.uid,name:employee?.name||entry.name||'Funcionário',shift,area,start,status,ongoing:state==='working'||state==='on_break'||(start&&clock>=start&&state!=='finished'&&state!=='absent')};
  }),[current,today,staff,presence,clock]);
  const nowTeam=roster.filter(x=>x.ongoing);
- const nextTeam=roster.filter(x=>!x.ongoing&&x.status==='Previsto').sort((a,b)=>(a.start||'99:99').localeCompare(b.start||'99:99'));
+ const nextTeam=roster.filter(x=>!x.ongoing&&x.start&&x.status==='Previsto').sort((a,b)=>a.start.localeCompare(b.start));
+ const withoutTime=roster.filter(x=>!x.start&&!x.ongoing);
  return <section className="ti-planning ti-mural-home" aria-label="Mural da equipe">
   <header className="ti-mural-header"><div><span className="eyebrow">INFORMAÇÕES DA UNIDADE</span><h1>Mural da equipe</h1><p>Escalas e comunicados importantes, organizados para consulta.</p></div><button type="button" className="ti-mural-refresh" onClick={()=>{refresh();refreshPresence()}}>Atualizar</button></header>
   {error&&<p role="alert" className="team-error">{error}</p>}
@@ -60,6 +61,7 @@ export default function TeamMural({membership}){
     <header className="ti-mural-section-header"><div><h2 id="mural-roster-title">Equipe de hoje</h2><p>Quem deveria estar em serviço e quem entra depois.</p></div></header>
     <div className="ti-mural-now"><h3>Agora <small>{nowTeam.length} escalado(s)</small></h3>{nowTeam.length?<ul>{nowTeam.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift}{p.start?' · '+p.start:''}</span><small>{p.status}</small></li>)}</ul>:<p>Ninguém com início previsto até agora.</p>}</div>
     <div className="ti-mural-next"><h3>Próximos a entrar</h3>{nextTeam.length?<ul>{nextTeam.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift} · {p.start||'Horário não informado'}</span></li>)}</ul>:<p>Nenhuma próxima entrada identificada.</p>}</div>
+    {withoutTime.length>0&&<div className="ti-mural-next"><h3>Horário não definido <small>· consultar escala</small></h3><ul>{withoutTime.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift}</span></li>)}</ul></div>}
     <details className="ti-mural-roster-details"><summary>Consultar escala completa e folgas</summary>
     {loading?<p role="status">Carregando escalas…</p>:schedules.length===0?<p className="ti-mural-empty">Nenhuma escala publicada.</p>:<>
      <div className="ti-mural-period-list">{schedules.slice(0,12).map(s=><button type="button" key={s.id} className={selected===s.id?'ti-mural-period active':'ti-mural-period'} aria-pressed={selected===s.id} onClick={()=>setExpanded(s.id)}>{monthLabel(s.period)}{s.id===current?.id&&<small>Mês atual</small>}</button>)}</div>
