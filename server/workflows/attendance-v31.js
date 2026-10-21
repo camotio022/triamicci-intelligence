@@ -30,7 +30,7 @@ export default async function attendanceWorkflow(req,res){
   if(action==='correct'){
    if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerência pode corrigir registros.');
    const {targetUid,workDay,status,reason,requestId}=req.body||{};
-   if(typeof targetUid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(targetUid)||typeof workDay!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(workDay)||!['working','on_break','finished','absent'].includes(status)||typeof reason!=='string'||reason.trim().length<8||reason.length>240||typeof requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(requestId))return send(res,400,'Informe colaborador, data, situação e justificativa válida.');
+   if(typeof targetUid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(targetUid)||typeof workDay!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(workDay)||!['working','on_break','finished','absent'].includes(status)||typeof reason!=='string'||reason.trim().length<8||reason.length>240||typeof requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(requestId))return send(res,400,'Informe colaborador, data, situação e justificativa válida.');
    const target=attendance.doc(workDay+'_'+targetUid),account=db.doc('memberships/'+targetUid);
    let duplicate=false;
    await db.runTransaction(async tx=>{
@@ -55,7 +55,7 @@ export default async function attendanceWorkflow(req,res){
    if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente a gestão corrige presença.');
    const {targetUid,shiftDay,status,reason}=req.body||{};
    if(typeof targetUid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(targetUid)||
-      typeof shiftDay!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(shiftDay)||shiftDay>day||
+      typeof shiftDay!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(shiftDay)||shiftDay>day||
       !['not_started','working','on_break','finished','absent'].includes(status)||
       typeof reason!=='string'||reason.trim().length<10||reason.length>400)
     return send(res,400,'Informe colaborador, data, situação e justificativa válida.');
@@ -78,12 +78,9 @@ export default async function attendanceWorkflow(req,res){
   if(action==='clock_in'&&overnight)return send(res,409,'Há uma jornada anterior em aberto. Registre a saída antes de iniciar outra.');
   let result,duplicate=false;
   await db.runTransaction(async tx=>{
-   const [actor,prior,previous]=await Promise.all([tx.get(actorRef),tx.get(ref),tx.get(previousRef)]);
-   const usePrevious=activeFromPrevious(previous.data());
-   const targetRef=usePrevious?previousRef:ref;
-   if(usePrevious&&action==='clock_in')throw Error('UNFINISHED_SHIFT');
+   const [actor,prior]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
    if(!actor.exists||actor.data().status!=='active'||actor.data().unitId!==m.unitId||!TEAM_ROLES.includes(actor.data().role))throw Error('FORBIDDEN');
-   const old=(usePrevious?previous:prior).data()||{status:'not_started',events:[]};
+   const old=prior.data()||{status:'not_started',events:[]};
    if(old.events.some(e=>e.requestId===requestId)){
     if(old.events.find(e=>e.requestId===requestId).action!==action)throw Error('CONFLICT');
     result=old.status;duplicate=true;return;
