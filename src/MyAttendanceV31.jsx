@@ -9,12 +9,12 @@ async function call(action,extra={}){
 export default function MyAttendanceV31(){
  const [record,setRecord]=useState(null),[day,setDay]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const reload=useCallback(async()=>{try{const d=await call('today');setRecord(d.record);setDay(d.day)}catch(e){setError(e.message)}},[]);
- useEffect(()=>{reload();const onVisible=()=>{if(document.visibilityState==='visible')reload()};document.addEventListener('visibilitychange',onVisible);return()=>document.removeEventListener('visibilitychange',onVisible)},[reload]);
+ useEffect(()=>{reload();const onVisible=()=>{if(document.visibilityState==='visible')reload()};document.addEventListener('visibilitychange',onVisible);const timer=setInterval(onVisible,15000);return()=>{document.removeEventListener('visibilitychange',onVisible);clearInterval(timer)}},[reload]);
  const status=record?.status||'not_started',next=actions[status];
- const labels={not_started:'Entrada ainda não registrada',working:'Entrada confirmada · em serviço',on_break:'Intervalo registrado',finished:'Turno encerrado'};
- const submit=async()=>{if(!next?.length||busy)return;setBusy(true);setError('');setNotice('');try{const d=await call(next[0],{requestId:crypto.randomUUID()});setRecord(p=>({...p,status:d.status}));setNotice(d.message);await reload()}catch(e){setError(e.message)}finally{setBusy(false)}};
+ const labels={not_started:'Entrada ainda não registrada',working:'Entrada declarada · aguardando confirmação presencial',on_break:'Intervalo declarado',finished:'Saída declarada · aguardando confirmação'};
+ const submit=async()=>{if(!next?.length||busy)return;setBusy(true);setError('');setNotice('');try{const d=await call(next[0],{requestId:crypto.randomUUID()});setRecord(p=>({...p,status:d.status}));setNotice('Declaração registrada. A confirmação da presença física depende de validação no estabelecimento.');await reload()}catch(e){setError(e.message)}finally{setBusy(false)}};
  return <section className="ti-attendance-v31" aria-label="Minha presença de hoje">
-  <div><strong>Minha presença · Hoje</strong><p>{day||'Data do restaurante'} · {labels[status]}</p><small>Este é um registro operacional declarado por você, não um ponto homologado.</small></div>
+  <div><strong>Minha presença · Hoje</strong><p>{day||'Data do restaurante'} · {labels[status]}</p><small>Seus registros são declarações operacionais. A presença no estabelecimento precisa de confirmação da gestão.</small></div>
   {next?.length>0&&<button type="button" onClick={submit} disabled={busy}>{busy?'Registrando…':next[1]}</button>}
   {status==='working'&&<button type="button" onClick={async()=>{setBusy(true);setError('');try{await call('clock_out',{requestId:crypto.randomUUID()});await reload()}catch(e){setError(e.message)}finally{setBusy(false)}}} disabled={busy}>Registrar saída</button>}
   {notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}
