@@ -21,7 +21,7 @@ export default async function handler(req,res){
    // Consulta dedicada: não carrega receitas nem permite rascunhos no quadro de leitura.
    const docs=await items.where('kind','==','notice').limit(100).get();
    const published=docs.docs.filter(d=>d.data().status==='published').map(serialize)
-    .sort((a,b)=>String(b.publishedAt?.toDate?.()?.toISOString?.()||b.updatedAt||'').localeCompare(String(a.publishedAt?.toDate?.()?.toISOString?.()||a.updatedAt||''))).slice(0,12);
+    .sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||''))).slice(0,12);
    return send(res,200,'Comunicados da unidade.',{items:published});
   }
   if(action==='list'){
