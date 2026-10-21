@@ -42,6 +42,7 @@ export default async function attendanceWorkflow(req,res){
     if(seen){if(seen.action!=='correct'||seen.status!==status)throw Error('CONFLICT');duplicate=true;return;}
     const at=new Date(),event={action:'correct',status,requestId,at,by:user.uid};
     tx.set(target,{uid:targetUid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at,lastCorrection:{by:user.uid,at,reason:reason.trim()}},{merge:true});
+    tx.set(unit.collection('live').doc('attendance'),{updatedAt:at},{merge:true});
     tx.create(db.collection('auditLogs').doc(),{event:'attendance.correct',unitId:m.unitId,actorUid:user.uid,at,details:{targetUid,workDay,from:old.status,to:status,requestId,reason:reason.trim()}});
    });
    return send(res,200,duplicate?'Correção já registrada.':'Correção auditada e registrada.',{duplicate});
@@ -68,6 +69,7 @@ export default async function attendanceWorkflow(req,res){
    if(!status)throw Error('INVALID_TRANSITION');
    const at=new Date(),event={action,requestId,at,by:user.uid};
    tx.set(ref,{uid:user.uid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at},{merge:true});
+   tx.set(unit.collection('live').doc('attendance'),{updatedAt:at},{merge:true});
    tx.create(db.collection('auditLogs').doc(),{event:'attendance.'+action,unitId:m.unitId,actorUid:user.uid,at,details:{day:workDay,requestId}});
    result=status;
   });
