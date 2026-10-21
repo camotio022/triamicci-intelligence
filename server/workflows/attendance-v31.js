@@ -57,9 +57,12 @@ export default async function attendanceWorkflow(req,res){
   if(action==='clock_in'&&overnight)return send(res,409,'Há uma jornada anterior em aberto. Registre a saída antes de iniciar outra.');
   let result,duplicate=false;
   await db.runTransaction(async tx=>{
-   const [actor,prior]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
+   const [actor,prior,previous]=await Promise.all([tx.get(actorRef),tx.get(ref),tx.get(previousRef)]);
+   const usePrevious=activeFromPrevious(previous.data());
+   const targetRef=usePrevious?previousRef:ref;
+   if(usePrevious&&action==='clock_in')throw Error('UNFINISHED_SHIFT');
    if(!actor.exists||actor.data().status!=='active'||actor.data().unitId!==m.unitId||!TEAM_ROLES.includes(actor.data().role))throw Error('FORBIDDEN');
-   const old=prior.data()||{status:'not_started',events:[]};
+   const old=(usePrevious?previous:prior).data()||{status:'not_started',events:[]};
    if(old.events.some(e=>e.requestId===requestId)){
     if(old.events.find(e=>e.requestId===requestId).action!==action)throw Error('CONFLICT');
     result=old.status;duplicate=true;return;
@@ -74,6 +77,7 @@ export default async function attendanceWorkflow(req,res){
   return send(res,200,duplicate?'Registro já confirmado.':'Registro de presença confirmado.',{day:workDay,status:result,duplicate});
  }catch(e){
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
+  if(e.message==='UNFINISHED_SHIFT')return send(res,409,'Encerre primeiro sua jornada anterior.');
   if(e.message==='INVALID_TRANSITION')return send(res,409,'Esta ação não corresponde à sua situação atual.');
   if(e.message==='CONFLICT')return send(res,409,'Registro com identificador diferente.');
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
