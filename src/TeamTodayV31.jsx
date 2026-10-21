@@ -1,5 +1,6 @@
+import {doc,onSnapshot} from 'firebase/firestore';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {auth} from './firebase.js';
+import {auth,db} from './firebase.js';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import {rosterToday} from '../server/schedules/restaurant-today.js';
 async function request(module,action,extra={}){
@@ -7,7 +8,7 @@ async function request(module,action,extra={}){
  const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...extra})});
  const d=await r.json();if(!r.ok)throw Error(d.message||'Dados indisponíveis.');return d;
 }
-export default function TeamTodayV31(){
+export default function TeamTodayV31({unitId}){
  const [correction,setCorrection]=useState({targetUid:'',workDay:restaurantDay(),status:'working',reason:''}),[correctionBusy,setCorrectionBusy]=useState(false),[correctionNotice,setCorrectionNotice]=useState('');
  const [clock,setClock]=useState(()=>new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));
  const [today,setToday]=useState(()=>restaurantDay()),[staff,setStaff]=useState([]),[schedules,setSchedules]=useState([]),[presence,setPresence]=useState({}),[error,setError]=useState(''),[busy,setBusy]=useState(true);
@@ -18,6 +19,7 @@ export default function TeamTodayV31(){
   setStaff((c.registry||[]).filter(x=>x.status==='active'));
   setError('');
  }catch(e){setError(e.message)}finally{setBusy(false)}},[]);
+ useEffect(()=>{if(!unitId)return;let initial=true;return onSnapshot(doc(db,'units',unitId,'live','attendance'),()=>{if(initial){initial=false;return;}refresh()},()=>{});},[unitId,refresh]);
  useEffect(()=>{refresh();const onVisible=()=>{if(document.visibilityState==='visible')refresh()};const timer=setInterval(onVisible,15000);document.addEventListener('visibilitychange',onVisible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',onVisible)}},[refresh]);
  const submitCorrection=async e=>{e.preventDefault();if(correctionBusy)return;setCorrectionBusy(true);setCorrectionNotice('');setError('');try{
   const result=await request('attendanceV31','correct',{...correction,requestId:crypto.randomUUID()});setCorrectionNotice(result.message);setCorrection(p=>({...p,reason:''}));await refresh()
