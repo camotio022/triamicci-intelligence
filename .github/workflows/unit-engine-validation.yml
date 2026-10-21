@@ -23,6 +23,6 @@ jobs:
       - name: Sintaxe da API V3 e dos motores
         run: node --check server/operations/v3-service.js && node --check server/operations/v3-ledger.js && node --check server/operations/v3-catalog-policy.js
       - name: Contrato V3.1 de data e permissões
-        run: node --test tests/v31-tempo-permissoes.test.mjs tests/v31-attendance.test.mjs
+        run: node --test tests/v31-tempo-permissoes.test.mjs tests/v31-attendance.test.mjs tests/v31-redaction.test.mjs
       - name: Build
         run: npm run build
