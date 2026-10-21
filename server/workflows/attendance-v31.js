@@ -10,11 +10,31 @@ export default async function attendanceWorkflow(req,res){
   const user=await authenticate(req),m=await membership(user.uid);
   if(!m?.unitId||!TEAM_ROLES.includes(m.role))return send(res,403,'Vínculo ativo necessário.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId),actorRef=db.doc('memberships/'+user.uid),day=restaurantDay(),action=req.body?.action;
-  const ref=unit.collection('attendanceV31').doc(day+'_'+user.uid);
+  const attendance=unit.collection('attendanceV31');
+  const ref=attendance.doc(day+'_'+user.uid);
   if(action==='teamToday'){
    const records=await unit.collection('attendanceV31').where('day','==',day).limit(201).get();
    if(records.size>200)return send(res,409,'Muitos registros. Filtragem por unidade necessária.');
    return send(res,200,'Situação operacional registrada hoje.',{day,presence:records.docs.map(doc=>({uid:doc.data().uid,status:doc.data().status,updatedAt:doc.data().updatedAt?.toDate?.()?.toISOString?.()||null}))});
+  }
+  if(action==='correct'){
+   if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerência pode corrigir registros.');
+   const {targetUid,workDay,status,reason,requestId}=req.body||{};
+   if(typeof targetUid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(targetUid)||typeof workDay!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(workDay)||!['working','on_break','finished','absent'].includes(status)||typeof reason!=='string'||reason.trim().length<8||reason.length>240||typeof requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(requestId))return send(res,400,'Informe colaborador, data, situação e justificativa válida.');
+   const target=attendance.doc(workDay+'_'+targetUid),account=db.doc('memberships/'+targetUid);
+   let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const [manager,employee,prior]=await Promise.all([tx.get(actorRef),tx.get(account),tx.get(target)]);
+    if(!manager.exists||manager.data().status!=='active'||manager.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(manager.data().role))throw Error('FORBIDDEN');
+    if(!employee.exists||employee.data().status!=='active'||employee.data().unitId!==m.unitId)throw Error('FORBIDDEN');
+    const old=prior.data()||{events:[],status:'not_started'};
+    const seen=old.events.find(e=>e.requestId===requestId);
+    if(seen){if(seen.action!=='correct'||seen.status!==status)throw Error('CONFLICT');duplicate=true;return;}
+    const at=new Date(),event={action:'correct',status,requestId,at,by:user.uid};
+    tx.set(target,{uid:targetUid,unitId:m.unitId,day:workDay,status,events:[...old.events,event],updatedAt:at,lastCorrection:{by:user.uid,at,reason:reason.trim()}},{merge:true});
+    tx.create(db.collection('auditLogs').doc(),{event:'attendance.correct',unitId:m.unitId,actorUid:user.uid,at,details:{targetUid,workDay,from:old.status,to:status,requestId,reason:reason.trim()}});
+   });
+   return send(res,200,duplicate?'Correção já registrada.':'Correção auditada e registrada.',{duplicate});
   }
   if(action==='today'){
    const snap=await ref.get(),record=snap.data()||null;
