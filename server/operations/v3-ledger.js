@@ -51,6 +51,79 @@ export default async function v3Ledger(req,res){
    const h=await unit.collection('v3Operations').orderBy('at','desc').limit(60).get();
    return send(res,200,'Movimentações recentes.',{operations:h.docs.map(snapMap)});
   }
+
+  if(action==='v3LossReport'){
+   const {requestId,productId,location,quantity,reason}=req.body||{};
+   if(!reqOk(requestId)||!idOk(productId)||!locations.includes(location)||!Number.isFinite(quantity)||quantity<=0||
+      typeof reason!=='string'||reason.trim().length<8||reason.length>240)return send(res,400,'Informe insumo, quantidade, local e motivo da perda.');
+   const ref=unit.collection('v3LossReports').doc(requestId),fingerprint=hashed(JSON.stringify({productId,location,quantity,reason:reason.trim()}));let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const [member,product,profile,old]=await Promise.all([tx.get(actorRef),tx.get(products.doc(productId)),tx.get(profiles.doc(productId)),tx.get(ref)]);
+    if(!active(member,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
+    if(old.exists){if(old.data().fingerprint!==fingerprint||old.data().reportedBy!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
+    if(!product.exists||product.data().status!=='active'||!profile.exists||profile.data().controlMode!=='quantitative'||!profile.data().locations.includes(location))throw Error('MISSING');
+    if(!number(quantity,profile.data().countUnit))throw Error('QUANTITY');
+    tx.create(ref,{productId,location,quantity,unit:profile.data().countUnit,reason:reason.trim(),status:'pending',fingerprint,reportedAt:now(),reportedBy:actor.uid,unitId:m.unitId});
+    audit(tx,db,'v3.loss_reported',m.unitId,actor.uid,{requestId,productId,quantity,location});
+   });
+   return send(res,200,duplicate?'Perda já comunicada.':'Perda enviada para aprovação. Nenhum saldo foi alterado.',{id:requestId,duplicate});
+  }
+  if(action==='v3LossPending'){
+   const who=await actorRef.get();if(!active(who,m.unitId,MANAGEMENT_ROLES))return send(res,403,'Somente gestão.');
+   const snap=await unit.collection('v3LossReports').where('status','==','pending').limit(101).get();
+   if(snap.size>100)return send(res,409,'Há mais de 100 perdas pendentes.');
+   return send(res,200,'Perdas aguardando decisão.',{losses:snap.docs.map(d=>({id:d.id,...d.data(),reportedAt:d.data().reportedAt?.toDate?.()?.toISOString?.()}))});
+  }
+  if(action==='v3LossReject'){
+   const {reportId,reason}=req.body||{};
+   if(!reqOk(reportId)||typeof reason!=='string'||reason.trim().length<8||reason.length>240)return send(res,400,'Explique a rejeição.');
+   const ref=unit.collection('v3LossReports').doc(reportId);let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const [member,report]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
+    if(!active(member,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
+    if(!report.exists)throw Error('MISSING');
+    if(report.data().status==='rejected'){duplicate=true;return;}
+    if(report.data().status!=='pending')throw Error('CONFLICT');
+    const at=now();tx.update(ref,{status:'rejected',rejectedBy:actor.uid,rejectedAt:at,rejectionReason:reason.trim()});
+    audit(tx,db,'v3.loss_rejected',m.unitId,actor.uid,{reportId,reason:reason.trim()});
+   });
+   return send(res,200,duplicate?'Relatório já rejeitado.':'Perda rejeitada. Estoque preservado.',{duplicate});
+  }
+  if(action==='v3LossApprove'){
+   const reportId=req.body?.reportId;if(!reqOk(reportId))return send(res,400,'Perda inválida.');
+   const ref=unit.collection('v3LossReports').doc(reportId),operation=unit.collection('v3Operations').doc(reportId);let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const [member,report,oldOperation]=await Promise.all([tx.get(actorRef),tx.get(ref),tx.get(operation)]);
+    if(!active(member,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
+    if(!report.exists)throw Error('MISSING');
+    if(report.data().status==='approved'&&oldOperation.exists){duplicate=true;return;}
+    if(report.data().status!=='pending'||oldOperation.exists)throw Error('CONFLICT');
+    const data=report.data(),balRef=balances.doc(data.productId),profileRef=profiles.doc(data.productId),productRef=products.doc(data.productId);
+    const [bal,profile,product]=await Promise.all([tx.get(balRef),tx.get(profileRef),tx.get(productRef)]);
+    if(!bal.exists||!profile.exists||!product.exists||product.data().status!=='active'||profile.data().controlMode!=='quantitative')throw Error('MISSING');
+    if(profile.data().countUnit!==bal.data().unit||data.unit!==bal.data().unit||!number(data.quantity,data.unit)||!profile.data().locations.includes(data.location)||bal.data()[data.location]<data.quantity)throw Error('QUANTITY');
+    const lots=product.data().trackExpiry?await tx.get(lotRoots.doc(data.productId).collection('lots').orderBy('expiryDate').limit(101)):null;
+    if(lots?.size>100)throw Error('LOT');
+    let remaining=data.quantity,lotUpdates=[];
+    if(lots){
+     for(const l of lots.docs){
+      const old=l.data(),available=old[data.location]||0;
+      if(available<=0)continue;
+      const debit=round(Math.min(available,remaining));
+      lotUpdates.push({ref:l.ref,locationAfter:round(available-debit),totalAfter:round((old.reserva||0)+(old.giro||0)-debit)});
+      remaining=round(remaining-debit);if(remaining<=0)break;
+     }
+     if(remaining>0)throw Error('LOT');
+    }
+    const at=now();
+    for(const l of lotUpdates)tx.update(l.ref,{[data.location]:l.locationAfter,availableQuantity:l.totalAfter,updatedAt:at});
+    tx.update(balRef,{[data.location]:round(bal.data()[data.location]-data.quantity),total:round(bal.data().total-data.quantity),lastOperationId:reportId,updatedAt:at,quality:'ESTIMATED_BY_MOVEMENTS'});
+    tx.update(ref,{status:'approved',approvedBy:actor.uid,approvedAt:at});
+    tx.create(operation,{kind:'loss',productId:data.productId,location:data.location,quantity:data.quantity,unit:data.unit,notes:data.reason,actorUid:actor.uid,unitId:m.unitId,reportId,at});
+    audit(tx,db,'v3.loss_approved',m.unitId,actor.uid,{reportId,productId:data.productId,quantity:data.quantity,location:data.location});
+   });
+   return send(res,200,duplicate?'Perda já aprovada.':'Perda aprovada; saldo atualizado com rastreabilidade.',{duplicate});
+  }
   if(action==='v3InspectReceive'){
    const {requestId,productId,commercialQuantity,commercialUnit,stockQuantity,location='reserva',orderId=null,lot='',expiryDate='',supplier='',notes=''}=req.body||{};
    if(!reqOk(requestId)||!idOk(productId)||!locations.includes(location)||!['kg','g','L','mL','un','porcao','pacote','duzia'].includes(commercialUnit)||
