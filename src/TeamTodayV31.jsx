@@ -41,14 +41,26 @@ export default function TeamTodayV31({unitId}){
    const startTime=windowMatch?.[0]?.trim()||null;
    const status=confirmed|| (x.operationalStatus==='day_off'?'Folga prevista':x.operationalStatus==='absence_recorded'?'Ausência na escala':x.operationalStatus==='not_scheduled'?'Sem lançamento na escala':startTime&&clock<startTime?'Entrada prevista às '+startTime:'Escalado · presença não confirmada');
    const timeLabel=hours?(x.operationalStatus==='not_scheduled'?'Jornada habitual: ':'Horário: ')+hours:'Horário não informado';
-   return {key:x.uid,name:profile?.name||x.name||'Colaborador',status,timeLabel};
+   const areaRaw=String(profile?.area||profile?.sector||profile?.department||x.area||'').toLowerCase();
+   const area=/cozinha|kitchen/.test(areaRaw)?'Cozinha':/sal[aã]o|frente|atendimento|front/.test(areaRaw)?'Frente':'Setor não informado';
+   const startHour=startTime?Number(startTime.slice(0,2)):null;
+   const shift=/manh[aã]/i.test(hours||'')?'Manhã':/noite/i.test(hours||'')?'Noite':/tarde/i.test(hours||'')?'Tarde':startHour===null?'Turno não informado':startHour<12?'Manhã':startHour<18?'Tarde':'Noite';
+   const awaiting=Boolean(startTime&&clock>=startTime&&!presenceStatus);
+   return {key:x.uid,name:profile?.name||x.name||'Colaborador',status:awaiting?'Horário iniciado · aguardando confirmação':status,timeLabel,area,shift};
+
   });
  },[schedules,today,staff,presence,clock]);
  return <section className="ti-team-today" aria-label="Equipe de hoje">
   <header><div><small>OPERAÇÃO · {today}</small><h2>Equipe de hoje</h2><p>Escala publicada e presença registrada são informações diferentes.</p></div><button type="button" onClick={refresh} disabled={busy}>{busy?'Atualizando…':'Atualizar'}</button></header>
   {error&&<p role="alert">{error}</p>}
   {!error&&!busy&&people.length===0&&<p>Não há colaboradores escalados para trabalhar hoje nesta publicação.</p>}
-  <div className="ti-team-today-grid">{people.map(p=><article key={p.key}><strong>{p.name}</strong><span>{p.status}</span><small>{p.timeLabel}</small></article>)}</div>
+  {['Manhã','Tarde','Noite','Turno não informado'].map(shift=>{
+   const group=people.filter(p=>p.shift===shift);
+   return group.length?<section key={shift} className="ti-team-shift-group" aria-label={'Equipe '+shift}>
+    <h3>{shift} <small>{group.length} escalado{group.length!==1?'s':''}</small></h3>
+    <div className="ti-team-today-grid">{group.map(p=><article key={p.key}><strong>{p.name}</strong><small>{p.area} · {p.timeLabel}</small><span>{p.status}</span></article>)}</div>
+   </section>:null;
+  })}
   <details className="ti-team-correction"><summary>Corrigir presença de um funcionário</summary><p>Ajustes são auditados. Use somente após conferir a ocorrência real; motivos pessoais permanecem restritos à gestão.</p>
    <form onSubmit={submitCorrection}><label>Funcionário<select required value={correction.targetUid} onChange={e=>setCorrection(p=>({...p,targetUid:e.target.value}))}><option value="">Selecione uma conta vinculada</option>{staff.filter(p=>p.accountUid).map(p=><option key={p.id} value={p.accountUid}>{p.name}</option>)}</select></label>
    <label>Data da jornada<input required type="date" max={today} value={correction.workDay} onChange={e=>setCorrection(p=>({...p,workDay:e.target.value}))}/></label>

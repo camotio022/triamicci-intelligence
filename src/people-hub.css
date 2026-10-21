@@ -28,3 +28,10 @@
 .ti-team-correction button[type=submit]{border:1px solid #a71916;border-radius:11px;color:#fff;background:#a71916;font-weight:750;cursor:pointer}
 .ti-team-correction button:disabled{opacity:.52;cursor:not-allowed}
 @media(max-width:600px){.ti-team-correction form{grid-template-columns:minmax(0,1fr)}}
+
+.ti-team-shift-group{margin-top:17px}
+.ti-team-shift-group h3{font-size:15px;color:#283246;margin:0 0 10px;display:flex;align-items:center;gap:9px}
+.ti-team-shift-group h3 small{font-size:11px;color:#667085;font-weight:600}
+.ti-team-shift-group .ti-team-today-grid{margin-top:0}
+.ti-team-shift-group article{border:1px solid #e8e3e6;background:var(--surface,#fff)}
+.ti-team-shift-group article span{font-weight:700;color:#7f332c}
