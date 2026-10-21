@@ -35,3 +35,18 @@
 .ti-photo-actions button:disabled{opacity:.5;cursor:wait}
 @media(max-width:760px){.ti-premium-hero{padding:18px;gap:12px}.ti-premium-unit{width:auto;align-self:center;margin-left:auto}.ti-premium-avatar{width:68px;height:68px}}
 @media(max-width:420px){.ti-premium-hero{padding:15px}.ti-premium-unit{width:100%;margin-left:0}.ti-premium-identity{flex-basis:calc(100% - 104px)}.ti-premium-avatar{width:64px;height:64px}}
+
+/* Minha ficha · solicitações de cobertura: controles mobile-first consistentes. */
+.ti-cov-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:19px 0 25px;min-width:0}
+.ti-cov-fields label{display:flex;flex-direction:column;gap:7px;min-width:0;color:#344054;font-size:13px;font-weight:700}
+.ti-cov-fields label span{display:block;line-height:1.35}
+.ti-cov-fields :is(select,input,textarea){box-sizing:border-box;display:block;width:100%;min-width:0;max-width:100%;min-height:46px;padding:11px 13px;border:1px solid #cdd6e2;border-radius:11px;background:#fff;color:#202939;font:inherit;font-size:16px;line-height:1.4}
+.ti-cov-fields select{cursor:pointer}
+.ti-cov-fields textarea{min-height:112px;resize:vertical}
+.ti-cov-fields :is(select,input,textarea):focus-visible{outline:none;border-color:#a71916;box-shadow:0 0 0 3px rgba(167,25,22,.12)}
+.ti-cov-fields .ti-cov-reason{grid-column:1/-1}
+.ti-cov-reason small{font-size:11px;color:#667085;font-weight:500;text-align:right}
+.ti-cov-fields button[type=submit]{grid-column:1/-1;min-height:48px;padding:12px 15px;border-radius:11px;border:0;background:#a71916;color:#fff;font:inherit;font-weight:750;cursor:pointer}
+.ti-cov-fields button[type=submit]:focus-visible{outline:3px solid #d78b87;outline-offset:2px}
+.ti-cov-fields button[type=submit]:disabled{opacity:.48;cursor:not-allowed}
+@media(max-width:620px){.ti-cov-fields{grid-template-columns:minmax(0,1fr);gap:13px}.ti-cov-fields button[type=submit]{width:100%}}
