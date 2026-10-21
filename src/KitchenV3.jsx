@@ -1,3 +1,4 @@
+import {isManagement} from '../server/permissions/v31-policy.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -18,7 +19,7 @@ const date=iso=>iso?new Date(iso+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const longDate=x=>x?new Date(x).toLocaleString('pt-BR'):'—';
 export default function KitchenV3({membership}){
  const {notify}=useFeedback();
- const canManage=['admin','manager'].includes(membership.role);
+ const canManage=isManagement(membership.role);
  const [tab,setTab]=useState('overview'),[products,setProducts]=useState([]),[signals,setSignals]=useState([]),[orders,setOrders]=useState([]);
  const [selected,setSelected]=useState(''),[search,setSearch]=useState(''),[location,setLocation]=useState('reserva'),[showArchived,setShowArchived]=useState(false),[newName,setNewName]=useState(''),[newCategory,setNewCategory]=useState('Proteínas'),[newUnit,setNewUnit]=useState('kg'),[newExpiry,setNewExpiry]=useState(false),[resolutionById,setResolutionById]=useState({});
  const [observation,setObservation]=useState('missing'),[note,setNote]=useState('');
