@@ -68,7 +68,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    return commit('v3Count',{productId,location,sessionId,quantity:Number(quantity),lotCounts:counts,initialLot:chosen?.trackExpiry&&!lots.length&&Number(quantity)>0?{lot:initialLotName.trim(),expiryDate:initialLotExpiry}:null,notes},'Contagem física registrada.');
   }
   if(kind==='transfer'&&from===to){setError('Escolha locais diferentes para a transferência.');return;}
-  if(kind==='transfer'&&(!(Number(quantity)>0)||(hasKnownBalance&&Number(quantity)>available))){setError('A quantidade precisa ser positiva e não pode exceder o saldo disponível no local de origem.');return;}
+  if(kind==='transfer'&&(!hasKnownBalance||!(Number(quantity)>0)||Number(quantity)>available)){setError('A quantidade precisa ser positiva e não pode exceder o saldo disponível no local de origem.');return;}
   if(kind==='transfer')return commit('v3Transfer',{productId,from,to,quantity:Number(quantity)},'Transferência registrada.');
   if(kind==='produce')return commit('v3Produce',{outputProductId:outputId,outputQuantity:Number(outputQty),outputLocation,inputs:sources.map(i=>({...i,quantity:Number(i.quantity)})),
    lot,expiryDate:expiry,notes,alternativeReason},'Produção concluída e saldos registrados.');
@@ -129,7 +129,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
     <div className="v3-line"><Field name="Lote de armazenamento"><input required maxLength={80} value={lot} onChange={e=>setLot(e.target.value)} placeholder="Identificação real"/></Field><Field name="Validade"><input required type="date" value={expiry} onChange={e=>setExpiry(e.target.value)}/></Field></div>
    </>}
    {kind!=='transfer'&&<Field name="Observações (opcional)"><textarea maxLength={240} value={notes} onChange={e=>setNotes(e.target.value)}/></Field>}
-   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='count'&&(!managers||chosen?.profile?.controlMode!=='quantitative')||kind==='count'&&chosen?.trackExpiry&&!lots.length&&!managers||kind==='transfer'&&(from===to||!(Number(quantity)>0)||Number(quantity)>Number(chosen?.v3Balance?.[from]??0))||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
+   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='count'&&(!managers||chosen?.profile?.controlMode!=='quantitative')||kind==='count'&&chosen?.trackExpiry&&!lots.length&&!managers||kind==='transfer'&&(from===to||!hasKnownBalance||!(Number(quantity)>0)||Number(quantity)>available)||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
     {busy?'Registrando…':({receive:'Enviar conferência',count:'Salvar contagem',transfer:'Confirmar transferência',produce:'Concluir produção'})[kind]}
    </button>
   </form>
