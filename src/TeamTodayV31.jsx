@@ -30,7 +30,7 @@ export default function TeamTodayV31(){
    const profile=staff.find(y=>y.id===x.uid||y.accountUid===x.uid);
    const key=profile?.accountUid||x.uid;
    const presenceStatus=presence[key];
-   const confirmed=({working:'Em serviço',on_break:'Em intervalo',finished:'Turno encerrado'})[presenceStatus];
+   const confirmed=({working:'Em serviço',on_break:'Em intervalo',finished:'Turno encerrado',absent:'Ausência confirmada'})[presenceStatus];
    const status=confirmed|| (x.operationalStatus==='day_off'?'Folga prevista':x.operationalStatus==='absence_recorded'?'Ausência na escala':x.operationalStatus==='not_scheduled'?'Sem lançamento na escala':'Escalado · presença não confirmada');
    return {key:x.uid,name:profile?.name||x.name||'Colaborador',status};
   });
