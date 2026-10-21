@@ -2,7 +2,7 @@ import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {doc,onSnapshot} from 'firebase/firestore';
 import {auth,db} from './firebase.js';
 import PublishedRoster from './PublishedRoster.jsx';
-import {rosterToday} from '../server/schedules/restaurant-today.js';
+import {rosterToday,liveShiftState} from '../server/schedules/restaurant-today.js';
 import './operations-planning.css';
 
 async function read(module,action){
@@ -28,7 +28,7 @@ export default function TeamMural({membership}){
   }catch(e){setError(e.message)}finally{setLoading(false)}
  },[]);
  const refreshPresence=useCallback(async()=>{
-  try{const result=await read('attendanceV31','teamToday');setPresence(Object.fromEntries((result.presence||[]).map(x=>[x.uid,x.status])));}
+  try{const result=await read('attendanceV31','teamToday');setPresence(Object.fromEntries((result.presence||[]).map(x=>[x.uid,x])));}
   catch{/* A escala permanece disponível se a presença não puder ser consultada. */}
  },[]);
  useEffect(()=>{refresh();refreshPresence();const onVisible=()=>{if(document.visibilityState==='visible'){setToday(todayInSaoPaulo());refresh();refreshPresence()}};document.addEventListener('visibilitychange',onVisible);const interval=setInterval(onVisible,60000);return()=>{document.removeEventListener('visibilitychange',onVisible);clearInterval(interval)}},[refresh,refreshPresence]);
@@ -44,12 +44,13 @@ export default function TeamMural({membership}){
   const weekday=['dom','seg','ter','qua','qui','sex','sab'][new Date(today+'T12:00:00Z').getUTCDay()];
   const habitual=Array.isArray(employee?.availability)?employee.availability.find(slot=>slot.day===weekday):null;
   const start=/^([01]\d|2[0-3]):[0-5]\d$/.test(habitual?.start||'')?habitual.start:null;
-  const state=presence[employee?.accountUid||entry.uid]||presence[entry.uid];
-  const status=({working:'Entrada declarada',on_break:'Em intervalo',finished:'Saída registrada',absent:'Ausência confirmada'})[state]||(start&&clock>=start?'Entrada não confirmada':'Previsto');
-  return {uid:entry.uid,name:employee?.name||entry.name||'Funcionário',shift,area,start,status,ongoing:state==='working'||state==='on_break'||(start&&clock>=start&&state!=='finished'&&state!=='absent')};
+  const attendance=presence[employee?.accountUid||entry.uid]||presence[entry.uid]||null;
+  const live=liveShiftState({day:today,clock,employee:employee||{},attendance});
+  return {uid:entry.uid,name:employee?.name||entry.name||'Funcionário',shift,area,start:live.start,status:live.label,source:live.source,ongoing:live.due||Boolean(attendance&&['working','on_break'].includes(attendance.status)),upcoming:live.upcoming};
+
  }),[current,today,staff,presence,clock]);
  const nowTeam=roster.filter(x=>x.ongoing);
- const nextTeam=roster.filter(x=>!x.ongoing&&x.start&&x.status==='Previsto').sort((a,b)=>a.start.localeCompare(b.start));
+ const nextTeam=roster.filter(x=>!x.ongoing&&x.upcoming).sort((a,b)=>a.start.localeCompare(b.start));
  const withoutTime=roster.filter(x=>!x.start&&!x.ongoing);
  return <section className="ti-planning ti-mural-home" aria-label="Mural da equipe">
   <header className="ti-mural-header"><div><span className="eyebrow">INFORMAÇÕES DA UNIDADE</span><h1>Mural da equipe</h1><p>Escalas e comunicados importantes, organizados para consulta.</p></div><button type="button" className="ti-mural-refresh" onClick={()=>{refresh();refreshPresence()}}>Atualizar</button></header>
@@ -57,7 +58,7 @@ export default function TeamMural({membership}){
   <div className="ti-mural-home-layout">
    <section className="ti-mural-card ti-mural-roster" aria-labelledby="mural-roster-title">
     <header className="ti-mural-section-header"><div><h2 id="mural-roster-title">Equipe de hoje</h2><p>Quem deveria estar em serviço e quem entra depois.</p></div></header>
-    <div className="ti-mural-now"><h3>Agora <small>{nowTeam.length} escalado(s)</small></h3>{nowTeam.length?<ul>{nowTeam.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift}{p.start?' · '+p.start:''}</span><small>{p.status}</small></li>)}</ul>:<p>Ninguém com início previsto até agora.</p>}</div>
+    <div className="ti-mural-now"><h3>Agora <small>{nowTeam.length} escalado(s)</small></h3>{nowTeam.length?<ul>{nowTeam.map(p=><li key={p.uid} className={p.source==='employee'?'ti-live-confirmed':''}><strong>{p.name}</strong><span>{p.area} · {p.shift}{p.start?' · '+p.start:''}</span><small>{p.status}</small></li>)}</ul>:<p>Ninguém com início previsto até agora.</p>}</div>
     <div className="ti-mural-next"><h3>Próximos a entrar</h3>{nextTeam.length?<ul>{nextTeam.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift} · {p.start||'Horário não informado'}</span></li>)}</ul>:<p>Nenhuma próxima entrada identificada.</p>}</div>
     {withoutTime.length>0&&<div className="ti-mural-next"><h3>Sem horário habitual informado <small>· por turno</small></h3><ul>{withoutTime.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift}</span></li>)}</ul></div>}
     <details className="ti-mural-roster-details"><summary>Consultar escala completa e folgas</summary>
