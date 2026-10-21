@@ -42,7 +42,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
   finally{setBusy(false);}
  };
  const productOptions=productsActive.map(p=><option value={p.id} key={p.id}>{p.profile?.displayName||p.name}</option>);
- const sourceOptions=[...(out?.profile?.sourceProductIds||[]),...(out?.profile?.alternativeProductIds||[])];
+ const sourceOptions=[...(out?.profile?.sourceProductIds||[]),...(managers?(out?.profile?.alternativeProductIds||[]):[])];
  const configuredSources=sourceOptions.map(id=>products.find(p=>p.id===id)).filter(Boolean);
  const submit=e=>{
   e.preventDefault();
@@ -101,7 +101,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
     </div>)}
      <button className="v3-secondary" type="button" onClick={()=>setSources(s=>[...s,{productId:'',quantity:'',location:'reserva'}])} disabled={sources.length>=12}>Adicionar matéria-prima</button>
     </fieldset>
-    <Field name="Motivo de substituição (obrigatório quando origem alternativa)"><textarea maxLength={240} value={alternativeReason} onChange={e=>setAlternativeReason(e.target.value)}/></Field>
+    {managers&&<Field name="Motivo de substituição (obrigatório quando origem alternativa)"><textarea maxLength={240} value={alternativeReason} onChange={e=>setAlternativeReason(e.target.value)}/></Field>}
    </>}
    {showLot&&<>
     <div className="v3-line"><Field name="Lote de armazenamento"><input required maxLength={80} value={lot} onChange={e=>setLot(e.target.value)} placeholder="Identificação real"/></Field><Field name="Validade"><input required type="date" value={expiry} onChange={e=>setExpiry(e.target.value)}/></Field></div>
