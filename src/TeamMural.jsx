@@ -39,13 +39,11 @@ export default function TeamMural({membership}){
  const active=schedules.find(x=>x.id===selected);
  const roster=useMemo(()=>rosterToday(current,today).filter(x=>x.operationalStatus==='scheduled_unconfirmed').map(entry=>{
   const employee=staff.find(x=>x.id===entry.uid||x.accountUid===entry.uid);
-  const hours=String(employee?.shift||entry.shift||'');
-  const match=hours.match(/([01]\d|2[0-3]):[0-5]\d/);
-  const start=match?.[0]||null;
-  const h=start?Number(start.slice(0,2)):null;
-  const shift=/manh[aã]/i.test(hours)?'Manhã':/tarde/i.test(hours)?'Tarde':/noite/i.test(hours)?'Noite':h===null?'Turno a definir':h<12?'Manhã':h<18?'Tarde':'Noite';
-  const rawArea=String(employee?.area||employee?.sector||employee?.department||entry.area||'').toLowerCase();
-  const area=/cozinha|kitchen/.test(rawArea)?'Cozinha':/frente|sal[aã]o|atendimento/.test(rawArea)?'Frente':'Setor a definir';
+  const shift=({manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variavel:'Variável'})[String(employee?.shift||entry.shift||'').toLowerCase()]||'Turno a definir';
+  const area=({cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'})[String(employee?.sector||entry.sector||'').toLowerCase()]||'Setor a definir';
+  const weekday=['dom','seg','ter','qua','qui','sex','sab'][new Date(today+'T12:00:00Z').getUTCDay()];
+  const habitual=Array.isArray(employee?.availability)?employee.availability.find(slot=>slot.day===weekday):null;
+  const start=/^([01]\d|2[0-3]):[0-5]\d$/.test(habitual?.start||'')?habitual.start:null;
   const state=presence[employee?.accountUid||entry.uid]||presence[entry.uid];
   const status=({working:'Entrada declarada',on_break:'Em intervalo',finished:'Saída registrada',absent:'Ausência confirmada'})[state]||(start&&clock>=start?'Entrada não confirmada':'Previsto');
   return {uid:entry.uid,name:employee?.name||entry.name||'Funcionário',shift,area,start,status,ongoing:state==='working'||state==='on_break'||(start&&clock>=start&&state!=='finished'&&state!=='absent')};
@@ -61,7 +59,7 @@ export default function TeamMural({membership}){
     <header className="ti-mural-section-header"><div><h2 id="mural-roster-title">Equipe de hoje</h2><p>Quem deveria estar em serviço e quem entra depois.</p></div></header>
     <div className="ti-mural-now"><h3>Agora <small>{nowTeam.length} escalado(s)</small></h3>{nowTeam.length?<ul>{nowTeam.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift}{p.start?' · '+p.start:''}</span><small>{p.status}</small></li>)}</ul>:<p>Ninguém com início previsto até agora.</p>}</div>
     <div className="ti-mural-next"><h3>Próximos a entrar</h3>{nextTeam.length?<ul>{nextTeam.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift} · {p.start||'Horário não informado'}</span></li>)}</ul>:<p>Nenhuma próxima entrada identificada.</p>}</div>
-    {withoutTime.length>0&&<div className="ti-mural-next"><h3>Horário não definido <small>· consultar escala</small></h3><ul>{withoutTime.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift}</span></li>)}</ul></div>}
+    {withoutTime.length>0&&<div className="ti-mural-next"><h3>Sem horário habitual informado <small>· por turno</small></h3><ul>{withoutTime.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift}</span></li>)}</ul></div>}
     <details className="ti-mural-roster-details"><summary>Consultar escala completa e folgas</summary>
     {loading?<p role="status">Carregando escalas…</p>:schedules.length===0?<p className="ti-mural-empty">Nenhuma escala publicada.</p>:<>
      <div className="ti-mural-period-list">{schedules.slice(0,12).map(s=><button type="button" key={s.id} className={selected===s.id?'ti-mural-period active':'ti-mural-period'} aria-pressed={selected===s.id} onClick={()=>setExpanded(s.id)}>{monthLabel(s.period)}{s.id===current?.id&&<small>Mês atual</small>}</button>)}</div>
