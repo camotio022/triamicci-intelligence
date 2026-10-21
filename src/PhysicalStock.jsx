@@ -24,7 +24,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
  const [summary,setSummary]=useState(null);
  const [lots,setLots]=useState([]);
  const [more,setMore]=useState({receipts:false,counts:false,outflows:false,transfers:false}),[loadingMore,setLoadingMore]=useState(false);
- const canReceive=['admin','manager'].includes(membership.role);
+ const canReceive=['admin','manager','submanager'].includes(membership.role);
  const load=useCallback(async()=>{
   try{
    const [p,h,c]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list'),api('/api/catalog/manage','list')]);
