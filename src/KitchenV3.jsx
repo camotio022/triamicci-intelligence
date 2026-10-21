@@ -71,7 +71,7 @@ export default function KitchenV3({membership}){
  return <section className="v3-page">
   <header className="v3-head"><div><p className="eyebrow">OPERAÇÃO DA COZINHA · V3</p><h1>Central de insumos</h1><p>O que temos, o que falta e o que está previsto para chegar.</p></div><button type="button" className="v3-secondary" onClick={load} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></header>
   <nav className="v3-tabs" aria-label="Seções de insumos">
-   {[['overview','Visão geral'],['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['count','Contagem'],['history','Histórico'],...(canManage?[['catalog','Configurar catálogo']]:[])].map(([key,label])=><button type="button" key={key} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
+   {[['overview','Visão geral'],['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],...(canManage?[['count','Contagem oficial']]:[]),['history','Histórico'],...(canManage?[['catalog','Configurar catálogo']]:[])].map(([key,label])=><button type="button" key={key} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
   </nav>
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {loading?<p role="status">Carregando dados reais da unidade…</p>:<>
