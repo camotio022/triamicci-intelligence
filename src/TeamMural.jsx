@@ -43,7 +43,7 @@ export default function TeamMural({membership}){
   const area=({cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'})[String(employee?.sector||entry.sector||'').toLowerCase()]||'Setor a definir';
   const weekday=['dom','seg','ter','qua','qui','sex','sab'][new Date(today+'T12:00:00Z').getUTCDay()];
   const habitual=Array.isArray(employee?.availability)?employee.availability.find(slot=>slot.day===weekday):null;
-  const start=/^([01]\\d|2[0-3]):[0-5]\\d$/.test(habitual?.start||'')?habitual.start:null;
+  const start=/^([01]\d|2[0-3]):[0-5]\d$/.test(habitual?.start||'')?habitual.start:null;
   const state=presence[employee?.accountUid||entry.uid]||presence[entry.uid];
   const status=({working:'Entrada declarada',on_break:'Em intervalo',finished:'Saída registrada',absent:'Ausência confirmada'})[state]||(start&&clock>=start?'Entrada não confirmada':'Previsto');
   return {uid:entry.uid,name:employee?.name||entry.name||'Funcionário',shift,area,start,status,ongoing:state==='working'||state==='on_break'||(start&&clock>=start&&state!=='finished'&&state!=='absent')};
