@@ -35,3 +35,15 @@
 .ti-photo-actions button:disabled{opacity:.5;cursor:wait}
 @media(max-width:760px){.ti-premium-hero{padding:18px;gap:12px}.ti-premium-unit{width:auto;align-self:center;margin-left:auto}.ti-premium-avatar{width:68px;height:68px}}
 @media(max-width:420px){.ti-premium-hero{padding:15px}.ti-premium-unit{width:100%;margin-left:0}.ti-premium-identity{flex-basis:calc(100% - 104px)}.ti-premium-avatar{width:64px;height:64px}}
+
+/* Minha ficha: identidade primeiro, ponto contextual compacto abaixo. */
+.ti-my-profile-page{min-width:0}
+.ti-my-profile-page .ti-premium-hero{margin-top:0}
+.ti-my-profile-attendance{margin:16px 0 0;min-width:0}
+.ti-my-profile-attendance .ti-attendance-v31{margin:0;max-width:none;width:100%;min-height:0;padding:17px 20px}
+.ti-my-profile-attendance .ti-attendance-v31-content{flex:1 1 100%;min-width:0}
+.ti-my-profile-attendance .ti-attendance-v31 h2{font-size:18px;line-height:1.35}
+.ti-my-profile-attendance .ti-attendance-v31 p{max-width:75ch}
+.ti-my-profile-attendance .ti-sync-status{margin:7px 2px 0;text-align:right;color:#687385;font-size:12px}
+.ti-my-profile-page .ti-premium-stats{margin-top:16px}
+@media(max-width:600px){.ti-my-profile-attendance .ti-attendance-v31{padding:15px 16px;border-radius:16px}.ti-my-profile-attendance .ti-attendance-v31 h2{font-size:17px}}
