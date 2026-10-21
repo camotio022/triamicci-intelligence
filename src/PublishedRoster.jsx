@@ -6,7 +6,7 @@ const formatDate=date=>new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'sho
 const getWeeks=s=>weeksForMonth(s.period);
 export default function PublishedRoster({schedule,presence={}}){
  const weeks=useMemo(()=>getWeeks(schedule),[schedule.period]);
- const [weekIndex,setWeekIndex]=useState(0);
+ const [weekIndex,setWeekIndex]=useState(()=>{const today=restaurantDay();return weeks.findIndex(days=>days.includes(today))>=0?weeks.findIndex(days=>days.includes(today)):0;});
  const index=Math.min(weekIndex,Math.max(0,weeks.length-1));
  const data=useMemo(()=>paperRoster(schedule,weeks[index]||[]),[schedule,index]);
  const allSundays=useMemo(()=>paperRoster(schedule,[]).sundays,[schedule]);
@@ -19,7 +19,14 @@ export default function PublishedRoster({schedule,presence={}}){
  React.useEffect(()=>{const refresh=()=>setToday(restaurantDay());const timer=setInterval(refresh,60000);document.addEventListener('visibilitychange',refresh);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh)}},[]);
  const todayPeople=useMemo(()=>rosterToday(schedule,today),[schedule,today]);
  return <div className="ti-roster" aria-label={'Folgas oficiais '+schedule.period}>
-  <div className="ti-roster-today-summary" aria-label={'Equipe de hoje '+today}><strong>Hoje · {formatDate(today)}</strong><span>Escala publicada, não comprovante de presença</span>{schedule.period===today.slice(0,7)?<p>{todayPeople.length===0?'Sem lançamentos para hoje.':todayPeople.map(x=>`${x.name||'Colaborador'}: ${x.operationalStatus==='scheduled_unconfirmed'?({working:'Em serviço · entrada registrada',on_break:'Em intervalo',finished:'Turno encerrado',absent:'Ausente confirmado'})[presence[x.uid]]||'Escalado · presença não confirmada':x.operationalStatus==='day_off'?'Folga':'Ausência registrada'}`).join(' · ')}</p>:<p>Esta escala é de outro mês. Abra a escala do mês atual para consultar hoje.</p>}</div>
+  {schedule.period===today.slice(0,7)&&<section className="ti-roster-today-summary" aria-label={'Equipe escalada para hoje '+today}>
+   <strong>Escalados hoje · {formatDate(today)}</strong>
+   <span>Presença registrada e escala são informações diferentes.</span>
+   {todayPeople.filter(x=>x.operationalStatus==='scheduled_unconfirmed').length?
+    <ul className="ti-roster-today-people">{todayPeople.filter(x=>x.operationalStatus==='scheduled_unconfirmed').map(x=><li key={x.uid}>
+     <strong>{x.name||'Colaborador'}</strong><span>{({working:'Entrada declarada',on_break:'Intervalo declarado',finished:'Saída registrada',absent:'Ausência confirmada'})[presence[x.uid]]||'Presença não confirmada'}</span>
+    </li>)}</ul>:<p>Ninguém escalado para trabalhar hoje nesta publicação.</p>}
+  </section>}
   <div className="ti-roster-heading">
    <div><strong>Escala de folgas</strong><small>{new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(schedule.period+'-01T12:00:00Z'))} · Publicada</small></div>
    <div className="ti-roster-switch" role="group" aria-label="Visualização da escala">

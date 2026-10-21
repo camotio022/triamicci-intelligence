@@ -45,11 +45,16 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
   catch(e){setError(e.message);notify(e.message,'error');return false;}
   finally{setBusy(false);}
  };
- const productOptions=productsActive.map(p=><option value={p.id} key={p.id}>{p.profile?.displayName||p.name}</option>);
+ const receiptOrders=orders.filter(o=>!['cancelled','received'].includes(o.status));
+ const receivingProducts=productsActive.filter(p=>['supplier','both'].includes(p.profile?.origin));
+ const allowedProducts=kind==='receive'?(orderId?receivingProducts.filter(p=>orders.find(o=>o.id===orderId)?.items?.some(i=>i.productId===p.id)):receivingProducts):productsActive;
+ const productOptions=allowedProducts.map(p=><option value={p.id} key={p.id}>{p.profile?.displayName||p.name}</option>);
  const sourceOptions=[...(out?.profile?.sourceProductIds||[]),...(managers?(out?.profile?.alternativeProductIds||[]):[])];
  const configuredSources=sourceOptions.map(id=>products.find(p=>p.id===id)).filter(Boolean);
  const submit=e=>{
   e.preventDefault();
+  if(kind==='receive'&&!orderId&&notes.trim().length<8){setError('Descreva por que a entrega ocorreu sem pedido cadastrado (mínimo de 8 caracteres).');return;}
+  if(kind==='receive'&&orderId&&chosenLine&&Number(commercialQuantity)>Math.max(0,chosenLine.quantity-Number(order?.received?.[productId]||0))&&notes.trim().length<8){setError('Justifique a quantidade acima do pedido antes de enviar a conferência.');return;}
   if(kind==='receive')return commit('v3InspectReceive',{productId,orderId:orderId||null,supplier,
    commercialQuantity:Number(commercialQuantity),commercialUnit,stockQuantity:Number(stockQuantity||0),location,lot,expiryDate:expiry,notes},'Conferência enviada. A entrada depende da aprovação gerencial.');
   if(kind==='count'){
@@ -58,6 +63,8 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    const counts=lots.map(l=>({id:l.id,quantity:Number(lotCounts[l.id])}));
    return commit('v3Count',{productId,location,sessionId,quantity:Number(quantity),lotCounts:counts,initialLot:chosen?.trackExpiry&&!lots.length&&Number(quantity)>0?{lot:initialLotName.trim(),expiryDate:initialLotExpiry}:null,notes},'Contagem física registrada.');
   }
+  if(kind==='transfer'&&from===to){setError('Escolha locais diferentes para a transferência.');return;}
+  if(kind==='transfer'&&(!(Number(quantity)>0)||Number(quantity)>Number(chosen?.v3Balance?.[from]??0))){setError('A quantidade precisa ser positiva e não pode exceder o saldo disponível no local de origem.');return;}
   if(kind==='transfer')return commit('v3Transfer',{productId,from,to,quantity:Number(quantity)},'Transferência registrada.');
   if(kind==='produce')return commit('v3Produce',{outputProductId:outputId,outputQuantity:Number(outputQty),outputLocation,inputs:sources.map(i=>({...i,quantity:Number(i.quantity)})),
    lot,expiryDate:expiry,notes,alternativeReason},'Produção concluída e saldos registrados.');
@@ -72,9 +79,13 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
   {error&&<p role="alert" className="v3-error">{error}</p>}
   <form className="v3-form" onSubmit={submit}>
    {prepared?<Field name="O que foi preparado?"><select required value={outputId} onChange={e=>{setOutputId(e.target.value);setSources([{productId:'',location:'reserva',quantity:''}]);}}><option value="">Selecione um preparo</option>{productsActive.filter(p=>['internal','both'].includes(p.profile?.origin)&&p.profile?.controlMode==='quantitative').map(p=><option key={p.id} value={p.id}>{p.profile?.displayName||p.name}</option>)}</select></Field>:
-    <Field name="Insumo"><select required value={productId} onChange={e=>{setProductId(e.target.value);setOrderId('')}}><option value="">Selecione um insumo</option>{productOptions}</select></Field>}
+    kind==='receive'?null:<Field name="Insumo"><select required value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Selecione um insumo</option>{productOptions}</select></Field>}
    {kind==='receive'&&<>
-    <Field name="Pedido relacionado (opcional)"><select value={orderId} onChange={e=>setOrderId(e.target.value)}><option value="">Entrega sem pedido cadastrado</option>{relatedOrders.map(o=><option value={o.id} key={o.id}>{o.supplier} · {o.etaDate}</option>)}</select></Field>
+    <Field name="Tipo de entrega"><select value={orderId} onChange={e=>{setOrderId(e.target.value);setProductId('');setSupplier('');}}><option value="">Entrega não prevista · exige justificativa</option>{receiptOrders.map(o=><option value={o.id} key={o.id}>Pedido de {o.supplier} · {o.etaDate||'sem data prevista'}</option>)}</select></Field>
+    {orderId&&<p className="v3-info">Selecione apenas os itens deste pedido. Quantidades acima do previsto exigem justificativa.</p>}
+    {!orderId&&<p className="v3-info">Entrega não prevista: informe o motivo nas observações. A gestão deverá aprovar antes de alterar o estoque.</p>}
+    <Field name="Produto recebido"><select required value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Selecione o produto</option>{productOptions}</select></Field>
+    {allowedProducts.length===0&&<p className="v3-info">Não existem produtos elegíveis neste pedido. Verifique a origem e o cadastro do insumo.</p>}
     <Field name="Fornecedor"><input required maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)}/></Field>
     <div className="v3-line"><Field name="Quanto chegou?"><input type="number" required min={["un","porcao","pacote","duzia"].includes(commercialUnit)?"1":".001"} step={["un","porcao","pacote","duzia"].includes(commercialUnit)?"1":".001"} value={commercialQuantity} onChange={e=>setCommercialQuantity(e.target.value)}/></Field>
      <Field name="Conferido em"><select value={commercialUnit} onChange={e=>setCommercialUnit(e.target.value)}>{listUnits.map(x=><option key={x}>{x}</option>)}</select></Field></div>
@@ -94,7 +105,9 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    {kind==='transfer'&&<>
     <Field name="De"><select value={from} onChange={e=>setFrom(e.target.value)}><option value="reserva">Reserva · 2º piso</option><option value="giro">Giro · 1º piso</option></select></Field>
     <Field name="Para"><select value={to} onChange={e=>setTo(e.target.value)}><option value="giro">Giro · 1º piso</option><option value="reserva">Reserva · 2º piso</option></select></Field>
-    <Field name={'Quantidade ('+(expected||'não configurada')+')'}><input required type="number" min=".001" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={quantity} onChange={e=>setQuantity(e.target.value)}/></Field>
+    <p role="status" className="v3-info">Disponível na origem: {Number(chosen?.v3Balance?.[from]??0)} {expected||'unidade não configurada'}. Não é possível transferir mais do que o estoque registrado.</p>
+    {from===to&&<p role="alert" className="v3-error">Escolha um destino diferente da origem.</p>}
+    <Field name={'Quantidade ('+(expected||'não configurada')+')'}><input required type="number" max={Number(chosen?.v3Balance?.[from]??0)} min=".001" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={quantity} onChange={e=>setQuantity(e.target.value)}/></Field>
    </>}
    {prepared&&<>
     <Field name={'Quantidade preparada ('+(out?.profile?.countUnit||'não configurada')+')'}><input required type="number" min=".001" step={['un','pacote','porcao','duzia'].includes(out?.profile?.countUnit)?'1':'.001'} value={outputQty} onChange={e=>setOutputQty(e.target.value)}/></Field>
@@ -111,7 +124,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
     <div className="v3-line"><Field name="Lote de armazenamento"><input required maxLength={80} value={lot} onChange={e=>setLot(e.target.value)} placeholder="Identificação real"/></Field><Field name="Validade"><input required type="date" value={expiry} onChange={e=>setExpiry(e.target.value)}/></Field></div>
    </>}
    {kind!=='transfer'&&<Field name="Observações (opcional)"><textarea maxLength={240} value={notes} onChange={e=>setNotes(e.target.value)}/></Field>}
-   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='count'&&(!managers||chosen?.profile?.controlMode!=='quantitative')||kind==='count'&&chosen?.trackExpiry&&!lots.length&&!managers||kind==='transfer'&&from===to||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
+   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='count'&&(!managers||chosen?.profile?.controlMode!=='quantitative')||kind==='count'&&chosen?.trackExpiry&&!lots.length&&!managers||kind==='transfer'&&(from===to||!(Number(quantity)>0)||Number(quantity)>Number(chosen?.v3Balance?.[from]??0))||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
     {busy?'Registrando…':({receive:'Enviar conferência',count:'Salvar contagem',transfer:'Confirmar transferência',produce:'Concluir produção'})[kind]}
    </button>
   </form>

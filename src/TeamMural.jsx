@@ -1,24 +1,55 @@
+import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import {doc,onSnapshot} from 'firebase/firestore';
+import {auth,db} from './firebase.js';
 import PublishedRoster from './PublishedRoster.jsx';
-import React,{useCallback,useEffect,useMemo,useState} from 'react';import {auth} from './firebase.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';
-async function call(module,action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...extra})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
-const mural='mural',sc='schedules';
-const blank=()=>({kind:'preparation',title:'',body:'',yieldText:'',allergens:[],ingredients:[{name:'',amount:'',unit:'g'}]});
-export default function TeamMural({membership,onLabels}){
- const {notify}=useFeedback(),[items,setItems]=useState([]),[schedules,setSchedules]=useState([]),[todayPresence,setTodayPresence]=useState({}),[error,setError]=useState(''),[loading,setLoading]=useState(true),[search,setSearch]=useState('');
- const [editing,setEditing]=useState(false),[draft,setDraft]=useState(blank()),[supersedesId,setSupersedesId]=useState(null),[saving,setSaving]=useState(false),[expand,setExpand]=useState('');
- const admin=['admin','manager','submanager'].includes(membership.role);
- const load=useCallback(async()=>{setLoading(true);setError('');try{const [a,b]=await Promise.all([call(mural,'list'),call(sc,'list')]);setItems(a.items||[]);setSchedules((b.schedules||[]).filter(x=>x.status==='published'))}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
- useEffect(()=>{let live=true;const refresh=async()=>{try{const d=await call('attendanceV31','teamToday');if(live)setTodayPresence(Object.fromEntries((d.presence||[]).map(x=>[x.uid,x.status])))}catch{}};refresh();const interval=setInterval(refresh,60000);return()=>{live=false;clearInterval(interval)}},[]);
- useEffect(()=>{load()},[load]);
- const visible=useMemo(()=>items.filter(x=>admin||x.status==='published').filter(x=>(x.title+' '+x.body).toLowerCase().includes(search.trim().toLowerCase())),[items,admin,search]);
- const changeIngredient=(i,key,val)=>setDraft(x=>({...x,ingredients:x.ingredients.map((r,j)=>j===i?{...r,[key]:val}:r)}));
- const save=async e=>{e.preventDefault();setSaving(true);try{const item={...draft,ingredients:draft.kind==='preparation'?draft.ingredients.map(x=>({...x,amount:Number(x.amount)})):[],allergens:draft.kind==='preparation'?draft.allergens:[]};const r=await call(mural,'saveDraft',{item,supersedesId});notify(r.message,'success');setEditing(false);setDraft(blank());setSupersedesId(null);await load()}catch(e){setError(e.message);notify(e.message,'error')}finally{setSaving(false)}};
- const publish=async id=>{setSaving(true);try{const r=await call(mural,'publish',{id});notify(r.message,'success');await load()}catch(e){setError(e.message);notify(e.message,'error')}finally{setSaving(false)}};
- return <section className="ti-planning"><p className="eyebrow">TRIAMICCI · MURAL DA UNIDADE</p><h1>Mural da equipe</h1><p>Um único local para escalas publicadas, preparações aprovadas e comunicados. Rascunhos nunca são exibidos a toda a equipe.</p>
- <div className="ti-mural-grid">
-  <section className="ti-mural-card"><h2>Etiquetas e validades</h2><p>Consultar etiquetas, lotes, emissão e histórico de trocas com rastreabilidade. As políticas só funcionam após aprovação.</p><button type="button" onClick={onLabels}>Abrir controle de etiquetas</button></section>
-  <section className="ti-mural-card"><h2>Escalas e folgas publicadas</h2><p>Somente a versão oficialmente publicada aparece aqui.</p>{loading?<p>Carregando...</p>:schedules.length===0?<p>Nenhuma escala publicada ainda.</p>:<div className="ti-mural-list">{schedules.map(s=><article key={s.id}><strong>{s.title} · {s.period}</strong><button type="button" onClick={()=>setExpand(expand===s.id?'':s.id)} aria-expanded={expand===s.id}>{expand===s.id?'Ocultar':'Ver escala'}</button>{expand===s.id&&<PublishedRoster schedule={s} presence={todayPresence}/> }</article>)}</div>}</section>
-  <section className="ti-mural-card"><h2>Preparações e comunicados</h2><p>Fichas técnicas e orientações aprovadas pela gerência.</p><label>Pesquisar<input type="search" placeholder="Molho, tempero, preparo..." value={search} onChange={e=>setSearch(e.target.value)}/></label>{visible.length===0?<p>Nenhuma publicação encontrada.</p>:<div className="ti-mural-list">{visible.map(x=><article key={x.id}><strong>{x.title}</strong><small>{x.kind==='preparation'?'Preparação':'Comunicado'} · {x.status==='draft'?'Rascunho':'Publicado'} · v{x.version}</small><p>{x.body}</p>{x.kind==='preparation'&&<><p><strong>Rendimento:</strong> {x.yieldText}</p><ul>{x.ingredients.map((ing,i)=><li key={i}>{ing.amount} {ing.unit} · {ing.name}</li>)}</ul><p><strong>Alergênicos informados:</strong> {x.allergens.length?x.allergens.join(', '):'Não cadastrados — conferir ficha oficial'}</p></>}{x.status==='published'&&admin&&<button type="button" onClick={()=>{setDraft({kind:x.kind,title:x.title,body:x.body,yieldText:x.yieldText||'',allergens:x.allergens||[],ingredients:x.ingredients?.length?x.ingredients:[{name:'',amount:'',unit:'g'}]});setSupersedesId(x.id);setEditing(true)}}>Propor nova versão</button>}{x.status==='draft'&&(x.kind==='notice'&&admin||membership.role==='admin')&&<button type="button" disabled={saving} onClick={()=>publish(x.id)}>Aprovar e publicar</button>}</article>)}</div>}</section>
- </div>{admin&&<section className="ti-planning-card" style={{marginTop:20}}><div className="ti-planning-heading"><h2>Administração do Mural</h2><button type="button" onClick={()=>{setEditing(!editing);setSupersedesId(null);setDraft(blank())}}>{editing?'Cancelar':'Nova publicação'}</button></div>{editing&&<form className="ti-planning-add" onSubmit={save}><label>Categoria<select value={draft.kind} onChange={e=>setDraft({...blank(),kind:e.target.value})}><option value="preparation">Preparação</option><option value="notice">Comunicado</option></select></label><label>Título<input required minLength={1} maxLength={100} value={draft.title} onChange={e=>setDraft(x=>({...x,title:e.target.value}))}/></label><label>Conteúdo / modo de preparo<textarea required maxLength={3000} value={draft.body} onChange={e=>setDraft(x=>({...x,body:e.target.value}))}/></label>{draft.kind==='preparation'&&<><label>Rendimento<input required maxLength={100} value={draft.yieldText} onChange={e=>setDraft(x=>({...x,yieldText:e.target.value}))}/></label><label>Alergênicos (separar por vírgulas; conferir antes de publicar)<input value={draft.allergens.join(', ')} onChange={e=>setDraft(x=>({...x,allergens:e.target.value.split(',').map(v=>v.trim()).filter(Boolean)}))}/></label><div><strong>Ingredientes e quantidades</strong>{draft.ingredients.map((ing,i)=><div key={i} className="ti-planning-add"><label>Ingrediente<input required maxLength={90} value={ing.name} onChange={e=>changeIngredient(i,'name',e.target.value)}/></label><label>Quantidade<input type="number" required min="0.001" step="0.001" value={ing.amount} onChange={e=>changeIngredient(i,'amount',e.target.value)}/></label><label>Unidade<select value={ing.unit} onChange={e=>changeIngredient(i,'unit',e.target.value)}>{['g','kg','ml','L','un'].map(u=><option key={u} value={u}>{u}</option>)}</select></label></div>)}<button type="button" onClick={()=>setDraft(x=>({...x,ingredients:[...x.ingredients,{name:'',amount:'',unit:'g'}]}))}>Adicionar ingrediente</button></div></>}<button disabled={saving} type="submit">{saving?'Salvando...':'Salvar rascunho'}</button></form>}</section>}{error&&<p className="team-error" role="alert">{error}</p>}
+import './operations-planning.css';
+
+async function read(module,action){
+ const token=await auth.currentUser?.getIdToken();
+ if(!token)throw Error('Faça login novamente.');
+ const response=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action})});
+ const data=await response.json();
+ if(!response.ok)throw Error(data.message||'Não foi possível atualizar o mural.');
+ return data;
+}
+const monthLabel=period=>new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(period+'-01T12:00:00Z'));
+const todayInSaoPaulo=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+
+export default function TeamMural({membership}){
+ const [schedules,setSchedules]=useState([]),[notices,setNotices]=useState([]),[presence,setPresence]=useState({}),[today,setToday]=useState(todayInSaoPaulo);
+ const [loading,setLoading]=useState(true),[error,setError]=useState(''),[expanded,setExpanded]=useState(null);
+ const refresh=useCallback(async()=>{
+  try{
+   const [roster,board]=await Promise.all([read('schedules','list'),read('mural','publicNotices')]);
+   setSchedules((roster.schedules||[]).filter(x=>x.status==='published').sort((a,b)=>String(b.period).localeCompare(String(a.period))));
+   setNotices(board.items||[]);setError('');
+  }catch(e){setError(e.message)}finally{setLoading(false)}
+ },[]);
+ const refreshPresence=useCallback(async()=>{
+  try{const result=await read('attendanceV31','teamToday');setPresence(Object.fromEntries((result.presence||[]).map(x=>[x.uid,x.status])));}
+  catch{/* A escala permanece disponível se a presença não puder ser consultada. */}
+ },[]);
+ useEffect(()=>{refresh();refreshPresence();const onVisible=()=>{if(document.visibilityState==='visible'){setToday(todayInSaoPaulo());refresh();refreshPresence()}};document.addEventListener('visibilitychange',onVisible);const interval=setInterval(onVisible,60000);return()=>{document.removeEventListener('visibilitychange',onVisible);clearInterval(interval)}},[refresh,refreshPresence]);
+ useEffect(()=>{if(!membership?.unitId)return;let first=true;return onSnapshot(doc(db,'units',membership.unitId,'live','attendance'),()=>{if(first){first=false;return}refreshPresence()},()=>{});},[membership?.unitId,refreshPresence]);
+ const current=useMemo(()=>schedules.find(x=>x.period===today.slice(0,7)),[schedules,today]);
+ const selected=expanded===null?current?.id:expanded;
+ const active=schedules.find(x=>x.id===selected);
+ return <section className="ti-planning ti-mural-home" aria-label="Mural da equipe">
+  <header className="ti-mural-header"><div><span className="eyebrow">INFORMAÇÕES DA UNIDADE</span><h1>Mural da equipe</h1><p>Escalas e comunicados importantes, organizados para consulta.</p></div><button type="button" className="ti-mural-refresh" onClick={()=>{refresh();refreshPresence()}}>Atualizar</button></header>
+  {error&&<p role="alert" className="team-error">{error}</p>}
+  <div className="ti-mural-home-layout">
+   <section className="ti-mural-card ti-mural-roster" aria-labelledby="mural-roster-title">
+    <header className="ti-mural-section-header"><div><h2 id="mural-roster-title">Escala da equipe</h2><p>Consulte quem trabalha hoje e as folgas publicadas.</p></div></header>
+    {loading?<p role="status">Carregando escalas…</p>:schedules.length===0?<p className="ti-mural-empty">Nenhuma escala publicada.</p>:<>
+     <div className="ti-mural-period-list">{schedules.slice(0,12).map(s=><button type="button" key={s.id} className={selected===s.id?'ti-mural-period active':'ti-mural-period'} aria-pressed={selected===s.id} onClick={()=>setExpanded(s.id)}>{monthLabel(s.period)}{s.id===current?.id&&<small>Mês atual</small>}</button>)}</div>
+     {active?<PublishedRoster key={active.id} schedule={active} presence={presence}/>:<p>Escolha uma escala para consultar.</p>}
+    </>}
+   </section>
+   <aside className="ti-mural-card ti-mural-notices" aria-labelledby="mural-notices-title">
+    <header className="ti-mural-section-header"><div><h2 id="mural-notices-title">Comunicados</h2><p>Informações publicadas para a equipe.</p></div><span className="ti-mural-count">{notices.length}</span></header>
+    {loading?<p role="status">Carregando comunicados…</p>:notices.length===0?<p className="ti-mural-empty">Nenhum comunicado publicado no momento.</p>:
+     <ul className="ti-mural-notice-list">{notices.map(item=><li key={item.id}><strong>{item.title}</strong><p>{item.body}</p></li>)}</ul>}
+   </aside>
+  </div>
  </section>;
 }

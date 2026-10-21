@@ -1,4 +1,4 @@
-import React,{createContext,useCallback,useContext,useMemo,useState} from 'react';
+import React,{createContext,useCallback,useContext,useMemo,useState,useEffect} from 'react';
 import {CheckCircle2,AlertCircle,Info,X} from 'lucide-react';
 import './feedback.css';
 const Context=createContext(null);
@@ -11,6 +11,11 @@ export function FeedbackProvider({children}){
   setMessages(old=>[...old.slice(-3),{id,message:String(message),type}]);
   return id;
  },[]);
+ useEffect(()=>{
+  if(!messages.length)return;
+  const timers=messages.filter(m=>m.type!=='error').map(m=>setTimeout(()=>dismiss(m.id),5500));
+  return()=>timers.forEach(clearTimeout);
+ },[messages,dismiss]);
  const value=useMemo(()=>({notify,dismiss}),[notify,dismiss]);
  return <Context.Provider value={value}>{children}<div className="ti-feedback-stack" aria-label="Mensagens da operação">
  {messages.map(m=><section key={m.id} className={'ti-feedback ti-feedback-'+m.type} role={m.type==='error'?'alert':'status'}>

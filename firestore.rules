@@ -10,6 +10,11 @@ service cloud.firestore {
       allow read: if signedIn() && request.auth.uid == uid;
       allow write: if false; // Somente backend privilegiado (Admin SDK)
     }
+    // Sinal de invalidação sem dados pessoais: somente membros ativos da unidade leem.
+    match /units/{unitId}/live/{topic} {
+      allow read: if sameUnit(unitId) && topic in ['attendance'];
+      allow write: if false; // somente Admin SDK
+    }
     match /units/{unitId}/invitations/{inviteId} {
       allow read: if manager(unitId);
       allow write: if false; // Somente backend privilegiado
