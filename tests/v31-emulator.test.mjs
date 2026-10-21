@@ -44,6 +44,15 @@ test('Firebase V3.1: inspeção pendente, aprovação auditada, perda e presenç
   const res={statusCode:200,body:null,setHeader(){},status(code){this.statusCode=code;return this},json(data){this.body=data;return this}};
   await handler(req,res);return {httpStatus:res.statusCode,...res.body};
  };
+ const internalId='b'.repeat(40);
+ await Promise.all([
+  unit.collection('products').doc(internalId).set({name:'Preparo interno',status:'active',trackExpiry:false}),
+  unit.collection('operationalProfiles').doc(internalId).set({controlMode:'quantitative',countUnit:'un',locations:['reserva'],origin:'internal'})
+ ]);
+ const internalReceipt=await call(v3Ledger,worker,'v3InspectReceive',{requestId:randomUUID(),productId:internalId,commercialQuantity:1,commercialUnit:'un',stockQuantity:1,location:'reserva',supplier:'Fornecedor',notes:'Conferido'});
+ assert.equal(internalReceipt.httpStatus,409,'Produção interna não entra como compra');
+ const unplannedWithoutReason=await call(v3Ledger,worker,'v3InspectReceive',{requestId:randomUUID(),productId,commercialQuantity:1,commercialUnit:'un',stockQuantity:1,location:'reserva',supplier:'Fornecedor',notes:''});
+ assert.equal(unplannedWithoutReason.httpStatus,409,'Entrega não prevista precisa de justificativa');
  const inspectionId=randomUUID();
  const inspected=await call(v3Ledger,worker,'v3InspectReceive',{requestId:inspectionId,productId,commercialQuantity:3,commercialUnit:'un',stockQuantity:3,location:'reserva',supplier:'Fornecedor local',lot:'',expiryDate:'',orderId:null,notes:'Conferido'});
  assert.equal(inspected.httpStatus,200,JSON.stringify(inspected));
