@@ -16,7 +16,7 @@ async function api(action,extra={}){
  const data=await response.json();if(!response.ok)throw Error(data.message||'Não foi possível concluir.');
  return data;
 }
-export default function MyProfessionalProfile({membership}){
+export default function MyProfessionalProfile({membership,attendance=null}){
  const {notify}=useFeedback(),[profile,setProfile]=useState(null),[personal,setPersonal]=useState(blank),[recognition,setRecognition]=useState(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[editing,setEditing]=useState(false);
  const editingRef=useRef(false);editingRef.current=editing;
@@ -43,8 +43,6 @@ export default function MyProfessionalProfile({membership}){
  const confirmed=new Set(profile?.certifications||[]);
  const name=personal.displayName||auth.currentUser?.displayName||auth.currentUser?.email?.split('@')[0]||'Colaborador';
  return <section className="ti-premium team-page">
-  <p className="eyebrow ti-premium-eyebrow">MINHA JORNADA · {membership.unitId.toUpperCase()}</p>
-  <p className="ti-sync-status" role="status">{syncedAt?`Atualizada automaticamente · ${syncedAt.toLocaleTimeString("pt-BR")}`:"Buscando dados atualizados..."}</p>
   <div className="ti-premium-hero">
    <div className="ti-avatar-editor"><div className="ti-premium-avatar">{avatar?<img src={avatar} alt="Minha foto de perfil"/>:<UserRound size={35}/>}</div><label className="ti-avatar-change"> {uploading?'Enviando...':'Trocar foto'}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={uploadAvatar}/></label>{avatar&&<button type="button" className="ti-avatar-remove" onClick={removeAvatar} disabled={uploading}>Remover</button>}</div>
    <div className="ti-premium-identity"><p>Meu espaço profissional <Sparkles size={17}/></p><h1>{name}</h1>
@@ -55,6 +53,7 @@ export default function MyProfessionalProfile({membership}){
   {photoFile&&<PhotoCropDialog file={photoFile} busy={uploading} onCancel={()=>setPhotoFile(null)} onSave={saveAvatar}/>}
   {loading&&<p role="status">Preparando sua jornada profissional...</p>}
   {error&&<p role="alert" className="team-error">{error} <button type="button" onClick={load}>Tentar novamente</button></p>}
+  {attendance&&<div className="ti-my-profile-attendance">{attendance}<p className="ti-sync-status" role="status">{syncedAt?`Perfil atualizado · ${syncedAt.toLocaleTimeString("pt-BR")}`:"Sincronizando perfil…"}</p></div>}
   {!loading&&!error&&<>
    <div className="ti-premium-stats">
     <article><Award size={23}/><strong>{recognition?.points??0}</strong><span>Pontos de evolução</span></article>
