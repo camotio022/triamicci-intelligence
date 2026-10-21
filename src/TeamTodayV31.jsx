@@ -40,9 +40,8 @@ export default function TeamTodayV31({unitId}){
    const area=({cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'})[sector]||'Setor não informado';
    const shiftCode=String(profile?.shift||x.shift||'').toLowerCase();
    const shift=({manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variavel:'Variável'})[shiftCode]||'Turno não informado';
-   const weekday=['dom','seg','ter','qua','qui','sex','sab'][new Date(today+'T12:00:00Z').getUTCDay()];
    const habitual=Array.isArray(profile?.availability)?profile.availability.find(slot=>slot.day===weekday):null;
-   const startTime=/^([01]\\d|2[0-3]):[0-5]\\d$/.test(habitual?.start||'')?habitual.start:null;
+   const startTime=/^([01]\d|2[0-3]):[0-5]\d$/.test(habitual?.start||'')?habitual.start:null;
    const timeLabel=habitual?.start&&habitual?.end?'Jornada habitual: '+habitual.start+'–'+habitual.end:'Turno: '+shift;
    const status=confirmed||(startTime&&clock>=startTime?'Entrada não confirmada':'Escalado · presença não confirmada');
    return {key:x.uid,name:profile?.name||x.name||'Colaborador',status,timeLabel,area,shift};
