@@ -339,7 +339,7 @@ export default async function handler(req,res) {
       if (!roles.includes(target.role) || !statuses.includes(target.status)) throw new Error('INVALID_STATE');
 
       // Gerentes só podem administrar auxiliares e cozinheiros, inclusive o cargo de destino.
-      if (currentActor.role === 'manager' &&
+      if (['manager','submanager'].includes(currentActor.role) &&
           (!['auxiliar','cook'].includes(target.role) || !['auxiliar','cook'].includes(role)))
         throw new Error('FORBIDDEN');
 
