@@ -19,7 +19,11 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  [from,setFrom]=useState('reserva'),[to,setTo]=useState('giro'),
  [outputId,setOutputId]=useState(''),[outputQty,setOutputQty]=useState(''),[outputLocation,setOutputLocation]=useState('reserva'),
  [sources,setSources]=useState([{productId:'',location:'reserva',quantity:''}]),[alternativeReason,setAlternativeReason]=useState(''),
- [busy,setBusy]=useState(false),[error,setError]=useState('');
+ [busy,setBusy]=useState(false),[error,setError]=useState(''),[inspections,setInspections]=useState([]),[pendingError,setPendingError]=useState('');
+ const loadPending=async()=>{if(kind!=='receive'||!managers)return;try{const r=await invoke('v3PendingReceipts');setInspections(r.inspections||[]);setPendingError('')}catch(e){setPendingError(e.message)}};
+ useEffect(()=>{loadPending()},[kind,managers]);
+ const approve=async inspectionId=>{if(busy)return;setBusy(true);setError('');try{await invoke('v3ApproveReceipt',{inspectionId});notify('Entrada no estoque aprovada.','success');await loadPending();await onChange?.()}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
+ const reject=async inspectionId=>{if(busy)return;const reason=window.prompt('Explique a rejeição da conferência (mínimo de 8 caracteres):');if(reason===null)return;if(reason.trim().length<8){setError('A justificativa precisa ter pelo menos oito caracteres.');return}setBusy(true);setError('');try{await invoke('v3RejectReceipt',{inspectionId,reason:reason.trim()});notify('Conferência rejeitada sem alterar o estoque.','success');await loadPending()}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
  const productsActive=useMemo(()=>products.filter(p=>p.status==='active'),[products]);
  const chosen=products.find(p=>p.id===productId),out=products.find(p=>p.id===outputId);
  const expected=chosen?.profile?.countUnit;
@@ -37,7 +41,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  },[kind,productId,chosen?.trackExpiry]);
  const commit=async(action,payload,success)=>{
   if(busy)return;setBusy(true);setError('');
-  try{await invoke(action,{requestId:crypto.randomUUID(),...payload});notify(success,'success');await onChange?.();setNotes('');setQuantity('');setCommercialQuantity('');setStockQuantity('');setOutputQty('');return true;}
+  try{await invoke(action,{requestId:crypto.randomUUID(),...payload});notify(success,'success');await onChange?.();if(kind==='receive')await loadPending();setNotes('');setQuantity('');setCommercialQuantity('');setStockQuantity('');setOutputQty('');return true;}
   catch(e){setError(e.message);notify(e.message,'error');return false;}
   finally{setBusy(false);}
  };
@@ -111,6 +115,6 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
     {busy?'Registrando…':({receive:'Enviar conferência',count:'Salvar contagem',transfer:'Confirmar transferência',produce:'Concluir produção'})[kind]}
    </button>
   </form>
-  {kind==='receive'&&managers&&<section className="v3-approval-list" aria-label="Conferências aguardando aprovação"><h3>Aguardando aprovação gerencial</h3><p>Somente aprovar após verificar os dados conferidos. O estoque ainda não foi atualizado.</p><button type="button" className="v3-secondary" onClick={loadPending}>Atualizar pendências</button>{pendingError&&<p role="alert">{pendingError}</p>}{inspections.length===0?<p>Nenhuma conferência pendente encontrada.</p>:inspections.map(item=><article key={item.id} className="v3-card"><strong>{products.find(p=>p.id===item.productId)?.name||"Insumo"} · {item.supplier}</strong><p>Recebido: {item.commercialQuantity} {item.commercialUnit} · Saldo aferido: {item.stockQuantity} · {item.location}</p>{item.lot&&<p>Lote: {item.lot} · validade: {item.expiryDate}</p>}{item.notes&&<p>{item.notes}</p>}<button type="button" disabled={busy} onClick={()=>approve(item.id)}>{busy?"Processando…":"Aprovar entrada no estoque"}</button></article>)}</section>}
+  {kind==='receive'&&managers&&<section className="v3-approval-list" aria-label="Conferências aguardando aprovação"><h3>Aguardando aprovação gerencial</h3><p>Somente aprovar após verificar os dados conferidos. O estoque ainda não foi atualizado.</p><button type="button" className="v3-secondary" onClick={loadPending}>Atualizar pendências</button>{pendingError&&<p role="alert">{pendingError}</p>}{inspections.length===0?<p>Nenhuma conferência pendente encontrada.</p>:inspections.map(item=><article key={item.id} className="v3-card"><strong>{products.find(p=>p.id===item.productId)?.name||"Insumo"} · {item.supplier}</strong><p>Recebido: {item.commercialQuantity} {item.commercialUnit} · Saldo aferido: {item.stockQuantity} · {item.location}</p>{item.lot&&<p>Lote: {item.lot} · validade: {item.expiryDate}</p>}{item.notes&&<p>{item.notes}</p>}<button type="button" disabled={busy} onClick={()=>approve(item.id)}>{busy?"Processando…":"Aprovar entrada no estoque"}</button><button type="button" className="v3-secondary" disabled={busy} onClick={()=>reject(item.id)}>Rejeitar conferência</button></article>)}</section>}
  </section>;
 }
