@@ -78,3 +78,18 @@
 .ti-mural-home :is(button):focus-visible{outline:2px solid #a71916;outline-offset:3px}
 @media(max-width:980px){.ti-mural-home-layout{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:580px){.ti-mural-header{align-items:stretch;flex-direction:column}.ti-mural-refresh{align-self:flex-start}.ti-mural-home .ti-mural-card{padding:14px}.ti-mural-home .ti-mural-period{flex:1 1 auto;justify-content:center}}
+
+/* Painel do mural: poucas informações e acesso secundário à escala integral. */
+.ti-mural-now,.ti-mural-next{border:1px solid #e9e1e3;border-radius:13px;padding:14px;margin-bottom:12px;background:#fbfbfd}
+.ti-mural-now h3,.ti-mural-next h3{margin:0 0 10px;font-size:15px;color:#2c3344}
+.ti-mural-now h3 small{margin-left:7px;font-weight:500;color:#667085;font-size:11px}
+.ti-mural-now ul,.ti-mural-next ul{padding:0;margin:0;list-style:none;display:grid;gap:6px}
+.ti-mural-now li,.ti-mural-next li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 12px;padding:10px 11px;background:#fff;border:1px solid #eee8ed;border-radius:9px}
+.ti-mural-now li strong,.ti-mural-next li strong{font-size:13px;color:#293242}
+.ti-mural-now li span,.ti-mural-next li span{font-size:12px;color:#697385;grid-column:1}
+.ti-mural-now li small{grid-column:2;grid-row:1/3;align-self:center;text-align:right;color:#842922;font-size:11px;font-weight:700}
+.ti-mural-now p,.ti-mural-next p{font-size:12px;margin:0;color:#687385}
+.ti-mural-roster-details{margin-top:12px}
+.ti-mural-roster-details summary{cursor:pointer;font-weight:700;color:#83231f;border:1px solid #e9d2d0;border-radius:10px;min-height:44px;padding:12px;font-size:13px}
+.ti-mural-roster-details summary:focus-visible{outline:2px solid #a71916;outline-offset:2px}
+@media(max-width:500px){.ti-mural-now li,.ti-mural-next li{grid-template-columns:1fr}.ti-mural-now li small{grid-column:1;grid-row:auto;text-align:left}}
