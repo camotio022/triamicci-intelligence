@@ -1,5 +1,6 @@
 import {staffSeed,reconcileStaff,normalizeStaffName,defaultStaffAvailability} from '../../server/team/master-registry.js';
 import schedulesWorkflow from '../../server/workflows/schedules.js';
+import attendanceWorkflow from '../../server/workflows/attendance-v31.js';
 import muralWorkflow from '../../server/workflows/mural.js';
 import labelsWorkflow from '../../server/workflows/labels.js';
 import {createHash,randomUUID} from 'node:crypto';
@@ -25,6 +26,7 @@ const cleanMember = (doc) => {
 
 export default async function handler(req,res) {
   if(req.body?.module==='schedules')return schedulesWorkflow(req,res);
+  if(req.body?.module==='attendanceV31')return attendanceWorkflow(req,res);
   if(req.body?.module==='mural')return muralWorkflow(req,res);
   if(req.body?.module==='labels')return labelsWorkflow(req,res);
   if (!checkRequest(req,res)) return;
