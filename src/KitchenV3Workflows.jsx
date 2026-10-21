@@ -27,6 +27,9 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  const productsActive=useMemo(()=>products.filter(p=>p.status==='active'),[products]);
  const chosen=products.find(p=>p.id===productId),out=products.find(p=>p.id===outputId);
  const expected=chosen?.profile?.countUnit;
+ const transferBalance=chosen?.v3Balance;
+ const available=Number(transferBalance?.[from]);
+ const hasKnownBalance=transferBalance&&Number.isFinite(available);
  const relatedOrders=orders.filter(o=>o.items?.some(i=>i.productId===productId)&&!['cancelled','received'].includes(o.status));
  const order=orders.find(o=>o.id===orderId);
  const chosenLine=order?.items?.find(i=>i.productId===productId);
@@ -65,7 +68,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    return commit('v3Count',{productId,location,sessionId,quantity:Number(quantity),lotCounts:counts,initialLot:chosen?.trackExpiry&&!lots.length&&Number(quantity)>0?{lot:initialLotName.trim(),expiryDate:initialLotExpiry}:null,notes},'Contagem física registrada.');
   }
   if(kind==='transfer'&&from===to){setError('Escolha locais diferentes para a transferência.');return;}
-  if(kind==='transfer'&&(!(Number(quantity)>0)||Number(quantity)>Number(chosen?.v3Balance?.[from]??0))){setError('A quantidade precisa ser positiva e não pode exceder o saldo disponível no local de origem.');return;}
+  if(kind==='transfer'&&(!(Number(quantity)>0)||(hasKnownBalance&&Number(quantity)>available))){setError('A quantidade precisa ser positiva e não pode exceder o saldo disponível no local de origem.');return;}
   if(kind==='transfer')return commit('v3Transfer',{productId,from,to,quantity:Number(quantity)},'Transferência registrada.');
   if(kind==='produce')return commit('v3Produce',{outputProductId:outputId,outputQuantity:Number(outputQty),outputLocation,inputs:sources.map(i=>({...i,quantity:Number(i.quantity)})),
    lot,expiryDate:expiry,notes,alternativeReason},'Produção concluída e saldos registrados.');
@@ -107,9 +110,9 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    {kind==='transfer'&&<>
     <Field name="De"><select value={from} onChange={e=>setFrom(e.target.value)}><option value="reserva">Reserva · 2º piso</option><option value="giro">Giro · 1º piso</option></select></Field>
     <Field name="Para"><select value={to} onChange={e=>setTo(e.target.value)}><option value="giro">Giro · 1º piso</option><option value="reserva">Reserva · 2º piso</option></select></Field>
-    <p role="status" className="v3-info">Disponível na origem: {Number(chosen?.v3Balance?.[from]??0)} {expected||'unidade não configurada'}. Não é possível transferir mais do que o estoque registrado.</p>
+    <p role="status" className="v3-info">{hasKnownBalance?`Disponível na origem: ${available} ${expected||''}`:'Saldo da origem indisponível. Atualize o estoque ou solicite uma contagem antes de transferir.'}</p>
     {from===to&&<p role="alert" className="v3-error">Escolha um destino diferente da origem.</p>}
-    <Field name={'Quantidade ('+(expected||'não configurada')+')'}><input required type="number" max={Number(chosen?.v3Balance?.[from]??0)} min=".001" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={quantity} onChange={e=>setQuantity(e.target.value)}/></Field>
+    <Field name={'Quantidade ('+(expected||'não configurada')+')'}><input required type="number" max={hasKnownBalance?available:undefined} min=".001" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={quantity} onChange={e=>setQuantity(e.target.value)}/></Field>
    </>}
    {prepared&&<>
     <Field name={'Quantidade preparada ('+(out?.profile?.countUnit||'não configurada')+')'}><input required type="number" min=".001" step={['un','pacote','porcao','duzia'].includes(out?.profile?.countUnit)?'1':'.001'} value={outputQty} onChange={e=>setOutputQty(e.target.value)}/></Field>
