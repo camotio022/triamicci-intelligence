@@ -1,3 +1,4 @@
+import {isManagement} from '../server/permissions/v31-policy.js';
 import React,{useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -9,7 +10,7 @@ async function invoke(action,payload={}){
 }
 function Field({name,children}){return <label>{name}{children}</label>}
 export default function KitchenV3Workflows({kind,products,orders,membership,onChange}){
- const {notify}=useFeedback();const managers=['admin','manager'].includes(membership.role);
+ const {notify}=useFeedback();const managers=isManagement(membership.role);
  const [productId,setProductId]=useState(''),[location,setLocation]=useState('reserva'),[supplier,setSupplier]=useState(''),
  [commercialUnit,setCommercialUnit]=useState('kg'),[commercialQuantity,setCommercialQuantity]=useState(''),
  [stockQuantity,setStockQuantity]=useState(''),[orderId,setOrderId]=useState(''),[lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),
@@ -106,7 +107,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
     <div className="v3-line"><Field name="Lote de armazenamento"><input required maxLength={80} value={lot} onChange={e=>setLot(e.target.value)} placeholder="Identificação real"/></Field><Field name="Validade"><input required type="date" value={expiry} onChange={e=>setExpiry(e.target.value)}/></Field></div>
    </>}
    {kind!=='transfer'&&<Field name="Observações (opcional)"><textarea maxLength={240} value={notes} onChange={e=>setNotes(e.target.value)}/></Field>}
-   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='receive'&&!managers||kind==='count'&&chosen?.profile?.controlMode!=='quantitative'||kind==='count'&&chosen?.trackExpiry&&!lots.length&&!managers||kind==='transfer'&&from===to||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
+   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='receive'&&!managers||kind==='count'&&(!managers||chosen?.profile?.controlMode!=='quantitative')||kind==='count'&&chosen?.trackExpiry&&!lots.length&&!managers||kind==='transfer'&&from===to||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
     {busy?'Registrando…':({receive:'Confirmar recebimento',count:'Salvar contagem',transfer:'Confirmar transferência',produce:'Concluir produção'})[kind]}
    </button>
   </form>
