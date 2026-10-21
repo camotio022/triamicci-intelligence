@@ -83,6 +83,21 @@ export default async function v3Ledger(req,res){
    if(snap.size>100)return send(res,409,'Há mais de 100 conferências pendentes. Solicite paginação.');
    return send(res,200,'Conferências pendentes.',{inspections:snap.docs.map(d=>({id:d.id,...d.data(),inspectedAt:d.data().inspectedAt?.toDate?.()?.toISOString?.()}))});
   }
+  if(action==='v3RejectReceipt'){
+   const {inspectionId,reason}=req.body||{};
+   if(!reqOk(inspectionId)||typeof reason!=='string'||reason.trim().length<8||reason.length>240)return send(res,400,'Informe a conferência e a justificativa da rejeição.');
+   const ref=unit.collection('v3ReceiptInspections').doc(inspectionId);let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const [manager,old]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
+    if(!active(manager,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
+    if(!old.exists)throw Error('MISSING');
+    if(old.data().status==='rejected'){duplicate=true;return;}
+    if(old.data().status!=='pending')throw Error('CONFLICT');
+    const at=now();tx.update(ref,{status:'rejected',rejectedBy:actor.uid,rejectedAt:at,rejectionReason:reason.trim()});
+    audit(tx,db,'v3.receipt_rejected',m.unitId,actor.uid,{inspectionId,reason:reason.trim()});
+   });
+   return send(res,200,duplicate?'Conferência já rejeitada.':'Conferência rejeitada. Estoque não alterado.',{duplicate});
+  }
   if(action==='v3ApproveReceipt'){
    const inspectionId=req.body?.inspectionId;
    if(!reqOk(inspectionId))return send(res,400,'Conferência inválida.');
