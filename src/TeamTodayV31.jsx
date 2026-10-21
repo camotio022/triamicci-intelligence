@@ -2,7 +2,7 @@ import {doc,onSnapshot} from 'firebase/firestore';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth,db} from './firebase.js';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
-import {rosterToday} from '../server/schedules/restaurant-today.js';
+import {rosterToday,liveShiftState} from '../server/schedules/restaurant-today.js';
 async function request(module,action,extra={}){
  const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');
  const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...extra})});
@@ -35,16 +35,13 @@ export default function TeamTodayV31({unitId}){
    const key=profile?.accountUid||x.uid;
    const attendance=presence[key];
    const presenceStatus=attendance?.status;
-   const confirmed=presenceStatus==='working'&&attendance?.lastAction==='break_end'?'Retorno do intervalo declarado':({working:'Entrada declarada · não verificada',on_break:'Intervalo declarado',finished:'Saída registrada',absent:'Ausência confirmada pela gestão'})[presenceStatus];
    const sector=String(profile?.sector||x.sector||'').toLowerCase();
    const area=({cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'})[sector]||'Setor não informado';
-   const shiftCode=String(profile?.shift||x.shift||'').toLowerCase();
-   const shift=({manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variavel:'Variável'})[shiftCode]||'Turno não informado';
-   const habitual=Array.isArray(profile?.availability)?profile.availability.find(slot=>slot.day===weekday):null;
-   const startTime=/^([01]\d|2[0-3]):[0-5]\d$/.test(habitual?.start||'')?habitual.start:null;
-   const timeLabel=habitual?.start&&habitual?.end?'Jornada habitual: '+habitual.start+'–'+habitual.end:'Turno: '+shift;
-   const status=confirmed||(startTime&&clock>=startTime?'Entrada não confirmada':'Escalado · presença não confirmada');
-   return {key:x.uid,name:profile?.name||x.name||'Colaborador',status,timeLabel,area,shift};
+   const shift=({manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variavel:'Variável'})[String(profile?.shift||x.shift||'').toLowerCase()]||'Turno não informado';
+   const live=liveShiftState({day:today,clock,employee:profile||{},attendance});
+   const timeLabel=live.start&&live.end?'Jornada habitual: '+live.start+'–'+live.end:'Turno: '+shift;
+   const status=live.label;
+   return {key:x.uid,name:profile?.name||x.name||'Colaborador',status,timeLabel,area,shift,source:live.source};
 
   });
  },[schedules,today,staff,presence,clock]);
@@ -56,7 +53,7 @@ export default function TeamTodayV31({unitId}){
    const group=people.filter(p=>p.shift===shift);
    return group.length?<section key={shift} className="ti-team-shift-group" aria-label={'Equipe '+shift}>
     <h3>{shift} <small>{group.length} escalado{group.length!==1?'s':''}</small></h3>
-    <div className="ti-team-today-grid">{group.map(p=><article key={p.key}><strong>{p.name}</strong><small>{p.area} · {p.timeLabel}</small><span>{p.status}</span></article>)}</div>
+    <div className="ti-team-today-grid">{group.map(p=><article key={p.key} className={p.source==='employee'?'ti-live-confirmed':''}><strong>{p.name}</strong><small>{p.area} · {p.timeLabel}</small><span>{p.status}</span></article>)}</div>
    </section>:null;
   })}
   <details className="ti-team-correction"><summary>Corrigir presença de um funcionário</summary><p>Ajustes são auditados. Use somente após conferir a ocorrência real; motivos pessoais permanecem restritos à gestão.</p>

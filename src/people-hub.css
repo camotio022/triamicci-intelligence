@@ -35,3 +35,5 @@
 .ti-team-shift-group .ti-team-today-grid{margin-top:0}
 .ti-team-shift-group article{border:1px solid #e8e3e6;background:var(--surface,#fff)}
 .ti-team-shift-group article span{font-weight:700;color:#7f332c}
+
+.ti-team-today-grid article.ti-live-confirmed{border-color:#b5dfc6;background:#f0faf4}.ti-team-today-grid article.ti-live-confirmed span{color:#187446}

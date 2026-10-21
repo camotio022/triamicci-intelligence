@@ -93,3 +93,5 @@
 .ti-mural-roster-details summary{cursor:pointer;font-weight:700;color:#83231f;border:1px solid #e9d2d0;border-radius:10px;min-height:44px;padding:12px;font-size:13px}
 .ti-mural-roster-details summary:focus-visible{outline:2px solid #a71916;outline-offset:2px}
 @media(max-width:500px){.ti-mural-now li,.ti-mural-next li{grid-template-columns:1fr}.ti-mural-now li small{grid-column:1;grid-row:auto;text-align:left}}
+
+.ti-mural-now li.ti-live-confirmed{border-color:#b7ddc5;background:#f0fbf4}.ti-mural-now li.ti-live-confirmed small{color:#197447}

@@ -92,3 +92,16 @@ test('Firebase V3.1: inspeção pendente, aprovação auditada, perda e presenç
  const audit=await db.collection('auditLogs').where('unitId','==',unitId).limit(100).get();
  assert.ok(audit.size>=5,'Operações devem gerar eventos auditáveis');
 });
+
+test('Operação Viva: previsão automática nunca vira presença confirmada',async()=>{
+ const {liveShiftState}=await import('../server/schedules/restaurant-today.js');
+ const employee={availability:[{day:'qua',start:'08:00',end:'16:20'}]};
+ const before=liveShiftState({day:'2026-10-21',clock:'07:50',employee});
+ assert.equal(before.source,'system');assert.equal(before.upcoming,true);
+ const due=liveShiftState({day:'2026-10-21',clock:'08:05',employee});
+ assert.equal(due.label,'Início previsto pelo sistema');assert.equal(due.declared,false);
+ const declared=liveShiftState({day:'2026-10-21',clock:'08:05',employee,attendance:{status:'working',lastAction:'clock_in'}});
+ assert.equal(declared.source,'employee');assert.equal(declared.label,'Confirmado pelo funcionário');
+ const finish=liveShiftState({day:'2026-10-21',clock:'17:00',employee});
+ assert.equal(finish.label,'Jornada prevista encerrada');assert.equal(finish.declared,false);
+});
