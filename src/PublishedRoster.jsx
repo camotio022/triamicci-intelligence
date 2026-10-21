@@ -31,7 +31,7 @@ export default function PublishedRoster({schedule}){
    <div className="ti-roster-nav"><button type="button" disabled={index===0} onClick={()=>setWeekIndex(n=>Math.max(0,n-1))} aria-label="Semana anterior">‹</button><strong>{weeks[index]?.length?formatDate(weeks[index][0])+' – '+formatDate(weeks[index].at(-1)):'Sem datas'}{partialFirst?' · início do mês':''}</strong><button type="button" disabled={index===weeks.length-1} onClick={()=>setWeekIndex(n=>n+1)} aria-label="Próxima semana">›</button></div>
    {partialFirst&&<p className="ti-roster-context">A primeira visualização reúne o começo do mês e a semana seguinte para facilitar a leitura da escala.</p>}
    <div className="ti-roster-days">
-    {data.offByDay.map(group=><section className={"ti-roster-day"+(group.day===today?" ti-roster-day-today":"")} key={group.day}><h4>{group.label}</h4>{group.people.length?<ul>{group.people.map(p=><li key={p.uid+'-'+p.date}>{p.name}</li>)}</ul>:<p>Nenhuma folga</p>}</section>)}
+    {data.offByDay.map(group=><section className={"ti-roster-day"+(weeks[index]?.includes(today)&&dayOf(today)===group.day?" ti-roster-day-today":"")} key={group.day}><h4>{group.label}</h4>{group.people.length?<ul>{group.people.map(p=><li key={p.uid+'-'+p.date}>{p.name}</li>)}</ul>:<p>Nenhuma folga</p>}</section>)}
    </div>
    {data.exceptions.length>0&&<div className="ti-roster-exceptions"><strong>Ausências e exceções</strong>{data.exceptions.map(p=><p key={p.uid+p.date}>{formatDate(p.date)} · {p.name} · {p.type==='leave'?'Ausência':'Folga excepcional'}</p>)}</div>}
   </>}
