@@ -97,12 +97,8 @@ export default async function v3Ledger(req,res){
     commercialUnit:data.commercialUnit,stockQuantity:data.stockQuantity,location:data.location,orderId:data.orderId,
     lot:data.lot,expiryDate:data.expiryDate,supplier:data.supplier,notes:data.notes};
    const previous=req.body;
-   req.body={...payload,action:'v3Receive'};
+   req.body={...payload,action:'v3Receive',_approvedInspectionId:inspectionId};
    try{await v3Ledger(req,res)}finally{req.body=previous}
-   // A entrada oficial usa operação idempotente. A atualização abaixo não afeta o saldo.
-   if(res.statusCode===200){
-    await inspectionRef.update({status:'approved',approvedBy:actor.uid,approvedAt:now()});
-   }
    return;
   }
   if(action==='v3Receive'){
@@ -113,12 +109,14 @@ export default async function v3Ledger(req,res){
       orderId!==null&&!reqOk(orderId)||typeof supplier!=='string'||supplier.length>100||typeof notes!=='string'||notes.length>240)
       return send(res,400,'Recebimento incompleto.');
    const recordRef=unit.collection('v3Operations').doc(requestId),pr=products.doc(productId),profileRef=profiles.doc(productId),balRef=balances.doc(productId),orderRef=orderId?orders.doc(orderId):null;
+   const approvalRef=req.body?._approvedInspectionId===requestId?unit.collection('v3ReceiptInspections').doc(requestId):null;
    const fingerprint=hashed(JSON.stringify({productId,commercialQuantity,commercialUnit,stockQuantity,location,orderId,lot,expiryDate,supplier,notes}));
    let duplicate=false;
    await db.runTransaction(async tx=>{
-    const [authSnap,product,profile,balance,existing,order]=await Promise.all([
-     tx.get(actorRef),tx.get(pr),tx.get(profileRef),tx.get(balRef),tx.get(recordRef),orderRef?tx.get(orderRef):Promise.resolve(null)]);
+    const [authSnap,product,profile,balance,existing,order,approval]=await Promise.all([
+     tx.get(actorRef),tx.get(pr),tx.get(profileRef),tx.get(balRef),tx.get(recordRef),orderRef?tx.get(orderRef):Promise.resolve(null),approvalRef?tx.get(approvalRef):Promise.resolve(null)]);
     if(!active(authSnap,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
+    if(approvalRef&&(!approval?.exists||approval.data().status!=='pending'))throw Error('CONFLICT');
     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
     if(!product.exists||product.data().status!=='active'||!profile.exists)throw Error('MISSING');
     const cfg=profile.data(),isCounted=cfg.controlMode==='quantitative';
@@ -155,6 +153,7 @@ export default async function v3Ledger(req,res){
      const all=o.items.every(i=>(received[i.productId]||0)>=i.quantity);
      tx.update(orderRef,{received,status:all?'received':'partially_received',updatedAt:now()});
     }
+    if(approvalRef)tx.update(approvalRef,{status:'approved',approvedBy:actor.uid,approvedAt:now()});
     tx.create(recordRef,{kind:'receipt',actorUid:actor.uid,at:now(),unitId:m.unitId,productId,
      commercialQuantity,commercialUnit,stockQuantity: isCounted?stockQuantity:null,stockUnit:isCounted?cfg.countUnit:null,
      location,orderId,lot,expiryDate,supplier,notes,fingerprint});
