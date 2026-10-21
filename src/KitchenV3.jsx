@@ -3,6 +3,7 @@ import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import KitchenV3Workflows from './KitchenV3Workflows.jsx';
+import KitchenV3Loss from './KitchenV3Loss.jsx';
 import KitchenV3History from './KitchenV3History.jsx';
 import './v3-kitchen.css';
 async function api(action,payload={}){
@@ -71,11 +72,12 @@ export default function KitchenV3({membership}){
  return <section className="v3-page">
   <header className="v3-head"><div><p className="eyebrow">OPERAÇÃO DA COZINHA · V3</p><h1>Central de insumos</h1><p>O que temos, o que falta e o que está previsto para chegar.</p></div><button type="button" className="v3-secondary" onClick={load} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></header>
   <nav className="v3-tabs" aria-label="Seções de insumos">
-   {[['overview','Visão geral'],['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],...(canManage?[['count','Contagem oficial']]:[]),['history','Histórico'],...(canManage?[['catalog','Configurar catálogo']]:[])].map(([key,label])=><button type="button" key={key} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
+   {[['overview','Visão geral'],['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['loss','Perdas e avarias'],...(canManage?[['count','Contagem oficial']]:[]),['history','Histórico'],...(canManage?[['catalog','Configurar catálogo']]:[])].map(([key,label])=><button type="button" key={key} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
   </nav>
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {loading?<p role="status">Carregando dados reais da unidade…</p>:<>
    {tab==='history'&&<KitchenV3History products={products}/>}
+   {tab==='loss'&&<KitchenV3Loss membership={membership} products={products} onChange={load}/>}
    {['receive','produce','transfer','count'].includes(tab)&&<KitchenV3Workflows key={tab} kind={tab} products={products} orders={orders} membership={membership} onChange={load}/>}
    {tab==='overview'&&<div className="v3-columns">
     <section className="v3-card"><h2>Avisos da equipe</h2>{signals.length===0?<p>Nenhuma falta em aberto.</p>:signals.map(s=><article className="v3-row" key={s.id}><div><strong>{s.productName}</strong><p>{s.location==='giro'?'Giro · 1º piso':'Reserva · 2º piso'} · {s.observation==='missing'?'Possível falta':'Estoque baixo'}</p><small>{s.reports?.length||1} relato(s)</small></div>{canManage&&<form className="v3-inline-resolve" onSubmit={e=>{e.preventDefault();update('v3ResolveSignal',{productId:s.productId,location:s.location,resolution:resolutionById[s.id]||''},'Aviso resolvido.')}}><label>Decisão<input required maxLength={240} value={resolutionById[s.id]||''} onChange={e=>setResolutionById(old=>({...old,[s.id]:e.target.value}))} placeholder="Ex.: conferido e localizado"/></label><button type="submit" disabled={busy}>Resolver</button></form>}</article>)}</section>
