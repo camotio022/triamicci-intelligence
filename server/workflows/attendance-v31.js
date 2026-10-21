@@ -67,7 +67,7 @@ export default async function attendanceWorkflow(req,res){
    const status=attendanceTransition(old.status,action);
    if(!status)throw Error('INVALID_TRANSITION');
    const at=new Date(),event={action,requestId,at,by:user.uid};
-   tx.set(ref,{uid:user.uid,unitId:m.unitId,day:workDay,status,events:[...old.events,event],updatedAt:at},{merge:true});
+   tx.set(ref,{uid:user.uid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at},{merge:true});
    tx.create(db.collection('auditLogs').doc(),{event:'attendance.'+action,unitId:m.unitId,actorUid:user.uid,at,details:{day:workDay,requestId}});
    result=status;
   });
