@@ -51,27 +51,6 @@ export default async function attendanceWorkflow(req,res){
    const snap=await selected.get(),record=snap.data()||null;
    return send(res,200,'Sua presença de hoje.',{day,workDay:overnight?previousDay:day,record:record?{status:record.status,events:record.events||[],day:record.day}:null});
   }
-  if(action==='correct'){
-   if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente a gestão corrige presença.');
-   const {targetUid,shiftDay,status,reason}=req.body||{};
-   if(typeof targetUid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(targetUid)||
-      typeof shiftDay!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(shiftDay)||shiftDay>day||
-      !['not_started','working','on_break','finished','absent'].includes(status)||
-      typeof reason!=='string'||reason.trim().length<10||reason.length>400)
-    return send(res,400,'Informe colaborador, data, situação e justificativa válida.');
-   const targetRef=db.doc('memberships/'+targetUid),recordRef=unit.collection('attendanceV31').doc(shiftDay+'_'+targetUid);
-   await db.runTransaction(async tx=>{
-    const [manager,target,previous]=await Promise.all([tx.get(actorRef),tx.get(targetRef),tx.get(recordRef)]);
-    if(!manager.exists||manager.data().status!=='active'||manager.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(manager.data().role))throw Error('FORBIDDEN');
-    if(!target.exists||target.data().status!=='active'||target.data().unitId!==m.unitId)throw Error('FORBIDDEN');
-    const old=previous.data()||{status:'not_started',events:[]};
-    const at=new Date();
-    const correction={from:old.status,to:status,reason:reason.trim(),at,by:user.uid};
-    tx.set(recordRef,{uid:targetUid,unitId:m.unitId,day:shiftDay,status,events:old.events||[],corrections:[...(old.corrections||[]).slice(-49),correction],updatedAt:at},{merge:true});
-    tx.create(db.collection('auditLogs').doc(),{event:'attendance.corrected',actorUid:user.uid,targetUid,unitId:m.unitId,at,details:{day:shiftDay,from:old.status,to:status,reason:reason.trim()}});
-   });
-   return send(res,200,'Correção gerencial registrada e auditada.');
-  }
   if(!['clock_in','break_start','break_end','clock_out'].includes(action))return send(res,400,'Ação de presença desconhecida.');
   const requestId=req.body?.requestId;
   if(typeof requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(requestId))return send(res,400,'Identificador inválido.');
