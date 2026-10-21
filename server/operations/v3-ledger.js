@@ -418,6 +418,7 @@ export default async function v3Ledger(req,res){
   const errors={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem permissão.'],MISSING:[409,'Produto não configurado ou saldo indisponível.'],
    CONFLICT:[409,'Operação já registrada ou identificador repetido.'],UNIT:[409,'Unidades incompatíveis; revisão necessária.'],
    QUANTITY:[409,'Quantidade inválida ou saldo insuficiente.'],LOT:[409,'Lotes e validade precisam ser reconciliados.'],
+   RECEIPT_ORIGIN:[409,'Este produto é de produção interna e não pode entrar como entrega de fornecedor.'],RECEIPT_REASON:[409,'Explique a entrega não prevista ou o excedente com pelo menos oito caracteres.'],
    LOCATION:[409,'Local não permitido para este item.'],ORDER:[409,'Pedido não corresponde ao item recebido.'],
    ORDER_UNIT:[409,'Unidade do pedido não corresponde à conferência.'],SOURCE:[409,'Matéria-prima não autorizada nesta preparação.'],ALTERNATIVE:[409,'Explique a substituição antes de produzir.'],ALTERNATIVE_APPROVAL:[403,'Uma substituição de matéria-prima exige autorização gerencial. Solicite à gestão que registre a produção.']};
   if(errors[e.message])return send(res,...errors[e.message]);
