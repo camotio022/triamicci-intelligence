@@ -110,13 +110,15 @@ export default async function v3Ledger(req,res){
       return send(res,400,'Recebimento incompleto.');
    const recordRef=unit.collection('v3Operations').doc(requestId),pr=products.doc(productId),profileRef=profiles.doc(productId),balRef=balances.doc(productId),orderRef=orderId?orders.doc(orderId):null;
    const approvalRef=req.body?._approvedInspectionId===requestId?unit.collection('v3ReceiptInspections').doc(requestId):null;
+   // V3.1: recebimento direto não é permitido; crédito exige conferência pendente vinculada.
+   if(!approvalRef)return send(res,403,'Primeiro confira o recebimento e solicite a aprovação da gestão.');
    const fingerprint=hashed(JSON.stringify({productId,commercialQuantity,commercialUnit,stockQuantity,location,orderId,lot,expiryDate,supplier,notes}));
    let duplicate=false;
    await db.runTransaction(async tx=>{
     const [authSnap,product,profile,balance,existing,order,approval]=await Promise.all([
      tx.get(actorRef),tx.get(pr),tx.get(profileRef),tx.get(balRef),tx.get(recordRef),orderRef?tx.get(orderRef):Promise.resolve(null),approvalRef?tx.get(approvalRef):Promise.resolve(null)]);
     if(!active(authSnap,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
-    if(approvalRef&&(!approval?.exists||approval.data().status!=='pending'))throw Error('CONFLICT');
+    if(!approval?.exists||approval.data().status!=='pending'||approval.data().unitId!==m.unitId||approval.data().fingerprint!==fingerprint)throw Error('CONFLICT');
     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
     if(!product.exists||product.data().status!=='active'||!profile.exists)throw Error('MISSING');
     const cfg=profile.data(),isCounted=cfg.controlMode==='quantitative';
