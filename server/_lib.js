@@ -1,7 +1,7 @@
 import admin from 'firebase-admin';
 import { createHash, randomBytes } from 'node:crypto';
 
-export const roles = ['admin','manager','cook','auxiliar'];
+export const roles = ['admin','manager','submanager','cook','auxiliar'];
 export const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const normalizeEmail = email => typeof email === 'string' ? email.trim().toLowerCase() : '';
 export const hashToken = token => createHash('sha256').update(token).digest('hex');
