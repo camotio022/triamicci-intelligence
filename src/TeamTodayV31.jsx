@@ -20,7 +20,7 @@ export default function TeamTodayV31(){
  const people=useMemo(()=>{const schedule=schedules.at(-1);return rosterToday(schedule,today).map(x=>{
   const profile=staff.find(y=>y.id===x.uid||y.accountUid===x.uid);
   const key=profile?.accountUid||x.uid;
-  const status= x.operationalStatus==='day_off'?'Folga':x.operationalStatus==='absence_recorded'?'Ausência registrada':({working:'Em serviço',on_break:'Em intervalo',finished:'Turno encerrado'})[presence[key]]||'Escalado · sem confirmação';
+  const status= x.operationalStatus==='day_off'?'Folga':x.operationalStatus==='absence_recorded'?'Ausência registrada':({working:'Em serviço',on_break:'Em intervalo',finished:'Turno encerrado',absent:'Ausente confirmado'})[presence[key]]||'Escalado · sem confirmação';
   return {key:x.uid,name:profile?.name||x.name||'Colaborador',status};
  })},[schedules,today,staff,presence]);
  return <section className="ti-team-today" aria-label="Equipe de hoje">
