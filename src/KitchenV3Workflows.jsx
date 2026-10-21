@@ -46,6 +46,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
   finally{setBusy(false);}
  };
  const receiptOrders=orders.filter(o=>!['cancelled','received'].includes(o.status));
+ const formatOrder=o=>(o.items||[]).map(i=>`${i.name||products.find(p=>p.id===i.productId)?.name||'Produto'}: ${Math.max(0,Number(i.quantity)-Number(o.received?.[i.productId]||0))} ${i.unit}`).join(' · ');
  const receivingProducts=productsActive.filter(p=>['supplier','both'].includes(p.profile?.origin));
  const allowedProducts=kind==='receive'?(orderId?receivingProducts.filter(p=>orders.find(o=>o.id===orderId)?.items?.some(i=>i.productId===p.id)):receivingProducts):productsActive;
  const productOptions=allowedProducts.map(p=><option value={p.id} key={p.id}>{p.profile?.displayName||p.name}</option>);
@@ -81,12 +82,13 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    {prepared?<Field name="O que foi preparado?"><select required value={outputId} onChange={e=>{setOutputId(e.target.value);setSources([{productId:'',location:'reserva',quantity:''}]);}}><option value="">Selecione um preparo</option>{productsActive.filter(p=>['internal','both'].includes(p.profile?.origin)&&p.profile?.controlMode==='quantitative').map(p=><option key={p.id} value={p.id}>{p.profile?.displayName||p.name}</option>)}</select></Field>:
     kind==='receive'?null:<Field name="Insumo"><select required value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Selecione um insumo</option>{productOptions}</select></Field>}
    {kind==='receive'&&<>
-    <Field name="Tipo de entrega"><select value={orderId} onChange={e=>{setOrderId(e.target.value);setProductId('');setSupplier('');}}><option value="">Entrega não prevista · exige justificativa</option>{receiptOrders.map(o=><option value={o.id} key={o.id}>Pedido de {o.supplier} · {o.etaDate||'sem data prevista'}</option>)}</select></Field>
-    {orderId&&<p className="v3-info">Selecione apenas os itens deste pedido. Quantidades acima do previsto exigem justificativa.</p>}
+    <Field name="Tipo de entrega"><select value={orderId} onChange={e=>{setOrderId(e.target.value);setProductId('');setSupplier(orders.find(o=>o.id===e.target.value)?.supplier||'');setCommercialQuantity('');setStockQuantity('');}}><option value="">Entrega não prevista · exige justificativa</option>{receiptOrders.map(o=><option value={o.id} key={o.id}>{formatOrder(o)} — {o.supplier} · {o.etaDate||'sem data prevista'}</option>)}</select></Field>
+    {orderId&&<p className="v3-info"><strong>Entrega esperada:</strong> {order?formatOrder(order):'Pedido indisponível'}. Quantidades acima do previsto exigem justificativa.</p>}
     {!orderId&&<p className="v3-info">Entrega não prevista: informe o motivo nas observações. A gestão deverá aprovar antes de alterar o estoque.</p>}
-    <Field name="Produto recebido"><select required value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Selecione o produto</option>{productOptions}</select></Field>
+    <Field name="Produto recebido"><select required value={productId} onChange={e=>{setProductId(e.target.value);setStockQuantity('');setCommercialQuantity('')}}><option value="">Selecione o produto</option>{productOptions}</select></Field>
     {allowedProducts.length===0&&<p className="v3-info">Não existem produtos elegíveis neste pedido. Verifique a origem e o cadastro do insumo.</p>}
-    <Field name="Fornecedor"><input required maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)}/></Field>
+    <Field name="Fornecedor"><input required readOnly={Boolean(orderId)} maxLength={100} value={supplier} onChange={e=>setSupplier(e.target.value)}/></Field>
+    {orderId&&chosenLine&&<p className="v3-info">Quantidade pendente: {Math.max(0,Number(chosenLine.quantity)-Number(order?.received?.[productId]||0))} {chosenLine.unit}. Confira e informe somente o que chegou.</p>}
     <div className="v3-line"><Field name="Quanto chegou?"><input type="number" required min={["un","porcao","pacote","duzia"].includes(commercialUnit)?"1":".001"} step={["un","porcao","pacote","duzia"].includes(commercialUnit)?"1":".001"} value={commercialQuantity} onChange={e=>setCommercialQuantity(e.target.value)}/></Field>
      <Field name="Conferido em"><select value={commercialUnit} onChange={e=>setCommercialUnit(e.target.value)}>{listUnits.map(x=><option key={x}>{x}</option>)}</select></Field></div>
     {chosen?.profile?.controlMode==='quantitative'?
