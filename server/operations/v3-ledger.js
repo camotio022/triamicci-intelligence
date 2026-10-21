@@ -51,6 +51,60 @@ export default async function v3Ledger(req,res){
    const h=await unit.collection('v3Operations').orderBy('at','desc').limit(60).get();
    return send(res,200,'Movimentações recentes.',{operations:h.docs.map(snapMap)});
   }
+  if(action==='v3InspectReceive'){
+   const {requestId,productId,commercialQuantity,commercialUnit,stockQuantity,location='reserva',orderId=null,lot='',expiryDate='',supplier='',notes=''}=req.body||{};
+   if(!reqOk(requestId)||!idOk(productId)||!locations.includes(location)||!['kg','g','L','mL','un','porcao','pacote','duzia'].includes(commercialUnit)||
+     !number(commercialQuantity,commercialUnit)||typeof stockQuantity!=='number'||!Number.isFinite(stockQuantity)||stockQuantity<0||
+     typeof lot!=='string'||lot.length>80||typeof expiryDate!=='string'||typeof supplier!=='string'||!supplier.trim()||supplier.length>100||
+     typeof notes!=='string'||notes.length>240||(orderId!==null&&!reqOk(orderId)))
+     return send(res,400,'Revise a conferência do recebimento.');
+   const inspection=unit.collection('v3ReceiptInspections').doc(requestId);
+   const payload={productId,commercialQuantity,commercialUnit,stockQuantity,location,orderId,lot,expiryDate,supplier,notes};
+   const fingerprint=hashed(JSON.stringify(payload));
+   let duplicate=false;
+   await db.runTransaction(async tx=>{
+     const [who,existing,product,profile]=await Promise.all([tx.get(actorRef),tx.get(inspection),tx.get(products.doc(productId)),tx.get(profiles.doc(productId))]);
+     if(!active(who,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
+     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().inspectedBy!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
+     if(!product.exists||product.data().status!=='active'||!profile.exists)throw Error('MISSING');
+     const cfg=profile.data();
+     if(cfg.controlMode==='quantitative'&&!number(stockQuantity,cfg.countUnit))throw Error('QUANTITY');
+     if(cfg.controlMode!=='quantitative'&&stockQuantity!==0)throw Error('QUANTITY');
+     if(cfg.controlMode==='quantitative'&&!cfg.locations.includes(location))throw Error('LOCATION');
+     if(product.data().trackExpiry&&(!lot.trim()||!isoDay(expiryDate)))throw Error('LOT');
+     tx.create(inspection,{...payload,unitId:m.unitId,status:'pending',fingerprint,inspectedBy:actor.uid,inspectedAt:now()});
+     audit(tx,db,'v3.receipt_inspected',m.unitId,actor.uid,{requestId,productId});
+   });
+   return send(res,200,duplicate?'Conferência já enviada.':'Conferência enviada para aprovação. Estoque ainda não alterado.',{id:requestId,duplicate,status:'pending'});
+  }
+  if(action==='v3PendingReceipts'){
+   const a=await actorRef.get();if(!active(a,m.unitId,MANAGEMENT_ROLES))return send(res,403,'Aprovação reservada à gestão.');
+   const snap=await unit.collection('v3ReceiptInspections').where('status','==','pending').limit(101).get();
+   if(snap.size>100)return send(res,409,'Há mais de 100 conferências pendentes. Solicite paginação.');
+   return send(res,200,'Conferências pendentes.',{inspections:snap.docs.map(d=>({id:d.id,...d.data(),inspectedAt:d.data().inspectedAt?.toDate?.()?.toISOString?.()}))});
+  }
+  if(action==='v3ApproveReceipt'){
+   const inspectionId=req.body?.inspectionId;
+   if(!reqOk(inspectionId))return send(res,400,'Conferência inválida.');
+   const who=await actorRef.get();if(!active(who,m.unitId,MANAGEMENT_ROLES))return send(res,403,'Aprovação reservada à gestão.');
+   const inspectionRef=unit.collection('v3ReceiptInspections').doc(inspectionId),snapshot=await inspectionRef.get();
+   if(!snapshot.exists)return send(res,404,'Conferência não encontrada.');
+   const data=snapshot.data();
+   if(data.status==='approved')return send(res,200,'Conferência já aprovada.',{duplicate:true,id:inspectionId});
+   if(data.status!=='pending')return send(res,409,'Conferência não está pendente.');
+   // Mesmo identificador evita dupla entrada em aprovações concorrentes e reenvios.
+   const payload={requestId:inspectionId,productId:data.productId,commercialQuantity:data.commercialQuantity,
+    commercialUnit:data.commercialUnit,stockQuantity:data.stockQuantity,location:data.location,orderId:data.orderId,
+    lot:data.lot,expiryDate:data.expiryDate,supplier:data.supplier,notes:data.notes};
+   const previous=req.body;
+   req.body={...payload,action:'v3Receive'};
+   try{await v3Ledger(req,res)}finally{req.body=previous}
+   // A entrada oficial usa operação idempotente. A atualização abaixo não afeta o saldo.
+   if(res.statusCode===200){
+    await inspectionRef.update({status:'approved',approvedBy:actor.uid,approvedAt:now()});
+   }
+   return;
+  }
   if(action==='v3Receive'){
    if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerência recebe mercadorias.');
    const {requestId,productId,commercialQuantity,commercialUnit,stockQuantity,location='reserva',orderId=null,lot='',expiryDate='',supplier='',notes=''}=req.body||{};
