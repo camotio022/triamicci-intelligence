@@ -16,7 +16,7 @@ export default function SchedulePlanner({membership}){
  const [fixedOff,setFixedOff]=useState({}),[sundayOff,setSundayOff]=useState({}),[savingFixed,setSavingFixed]=useState(''),[selectedPerson,setSelectedPerson]=useState(''),[matrixSector,setMatrixSector]=useState('todos');
  const [registryState,setRegistryState]=useState({activated:false,registeredCount:0});
  const [uid,setUid]=useState(''),[date,setDate]=useState(''),[type,setType]=useState('work'),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
- const allowed=['admin','manager'].includes(membership.role);
+ const allowed=['admin','manager','submanager'].includes(membership.role);
  const refresh=useCallback(async()=>{setLoading(true);setError('');try{const [p,m,f]=await Promise.all([call('list'),membersApi(),call('fixedOffList')]);setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})})}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useEffect(()=>{refresh()},[refresh]);
  const chosen=plans.find(x=>x.id===selected);
