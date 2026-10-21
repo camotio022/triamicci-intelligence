@@ -14,11 +14,18 @@ export default function MyAttendanceV31({unitId}){
  useEffect(()=>{reload();const onVisible=()=>{if(document.visibilityState==='visible')reload()};document.addEventListener('visibilitychange',onVisible);const timer=setInterval(onVisible,15000);return()=>{document.removeEventListener('visibilitychange',onVisible);clearInterval(timer)}},[reload]);
  const status=record?.status||'not_started',next=actions[status];
  const labels={not_started:'Entrada ainda não registrada',working:'Entrada declarada · aguardando confirmação presencial',on_break:'Intervalo declarado',finished:'Saída declarada · aguardando confirmação'};
- const submit=async()=>{if(!next?.length||busy)return;setBusy(true);setError('');setNotice('');try{const d=await call(next[0],{requestId:crypto.randomUUID()});setRecord(p=>({...p,status:d.status}));setNotice('Declaração registrada. A confirmação da presença física depende de validação no estabelecimento.');await reload()}catch(e){setError(e.message)}finally{setBusy(false)}};
- return <section className="ti-attendance-v31" aria-label="Minha presença de hoje">
-  <div><strong>Minha presença · Hoje</strong><p>{day||'Data do restaurante'} · {labels[status]}</p><small>Seus registros são declarações operacionais. A presença no estabelecimento precisa de confirmação da gestão.</small></div>
-  {next?.length>0&&<button type="button" onClick={submit} disabled={busy}>{busy?'Registrando…':next[1]}</button>}
-  {status==='working'&&<button type="button" onClick={async()=>{setBusy(true);setError('');try{await call('clock_out',{requestId:crypto.randomUUID()});await reload()}catch(e){setError(e.message)}finally{setBusy(false)}}} disabled={busy}>Registrar saída</button>}
-  {notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}
+ const submit=async(action=next?.[0])=>{if(!action||busy)return;setBusy(true);setError('');setNotice('');try{const d=await call(action,{requestId:crypto.randomUUID()});setRecord(p=>({...p,status:d.status}));setNotice('Declaração registrada. A confirmação da presença física depende de validação no estabelecimento.');await reload()}catch(e){setError(e.message)}finally{setBusy(false)}};
+ return <section className="ti-attendance-v31" aria-label="Minha jornada">
+  <div className="ti-attendance-v31-content">
+   <span className="ti-attendance-eyebrow">MINHA JORNADA · {day||'HOJE'}</span>
+   <h2>{labels[status]}</h2>
+   <p>Os horários reais são registrados ao confirmar cada ação. A escala é uma previsão, não comprovação de presença.</p>
+  </div>
+  <div className="ti-attendance-actions">
+   {next?.length>0&&<button className="ti-attendance-primary" type="button" onClick={()=>submit()} disabled={busy}>{busy?'Registrando…':next[1]}</button>}
+   {status==='working'&&<button className="ti-attendance-secondary" type="button" onClick={()=>submit('clock_out')} disabled={busy}>Encerrar jornada</button>}
+  </div>
+  {notice&&<p role="status" className="ti-attendance-notice">{notice}</p>}
+  {error&&<p role="alert">{error}</p>}
  </section>;
 }
