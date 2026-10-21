@@ -36,17 +36,16 @@ export default function TeamTodayV31({unitId}){
    const attendance=presence[key];
    const presenceStatus=attendance?.status;
    const confirmed=presenceStatus==='working'&&attendance?.lastAction==='break_end'?'Retorno do intervalo declarado':({working:'Entrada declarada · não verificada',on_break:'Intervalo declarado',finished:'Saída registrada',absent:'Ausência confirmada pela gestão'})[presenceStatus];
-   const hours=typeof profile?.shift==='string'&&profile.shift.trim()?profile.shift.trim():null;
-   const windowMatch=hours?.match(/(?:^|\s)([01]\d|2[0-3]):[0-5]\d/);
-   const startTime=windowMatch?.[0]?.trim()||null;
-   const status=confirmed|| (x.operationalStatus==='day_off'?'Folga prevista':x.operationalStatus==='absence_recorded'?'Ausência na escala':x.operationalStatus==='not_scheduled'?'Sem lançamento na escala':startTime&&clock<startTime?'Entrada prevista às '+startTime:'Escalado · presença não confirmada');
-   const timeLabel=hours?(x.operationalStatus==='not_scheduled'?'Jornada habitual: ':'Horário: ')+hours:'Horário não informado';
-   const areaRaw=String(profile?.area||profile?.sector||profile?.department||x.area||'').toLowerCase();
-   const area=/cozinha|kitchen/.test(areaRaw)?'Cozinha':/sal[aã]o|frente|atendimento|front/.test(areaRaw)?'Frente':'Setor não informado';
-   const startHour=startTime?Number(startTime.slice(0,2)):null;
-   const shift=/manh[aã]/i.test(hours||'')?'Manhã':/noite/i.test(hours||'')?'Noite':/tarde/i.test(hours||'')?'Tarde':startHour===null?'Turno não informado':startHour<12?'Manhã':startHour<18?'Tarde':'Noite';
-   const awaiting=Boolean(startTime&&clock>=startTime&&!presenceStatus);
-   return {key:x.uid,name:profile?.name||x.name||'Colaborador',status:awaiting?'Horário iniciado · aguardando confirmação':status,timeLabel,area,shift};
+   const sector=String(profile?.sector||x.sector||'').toLowerCase();
+   const area=({cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'})[sector]||'Setor não informado';
+   const shiftCode=String(profile?.shift||x.shift||'').toLowerCase();
+   const shift=({manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variavel:'Variável'})[shiftCode]||'Turno não informado';
+   const weekday=['dom','seg','ter','qua','qui','sex','sab'][new Date(today+'T12:00:00Z').getUTCDay()];
+   const habitual=Array.isArray(profile?.availability)?profile.availability.find(slot=>slot.day===weekday):null;
+   const startTime=/^([01]\\d|2[0-3]):[0-5]\\d$/.test(habitual?.start||'')?habitual.start:null;
+   const timeLabel=habitual?.start&&habitual?.end?'Jornada habitual: '+habitual.start+'–'+habitual.end:'Turno: '+shift;
+   const status=confirmed||(startTime&&clock>=startTime?'Entrada não confirmada':'Escalado · presença não confirmada');
+   return {key:x.uid,name:profile?.name||x.name||'Colaborador',status,timeLabel,area,shift};
 
   });
  },[schedules,today,staff,presence,clock]);
@@ -54,7 +53,7 @@ export default function TeamTodayV31({unitId}){
   <header><div><small>OPERAÇÃO · {today}</small><h2>Equipe de hoje</h2><p>Escala publicada e presença registrada são informações diferentes.</p></div><button type="button" onClick={refresh} disabled={busy}>{busy?'Atualizando…':'Atualizar'}</button></header>
   {error&&<p role="alert">{error}</p>}
   {!error&&!busy&&people.length===0&&<p>Não há colaboradores escalados para trabalhar hoje nesta publicação.</p>}
-  {['Manhã','Tarde','Noite','Turno não informado'].map(shift=>{
+  {['Manhã','Intermediário','Tarde','Noite','Variável','Turno não informado'].map(shift=>{
    const group=people.filter(p=>p.shift===shift);
    return group.length?<section key={shift} className="ti-team-shift-group" aria-label={'Equipe '+shift}>
     <h3>{shift} <small>{group.length} escalado{group.length!==1?'s':''}</small></h3>
