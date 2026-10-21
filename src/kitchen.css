@@ -101,3 +101,13 @@
 /* V3.1: indicação temporal visível sem confundir data e seleção. */
 .ti-current-day{display:inline-flex;align-items:center;white-space:nowrap;padding:6px 10px;border-radius:999px;border:1px solid #3278b6;color:#26699e;background:rgba(50,120,182,.09);font-weight:750;font-size:.78rem}
 @media(max-width:700px){.ti-current-day{font-size:.69rem;padding:5px 7px;white-space:normal;text-align:center}}
+
+/* V3.1 — cartão de presença acompanha tokens e responsividade do aplicativo. */
+.ti-attendance-v31{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px;border-radius:14px;margin-bottom:16px;border:1px solid var(--border-color,#d7dce2);background:var(--surface,#fff)}
+.ti-attendance-v31>div{flex:1 1 240px;min-width:0}
+.ti-attendance-v31 strong{font-weight:750}
+.ti-attendance-v31 p{margin:5px 0}
+.ti-attendance-v31 small{opacity:.75;line-height:1.45;display:block}
+.ti-attendance-v31 button{min-height:44px;min-width:130px;border-radius:10px;padding:10px 14px}
+.ti-attendance-v31 [role="alert"]{color:#b53434;width:100%}
+@media(max-width:480px){.ti-attendance-v31{padding:12px;gap:10px}.ti-attendance-v31 button{width:100%}}
