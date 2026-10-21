@@ -7,11 +7,12 @@ import TeamProfiles from './TeamProfiles.jsx';
 import TeamPreRegister from './TeamPreRegister.jsx';
 import './team-preregister.css';
 
-const roleLabels = { admin: 'Administrador', manager: 'Gerente', cook: 'Cozinheiro', auxiliar: 'Auxiliar' };
+const roleLabels = { admin: 'Administrador', manager: 'Gerente', submanager:'Subgerente', cook: 'Cozinheiro', auxiliar: 'Auxiliar' };
 const roleOptions = [
   { value: 'auxiliar', label: 'Auxiliar' },
   { value: 'cook', label: 'Cozinheiro' },
   { value: 'manager', label: 'Gerente' },
+  { value: 'submanager', label: 'Subgerente' },
   { value: 'admin', label: 'Administrador' }
 ];
 
@@ -27,7 +28,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
   const [deliveryMethod, setDeliveryMethod] = useState('link');
   const [shareInvite, setShareInvite] = useState(null);
   const [revokingId, setRevokingId] = useState('');
-  const allowed = membership.role === 'admin' || membership.role === 'manager';
+  const allowed = ['admin','manager','submanager'].includes(membership.role);
   const roles = membership.role === 'admin' ? roleOptions : roleOptions.filter(item => ['auxiliar', 'cook'].includes(item.value));
 
   const sendInvitation = async event => {
