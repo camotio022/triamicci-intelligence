@@ -20,7 +20,7 @@ export function rosterToday(schedule,today=restaurantDay()){
 export function liveShiftState({day,clock,employee={},attendance=null}){
  const weekday=['dom','seg','ter','qua','qui','sex','sab'][new Date(day+'T12:00:00Z').getUTCDay()];
  const slot=Array.isArray(employee.availability)?employee.availability.find(x=>x.day===weekday):null;
- const valid=x=>typeof x==='string'&&/^([01]\\d|2[0-3]):[0-5]\\d$/.test(x);
+ const valid=x=>typeof x==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(x);
  const start=valid(slot?.start)?slot.start:null,end=valid(slot?.end)?slot.end:null;
  const minute=x=>Number(x.slice(0,2))*60+Number(x.slice(3));
  const current=valid(clock)?minute(clock):null;
