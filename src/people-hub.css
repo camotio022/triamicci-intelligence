@@ -37,3 +37,46 @@
 .ti-team-shift-group article span{font-weight:700;color:#7f332c}
 
 .ti-team-today-grid article.ti-live-confirmed{border-color:#b5dfc6;background:#f0faf4}.ti-team-today-grid article.ti-live-confirmed span{color:#187446}
+
+/* Gestão de pessoas: tipografia acessível e ficha em modal, não página infinita. */
+.ti-people-nav button{min-height:78px;gap:5px 10px;padding:12px 13px}
+.ti-people-nav button strong{font-size:14px;line-height:1.35}
+.ti-people-nav button span{font-size:12px;line-height:1.45}
+.ti-people-nav button small{font-size:11px}
+.ti-people-hero>span{font-size:11px}
+.ti-people-hero p{font-size:14px}
+.ti-people-content .team-panel>p{font-size:14px;line-height:1.55}
+.ti-people-content .team-member-info strong{font-size:14px}
+.ti-people-content .team-member-info>span,.ti-people-content .team-member-tags span{font-size:12px}
+.ti-people-content .team-member-edit{min-height:44px;font-size:13px}
+.ti-profile-backdrop{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(18,23,35,.65);padding:16px;box-sizing:border-box}
+.ti-profile-dialog{width:min(100%,760px);max-height:min(92dvh,900px);overflow-y:auto;overscroll-behavior:contain;background:var(--surface,#fff);border-radius:18px;box-shadow:0 22px 80px rgba(0,0,0,.24);padding:0 20px 20px;box-sizing:border-box}
+.ti-profile-dialog-header{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 0 14px;background:var(--surface,#fff);border-bottom:1px solid #e7e8ec}
+.ti-profile-dialog-header span{font-size:11px;letter-spacing:.075em;font-weight:800;color:#9a2c27}
+.ti-profile-dialog-header h3{font-size:20px;margin:5px 0 0;line-height:1.3;color:#273043}
+.ti-profile-dialog .ti-profile-close{width:44px;height:44px;min-width:44px;border:1px solid #dce1ea;border-radius:11px;background:#fff;color:#82251f;font-size:28px;line-height:1;cursor:pointer}
+.ti-profile-dialog .ti-profile-close:focus-visible{outline:3px solid #bc8982;outline-offset:2px}
+.ti-profile-dialog .team-profile-form{margin-top:15px;max-width:none;min-width:0}
+.ti-profile-dialog .team-profile-form>label{font-size:14px;font-weight:700}
+.ti-profile-dialog .team-profile-form :is(input,select,textarea){font-size:16px;max-width:100%;box-sizing:border-box}
+.ti-profile-dialog .team-profile-form h4{font-size:16px}
+@media(max-width:600px){.ti-profile-backdrop{padding:0;align-items:stretch}.ti-profile-dialog{width:100%;max-height:100dvh;border-radius:0;padding:0 16px 24px}.ti-profile-dialog-header{padding-top:16px}.ti-people-nav button{padding:12px 10px}.ti-people-nav button strong{font-size:13px}.ti-people-nav button span{font-size:11px}}
+
+/* Padrão único de tipografia em Gestão de Pessoas, preservando a hierarquia. */
+.ti-people-hub{--ti-text:14px;--ti-caption:12px;--ti-heading:20px}
+.ti-people-content :is(.team-panel,.ti-master,.ti-cov-panel){font-size:var(--ti-text);line-height:1.5}
+.ti-people-content :is(.team-panel,.ti-master,.ti-cov-panel) h2{font-size:var(--ti-heading);line-height:1.3}
+.ti-people-content :is(.team-panel,.ti-master,.ti-cov-panel) h3{font-size:17px;line-height:1.35}
+.ti-people-content :is(.team-panel,.ti-master,.ti-cov-panel) :is(input:not([type=checkbox]),select,textarea){font-size:16px;min-height:44px;max-width:100%;box-sizing:border-box}
+.ti-people-content :is(.team-panel,.ti-master,.ti-cov-panel) :is(button,summary){font-size:14px}
+.ti-people-content :is(.team-panel,.ti-master,.ti-cov-panel) small{font-size:var(--ti-caption);line-height:1.4}
+.ti-unified-modal-backdrop{position:fixed;inset:0;z-index:9998;background:rgba(18,23,35,.65);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.ti-unified-modal{background:#fff;color:#293043;max-height:min(92dvh,880px);width:min(100%,720px);overflow-y:auto;overscroll-behavior:contain;border-radius:18px;padding:0 20px 20px;box-shadow:0 20px 70px rgba(20,20,30,.24);box-sizing:border-box}
+.ti-unified-modal-top{position:sticky;top:0;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid #e6e8ed;background:#fff}
+.ti-unified-modal-top strong{font-size:18px}
+.ti-unified-modal-top button{min-height:44px;min-width:44px;border:1px solid #e0e4ec;border-radius:10px;background:#fff;color:#922824;font-size:26px!important}
+.ti-unified-modal :is(form,input,select,textarea){min-width:0}
+.ti-unified-modal .ti-master-editor{margin-top:16px}
+.ti-unified-modal :is(input:not([type=checkbox]),select,textarea){width:100%;max-width:100%;min-height:44px;font-size:16px}
+.ti-unified-modal :is(button,input,select,textarea):focus-visible{outline:2px solid #a71916;outline-offset:2px}
+@media(max-width:600px){.ti-unified-modal-backdrop{padding:0}.ti-unified-modal{width:100%;height:100dvh;max-height:100dvh;border-radius:0;padding:0 16px 24px}}

@@ -1,4 +1,4 @@
-import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import React,{useCallback,useEffect,useMemo,useState,useRef} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {DEFAULT_DAY,defaultAvailability} from '../server/team/ux-rules.js';
@@ -16,6 +16,7 @@ async function api(action,extra={}){
 }
 export default function TeamProfiles({membership,initialTab='profiles'}){
  const {notify}=useFeedback();
+ const dialogRef=useRef(null);
  const [requests,setRequests]=useState([]);const [members,setMembers]=useState([]),[tab,setTab]=useState(initialTab),[selected,setSelected]=useState(''),
  [form,setForm]=useState(blank()),[error,setError]=useState(''),[notice,setNotice]=useState(''),
  [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[search,setSearch]=useState('');
@@ -28,6 +29,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  const current=members.find(x=>x.uid===selected);
  const editable=current&&(current.registry||membership.role==='admin'||['cook','auxiliar'].includes(current.role));
  const select=m=>{setSelected(m.uid);setForm(m.professional?{...blank(),...structuredClone(m.professional)}:blank());setNotice('');setError('');setTab('profiles')};
+ useEffect(()=>{if(!selected)return;const previous=document.activeElement;const onKey=e=>{if(e.key==='Escape'){setSelected('');return;}if(e.key!=='Tab')return;const controls=[...dialogRef.current?.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]')||[]];if(!controls.length)return;const first=controls[0],last=controls.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}};document.addEventListener('keydown',onKey);dialogRef.current?.querySelector('.ti-profile-close')?.focus();return()=>{document.removeEventListener('keydown',onKey);previous?.focus?.()}},[selected]);
  const update=(key,value)=>setForm(old=>({...old,[key]:value}));
  const toggle=(key,value)=>setForm(old=>{const arr=old[key].includes(value)?old[key].filter(x=>x!==value):[...old[key],value];
   return {...old,[key]:arr,...(key==='skills'?{certifications:old.certifications.filter(x=>arr.includes(x))}:{})}});
@@ -65,8 +67,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
    </article>)}
    {!loading&&!filtered.length&&<p>Nenhum colaborador encontrado.</p>}
   </div>}
-  {tab==='profiles'&&current&&<form className="team-edit-form team-profile-form" onSubmit={save}>
-    <h3>Ficha profissional · {current.name||current.email}</h3>
+  {tab==='profiles'&&current&&<div className="ti-profile-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setSelected('')}}><div className="ti-profile-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="ti-profile-title"><header className="ti-profile-dialog-header"><div><span>GESTÃO · FICHA PROFISSIONAL</span><h3 id="ti-profile-title">{current.name||current.email}</h3></div><button type="button" className="ti-profile-close" onClick={()=>setSelected('')} aria-label="Fechar ficha">×</button></header><form className="team-edit-form team-profile-form" onSubmit={save}>
     {!editable&&<p className="team-warning">Este perfil é protegido e não pode ser alterado pelo seu nível de acesso.</p>}
     <label>Setor</label><select disabled={!editable} value={form.sector} onChange={e=>update('sector',e.target.value)}>{Object.entries(sectors).map(([v,l])=><option value={v} key={v}>{l}</option>)}</select>
     <label>Cargo operacional (não altera permissões)</label><input disabled={!editable} required maxLength={80} minLength={2} value={form.jobTitle} onChange={e=>update('jobTitle',e.target.value)}/>
@@ -84,7 +85,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
     </div>})}
     <label>Observações profissionais</label><textarea maxLength={240} disabled={!editable} value={form.notes} onChange={e=>update('notes',e.target.value)}/>
     <div className="team-edit-actions">{editable&&<button disabled={saving} type="submit">{saving?'Salvando...':'Salvar ficha'}</button>}<button type="button" className="team-secondary" onClick={()=>setSelected('')}>Fechar</button></div>
-   </form>}
+   </form></div></div>}
   {tab==='matrix'&&<div className="inventory-table-wrap team-matrix-scroll" role="region" aria-label="Matriz de habilidades" tabIndex={0}><table className="inventory-table"><thead><tr><th>Colaborador</th><th>Setor</th>{Object.entries(abilities).map(([k,l])=><th key={k}>{l}</th>)}</tr></thead><tbody>{filtered.map(m=><tr key={m.uid}><td>{m.name||m.email}</td><td>{sectors[m.professional?.sector]||'—'}</td>{Object.keys(abilities).map(k=><td key={k}>{m.professional?.certifications?.includes(k)?<span className="ti-skill-status confirmed" title="Habilidade confirmada pela gerência" aria-label="Confirmada">✓</span>:m.professional?.skills?.includes(k)?<span className="ti-skill-status declared" title="Habilidade declarada, não certificada" aria-label="Declarada">•</span>:<span className="ti-skill-status missing" aria-label="Não atribuída">—</span>}</td>)}</tr>)}</tbody></table><p className="ti-skill-legend"><span>✓ Confirmada</span><span>• Declarada</span><span>— Sem registro</span></p></div>}
   {tab==='matrix'&&<div className="ti-skill-mobile" aria-label="Habilidades por colaborador">
    {filtered.map(m=>{const p=m.professional||{};const skills=Object.entries(abilities).filter(([key])=>p.skills?.includes(key)||p.certifications?.includes(key));return <article className="ti-skill-person" key={m.uid}>
