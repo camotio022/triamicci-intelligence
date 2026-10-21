@@ -28,7 +28,7 @@ export default async function handler(req,res){
    return send(res,200,'Produção carregada.',{recipes:r.docs.map(clean),runs:p.docs.map(clean)});
   }
   if(action==='saveRecipe'){
-   if(!['admin','manager'].includes(member.role))return send(res,403,'Somente administração pode definir preparações.');
+   if(!['admin','manager','submanager'].includes(member.role))return send(res,403,'Somente administração pode definir preparações.');
    const {id,name,yieldQuantity,lines}=req.body||{};
    if(!idPattern.test(id||'')||typeof name!=='string'||name.trim().length<3||name.length>100||
     !Number.isInteger(yieldQuantity)||yieldQuantity<1||yieldQuantity>10000||
@@ -39,7 +39,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const [a,prev,...products]=await Promise.all([tx.get(actorRef),tx.get(ref),
      ...[...new Set(lines.flatMap(x=>[x.productId,...(x.substitutes||[])]))].map(id=>tx.get(unit.collection('products').doc(id)))]);
-    if(!a.exists||a.data().status!=='active'||!['admin','manager'].includes(a.data().role)||a.data().unitId!==member.unitId)throw Error('FORBIDDEN');
+    if(!a.exists||a.data().status!=='active'||!['admin','manager','submanager'].includes(a.data().role)||a.data().unitId!==member.unitId)throw Error('FORBIDDEN');
     if(products.some(x=>!x.exists||x.data().status!=='active'))throw Error('PRODUCT_NOT_FOUND');
     const now=new Date();
     tx.set(ref,{name:name.trim(),yieldQuantity,lines:lines.map(x=>({productId:x.productId,
@@ -68,7 +68,7 @@ export default async function handler(req,res){
    const [a,recipe,existing,...docs]=await Promise.all([tx.get(actorRef),tx.get(recipeRef),tx.get(ref),
     ...productRefs.map(p=>tx.get(p)),...balanceRefs.map(b=>tx.get(b))]);
    if(!a.exists||a.data().status!=='active'||a.data().unitId!==member.unitId||
-     !['admin','manager','cook'].includes(a.data().role))throw Error('FORBIDDEN');
+     !['admin','manager','submanager','cook','auxiliar'].includes(a.data().role))throw Error('FORBIDDEN');
    if(existing.exists){
     if(existing.data().payloadHash!==payloadHash||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');
     duplicate=true;return;
