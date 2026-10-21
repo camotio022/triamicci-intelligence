@@ -90,7 +90,7 @@ export default async function handler(req,res){
     const [ms,ps,policy]=await Promise.all([tx.get(member),tx.get(professional),tx.get(policies.doc(p.id))]);
     if(!ms.exists||ms.data().status!=='active'||ms.data().unitId!==m.unitId)throw Error('FORBIDDEN');
     const trained=ps.data()?.profile?.certifications?.includes('etiquetagem');
-    if(!['admin','manager'].includes(ms.data().role)&&!trained)throw Error('FORBIDDEN');
+    if(!['admin','manager','submanager'].includes(ms.data().role)&&!trained)throw Error('FORBIDDEN');
     if(!policy.exists||policy.data().status!=='approved'||policy.data().revision!==p.data().revision)throw Error('POLICY_STATE');
     const record={productId,productName:product.data().name,category,zone,lot:lot.trim(),quantity,quantityUnit,startedOn,originalExpiry:sourceExpiryDate,expiresOn,policyRevision:p.data().revision,status:'active',createdBy:actor.uid,createdAt:now,at:now,unitId:m.unitId};
     tx.create(ref,record);
@@ -116,7 +116,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const [member,profile,current,policy]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(unit.collection('staffProfiles').doc(actor.uid)),tx.get(ref),tx.get(policies.doc(p.id))]);
     if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId)throw Error('FORBIDDEN');
-    if(!['admin','manager'].includes(member.data().role)&&!profile.data()?.profile?.certifications?.includes('etiquetagem'))throw Error('FORBIDDEN');
+    if(!['admin','manager','submanager'].includes(member.data().role)&&!profile.data()?.profile?.certifications?.includes('etiquetagem'))throw Error('FORBIDDEN');
     if(!current.exists||current.data().status!=='active'||current.data().expiresOn!==old.data().expiresOn||!policy.exists||policy.data().status!=='approved'||policy.data().revision!==p.data().revision)throw Error('POLICY_STATE');
     tx.update(ref,{zone,expiresOn,updatedAt:now,updatedBy:actor.uid,policyRevision:p.data().revision});
     tx.create(ref.collection('events').doc(),{kind:'replace',actorUid:actor.uid,at:now,reason:reason.trim(),fromZone:old.data().zone,toZone:zone,previousExpiry:old.data().expiresOn,expiresOn});
