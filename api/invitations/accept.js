@@ -20,12 +20,12 @@ export default async function handler(req,res) {
           invitation.tokenHash !== hashToken(token) || invitation.expiresAt.toMillis() <= Date.now() ||
           invitation.email !== normalizeEmail(actor.email)) throw new Error('INVALID_INVITATION');
       if (memberSnap.exists) throw new Error('MEMBERSHIP_EXISTS');
-      if (!['admin','manager','cook','auxiliar'].includes(invitation.role)) throw new Error('INVALID_INVITATION');
+      if (!['admin','manager','submanager','cook','auxiliar'].includes(invitation.role)) throw new Error('INVALID_INVITATION');
       const inviterSnap = await tx.get(db.doc('memberships/' + invitation.createdBy));
       const inviter = inviterSnap.data();
       if (!inviter || inviter.status !== 'active' || inviter.unitId !== unitId ||
-          !['admin','manager'].includes(inviter.role) ||
-          (inviter.role === 'manager' && !['cook','auxiliar'].includes(invitation.role)))
+          !['admin','manager','submanager'].includes(inviter.role) ||
+          (['manager','submanager'].includes(inviter.role) && !['cook','auxiliar'].includes(invitation.role)))
         throw new Error('INVALID_INVITATION');
       // Admin SDK só escreve após validar identidade e token em transação.
       tx.create(memberRef,{unitId,role:invitation.role,status:'active',email:normalizeEmail(actor.email),createdAt:new Date(),invitedBy:invitation.createdBy});

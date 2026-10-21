@@ -10,7 +10,7 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
-  if(!m?.unitId||!['admin','manager'].includes(m.role))return send(res,403,'Somente administração pode transferir estoque.');
+  if(!m?.unitId||!['admin','manager','submanager','cook','auxiliar'].includes(m.role))return send(res,403,'Somente administração pode transferir estoque.');
   const {action,productId,requestId,from,to,quantity,notes=''}=req.body||{};
   if(action!=='transfer'||!idPattern.test(productId||'')||!reqPattern.test(requestId||'')||
     !['reserva','giro'].includes(from)||!['reserva','giro'].includes(to)||from===to||
@@ -24,7 +24,7 @@ export default async function handler(req,res){
   await db.runTransaction(async tx=>{
    const [member,product,balance,previous]=await Promise.all([tx.get(memberRef),tx.get(pRef),tx.get(bRef),tx.get(opRef)]);
    const a=member.data();
-   if(!a||a.status!=='active'||a.unitId!==m.unitId||!['admin','manager'].includes(a.role))throw Error('FORBIDDEN');
+   if(!a||a.status!=='active'||a.unitId!==m.unitId||!['admin','manager','submanager','cook','auxiliar'].includes(a.role))throw Error('FORBIDDEN');
    if(!product.exists)throw Error('NOT_FOUND');
    const p=product.data();
    if(p.status!=='active')throw Error('INACTIVE');

@@ -66,7 +66,7 @@ export default async function handler(req,res) {
       });
       return send(res,200,'Unidade operacional corrigida. Registre nova contagem física antes de movimentar.');
     }
-    if (!['admin','manager'].includes(m.role)) return send(res,403,'Somente administração pode alterar o catálogo.');
+    if (!['admin','manager','submanager'].includes(m.role)) return send(res,403,'Somente administração pode alterar o catálogo.');
     if (action !== 'create' && action !== 'update') return send(res,400,'Ação inválida.');
     const {name,category,unit,minStock,trackExpiry} = req.body || {};
     const safeName = normalize(name);
@@ -84,7 +84,7 @@ export default async function handler(req,res) {
       await db.runTransaction(async tx => {
         const [actorSnap, existing] = await Promise.all([tx.get(actorRef),tx.get(ref)]);
         const current = actorSnap.data();
-        if (!current || current.status !== 'active' || current.unitId !== m.unitId || !['admin','manager'].includes(current.role))
+        if (!current || current.status !== 'active' || current.unitId !== m.unitId || !['admin','manager','submanager'].includes(current.role))
           throw new Error('FORBIDDEN');
         if (existing.exists) throw new Error('DUPLICATE');
         tx.create(ref,{...payload,quantity:0,status:'active',createdAt:now,createdBy:actor.uid,updatedAt:now});
@@ -100,7 +100,7 @@ export default async function handler(req,res) {
     await db.runTransaction(async tx => {
       const [actorSnap, productSnap] = await Promise.all([tx.get(actorRef),tx.get(ref)]);
       const current = actorSnap.data();
-      if (!current || current.status !== 'active' || current.unitId !== m.unitId || !['admin','manager'].includes(current.role))
+      if (!current || current.status !== 'active' || current.unitId !== m.unitId || !['admin','manager','submanager'].includes(current.role))
         throw new Error('FORBIDDEN');
       if (!productSnap.exists) throw new Error('NOT_FOUND');
       const previous = productSnap.data();

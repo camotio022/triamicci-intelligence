@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   try {
     const actor = await authenticate(req);
     const member = await membership(actor.uid);
-    if (!member || !['admin','manager'].includes(member.role))
+    if (!member || !['admin','manager','submanager'].includes(member.role))
       return send(res,403,'Sem permissão para revogar convites.');
     const { unitId, invitationId } = req.body || {};
     if (unitId !== member.unitId || typeof invitationId !== 'string' ||

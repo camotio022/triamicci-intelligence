@@ -39,7 +39,7 @@ export default async function handler(req,res) {
         !isQuantity(amount) || typeof note !== 'string' || note.trim().length < 3 ||
         note.trim().length > 240 || !requestPattern.test(requestId || ''))
       return send(res,400,'Informe produto, tipo, quantidade (até 3 casas), motivo e identificador válidos.');
-    if (type === 'entry' && !['admin','manager'].includes(m.role))
+    if (type === 'entry' && !['admin','manager','submanager'].includes(m.role))
       return send(res,403,'Somente administrador ou gerente pode registrar entradas.');
 
     const productRef = unit.collection('products').doc(productId);
@@ -56,7 +56,7 @@ export default async function handler(req,res) {
       const current = actorSnap.data();
       if (!current || current.status !== 'active' || current.unitId !== m.unitId)
         throw new Error('FORBIDDEN');
-      if (type === 'entry' && !['admin','manager'].includes(current.role))
+      if (type === 'entry' && !['admin','manager','submanager'].includes(current.role))
         throw new Error('FORBIDDEN');
       if (existing.exists) {
         const old = existing.data();

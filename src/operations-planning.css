@@ -47,3 +47,9 @@
 .ti-roster-attention button{border:1px solid #a71916;background:#a71916;color:white;font-weight:700;font-size:13px;padding:10px 14px;border-radius:10px;min-height:42px}
 .ti-roster-attention button:hover{background:#84221e}
 @media(max-width:640px){.ti-roster-attention{align-items:stretch;padding:13px}.ti-roster-attention span{flex-basis:100%}.ti-roster-attention button{width:100%}}
+
+/* V3.1: hoje é distinto da data selecionada; foco acessível. */
+.ti-calendar-day.ti-calendar-today{outline:2px solid #3278b6;outline-offset:-2px}
+.ti-calendar-day.ti-calendar-today::after{content:"HOJE";font-size:.64rem;font-weight:800;color:#3278b6;display:block}
+.ti-schedule-matrix-table [aria-current="date"]{box-shadow:inset 2px 0 #3278b6,inset -2px 0 #3278b6;outline-offset:-1px}
+.ti-calendar-day:focus-visible{outline:3px solid #3278b6;outline-offset:2px}

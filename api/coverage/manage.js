@@ -3,7 +3,7 @@ import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib
 import {evaluateCoverage,paymentFor,rateRoleFor,checkDoubleShift,approvalGate,DEFAULT_RATES} from '../../server/coverage/engine.js';
 import {validDate} from '../../server/schedules/rules.js';
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
-const roles=new Set(['admin','manager']);
+const roles=new Set(['admin','manager','submanager']);
 const validTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 const clean=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,updatedAt:d.data().updatedAt?.toDate?.()?.toISOString?.()||null});
 const rateKeys=Object.keys(DEFAULT_RATES);
@@ -14,24 +14,42 @@ export default async function handler(req,res){
   const actor=await authenticate(req),member=await membership(actor.uid);
   if(!member)return send(res,403,'Sem vínculo ativo.');
   const db=getDb(),unit=db.collection('units').doc(member.unitId),manager=roles.has(member.role),action=req.body?.action;
-  const proposals=unit.collection('coverageProposals'),settings=unit.collection('configuration').doc('coverageRates'),policyRef=unit.collection('configuration').doc('coverageRequirements');
+  const proposals=unit.collection('coverageProposals'),staffRequests=unit.collection('coverageRequestsV31'),settings=unit.collection('configuration').doc('coverageRates'),policyRef=unit.collection('configuration').doc('coverageRequirements');
   if(action==='dashboard'){
    if(!manager)return send(res,403,'Apenas gerência.');
-   const [peopleSnap,plansSnap,rateSnap,proposalSnap,policySnap]=await Promise.all([
-    unit.collection('staffRegistry').limit(200).get(),unit.collection('schedules').limit(120).get(),settings.get(),proposals.limit(100).get(),policyRef.get()
+   const [peopleSnap,plansSnap,rateSnap,proposalSnap,policySnap,requestSnap]=await Promise.all([
+    unit.collection('staffRegistry').limit(200).get(),unit.collection('schedules').limit(120).get(),settings.get(),proposals.limit(100).get(),policyRef.get(),staffRequests.limit(100).get()
    ]);
    const people=peopleSnap.docs.map(d=>({uid:d.id,name:d.data().name||'',status:d.data().status||'inactive',jobTitle:d.data().jobTitle||'',professional:{sector:d.data().sector,jobTitle:d.data().jobTitle,shift:d.data().shift,skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
    const plans=plansSnap.docs.map(d=>({id:d.id,...d.data()}));
    return send(res,200,'Painel de cobertura carregado.',{people,plans:plans.map(p=>({id:p.id,title:p.title,period:p.period,status:p.status,entries:p.entries||[]})),
     rates:{...DEFAULT_RATES,...(rateSnap.data()?.rates||{})},requirements:policySnap.data()?.requirements||[],
     proposals:proposalSnap.docs.map(clean).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))),
+    staffRequests:requestSnap.docs.map(clean).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))),
     note:'Simulação não substitui validação de jornada e folha.'});
   }
   if(action==='myProposals'){
    const snap=await proposals.limit(100).get();
    const linked=await unit.collection('staffRegistry').where('accountUid','==',actor.uid).limit(1).get();
    const ids=new Set([actor.uid,...linked.docs.map(d=>d.id)]);
-   return send(res,200,'Propostas consultadas.',{proposals:snap.docs.filter(d=>ids.has(d.data().staffId)).map(clean)});
+   const all=await staffRequests.where('accountUid','==',actor.uid).limit(100).get();
+   return send(res,200,'Propostas consultadas.',{proposals:snap.docs.filter(d=>ids.has(d.data().staffId)).map(clean),requests:all.docs.map(clean)});
+  }
+
+  if(action==='requestChange'){
+   const {kind,date,reason}=req.body||{};
+   if(!['coverage','swap'].includes(kind)||!validDate(date)||date<new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'})||
+      typeof reason!=='string'||reason.trim().length<10||reason.length>500)return send(res,400,'Informe tipo, data futura e justificativa.');
+   const linked=await unit.collection('staffRegistry').where('accountUid','==',actor.uid).limit(2).get();
+   if(linked.size!==1||linked.docs[0].data().status!=='active')return send(res,409,'Vincule sua conta a uma ficha profissional ativa para solicitar troca ou cobertura.');
+   const now=new Date(),requestId=randomUUID();
+   await db.runTransaction(async tx=>{
+    const who=await tx.get(db.collection('memberships').doc(actor.uid));
+    if(!who.exists||who.data().status!=='active'||who.data().unitId!==member.unitId)throw Error('FORBIDDEN');
+    tx.create(staffRequests.doc(requestId),{staffId:linked.docs[0].id,accountUid:actor.uid,name:linked.docs[0].data().name||'',kind,date,reason:reason.trim(),status:'pending',createdAt:now,updatedAt:now,unitId:member.unitId});
+    tx.create(db.collection('auditLogs').doc(),{event:'coverage.change_requested',requestId,unitId:member.unitId,actorUid:actor.uid,at:now});
+   });
+   return send(res,201,'Solicitação enviada à gerência. Nenhuma escala foi alterada.',{id:requestId});
   }
   if(action==='respond'){
    const {id,decision}=req.body||{};
@@ -48,6 +66,20 @@ export default async function handler(req,res){
    return send(res,200,'Resposta registrada. A escala publicada não foi alterada.');
   }
   if(!manager)return send(res,403,'Somente gerência.');
+
+  if(action==='decideStaffRequest'){
+   const {requestId,decision,note}=req.body||{};
+   if(!idOk(requestId)||!['approved','rejected'].includes(decision)||typeof note!=='string'||note.trim().length<8||note.length>500)return send(res,400,'Preencha decisão e justificativa.');
+   const ref=staffRequests.doc(requestId),now=new Date();
+   await db.runTransaction(async tx=>{
+    const [who,old]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(ref)]);
+    if(!who.exists||who.data().status!=='active'||who.data().unitId!==member.unitId||!roles.has(who.data().role))throw Error('FORBIDDEN');
+    if(!old.exists||old.data().status!=='pending'||old.data().accountUid===actor.uid)throw Error('CONFLICT');
+    tx.update(ref,{status:decision,note:note.trim(),decidedBy:actor.uid,decidedAt:now,updatedAt:now});
+    tx.create(db.collection('auditLogs').doc(),{event:'coverage.change_'+decision,requestId,unitId:member.unitId,actorUid:actor.uid,at:now,note:note.trim()});
+   });
+   return send(res,200,'Solicitação analisada. A escala oficial continua inalterada até sua atualização e publicação.');
+  }
   if(action==='requirementsSet'){
    if(member.role!=='admin')return send(res,403,'Somente administradores configuram mínimos de cobertura.');
    const requirements=req.body?.requirements;

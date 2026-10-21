@@ -1,6 +1,7 @@
 // Novo ledger isolado: não mistura os saldos legados nem converte kg em porções.
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {MANAGEMENT_ROLES,TEAM_ROLES} from '../permissions/v31-policy.js';
 const idOk=v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v);
 const reqOk=v=>typeof v==='string'&&/^[a-f0-9-]{36}$/i.test(v);
 const locations=['reserva','giro'];
@@ -38,7 +39,7 @@ export default async function v3Ledger(req,res){
   if(action==='v3Lots'){
    const {productId}=req.body||{};if(!idOk(productId))return send(res,400,'Insumo inválido.');
    const [a,p]=await Promise.all([actorRef.get(),products.doc(productId).get()]);
-   if(!active(a,m.unitId,['admin','manager','cook','auxiliar']))return send(res,403,'Sem permissão.');
+   if(!active(a,m.unitId,TEAM_ROLES))return send(res,403,'Sem permissão.');
    if(!p.exists||p.data().status!=='active')return send(res,404,'Insumo não encontrado.');
    const lots=await lotRoots.doc(productId).collection('lots').limit(101).get();
    if(lots.size>100)return send(res,409,'Muitos lotes: conferir paginação.');
@@ -46,24 +47,166 @@ export default async function v3Ledger(req,res){
   }
   if(action==='v3LedgerHistory'){
    const a=await actorRef.get();
-   if(!active(a,m.unitId,['admin','manager','cook','auxiliar']))return send(res,403,'Sem permissão.');
+   if(!active(a,m.unitId,TEAM_ROLES))return send(res,403,'Sem permissão.');
    const h=await unit.collection('v3Operations').orderBy('at','desc').limit(60).get();
    return send(res,200,'Movimentações recentes.',{operations:h.docs.map(snapMap)});
   }
+
+  if(action==='v3LossReport'){
+   const {requestId,productId,location,quantity,reason}=req.body||{};
+   if(!reqOk(requestId)||!idOk(productId)||!locations.includes(location)||!Number.isFinite(quantity)||quantity<=0||
+      typeof reason!=='string'||reason.trim().length<8||reason.length>240)return send(res,400,'Informe insumo, quantidade, local e motivo da perda.');
+   const ref=unit.collection('v3LossReports').doc(requestId),fingerprint=hashed(JSON.stringify({productId,location,quantity,reason:reason.trim()}));let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const [member,product,profile,old]=await Promise.all([tx.get(actorRef),tx.get(products.doc(productId)),tx.get(profiles.doc(productId)),tx.get(ref)]);
+    if(!active(member,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
+    if(old.exists){if(old.data().fingerprint!==fingerprint||old.data().reportedBy!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
+    if(!product.exists||product.data().status!=='active'||!profile.exists||profile.data().controlMode!=='quantitative'||!profile.data().locations.includes(location))throw Error('MISSING');
+    if(!number(quantity,profile.data().countUnit))throw Error('QUANTITY');
+    tx.create(ref,{productId,location,quantity,unit:profile.data().countUnit,reason:reason.trim(),status:'pending',fingerprint,reportedAt:now(),reportedBy:actor.uid,unitId:m.unitId});
+    audit(tx,db,'v3.loss_reported',m.unitId,actor.uid,{requestId,productId,quantity,location});
+   });
+   return send(res,200,duplicate?'Perda já comunicada.':'Perda enviada para aprovação. Nenhum saldo foi alterado.',{id:requestId,duplicate});
+  }
+  if(action==='v3LossPending'){
+   const who=await actorRef.get();if(!active(who,m.unitId,MANAGEMENT_ROLES))return send(res,403,'Somente gestão.');
+   const snap=await unit.collection('v3LossReports').where('status','==','pending').limit(101).get();
+   if(snap.size>100)return send(res,409,'Há mais de 100 perdas pendentes.');
+   return send(res,200,'Perdas aguardando decisão.',{losses:snap.docs.map(d=>({id:d.id,...d.data(),reportedAt:d.data().reportedAt?.toDate?.()?.toISOString?.()}))});
+  }
+  if(action==='v3LossReject'){
+   const {reportId,reason}=req.body||{};
+   if(!reqOk(reportId)||typeof reason!=='string'||reason.trim().length<8||reason.length>240)return send(res,400,'Explique a rejeição.');
+   const ref=unit.collection('v3LossReports').doc(reportId);let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const [member,report]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
+    if(!active(member,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
+    if(!report.exists)throw Error('MISSING');
+    if(report.data().status==='rejected'){duplicate=true;return;}
+    if(report.data().status!=='pending')throw Error('CONFLICT');
+    const at=now();tx.update(ref,{status:'rejected',rejectedBy:actor.uid,rejectedAt:at,rejectionReason:reason.trim()});
+    audit(tx,db,'v3.loss_rejected',m.unitId,actor.uid,{reportId,reason:reason.trim()});
+   });
+   return send(res,200,duplicate?'Relatório já rejeitado.':'Perda rejeitada. Estoque preservado.',{duplicate});
+  }
+  if(action==='v3LossApprove'){
+   const reportId=req.body?.reportId;if(!reqOk(reportId))return send(res,400,'Perda inválida.');
+   const ref=unit.collection('v3LossReports').doc(reportId),operation=unit.collection('v3Operations').doc(reportId);let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const [member,report,oldOperation]=await Promise.all([tx.get(actorRef),tx.get(ref),tx.get(operation)]);
+    if(!active(member,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
+    if(!report.exists)throw Error('MISSING');
+    if(report.data().status==='approved'&&oldOperation.exists){duplicate=true;return;}
+    if(report.data().status!=='pending'||oldOperation.exists)throw Error('CONFLICT');
+    const data=report.data(),balRef=balances.doc(data.productId),profileRef=profiles.doc(data.productId),productRef=products.doc(data.productId);
+    const [bal,profile,product]=await Promise.all([tx.get(balRef),tx.get(profileRef),tx.get(productRef)]);
+    if(!bal.exists||!profile.exists||!product.exists||product.data().status!=='active'||profile.data().controlMode!=='quantitative')throw Error('MISSING');
+    if(profile.data().countUnit!==bal.data().unit||data.unit!==bal.data().unit||!number(data.quantity,data.unit)||!profile.data().locations.includes(data.location)||bal.data()[data.location]<data.quantity)throw Error('QUANTITY');
+    const lots=product.data().trackExpiry?await tx.get(lotRoots.doc(data.productId).collection('lots').orderBy('expiryDate').limit(101)):null;
+    if(lots?.size>100)throw Error('LOT');
+    let remaining=data.quantity,lotUpdates=[];
+    if(lots){
+     for(const l of lots.docs){
+      const old=l.data(),available=old[data.location]||0;
+      if(available<=0)continue;
+      const debit=round(Math.min(available,remaining));
+      lotUpdates.push({ref:l.ref,locationAfter:round(available-debit),totalAfter:round((old.reserva||0)+(old.giro||0)-debit)});
+      remaining=round(remaining-debit);if(remaining<=0)break;
+     }
+     if(remaining>0)throw Error('LOT');
+    }
+    const at=now();
+    for(const l of lotUpdates)tx.update(l.ref,{[data.location]:l.locationAfter,availableQuantity:l.totalAfter,updatedAt:at});
+    tx.update(balRef,{[data.location]:round(bal.data()[data.location]-data.quantity),total:round(bal.data().total-data.quantity),lastOperationId:reportId,updatedAt:at,quality:'ESTIMATED_BY_MOVEMENTS'});
+    tx.update(ref,{status:'approved',approvedBy:actor.uid,approvedAt:at});
+    tx.create(operation,{kind:'loss',productId:data.productId,location:data.location,quantity:data.quantity,unit:data.unit,notes:data.reason,actorUid:actor.uid,unitId:m.unitId,reportId,at});
+    audit(tx,db,'v3.loss_approved',m.unitId,actor.uid,{reportId,productId:data.productId,quantity:data.quantity,location:data.location});
+   });
+   return send(res,200,duplicate?'Perda já aprovada.':'Perda aprovada; saldo atualizado com rastreabilidade.',{duplicate});
+  }
+  if(action==='v3InspectReceive'){
+   const {requestId,productId,commercialQuantity,commercialUnit,stockQuantity,location='reserva',orderId=null,lot='',expiryDate='',supplier='',notes=''}=req.body||{};
+   if(!reqOk(requestId)||!idOk(productId)||!locations.includes(location)||!['kg','g','L','mL','un','porcao','pacote','duzia'].includes(commercialUnit)||
+     !number(commercialQuantity,commercialUnit)||typeof stockQuantity!=='number'||!Number.isFinite(stockQuantity)||stockQuantity<0||
+     typeof lot!=='string'||lot.length>80||typeof expiryDate!=='string'||typeof supplier!=='string'||!supplier.trim()||supplier.length>100||
+     typeof notes!=='string'||notes.length>240||(orderId!==null&&!reqOk(orderId)))
+     return send(res,400,'Revise a conferência do recebimento.');
+   const inspection=unit.collection('v3ReceiptInspections').doc(requestId);
+   const payload={productId,commercialQuantity,commercialUnit,stockQuantity,location,orderId,lot,expiryDate,supplier,notes};
+   const fingerprint=hashed(JSON.stringify(payload));
+   let duplicate=false;
+   await db.runTransaction(async tx=>{
+     const [who,existing,product,profile]=await Promise.all([tx.get(actorRef),tx.get(inspection),tx.get(products.doc(productId)),tx.get(profiles.doc(productId))]);
+     if(!active(who,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
+     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().inspectedBy!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
+     if(!product.exists||product.data().status!=='active'||!profile.exists)throw Error('MISSING');
+     const cfg=profile.data();
+     if(cfg.controlMode==='quantitative'&&!number(stockQuantity,cfg.countUnit))throw Error('QUANTITY');
+     if(cfg.controlMode!=='quantitative'&&stockQuantity!==0)throw Error('QUANTITY');
+     if(cfg.controlMode==='quantitative'&&!cfg.locations.includes(location))throw Error('LOCATION');
+     if(product.data().trackExpiry&&(!lot.trim()||!isoDay(expiryDate)))throw Error('LOT');
+     tx.create(inspection,{...payload,unitId:m.unitId,status:'pending',fingerprint,inspectedBy:actor.uid,inspectedAt:now()});
+     audit(tx,db,'v3.receipt_inspected',m.unitId,actor.uid,{requestId,productId});
+   });
+   return send(res,200,duplicate?'Conferência já enviada.':'Conferência enviada para aprovação. Estoque ainda não alterado.',{id:requestId,duplicate,status:'pending'});
+  }
+  if(action==='v3PendingReceipts'){
+   const a=await actorRef.get();if(!active(a,m.unitId,MANAGEMENT_ROLES))return send(res,403,'Aprovação reservada à gestão.');
+   const snap=await unit.collection('v3ReceiptInspections').where('status','==','pending').limit(101).get();
+   if(snap.size>100)return send(res,409,'Há mais de 100 conferências pendentes. Solicite paginação.');
+   return send(res,200,'Conferências pendentes.',{inspections:snap.docs.map(d=>({id:d.id,...d.data(),inspectedAt:d.data().inspectedAt?.toDate?.()?.toISOString?.()}))});
+  }
+  if(action==='v3RejectReceipt'){
+   const {inspectionId,reason}=req.body||{};
+   if(!reqOk(inspectionId)||typeof reason!=='string'||reason.trim().length<8||reason.length>240)return send(res,400,'Informe a conferência e a justificativa da rejeição.');
+   const ref=unit.collection('v3ReceiptInspections').doc(inspectionId);let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const [manager,old]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
+    if(!active(manager,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
+    if(!old.exists)throw Error('MISSING');
+    if(old.data().status==='rejected'){duplicate=true;return;}
+    if(old.data().status!=='pending')throw Error('CONFLICT');
+    const at=now();tx.update(ref,{status:'rejected',rejectedBy:actor.uid,rejectedAt:at,rejectionReason:reason.trim()});
+    audit(tx,db,'v3.receipt_rejected',m.unitId,actor.uid,{inspectionId,reason:reason.trim()});
+   });
+   return send(res,200,duplicate?'Conferência já rejeitada.':'Conferência rejeitada. Estoque não alterado.',{duplicate});
+  }
+  if(action==='v3ApproveReceipt'){
+   const inspectionId=req.body?.inspectionId;
+   if(!reqOk(inspectionId))return send(res,400,'Conferência inválida.');
+   const who=await actorRef.get();if(!active(who,m.unitId,MANAGEMENT_ROLES))return send(res,403,'Aprovação reservada à gestão.');
+   const inspectionRef=unit.collection('v3ReceiptInspections').doc(inspectionId),snapshot=await inspectionRef.get();
+   if(!snapshot.exists)return send(res,404,'Conferência não encontrada.');
+   const data=snapshot.data();
+   if(data.status==='approved')return send(res,200,'Conferência já aprovada.',{duplicate:true,id:inspectionId});
+   if(data.status!=='pending')return send(res,409,'Conferência não está pendente.');
+   // Mesmo identificador evita dupla entrada em aprovações concorrentes e reenvios.
+   const payload={requestId:inspectionId,productId:data.productId,commercialQuantity:data.commercialQuantity,
+    commercialUnit:data.commercialUnit,stockQuantity:data.stockQuantity,location:data.location,orderId:data.orderId,
+    lot:data.lot,expiryDate:data.expiryDate,supplier:data.supplier,notes:data.notes};
+   const previous=req.body;
+   req.body={...payload,action:'v3Receive',_approvedInspectionId:inspectionId};
+   try{await v3Ledger(req,res)}finally{req.body=previous}
+   return;
+  }
   if(action==='v3Receive'){
-   if(!['admin','manager'].includes(m.role))return send(res,403,'Somente gerência recebe mercadorias.');
+   if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerência recebe mercadorias.');
    const {requestId,productId,commercialQuantity,commercialUnit,stockQuantity,location='reserva',orderId=null,lot='',expiryDate='',supplier='',notes=''}=req.body||{};
    if(!reqOk(requestId)||!idOk(productId)||!locations.includes(location)||typeof lot!=='string'||typeof expiryDate!=='string'||!['kg','g','L','mL','un','porcao','pacote','duzia'].includes(commercialUnit)||
       !number(commercialQuantity,commercialUnit)||!number(stockQuantity,'kg',true)||!Number.isFinite(stockQuantity)||stockQuantity<0||
       orderId!==null&&!reqOk(orderId)||typeof supplier!=='string'||supplier.length>100||typeof notes!=='string'||notes.length>240)
       return send(res,400,'Recebimento incompleto.');
    const recordRef=unit.collection('v3Operations').doc(requestId),pr=products.doc(productId),profileRef=profiles.doc(productId),balRef=balances.doc(productId),orderRef=orderId?orders.doc(orderId):null;
+   const approvalRef=req.body?._approvedInspectionId===requestId?unit.collection('v3ReceiptInspections').doc(requestId):null;
+   // V3.1: recebimento direto não é permitido; crédito exige conferência pendente vinculada.
+   if(!approvalRef)return send(res,403,'Primeiro confira o recebimento e solicite a aprovação da gestão.');
    const fingerprint=hashed(JSON.stringify({productId,commercialQuantity,commercialUnit,stockQuantity,location,orderId,lot,expiryDate,supplier,notes}));
    let duplicate=false;
    await db.runTransaction(async tx=>{
-    const [authSnap,product,profile,balance,existing,order]=await Promise.all([
-     tx.get(actorRef),tx.get(pr),tx.get(profileRef),tx.get(balRef),tx.get(recordRef),orderRef?tx.get(orderRef):Promise.resolve(null)]);
-    if(!active(authSnap,m.unitId,['admin','manager']))throw Error('FORBIDDEN');
+    const [authSnap,product,profile,balance,existing,order,approval]=await Promise.all([
+     tx.get(actorRef),tx.get(pr),tx.get(profileRef),tx.get(balRef),tx.get(recordRef),orderRef?tx.get(orderRef):Promise.resolve(null),approvalRef?tx.get(approvalRef):Promise.resolve(null)]);
+    if(!active(authSnap,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
+    if(!approval?.exists||approval.data().status!=='pending'||approval.data().unitId!==m.unitId||approval.data().fingerprint!==fingerprint)throw Error('CONFLICT');
     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
     if(!product.exists||product.data().status!=='active'||!profile.exists)throw Error('MISSING');
     const cfg=profile.data(),isCounted=cfg.controlMode==='quantitative';
@@ -100,6 +243,7 @@ export default async function v3Ledger(req,res){
      const all=o.items.every(i=>(received[i.productId]||0)>=i.quantity);
      tx.update(orderRef,{received,status:all?'received':'partially_received',updatedAt:now()});
     }
+    if(approvalRef)tx.update(approvalRef,{status:'approved',approvedBy:actor.uid,approvedAt:now()});
     tx.create(recordRef,{kind:'receipt',actorUid:actor.uid,at:now(),unitId:m.unitId,productId,
      commercialQuantity,commercialUnit,stockQuantity: isCounted?stockQuantity:null,stockUnit:isCounted?cfg.countUnit:null,
      location,orderId,lot,expiryDate,supplier,notes,fingerprint});
@@ -114,7 +258,7 @@ export default async function v3Ledger(req,res){
    const pr=products.doc(productId),cfgRef=profiles.doc(productId),balanceRef=balances.doc(productId),ref=unit.collection('v3Operations').doc(requestId);
    await db.runTransaction(async tx=>{
     const [a,p,cfg,balance,record]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),tx.get(balanceRef),tx.get(ref)]);
-    if(!active(a,m.unitId,['admin','manager','cook','auxiliar']))throw Error('FORBIDDEN');
+    if(!active(a,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
     if(record.exists){const old=record.data();if(old.kind==='count'&&old.actorUid===actor.uid&&old.sessionId===sessionId&&old.productId===productId&&old.location===location&&old.quantity===quantity&&old.notes===notes)return;throw Error('CONFLICT');}
     if(!p.exists||!cfg.exists||cfg.data().controlMode!=='quantitative'||!cfg.data().locations.includes(location))throw Error('MISSING');
     const u=cfg.data().countUnit;if(!number(quantity,u,true))throw Error('QUANTITY');
@@ -126,7 +270,7 @@ export default async function v3Ledger(req,res){
     if(lotQuery){
      const lots=lotQuery.docs;
      if(lots.length===0&&quantity>0){
-      if(!['admin','manager'].includes(a.data().role)||!initialLot||typeof initialLot.lot!=='string'||!initialLot.lot.trim()||initialLot.lot.length>80||!isoDay(initialLot.expiryDate)||initialLot.expiryDate<today)throw Error('LOT');
+      if(!MANAGEMENT_ROLES.includes(a.data().role)||!initialLot||typeof initialLot.lot!=='string'||!initialLot.lot.trim()||initialLot.lot.length>80||!isoDay(initialLot.expiryDate)||initialLot.expiryDate<today)throw Error('LOT');
       const newRef=lotRoots.doc(productId).collection('lots').doc(hashed(initialLot.lot.trim()+'|'+initialLot.expiryDate));
       tx.create(newRef,{productId,lot:initialLot.lot.trim(),expiryDate:initialLot.expiryDate,unit:u,
        reserva:location==='reserva'?quantity:0,giro:location==='giro'?quantity:0,availableQuantity:quantity,
@@ -159,7 +303,7 @@ export default async function v3Ledger(req,res){
    const ref=unit.collection('v3Operations').doc(requestId),pr=products.doc(productId),cfgRef=profiles.doc(productId),balRef=balances.doc(productId);
    await db.runTransaction(async tx=>{
     const [a,p,cfg,b,existing]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),tx.get(balRef),tx.get(ref)]);
-    if(!active(a,m.unitId,['admin','manager','cook','auxiliar']))throw Error('FORBIDDEN');
+    if(!active(a,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
     if(existing.exists)throw Error('CONFLICT');
     if(!p.exists||!cfg.exists||!b.exists||cfg.data().controlMode!=='quantitative'||!cfg.data().locations.includes(from)||!cfg.data().locations.includes(to))throw Error('MISSING');
     const u=cfg.data().countUnit,prior=b.data();
@@ -196,7 +340,7 @@ export default async function v3Ledger(req,res){
     const snaps=await Promise.all([tx.get(actorRef),tx.get(recordRef),tx.get(outputRef),tx.get(outputProfileRef),tx.get(outputBalanceRef),
      ...sourceRefs.map(r=>tx.get(r)),...sourceProfiles.map(r=>tx.get(r)),...sourceBalances.map(r=>tx.get(r))]);
     const [a,existing,outProduct,outProfile,outBalance]=snaps;
-    if(!active(a,m.unitId,['admin','manager','cook']))throw Error('FORBIDDEN');
+    if(!active(a,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
     if(!outProduct.exists||outProduct.data().status!=='active'||!outProfile.exists||!['internal','both'].includes(outProfile.data().origin)||
       outProfile.data().controlMode!=='quantitative'||!outProfile.data().locations.includes(outputLocation))throw Error('MISSING');
@@ -214,7 +358,8 @@ export default async function v3Ledger(req,res){
      if(ocfg.alternativeProductIds?.includes(item.productId)){usesAlternative=true;continue;}
      throw Error('SOURCE');
     }
-    if(usesAlternative&&alternativeReason.trim().length<8)throw Error('ALTERNATIVE');
+    if(usesAlternative&&!MANAGEMENT_ROLES.includes(a.data().role))throw Error('ALTERNATIVE_APPROVAL');
+     if(usesAlternative&&alternativeReason.trim().length<8)throw Error('ALTERNATIVE');
     const outputLotRef=outProduct.data().trackExpiry?lotRoots.doc(outputProductId).collection('lots').doc(hashed(lot.trim()+'|'+expiryDate)):null;
     const inputLots=await Promise.all(inputs.map((i,index)=>sP[index].data().trackExpiry?
       tx.get(lotRoots.doc(i.productId).collection('lots').orderBy('expiryDate').limit(101)):Promise.resolve(null)));
@@ -262,7 +407,7 @@ export default async function v3Ledger(req,res){
    CONFLICT:[409,'Operação já registrada ou identificador repetido.'],UNIT:[409,'Unidades incompatíveis; revisão necessária.'],
    QUANTITY:[409,'Quantidade inválida ou saldo insuficiente.'],LOT:[409,'Lotes e validade precisam ser reconciliados.'],
    LOCATION:[409,'Local não permitido para este item.'],ORDER:[409,'Pedido não corresponde ao item recebido.'],
-   ORDER_UNIT:[409,'Unidade do pedido não corresponde à conferência.'],SOURCE:[409,'Matéria-prima não autorizada nesta preparação.'],ALTERNATIVE:[409,'Explique a substituição antes de produzir.']};
+   ORDER_UNIT:[409,'Unidade do pedido não corresponde à conferência.'],SOURCE:[409,'Matéria-prima não autorizada nesta preparação.'],ALTERNATIVE:[409,'Explique a substituição antes de produzir.'],ALTERNATIVE_APPROVAL:[403,'Uma substituição de matéria-prima exige autorização gerencial. Solicite à gestão que registre a produção.']};
   if(errors[e.message])return send(res,...errors[e.message]);
   console.error('V3 ledger:',e.message);return send(res,500,'Erro ao registrar operação V3.');
  }

@@ -19,10 +19,10 @@ export default async function handler(req,res){
   const db=getDb(),unit=db.collection('units').doc(m.unitId),items=unit.collection('muralItems'),action=req.body?.action;
   if(action==='list'){
    const docs=await items.limit(150).get();
-   const manager=['admin','manager'].includes(m.role);
+   const manager=['admin','manager','submanager'].includes(m.role);
    return send(res,200,'Mural consultado.',{items:docs.docs.filter(d=>manager||d.data().status==='published').map(serialize).sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'))});
   }
-  if(!['admin','manager'].includes(m.role))return send(res,403,'Sem permissão para administrar publicações.');
+  if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Sem permissão para administrar publicações.');
   if(action==='saveDraft'){
    const normalized=normalize(req.body?.item),id=req.body?.id,supersedesId=req.body?.supersedesId||null;
    if(!normalized||id&&!idOk(id)||supersedesId&&!idOk(supersedesId))return send(res,400,'Confira título, conteúdo, ingredientes, rendimento e alergênicos.');
@@ -30,7 +30,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const priorRef=supersedesId?items.doc(supersedesId):null;
     const [member,old,prior]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref),priorRef?tx.get(priorRef):Promise.resolve(null)]);
-    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager'].includes(member.data().role))throw Error('FORBIDDEN');
+    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
     if(old.exists&&old.data().status!=='draft')throw Error('LOCKED');
     if(supersedesId&&(!prior?.exists||prior.data().status!=='published'||prior.data().kind!==normalized.kind))throw Error('LOCKED');
     tx.set(ref,{...normalized,supersedesId:supersedesId||old.data()?.supersedesId||null,status:'draft',version:(old.data()?.version||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
@@ -40,16 +40,16 @@ export default async function handler(req,res){
   }
   if(action==='publish'){
    const id=req.body?.id;if(!idOk(id))return send(res,400,'Publicação inválida.');
-   if(m.role!=='admin')return send(res,403,'Somente administrador pode publicar.');
    const ref=items.doc(id),now=new Date();
    await db.runTransaction(async tx=>{
     const [member,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||member.data().role!=='admin')throw Error('FORBIDDEN');
+    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
     if(!old.exists||old.data().status!=='draft')throw Error('LOCKED');
     const priorRef=old.data().supersedesId?items.doc(old.data().supersedesId):null;
     const prior=priorRef?await tx.get(priorRef):null;
     if(priorRef&&(!prior?.exists||prior.data().status!=='published'))throw Error('LOCKED');
-    if(old.data().createdBy===actor.uid)throw Error('SELF_APPROVAL');
+    if(old.data().kind==='preparation'&&member.data().role!=='admin')throw Error('FORBIDDEN');
+    if(old.data().kind==='preparation'&&old.data().createdBy===actor.uid)throw Error('SELF_APPROVAL');
     if(priorRef)tx.update(priorRef,{status:'superseded',supersededAt:now,supersededBy:id});
     tx.update(ref,{status:'published',publishedAt:now,publishedBy:actor.uid,version:prior?prior.data().version+1:old.data().version});
     tx.create(db.collection('auditLogs').doc(),{event:'mural.published',unitId:m.unitId,actorUid:actor.uid,itemId:id,version:old.data().version,at:now});

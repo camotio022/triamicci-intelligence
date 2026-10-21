@@ -4,13 +4,13 @@ export default async function handler(req,res) {
   try {
     const actor = await authenticate(req);
     const member = await membership(actor.uid);
-    if (!member || !['admin','manager'].includes(member.role)) return send(res,403,'Sem permissão para convidar.');
+    if (!member || !['admin','manager','submanager'].includes(member.role)) return send(res,403,'Sem permissão para convidar.');
     const { unitId, role, deliveryMethod = 'email' } = req.body || {};
     if (!['email','link'].includes(deliveryMethod)) return send(res,400,'Modo de convite inválido.');
     const email = normalizeEmail(req.body?.email);
     if (!emailPattern.test(email) || email.length > 254 || !roles.includes(role) || unitId !== member.unitId)
       return send(res,400,'E-mail, função ou unidade inválidos.');
-    if (member.role === 'manager' && !['cook','auxiliar'].includes(role)) return send(res,403,'Gerente não pode atribuir essa função.');
+    if (['manager','submanager'].includes(member.role) && !['cook','auxiliar'].includes(role)) return send(res,403,'Gerente não pode atribuir essa função.');
     // Convites não podem alterar o cargo de quem já possui vínculo.
     if (email === normalizeEmail(actor.email) || email === normalizeEmail(member.email))
       return send(res,409,'Não é possível convidar a própria conta.');
