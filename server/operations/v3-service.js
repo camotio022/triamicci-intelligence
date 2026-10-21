@@ -5,6 +5,8 @@ import {validateOperationalProfile,reportShortage,transitionOrder} from './v3-ca
 const idOk=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
 const requestOk=x=>typeof x==='string'&&/^[a-f0-9-]{36}$/i.test(x);
 import {MANAGEMENT_ROLES,TEAM_ROLES} from '../permissions/v31-policy.js';
+import {redactFinancial} from '../permissions/v31-redaction.js';
+import {restaurantDay} from '../schedules/restaurant-today.js';
 const roles=MANAGEMENT_ROLES;
 const locations=['reserva','giro'];
 const unitNames=['kg','g','L','mL','un','porcao','pacote','duzia'];
@@ -41,9 +43,9 @@ export default async function kitchenV3(req,res){
    const pm=new Map(b.docs.map(obj).map(p=>[p.id,p]));
    const bm=new Map(e.docs.map(obj).map(p=>[p.id,p]));
    return send(res,200,'Painel operacional carregado.',{
-    products:a.docs.map(s=>({...obj(s),profile:pm.get(s.id)||null,v3Balance:bm.get(s.id)||null})).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
+    products:a.docs.map(s=>{const data={...obj(s),profile:pm.get(s.id)||null,v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
     signals:c.docs.map(obj).filter(s=>s.status!=='resolved'),
-    orders:d.docs.map(obj).filter(o=>o.status!=='cancelled').sort((x,y)=>(x.etaDate||'').localeCompare(y.etaDate||'')),
+    orders:d.docs.map(obj).filter(o=>o.status!=='cancelled').map(x=>roles.includes(member.role)?x:redactFinancial(x)).sort((x,y)=>(x.etaDate||'').localeCompare(y.etaDate||'')),
    });
   }
   if(action==='v3ProfileSave'){
