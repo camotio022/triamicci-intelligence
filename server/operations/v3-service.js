@@ -4,7 +4,8 @@ import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {validateOperationalProfile,reportShortage,transitionOrder} from './v3-catalog-policy.js';
 const idOk=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
 const requestOk=x=>typeof x==='string'&&/^[a-f0-9-]{36}$/i.test(x);
-const roles=['admin','manager'];
+import {MANAGEMENT_ROLES,TEAM_ROLES} from '../permissions/v31-policy.js';
+const roles=MANAGEMENT_ROLES;
 const locations=['reserva','giro'];
 const unitNames=['kg','g','L','mL','un','porcao','pacote','duzia'];
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
@@ -102,7 +103,7 @@ export default async function kitchenV3(req,res){
    const ref=issues.doc(createHash('sha256').update(productId+':'+location).digest('hex'));
    await db.runTransaction(async tx=>{
     const [actor,p,old]=await Promise.all([tx.get(actorRef),tx.get(productPath(unit,productId)),tx.get(ref)]);
-    if(!verify(actor,unitId,['admin','manager','cook','auxiliar']))throw Error('FORBIDDEN');
+    if(!verify(actor,unitId,TEAM_ROLES))throw Error('FORBIDDEN');
     if(!p.exists||p.data().status!=='active')throw Error('NOT_FOUND');
     const previous=old.data()||{},reports=Array.isArray(previous.reports)?previous.reports.slice(-19):[];
     if(previous.status!=='resolved'&&reports.some(r=>r.actorUid===user.uid&&r.observation===observation))throw Error('ALREADY_REPORTED');
