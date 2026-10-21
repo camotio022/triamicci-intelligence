@@ -136,11 +136,20 @@ export default async function v3Ledger(req,res){
    const fingerprint=hashed(JSON.stringify(payload));
    let duplicate=false;
    await db.runTransaction(async tx=>{
-     const [who,existing,product,profile]=await Promise.all([tx.get(actorRef),tx.get(inspection),tx.get(products.doc(productId)),tx.get(profiles.doc(productId))]);
+     const [who,existing,product,profile,linkedOrder]=await Promise.all([tx.get(actorRef),tx.get(inspection),tx.get(products.doc(productId)),tx.get(profiles.doc(productId)),orderId?tx.get(orders.doc(orderId)):Promise.resolve(null)]);
      if(!active(who,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
      if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().inspectedBy!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
      if(!product.exists||product.data().status!=='active'||!profile.exists)throw Error('MISSING');
      const cfg=profile.data();
+     if(!['supplier','both'].includes(cfg.origin))throw Error('RECEIPT_ORIGIN');
+     if(!orderId&&notes.trim().length<8)throw Error('RECEIPT_REASON');
+     if(orderId){
+      if(!linkedOrder?.exists||['cancelled','received'].includes(linkedOrder.data().status))throw Error('ORDER');
+      const line=(linkedOrder.data().items||[]).find(i=>i.productId===productId);
+      if(!line||line.unit!==commercialUnit)throw Error('ORDER_UNIT');
+      const remaining=Math.max(0,line.quantity-(linkedOrder.data().received?.[productId]||0));
+      if(commercialQuantity>remaining&&notes.trim().length<8)throw Error('RECEIPT_REASON');
+     }
      if(cfg.controlMode==='quantitative'&&!number(stockQuantity,cfg.countUnit))throw Error('QUANTITY');
      if(cfg.controlMode!=='quantitative'&&stockQuantity!==0)throw Error('QUANTITY');
      if(cfg.controlMode==='quantitative'&&!cfg.locations.includes(location))throw Error('LOCATION');
@@ -210,6 +219,8 @@ export default async function v3Ledger(req,res){
     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
     if(!product.exists||product.data().status!=='active'||!profile.exists)throw Error('MISSING');
     const cfg=profile.data(),isCounted=cfg.controlMode==='quantitative';
+    if(!['supplier','both'].includes(cfg.origin))throw Error('RECEIPT_ORIGIN');
+    if(!orderRef&&notes.trim().length<8)throw Error('RECEIPT_REASON');
     if(isCounted&&!number(stockQuantity,cfg.countUnit))throw Error('QUANTITY');
     if(!isCounted&&stockQuantity!==0)throw Error('QUANTITY');
     if(isCounted&&!cfg.locations.includes(location))throw Error('LOCATION');
@@ -238,6 +249,7 @@ export default async function v3Ledger(req,res){
      const o=order.data(),received={...(o.received||{})};
      const previous=received[productId]||0;
      const expected=o.items.find(x=>x.productId===productId);
+     if(commercialQuantity>Math.max(0,expected.quantity-previous)&&notes.trim().length<8)throw Error('RECEIPT_REASON');
      if(expected.unit!==commercialUnit)throw Error('ORDER_UNIT');
      received[productId]=round(previous+commercialQuantity);
      const all=o.items.every(i=>(received[i.productId]||0)>=i.quantity);
