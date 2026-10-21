@@ -22,5 +22,7 @@ jobs:
         run: node --test tests/production-logic.test.mjs tests/physical-operations.test.mjs tests/daily-inventory.test.js
       - name: Sintaxe da API V3 e dos motores
         run: node --check server/operations/v3-service.js && node --check server/operations/v3-ledger.js && node --check server/operations/v3-catalog-policy.js
+      - name: Contrato V3.1 de data e permissões
+        run: node --test tests/v31-tempo-permissoes.test.mjs
       - name: Build
         run: npm run build
