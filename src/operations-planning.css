@@ -53,3 +53,28 @@
 .ti-calendar-day.ti-calendar-today::after{content:"HOJE";font-size:.64rem;font-weight:800;color:#3278b6;display:block}
 .ti-schedule-matrix-table [aria-current="date"]{box-shadow:inset 2px 0 #3278b6,inset -2px 0 #3278b6;outline-offset:-1px}
 .ti-calendar-day:focus-visible{outline:3px solid #3278b6;outline-offset:2px}
+
+/* Mural de consulta: síntese legível, sem formulários ou catálogo de preparações. */
+.ti-mural-home{max-width:1320px}
+.ti-mural-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+.ti-mural-header h1{margin:5px 0 7px}
+.ti-mural-header p{margin:0;font-size:14px;color:#667085;line-height:1.5}
+.ti-mural-refresh{border:1px solid #ded6d6;background:#fff;color:#8b211c;border-radius:11px;padding:10px 14px;min-height:44px;cursor:pointer;font-weight:700}
+.ti-mural-home-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(260px,.8fr);gap:16px;align-items:start}
+.ti-mural-home .ti-mural-card{padding:20px;border-radius:17px}
+.ti-mural-section-header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}
+.ti-mural-section-header h2{font-size:18px;margin:0 0 5px}
+.ti-mural-section-header p{margin:0}
+.ti-mural-period-list{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+.ti-mural-home .ti-mural-period{min-height:42px;padding:9px 12px;border:1px solid #e1d7d7;background:#fff;border-radius:11px;color:#78241e;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;text-transform:capitalize}
+.ti-mural-home .ti-mural-period.active{background:#fff3f1;border-color:#ae211b;box-shadow:inset 0 0 0 1px #ae211b}
+.ti-mural-period small{color:#8d302a;font-size:10px}
+.ti-mural-notice-list{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.ti-mural-notice-list li{background:#fafbfc;border:1px solid #e7e9ef;padding:15px;border-radius:12px;overflow-wrap:anywhere}
+.ti-mural-notice-list strong{font-size:14px;color:#273044;line-height:1.4}
+.ti-mural-notice-list p{white-space:pre-wrap;margin:7px 0 0;font-size:13px;line-height:1.65;color:#586377}
+.ti-mural-count{display:grid;place-items:center;border-radius:100px;background:#f7edeb;color:#892521;font-size:12px;font-weight:800;min-width:28px;height:28px}
+.ti-mural-empty{padding:16px;border:1px dashed #d6dce5;background:#fafbfc;border-radius:12px}
+.ti-mural-home :is(button):focus-visible{outline:2px solid #a71916;outline-offset:3px}
+@media(max-width:980px){.ti-mural-home-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:580px){.ti-mural-header{align-items:stretch;flex-direction:column}.ti-mural-refresh{align-self:flex-start}.ti-mural-home .ti-mural-card{padding:14px}.ti-mural-home .ti-mural-period{flex:1 1 auto;justify-content:center}}
