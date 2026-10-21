@@ -6,3 +6,8 @@
 .ti-roster-today-summary p{margin:4px 0 0;line-height:1.5;overflow-wrap:anywhere}
 .ti-roster-day-today{outline:2px solid #3278b6;outline-offset:-2px;background:rgba(50,120,182,.07)}
 .ti-roster-day-today h4::after{content:" · HOJE";color:#3278b6;font-weight:800;font-size:.75rem}
+
+.ti-roster-today-people{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));list-style:none;gap:8px;margin:10px 0 0;padding:0}
+.ti-roster-today-people li{display:flex;flex-direction:column;gap:4px;padding:11px 12px;border:1px solid #dbe2ed;border-radius:10px;background:var(--surface,#fff);min-width:0}
+.ti-roster-today-people li strong{font-size:13px;color:#263247}
+.ti-roster-today-people li span{font-size:12px;color:#667085;opacity:1}
