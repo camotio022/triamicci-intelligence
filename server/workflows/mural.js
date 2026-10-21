@@ -40,16 +40,16 @@ export default async function handler(req,res){
   }
   if(action==='publish'){
    const id=req.body?.id;if(!idOk(id))return send(res,400,'Publicação inválida.');
-   if(m.role!=='admin')return send(res,403,'Somente administrador pode publicar.');
    const ref=items.doc(id),now=new Date();
    await db.runTransaction(async tx=>{
     const [member,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||member.data().role!=='admin')throw Error('FORBIDDEN');
+    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
     if(!old.exists||old.data().status!=='draft')throw Error('LOCKED');
     const priorRef=old.data().supersedesId?items.doc(old.data().supersedesId):null;
     const prior=priorRef?await tx.get(priorRef):null;
     if(priorRef&&(!prior?.exists||prior.data().status!=='published'))throw Error('LOCKED');
-    if(old.data().createdBy===actor.uid)throw Error('SELF_APPROVAL');
+    if(old.data().kind==='preparation'&&member.data().role!=='admin')throw Error('FORBIDDEN');
+    if(old.data().kind==='preparation'&&old.data().createdBy===actor.uid)throw Error('SELF_APPROVAL');
     if(priorRef)tx.update(priorRef,{status:'superseded',supersededAt:now,supersededBy:id});
     tx.update(ref,{status:'published',publishedAt:now,publishedBy:actor.uid,version:prior?prior.data().version+1:old.data().version});
     tx.create(db.collection('auditLogs').doc(),{event:'mural.published',unitId:m.unitId,actorUid:actor.uid,itemId:id,version:old.data().version,at:now});
