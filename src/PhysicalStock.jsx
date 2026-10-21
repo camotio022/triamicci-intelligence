@@ -25,6 +25,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
  const [lots,setLots]=useState([]);
  const [more,setMore]=useState({receipts:false,counts:false,outflows:false,transfers:false}),[loadingMore,setLoadingMore]=useState(false);
  const canReceive=['admin','manager','submanager'].includes(membership.role);
+ if(mode==='count'&&!canReceive)return <section className="ti-premium-card"><h2>Contagem oficial</h2><p>A contagem física que altera saldos é restrita à gestão. Comunique divergências pela Central de Insumos V3.</p></section>;
  const load=useCallback(async()=>{
   try{
    const [p,h,c]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list'),api('/api/catalog/manage','list')]);
