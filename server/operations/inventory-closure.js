@@ -20,7 +20,7 @@ export default async function inventoryClosure(req,res) {
   if(!['closeSubmit','closeApprove','closeReject','closeList'].includes(action))throw Error('INVALID');
   const db=getDb(),unit=db.collection('units').doc(membershipData.unitId);
   if(action==='closeList'){
-   if(!['admin','manager'].includes(membershipData.role))throw Error('FORBIDDEN');
+   if(!['admin','manager','submanager'].includes(membershipData.role))throw Error('FORBIDDEN');
    const before=req.body?.before;
    if(before!==undefined&&(typeof before!=='string'||!Number.isFinite(Date.parse(before))))throw Error('INVALID');
    let query=unit.collection('inventoryClosures').orderBy('submittedAt','desc');
@@ -73,7 +73,7 @@ export default async function inventoryClosure(req,res) {
     result={id:ref.id,status:'pending',duplicate:false};
    });
   } else {
-   if(!['admin','manager'].includes(membershipData.role))throw Error('FORBIDDEN');
+   if(!['admin','manager','submanager'].includes(membershipData.role))throw Error('FORBIDDEN');
    // O identificador de uma contagem determina a data e impede aprovar um fechamento de outro produto.
    const count=await countRef.get();
    if(!count.exists||count.data().productId!==productId)throw Error('NOT_FOUND');
@@ -83,7 +83,7 @@ export default async function inventoryClosure(req,res) {
    await db.runTransaction(async tx=>{
     const [actorSnap,snap,b]=await Promise.all([tx.get(actorRef),tx.get(ref),tx.get(balanceRef)]);
     const a=actorSnap.data();
-    if(a?.status!=='active'||a.unitId!==membershipData.unitId||!['admin','manager'].includes(a.role))throw Error('FORBIDDEN');
+    if(a?.status!=='active'||a.unitId!==membershipData.unitId||!['admin','manager','submanager'].includes(a.role))throw Error('FORBIDDEN');
     if(!snap.exists||snap.data().countId!==requestId)throw Error('NOT_FOUND');
     const current=snap.data();
     const next=action==='closeApprove'?'approved':'rejected';
