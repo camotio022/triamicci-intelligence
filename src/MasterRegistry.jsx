@@ -59,7 +59,7 @@ export default function MasterRegistry(){
    </article>)}
   </div>
   {data?.registry?.length>0&&filteredRegistry.length===0&&<p>Nenhum colaborador encontrado com os filtros selecionados.</p>}
-  {editing&&<form onSubmit={saveEdit} className="ti-master-editor">
+  {editing&&<div className="ti-unified-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setEditing(null)}}><div className="ti-unified-modal" role="dialog" aria-modal="true" aria-label="Editar ficha do Cadastro Mestre"><div className="ti-unified-modal-top"><strong>Editar ficha do Cadastro Mestre</strong><button type="button" aria-label="Fechar janela" onClick={()=>setEditing(null)}>×</button></div><form onSubmit={saveEdit} className="ti-master-editor">
    <h3>Editar ficha · {data.registry.find(p=>p.id===editing)?.name}</h3>
    <label>Cargo <input required maxLength={80} value={form.jobTitle} onChange={e=>setForm(old=>({...old,jobTitle:e.target.value}))}/></label>
    <label>Setor <select value={form.sector} onChange={e=>setForm(old=>({...old,sector:e.target.value,skills:[],certifications:[]}))}>{[['cozinha','Cozinha'],['frente','Frente'],['caixa','Caixa'],['apoio','Apoio'],['gestao','Gestão']].map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
@@ -71,7 +71,7 @@ export default function MasterRegistry(){
    <p>Não altera a conta de acesso nem as escalas já publicadas.</p>
    <button type="submit" className="ti-master-primary" disabled={busy}>Salvar ficha</button>
    <button type="button" onClick={()=>setEditing(null)}>Cancelar</button>
-  </form>}
+  </form></div></div>}
   <p>Para pessoas com conta existente, compartilhe o código da ficha mostrado na prévia. O colaborador solicita o vínculo em Minha ficha; a gerência verifica a identidade e confirma aqui.</p>
   <p>Colaboradores com correspondência ficam bloqueados para importação até conferirmos identidade e vínculo. Daniel e Geraldo não participam desta importação.</p>
   {selectable.length>0&&<button type="button" className="ti-master-primary" onClick={importSelected} disabled={busy||selected.length===0}>Criar {selected.length} ficha(s) selecionada(s)</button>}
