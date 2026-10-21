@@ -5,7 +5,7 @@ service cloud.firestore {
     function membership() { return get(/databases/$(database)/documents/memberships/$(request.auth.uid)); }
     function active() { return signedIn() && exists(/databases/$(database)/documents/memberships/$(request.auth.uid)) && membership().data.status == 'active'; }
     function sameUnit(unitId) { return active() && membership().data.unitId == unitId; }
-    function manager(unitId) { return sameUnit(unitId) && membership().data.role in ['admin', 'manager']; }
+    function manager(unitId) { return sameUnit(unitId) && membership().data.role in ['admin', 'manager', 'submanager']; }
     match /memberships/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow write: if false; // Somente backend privilegiado (Admin SDK)
