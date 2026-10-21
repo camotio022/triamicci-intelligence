@@ -4,7 +4,7 @@ import {spawn} from 'node:child_process';
 import {chromium} from 'playwright';
 
 test('V3.1: layouts reais cabem em telas mobile sem overflow', {timeout:100000}, async()=>{
- const server=spawn('npm',['run','dev','--','--host','127.0.0.1','--port','4178','--strictPort'],{stdio:'pipe'});
+ const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4178','--strictPort'],{stdio:'pipe'});
  let output='';server.stdout.on('data',c=>output+=c.toString());server.stderr.on('data',c=>output+=c.toString());
  let browser;
  try{
@@ -19,7 +19,7 @@ test('V3.1: layouts reais cabem em telas mobile sem overflow', {timeout:100000},
   for(const width of [320,375,430,768,1280]){
    const page=await browser.newPage({viewport:{width,height:900},deviceScaleFactor:1});
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.goto('http://127.0.0.1:4178/qa/v31-mobile.html',{waitUntil:'networkidle'});
+   await page.goto('http://127.0.0.1:4178/qa/v31-mobile.html',{waitUntil:'domcontentloaded'});
    await page.getByText('Escala de folgas').waitFor();
    await page.getByRole('button',{name:'Enviar conferência'}).waitFor();
    await page.getByText('Perdas, avarias e vencimentos').waitFor();
