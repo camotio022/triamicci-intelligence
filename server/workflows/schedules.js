@@ -14,18 +14,18 @@ export default async function handler(req,res){
   const config=await unit.collection('configuration').doc('staffRegistry').get();const masterActive=config.data()?.active===true;
   const action=req.body?.action;
   if(action==='fixedOffList'){
-   if(!['admin','manager'].includes(m.role))return send(res,403,'Apenas a gerência consulta o planejamento de folgas.');
+   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Apenas a gerência consulta o planejamento de folgas.');
    const snap=await unit.collection('fixedOffDays').limit(200).get();
    return send(res,200,'Folgas habituais carregadas.',{fixedOffDays:Object.fromEntries(snap.docs.map(d=>[d.id,d.data().weekday]))});
   }
   if(action==='fixedOffSet'){
-   if(!['admin','manager'].includes(m.role))return send(res,403,'Apenas a gerência altera folgas habituais.');
+   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Apenas a gerência altera folgas habituais.');
    const {uid,weekday}=req.body||{};
    if(!idOk(uid)||!Number.isInteger(weekday)||weekday<1||weekday>4)return send(res,400,'Selecione um dia entre segunda e quinta.');
    const ref=unit.collection('fixedOffDays').doc(uid),now=new Date();
    await db.runTransaction(async tx=>{
     const [actorSnap,target,prior]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(db.doc('memberships/'+uid)),tx.get(ref)]);
-    if(!actorSnap.exists||actorSnap.data().status!=='active'||actorSnap.data().unitId!==m.unitId||!['admin','manager'].includes(actorSnap.data().role))throw Error('FORBIDDEN');
+    if(!actorSnap.exists||actorSnap.data().status!=='active'||actorSnap.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(actorSnap.data().role))throw Error('FORBIDDEN');
     if(!target.exists||target.data().unitId!==m.unitId||target.data().status!=='active')throw Error('FORBIDDEN');
     tx.set(ref,{weekday,unitId:m.unitId,updatedAt:now,updatedBy:actor.uid});
     tx.create(db.collection('auditLogs').doc(),{event:'schedule.fixed_off_changed',unitId:m.unitId,actorUid:actor.uid,targetUid:uid,previousWeekday:prior.exists?prior.data().weekday:null,weekday,at:now});
@@ -34,7 +34,7 @@ export default async function handler(req,res){
   }
   if(action==='list'){
    const snap=await schedules.limit(120).get();
-   const manager=['admin','manager'].includes(m.role);
+   const manager=['admin','manager','submanager'].includes(m.role);
    const records=snap.docs.filter(x=>manager||x.data().status==='published').map(clean).sort((a,b)=>String(b.period).localeCompare(String(a.period)));
    const assigned=[...new Set(records.flatMap(r=>(r.entries||[]).map(e=>e.uid)))].slice(0,200);
    const memberships=assigned.length?await db.getAll(...assigned.map(uid=>db.collection('memberships').doc(uid))):[];
@@ -68,17 +68,17 @@ export default async function handler(req,res){
    return send(res,201,'Solicitação enviada. A folga depende de aprovação.',{id:ref.id});
   }
   if(action==='leaveList'){
-   const manager=['admin','manager'].includes(m.role),snap=await unit.collection('leaveRequests').orderBy('createdAt','desc').limit(100).get();
+   const manager=['admin','manager','submanager'].includes(m.role),snap=await unit.collection('leaveRequests').orderBy('createdAt','desc').limit(100).get();
    return send(res,200,'Solicitações carregadas.',{requests:snap.docs.filter(d=>manager||d.data().uid===actor.uid).map(d=>({id:d.id,...d.data(),createdAt:iso(d.data().createdAt),decidedAt:iso(d.data().decidedAt)}))});
   }
   if(action==='leaveDecision'){
-   if(!['admin','manager'].includes(m.role))return send(res,403,'Somente gerência decide solicitações.');
+   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Somente gerência decide solicitações.');
    const {id,decision,note}=req.body||{};
    if(!idOk(id)||!['approved','rejected'].includes(decision)||typeof note!=='string'||note.trim().length<8||note.length>400)return send(res,400,'Decisão e justificativa obrigatórias.');
    const ref=unit.collection('leaveRequests').doc(id),now=new Date();
    await db.runTransaction(async tx=>{
     const [current,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!current.exists||current.data().status!=='active'||current.data().unitId!==m.unitId||!['admin','manager'].includes(current.data().role))throw Error('FORBIDDEN');
+    if(!current.exists||current.data().status!=='active'||current.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(current.data().role))throw Error('FORBIDDEN');
     if(!old.exists||old.data().status!=='pending'||old.data().uid===actor.uid)throw Error('CONFLICT');
     tx.update(ref,{status:decision,note:note.trim(),decidedAt:now,decidedBy:actor.uid});
     tx.create(unit.collection('memberNotifications').doc(old.data().uid).collection('items').doc(),{title:'Solicitação de folga analisada',message:old.data().date+' · '+(decision==='approved'?'Aprovada':'Recusada')+'. Consulte a escala oficial para confirmar a programação.',recipientUid:old.data().uid,unitId:m.unitId,actorUid:actor.uid,at:now,read:false});
@@ -86,7 +86,7 @@ export default async function handler(req,res){
    });
    return send(res,200,'Decisão registrada. A escala oficial precisa ser atualizada e publicada separadamente.');
   }
-  if(!['admin','manager'].includes(m.role))return send(res,403,'Somente gerência pode administrar escalas.');
+  if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Somente gerência pode administrar escalas.');
   if(action==='saveDraft'){
    const {period,entries,title,id}=req.body||{};
    if(!yyyyMm(period)||!Array.isArray(entries)||entries.length>1000||typeof title!=='string'||title.trim().length<3||title.length>100||id&&!idOk(id))
@@ -102,7 +102,7 @@ export default async function handler(req,res){
    const now=new Date();
    await db.runTransaction(async tx=>{
     const [actorSnap,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!actorSnap.exists||actorSnap.data().unitId!==m.unitId||actorSnap.data().status!=='active'||!['admin','manager'].includes(actorSnap.data().role))throw Error('FORBIDDEN');
+    if(!actorSnap.exists||actorSnap.data().unitId!==m.unitId||actorSnap.data().status!=='active'||!['admin','manager','submanager'].includes(actorSnap.data().role))throw Error('FORBIDDEN');
     if(old.exists&&old.data().status!=='draft')throw Error('LOCKED');
     tx.set(ref,{title:title.trim(),period,entries:entries.map(e=>({date:e.date,uid:e.uid,type:e.type})),status:'draft',revision:(old.data()?.revision||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
     tx.create(db.collection('auditLogs').doc(),{event:'schedule.draft_saved',unitId:m.unitId,actorUid:actor.uid,scheduleId:ref.id,at:now});
@@ -134,7 +134,7 @@ export default async function handler(req,res){
     const previousId=action==='publish'?lock?.data()?.activeId:null;
     const previousRef=previousId&&previousId!==id?schedules.doc(previousId):null;
     const previous=previousRef?await tx.get(previousRef):null;
-    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager'].includes(member.data().role))throw Error('FORBIDDEN');
+    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
     if(['approve','publish'].includes(action)&&member.data().role!=='admin')throw Error('FORBIDDEN');
     const expected={submit:'draft',approve:'in_review',publish:'approved'}[action];
     if(!current.exists||current.data().status!==expected||current.data().revision!==snap.data().revision)throw Error('CONFLICT');
