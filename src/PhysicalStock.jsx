@@ -25,7 +25,6 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
  const [lots,setLots]=useState([]);
  const [more,setMore]=useState({receipts:false,counts:false,outflows:false,transfers:false}),[loadingMore,setLoadingMore]=useState(false);
  const canReceive=['admin','manager','submanager'].includes(membership.role);
- if(mode==='count'&&!canReceive)return <section className="ti-premium-card"><h2>Contagem oficial</h2><p>A contagem física que altera saldos é restrita à gestão. Comunique divergências pela Central de Insumos V3.</p></section>;
  const load=useCallback(async()=>{
   try{
    const [p,h,c]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list'),api('/api/catalog/manage','list')]);
@@ -98,6 +97,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   ...history.transfers.map(x=>({...x,kind:'transfer'})),...history.productions.map(x=>({...x,kind:'production'}))
  ].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)):mode==='receive'?history.receipts:history.counts)
  .filter(x=>!initialProductId||x.productId===initialProductId||x.kind==='production'&&x.items?.some(i=>i.productId===initialProductId));
+ if(mode==='count'&&!canReceive)return <section className="ti-premium-card"><h2>Contagem oficial</h2><p>A contagem física que altera saldos é restrita à gestão. Comunique divergências pela Central de Insumos V3.</p></section>;
  return <section className="receiving-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId}</p>
   <h1>{mode==='history'?'Histórico da operação':mode==='receive'?'Recebimento de mercadorias':'Contagem diária — reserva e giro'}</h1>
