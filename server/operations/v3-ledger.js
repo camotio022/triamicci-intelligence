@@ -215,7 +215,8 @@ export default async function v3Ledger(req,res){
      if(ocfg.alternativeProductIds?.includes(item.productId)){usesAlternative=true;continue;}
      throw Error('SOURCE');
     }
-    if(usesAlternative&&alternativeReason.trim().length<8)throw Error('ALTERNATIVE');
+    if(usesAlternative&&!MANAGEMENT_ROLES.includes(a.data().role))throw Error('ALTERNATIVE_APPROVAL');
+     if(usesAlternative&&alternativeReason.trim().length<8)throw Error('ALTERNATIVE');
     const outputLotRef=outProduct.data().trackExpiry?lotRoots.doc(outputProductId).collection('lots').doc(hashed(lot.trim()+'|'+expiryDate)):null;
     const inputLots=await Promise.all(inputs.map((i,index)=>sP[index].data().trackExpiry?
       tx.get(lotRoots.doc(i.productId).collection('lots').orderBy('expiryDate').limit(101)):Promise.resolve(null)));
@@ -263,7 +264,7 @@ export default async function v3Ledger(req,res){
    CONFLICT:[409,'Operação já registrada ou identificador repetido.'],UNIT:[409,'Unidades incompatíveis; revisão necessária.'],
    QUANTITY:[409,'Quantidade inválida ou saldo insuficiente.'],LOT:[409,'Lotes e validade precisam ser reconciliados.'],
    LOCATION:[409,'Local não permitido para este item.'],ORDER:[409,'Pedido não corresponde ao item recebido.'],
-   ORDER_UNIT:[409,'Unidade do pedido não corresponde à conferência.'],SOURCE:[409,'Matéria-prima não autorizada nesta preparação.'],ALTERNATIVE:[409,'Explique a substituição antes de produzir.']};
+   ORDER_UNIT:[409,'Unidade do pedido não corresponde à conferência.'],SOURCE:[409,'Matéria-prima não autorizada nesta preparação.'],ALTERNATIVE:[409,'Explique a substituição antes de produzir.'],ALTERNATIVE_APPROVAL:[403,'Uma substituição de matéria-prima exige autorização gerencial. Solicite à gestão que registre a produção.']};
   if(errors[e.message])return send(res,...errors[e.message]);
   console.error('V3 ledger:',e.message);return send(res,500,'Erro ao registrar operação V3.');
  }
