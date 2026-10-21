@@ -35,7 +35,7 @@ export default function TeamTodayV31(){
    const presenceStatus=attendance?.status;
    const confirmed=presenceStatus==='working'&&attendance?.lastAction==='break_end'?'Retornou do intervalo':({working:'Em serviço',on_break:'Em intervalo',finished:'Turno encerrado',absent:'Ausência confirmada'})[presenceStatus];
    const hours=typeof profile?.shift==='string'&&profile.shift.trim()?profile.shift.trim():null;
-   const windowMatch=hours?.match(/(?:^|\\s)([01]\\d|2[0-3]):[0-5]\\d/);
+   const windowMatch=hours?.match(/(?:^|\s)([01]\d|2[0-3]):[0-5]\d/);
    const startTime=windowMatch?.[0]?.trim()||null;
    const status=confirmed|| (x.operationalStatus==='day_off'?'Folga prevista':x.operationalStatus==='absence_recorded'?'Ausência na escala':x.operationalStatus==='not_scheduled'?'Sem lançamento na escala':startTime&&clock<startTime?'Entrada prevista às '+startTime:'Escalado · presença não confirmada');
    const timeLabel=hours?(x.operationalStatus==='not_scheduled'?'Jornada habitual: ':'Horário: ')+hours:'Horário não informado';
