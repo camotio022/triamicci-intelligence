@@ -30,7 +30,7 @@ export default async function attendanceWorkflow(req,res){
   if(action==='correct'){
    if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerência pode corrigir registros.');
    const {targetUid,workDay,status,reason,requestId}=req.body||{};
-   if(typeof targetUid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(targetUid)||typeof workDay!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(workDay)||!['working','on_break','finished','absent'].includes(status)||typeof reason!=='string'||reason.trim().length<8||reason.length>240||typeof requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(requestId))return send(res,400,'Informe colaborador, data, situação e justificativa válida.');
+   if(typeof targetUid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(targetUid)||typeof workDay!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(workDay)||!Number.isFinite(Date.parse(workDay+'T12:00:00Z'))||new Date(workDay+'T12:00:00Z').toISOString().slice(0,10)!==workDay||workDay>day||!['working','on_break','finished','absent'].includes(status)||typeof reason!=='string'||reason.trim().length<8||reason.length>240||typeof requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(requestId))return send(res,400,'Informe colaborador, data, situação e justificativa válida.');
    const target=attendance.doc(workDay+'_'+targetUid),account=db.doc('memberships/'+targetUid);
    let duplicate=false;
    await db.runTransaction(async tx=>{
@@ -38,7 +38,7 @@ export default async function attendanceWorkflow(req,res){
     if(!manager.exists||manager.data().status!=='active'||manager.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(manager.data().role))throw Error('FORBIDDEN');
     if(!employee.exists||employee.data().status!=='active'||employee.data().unitId!==m.unitId)throw Error('FORBIDDEN');
     const old=prior.data()||{events:[],status:'not_started'};
-    const seen=old.events.find(e=>e.requestId===requestId);
+    const seen=(old.events||[]).find(e=>e.requestId===requestId);
     if(seen){if(seen.action!=='correct'||seen.status!==status)throw Error('CONFLICT');duplicate=true;return;}
     const at=new Date(),event={action:'correct',status,requestId,at,by:user.uid};
     tx.set(target,{uid:targetUid,unitId:m.unitId,day:workDay,status,events:[...old.events,event],updatedAt:at,lastCorrection:{by:user.uid,at,reason:reason.trim()}},{merge:true});
