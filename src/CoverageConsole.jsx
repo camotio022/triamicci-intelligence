@@ -17,7 +17,7 @@ export default function CoverageConsole({membership}){
  const plan=useMemo(()=>data?.plans.find(p=>p.id===planId),[data,planId]);
  const run=async(fn)=>{setBusy(true);setError('');setNotice('');try{const d=await fn();setNotice(d.message);await load();return d}catch(e){setError(e.message)}finally{setBusy(false)}};
  const simulate=async()=>{setBusy(true);setError('');try{const d=await request('simulate',{planId,date,sector,requiredSkill,required:Number(required),windowStart,windowEnd});setSimulation(d.simulation)}catch(e){setError(e.message)}finally{setBusy(false)}};
- if(!['admin','manager'].includes(membership.role))return <p>Somente a gerência consulta esta área.</p>;
+ if(!['admin','manager','submanager'].includes(membership.role))return <p>Somente a gerência consulta esta área.</p>;
  return <section className="ti-coverage">
  <div className="ti-cov-intro"><h2>Cobertura e dobras</h2><p>Simule reforços com habilidades confirmadas e controle o pagamento praticado. Nenhuma recomendação libera horas extras automaticamente.</p></div>
  {error&&<p role="alert" className="team-error">{error}</p>}{notice&&<p role="status" className="team-notice">{notice}</p>}
