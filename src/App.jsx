@@ -87,7 +87,7 @@ function Workspace({ user, membership, logout }) {
       <button data-mentor="mentor-inventory" type="button" className={page==="inventory" ? "nav-item active" : "nav-item"} onClick={() => navigate("inventory")}><Package size={18}/> Estoque</button>
       <button type="button" className={page==="kitchen-v3"?"nav-item active":"nav-item"} onClick={()=>navigate("kitchen-v3")}><Boxes size={18}/> Central de insumos V3</button>
       <button type="button" className={page === "production" ? "nav-item active" : "nav-item"} onClick={() => navigate("production")}><Boxes size={18}/> Produção</button>
-      <button type="button" className={page === "count" ? "nav-item active" : "nav-item"} onClick={() => navigate("count")}><Boxes size={18}/> Contagem diária</button>
+      {isManagement(membership.role)&&<button type="button" className={page === "count" ? "nav-item active" : "nav-item"} onClick={() => navigate("count")}><Boxes size={18}/> Contagem oficial</button>}
       <button type="button" className={page === "daily-inventory" ? "nav-item active" : "nav-item"} onClick={() => navigate("daily-inventory")}><Boxes size={18}/> Inventário inteligente</button>
       <button data-mentor="mentor-history" type="button" className={page==="history"?"nav-item active":"nav-item"} onClick={()=>navigate("history")}><Clock3 size={18}/> Histórico</button>
       {isManagement(membership.role)&&<p className="ti-nav-group-label">ADMINISTRAÇÃO</p>}
