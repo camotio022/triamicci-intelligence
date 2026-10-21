@@ -3,7 +3,7 @@ async function api(action,extra={}){const token=await auth.currentUser?.getIdTok
 const statuses={pending:'Pendente',approved:'Aprovada',rejected:'Recusada'};
 export default function LeaveRequests({membership}){
  const [requests,setRequests]=useState([]),[date,setDate]=useState(''),[reason,setReason]=useState(''),[notes,setNotes]=useState({}),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[notice,setNotice]=useState('');
- const manager=['admin','manager'].includes(membership.role);
+ const manager=['admin','manager','submanager'].includes(membership.role);
  const load=useCallback(async()=>{setLoading(true);try{const d=await api('leaveList');setRequests(d.requests||[])}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useEffect(()=>{load()},[load]);
  const submit=async e=>{e.preventDefault();setBusy(true);setError('');try{const d=await api('leaveRequest',{date,reason});setNotice(d.message);setReason('');setDate('');await load()}catch(e){setError(e.message)}finally{setBusy(false)}};
