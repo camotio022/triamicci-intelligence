@@ -10,3 +10,11 @@
 .ti-team-today-grid article{padding:12px;display:flex;flex-direction:column;gap:4px;border-radius:10px;background:var(--surface-secondary,#f1f3f6)}
 .ti-team-today-grid article span{font-size:.84rem;opacity:.8}
 @media(max-width:480px){.ti-team-today{padding:12px}.ti-team-today button{width:100%}}
+
+.ti-team-correction{border-top:1px solid var(--border-color,#d7dce2);padding-top:12px;margin-top:18px}
+.ti-team-correction summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+.ti-team-correction form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px}
+.ti-team-correction label{display:flex;flex-direction:column;font-weight:600;font-size:.88rem;gap:5px}
+.ti-team-correction input,.ti-team-correction select,.ti-team-correction textarea{min-height:44px;width:100%;max-width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border-color,#d7dce2);border-radius:9px;background:var(--surface,#fff);color:inherit}
+.ti-team-correction textarea{min-height:90px}
+.ti-team-correction button{min-height:44px;align-self:end}
