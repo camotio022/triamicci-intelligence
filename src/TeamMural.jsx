@@ -6,7 +6,7 @@ const blank=()=>({kind:'preparation',title:'',body:'',yieldText:'',allergens:[],
 export default function TeamMural({membership,onLabels}){
  const {notify}=useFeedback(),[items,setItems]=useState([]),[schedules,setSchedules]=useState([]),[todayPresence,setTodayPresence]=useState({}),[error,setError]=useState(''),[loading,setLoading]=useState(true),[search,setSearch]=useState('');
  const [editing,setEditing]=useState(false),[draft,setDraft]=useState(blank()),[supersedesId,setSupersedesId]=useState(null),[saving,setSaving]=useState(false),[expand,setExpand]=useState('');
- const admin=['admin','manager'].includes(membership.role);
+ const admin=['admin','manager','submanager'].includes(membership.role);
  const load=useCallback(async()=>{setLoading(true);setError('');try{const [a,b]=await Promise.all([call(mural,'list'),call(sc,'list')]);setItems(a.items||[]);setSchedules((b.schedules||[]).filter(x=>x.status==='published'))}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useEffect(()=>{let live=true;const refresh=async()=>{try{const d=await call('attendanceV31','teamToday');if(live)setTodayPresence(Object.fromEntries((d.presence||[]).map(x=>[x.uid,x.status])))}catch{}};refresh();const interval=setInterval(refresh,60000);return()=>{live=false;clearInterval(interval)}},[]);
  useEffect(()=>{load()},[load]);
