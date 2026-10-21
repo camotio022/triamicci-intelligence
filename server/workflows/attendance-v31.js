@@ -11,6 +11,11 @@ export default async function attendanceWorkflow(req,res){
   if(!m?.unitId||!TEAM_ROLES.includes(m.role))return send(res,403,'Vínculo ativo necessário.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId),actorRef=db.doc('memberships/'+user.uid),day=restaurantDay(),action=req.body?.action;
   const ref=unit.collection('attendanceV31').doc(day+'_'+user.uid);
+  if(action==='teamToday'){
+   const records=await unit.collection('attendanceV31').where('day','==',day).limit(201).get();
+   if(records.size>200)return send(res,409,'Muitos registros. Filtragem por unidade necessária.');
+   return send(res,200,'Situação operacional registrada hoje.',{day,presence:records.docs.map(doc=>({uid:doc.data().uid,status:doc.data().status,updatedAt:doc.data().updatedAt?.toDate?.()?.toISOString?.()||null}))});
+  }
   if(action==='today'){
    const snap=await ref.get(),record=snap.data()||null;
    return send(res,200,'Sua presença de hoje.',{day,record:record?{status:record.status,events:record.events||[],day}:null});
