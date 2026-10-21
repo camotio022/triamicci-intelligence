@@ -12,15 +12,15 @@ export default function TeamTodayV31({unitId}){
  const [correction,setCorrection]=useState({targetUid:'',workDay:restaurantDay(),status:'working',reason:''}),[correctionBusy,setCorrectionBusy]=useState(false),[correctionNotice,setCorrectionNotice]=useState('');
  const [clock,setClock]=useState(()=>new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));
  const [today,setToday]=useState(()=>restaurantDay()),[staff,setStaff]=useState([]),[schedules,setSchedules]=useState([]),[presence,setPresence]=useState({}),[error,setError]=useState(''),[busy,setBusy]=useState(true);
- const refresh=useCallback(async()=>{setClock(new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));setBusy(true);try{
+ const refresh=useCallback(async({silent=false}={})=>{setClock(new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));if(!silent)setBusy(true);try{
   const [a,b,c]=await Promise.all([request('schedules','list'),request('attendanceV31','teamToday'),request(undefined,'masterRegistryPreview')]);
   setToday(b.day);setSchedules((a.schedules||[]).filter(x=>x.status==='published'&&x.period===b.day.slice(0,7)));
   setPresence(Object.fromEntries((b.presence||[]).map(x=>[x.uid,x])));
   setStaff((c.registry||[]).filter(x=>x.status==='active'));
   setError('');
- }catch(e){setError(e.message)}finally{setBusy(false)}},[]);
- useEffect(()=>{if(!unitId)return;let initial=true;return onSnapshot(doc(db,'units',unitId,'live','attendance'),()=>{if(initial){initial=false;return;}refresh()},()=>{});},[unitId,refresh]);
- useEffect(()=>{refresh();const onVisible=()=>{if(document.visibilityState==='visible')refresh()};const timer=setInterval(onVisible,15000);document.addEventListener('visibilitychange',onVisible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',onVisible)}},[refresh]);
+ }catch(e){setError(e.message)}finally{if(!silent)setBusy(false)}},[]);
+ useEffect(()=>{if(!unitId)return;let initial=true;return onSnapshot(doc(db,'units',unitId,'live','attendance'),()=>{if(initial){initial=false;return;}refresh({silent:true})},()=>{});},[unitId,refresh]);
+ useEffect(()=>{refresh();const onVisible=()=>{if(document.visibilityState==='visible')refresh({silent:true})};const timer=setInterval(onVisible,60000);document.addEventListener('visibilitychange',onVisible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',onVisible)}},[refresh]);
  const submitCorrection=async e=>{e.preventDefault();if(correctionBusy)return;setCorrectionBusy(true);setCorrectionNotice('');setError('');try{
   const result=await request('attendanceV31','correct',{...correction,requestId:crypto.randomUUID()});setCorrectionNotice(result.message);setCorrection(p=>({...p,reason:''}));await refresh()
  }catch(e){setError(e.message)}finally{setCorrectionBusy(false)}};
@@ -46,7 +46,7 @@ export default function TeamTodayV31({unitId}){
   });
  },[schedules,today,staff,presence,clock]);
  return <section className="ti-team-today" aria-label="Equipe de hoje">
-  <header><div><small>OPERAÇÃO · {today}</small><h2>Equipe de hoje</h2><p>Escala publicada e presença registrada são informações diferentes.</p></div><button type="button" onClick={refresh} disabled={busy}>{busy?'Atualizando…':'Atualizar'}</button></header>
+  <header><div><small>OPERAÇÃO · {today}</small><h2>Equipe de hoje</h2><p>Escala publicada e presença registrada são informações diferentes.</p></div><button type="button" onClick={()=>refresh()} disabled={busy}>{busy?'Atualizando…':'Atualizar'}</button></header>
   {error&&<p role="alert">{error}</p>}
   {!error&&!busy&&people.length===0&&<p>Não há colaboradores escalados para trabalhar hoje nesta publicação.</p>}
   {['Manhã','Intermediário','Tarde','Noite','Variável','Turno não informado'].map(shift=>{
