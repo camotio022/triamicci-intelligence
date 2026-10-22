@@ -350,3 +350,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .ti-stock-detail-dialog{background:#fff;border-radius:16px;width:min(100%,820px);max-height:92dvh;overflow:auto;overscroll-behavior:contain;position:relative;padding:16px}
 .ti-stock-dialog-close{position:sticky;top:0;float:right;z-index:3;min-width:44px;min-height:44px;background:#fff;border:1px solid #d7dce5;border-radius:10px;color:#922824;font-size:26px}
 @media(max-width:600px){.ti-stock-detail-backdrop{padding:0}.ti-stock-detail-dialog{height:100dvh;max-height:100dvh;width:100%;border-radius:0}.ti-stock-item{padding:13px 12px;gap:7px}.ti-stock-overview>div{padding:11px 9px}.ti-stock-overview strong{font-size:20px}.ti-stock-item-total>strong{font-size:17px}.ti-stock-split{gap:8px}}
+
+.ti-live-status{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;border-radius:999px;padding:6px 10px;background:var(--surface-alt,#f3f4f6);color:var(--text-muted,#64748b);font-size:12px;min-height:32px}
+.ti-live-status.is-live{color:#21804a;background:rgba(33,128,74,.1)}
+.ti-live-status small{font-size:11px}
+
+.ti-stock-overview>button,.kitchen-summary>button{padding:13px 12px;display:flex;flex-direction:column;gap:3px;background:var(--surface,#fff);border:1px solid var(--border,#e1e4eb);border-radius:12px;text-align:left;min-height:64px;color:inherit}
+.ti-stock-overview>button[aria-pressed=true],.kitchen-summary>button[aria-pressed=true]{border-color:#a72b24;background:#a72b240b}
+.ti-v4-notice-priority{display:inline-block;font-size:12px;margin-bottom:8px;color:var(--text-muted,#667085)}
+.ti-v4-notice-priority.important{color:#92550b}.ti-v4-notice-priority.urgent{color:#ae2822;font-weight:700}
+.ti-inventory-investigation>article{padding:12px 0;border-top:1px solid var(--border,#e1e4eb)}
+.ti-inventory-investigation textarea{width:100%;min-height:80px}
+
+.ti-mural-v4 .ti-stock-filters{display:flex;flex-wrap:wrap;overflow:visible;gap:8px}

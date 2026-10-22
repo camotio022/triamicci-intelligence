@@ -19,8 +19,10 @@ jobs:
           distribution: temurin
           java-version: '21'
       - name: Instalar dependências
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund && npm install --no-save playwright@1.56.0
+      - name: Instalar navegador de homologação
+        run: npx playwright install --with-deps chromium
       - name: Testar Firebase Auth + Firestore isolados
         env:
           CI: true
-        run: npx --yes firebase-tools@14.2.0 emulators:exec --project demo-triamicci-v31 --only auth,firestore "node --test tests/v31-emulator.test.mjs"
+        run: npx --yes firebase-tools@14.2.0 emulators:exec --project demo-triamicci-v31 --only auth,firestore "node --test tests/v31-emulator.test.mjs tests/v4-emulator.test.mjs tests/v4-mobile.test.mjs"

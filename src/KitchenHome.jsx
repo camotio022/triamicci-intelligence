@@ -1,11 +1,12 @@
+import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {PackageCheck,ClipboardCheck,Boxes,History,RefreshCw,AlertCircle,CookingPot} from 'lucide-react';
 
 export default function KitchenHome({membership,navigate}){
  const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[],productions:[]}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
- const load=useCallback(async()=>{
-  setLoading(true);setError('');
+ const load=useCallback(async(silent=false)=>{
+  if(!silent)setLoading(true);setError('');
   try{
    const token=await auth.currentUser.getIdToken();
    const call=async(url,action)=>{const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action})});const data=await res.json();if(!res.ok)throw Error(data.message||'Falha ao carregar a operação');return data};
@@ -13,11 +14,14 @@ export default function KitchenHome({membership,navigate}){
    setProducts(stock.products||[]);setHistory({receipts:ops.receipts||[],counts:ops.counts||[],outflows:ops.outflows||[],transfers:ops.transfers||[],productions:ops.productions||[]});
   }catch(e){setError(e.message)}finally{setLoading(false)}
  },[]);
+ useUnitLive(membership?.unitId,()=>load(true));
  useEffect(()=>{load()},[load]);
+ const [filter,setFilter]=useState('counted');
  const counted=products.filter(p=>p.physicalBalance);
+ const displayed=products.filter(p=>filter==='all'||filter==='counted'&&p.physicalBalance||filter==='uncounted'&&!p.physicalBalance);
  const latest=[...history.receipts.map(x=>({...x,label:'Recebimento'})),...history.counts.map(x=>({...x,label:'Contagem'})),...history.outflows.map(x=>({...x,label:'Saída'})),...history.transfers.map(x=>({...x,label:'Transferência'})),...history.productions.map(x=>({...x,label:'Produção'}))]
    .sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,5);
- const actions=[{name:'Registrar produção',description:'Finalizar e descontar insumos do giro',page:'production',Icon:CookingPot},{name:'Receber mercadoria',description:'Conferir fornecedor e entrega',page:'receiving',Icon:PackageCheck},
+ const actions=[{name:'Registrar produção',description:'Registrar preparo e transformação de insumos',page:'production',Icon:CookingPot},{name:'Receber mercadoria',description:'Conferir fornecedor e entrega',page:'receiving',Icon:PackageCheck},
   {name:'Contagem diária',description:'Registrar reserva e giro',page:'count',Icon:ClipboardCheck},
   {name:'Estoque físico',description:'Consultar produtos da cozinha',page:'inventory',Icon:Boxes},
   {name:'Histórico',description:'Consultar operações registradas',page:'history',Icon:History}];
@@ -26,12 +30,11 @@ export default function KitchenHome({membership,navigate}){
   <div className="kitchen-header"><div><h1>Operação da cozinha</h1><p>Recebimentos, contagens e estoque físico da unidade em um só lugar.</p></div><button type="button" onClick={load} disabled={loading}><RefreshCw size={16}/> Atualizar</button></div>
   <div className="kitchen-actions">{actions.map(({name,description,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong><span>{description}</span></button>)}</div>
   {error&&<p role="alert" className="receiving-notice"><AlertCircle size={16}/> {error}</p>}
-  <div className="kitchen-summary"><div><strong>{products.length}</strong><span>Produtos vinculados</span></div><div><strong>{counted.length}</strong><span>Com contagem física</span></div><div><strong>{products.length-counted.length}</strong><span>Aguardam contagem</span></div></div>
+  <div className="kitchen-summary">{[['all',products.length,'Produtos vinculados'],['counted',counted.length,'Com contagem física'],['uncounted',products.length-counted.length,'Aguardam contagem']].map(([key,n,label])=><button type="button" key={key} aria-pressed={filter===key} onClick={()=>setFilter(key)}><strong>{n}</strong><span>{label}</span></button>)}</div>
   <div className="inventory-list-header"><h2>Produção registrada</h2><button type="button" onClick={()=>navigate('production')}>Abrir produção</button></div>
-  <p>Últimas produções no Firebase: <strong>{history.productions.length}</strong> registros consultados. A baixa ocorre ao finalizar, não ao planejar.</p>
-  <div className="inventory-list-header"><h2>Produtos conferidos</h2><button type="button" onClick={()=>navigate('inventory')}>Ver estoque</button></div>
-  {loading?<p>Carregando dados do Firebase...</p>:counted.length===0?<p>Ainda não há contagens físicas para esta unidade. Registre a primeira contagem de reserva e giro para começar.</p>:
-   <div className="operational-products">{counted.slice(0,6).map(p=><article key={p.id} className="operational-product"><div className="operational-product-head"><strong>{p.name}</strong><span>{p.physicalBalance.unit}</span></div><div className="operational-counts"><div><span>Reserva</span><strong>{p.physicalBalance.reserve}</strong></div><div><span>Giro</span><strong>{p.physicalBalance.rotation}</strong></div><div><span>Total</span><strong>{p.physicalBalance.total}</strong></div></div></article>)}</div>}
+  {history.productions.length?<div className="kitchen-history">{history.productions.slice(0,5).map(r=><div key={r.id}><div><strong>{r.recipeName||'Preparo'}</strong><span>{r.portions} {r.outputUnit||'porções'}</span></div><span>{r.at?new Date(r.at).toLocaleString('pt-BR'):'—'}</span></div>)}</div>:<p>Nenhuma produção registrada nesta consulta.</p>}
+  <div className="inventory-list-header"><h2>Produtos da cozinha</h2><button type="button" onClick={()=>navigate('inventory')}>Ver todos no estoque</button></div>
+  {loading?<p>Carregando dados…</p>:displayed.length===0?<p>Nenhum produto neste filtro.</p>:<div className="kitchen-history">{displayed.slice(0,6).map(p=><div key={p.id}><div><strong>{p.name}</strong><span>{p.physicalBalance?`Reserva ${p.physicalBalance.reserve} ${p.physicalBalance.unit} · Giro ${p.physicalBalance.rotation} ${p.physicalBalance.unit}`:'Sem contagem física'}</span></div><strong>{p.physicalBalance?`${p.physicalBalance.total} ${p.physicalBalance.unit}`:'Não verificado'}</strong></div>)}</div>}
   <div className="inventory-list-header"><h2>Atividade recente</h2><button type="button" onClick={()=>navigate('history')}>Ver histórico</button></div>
   {latest.length===0?<p>Nenhuma operação física registrada nesta unidade.</p>:<div className="kitchen-history">{latest.map(x=><div key={x.id}><div><strong>{x.label}</strong><span>{x.productName}</span></div><span>{x.at?new Date(x.at).toLocaleString('pt-BR'):'—'}</span></div>)}</div>}
   <p className="inventory-footnote">Os dados são carregados do Firebase. Contagem física e saldos legados permanecem separados até serem conciliados.</p>

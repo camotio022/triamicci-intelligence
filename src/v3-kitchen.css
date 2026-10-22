@@ -1,5 +1,5 @@
 .v3-page{width:100%;max-width:1300px;margin:auto;display:grid;gap:18px;color:#17212e}
-.v3-page *, .v3-page *::before,.v3-page *::after{box-sizing:border-box}
+.v3-page,.v3-page *, .v3-page *::before,.v3-page *::after{box-sizing:border-box}
 .v3-head{display:flex;flex-direction:column;align-items:stretch;gap:16px}
 .v3-head h1{font-size:clamp(1.5rem,3vw,2.1rem);line-height:1.2;margin:4px 0 8px}
 .v3-head p{margin:0;color:#64748b}

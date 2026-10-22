@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {restaurantDay} from '../schedules/restaurant-today.js';
 import {TEAM_ROLES,MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
@@ -43,6 +44,7 @@ export default async function attendanceWorkflow(req,res){
     const at=new Date(),event={action:'correct',status,requestId,at,by:user.uid};
     tx.set(target,{uid:targetUid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at,lastCorrection:{by:user.uid,at,reason:reason.trim()}},{merge:true});
     tx.set(unit.collection('live').doc('attendance'),{updatedAt:at},{merge:true});
+    signalUnitChange(tx,db,m.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'attendance.correct',unitId:m.unitId,actorUid:user.uid,at,details:{targetUid,workDay,from:old.status,to:status,requestId,reason:reason.trim()}});
    });
    return send(res,200,duplicate?'Correção já registrada.':'Correção auditada e registrada.',{duplicate});
@@ -70,6 +72,7 @@ export default async function attendanceWorkflow(req,res){
    const at=new Date(),event={action,requestId,at,by:user.uid};
    tx.set(ref,{uid:user.uid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at},{merge:true});
    tx.set(unit.collection('live').doc('attendance'),{updatedAt:at},{merge:true});
+   signalUnitChange(tx,db,m.unitId);
    tx.create(db.collection('auditLogs').doc(),{event:'attendance.'+action,unitId:m.unitId,actorUid:user.uid,at,details:{day:workDay,requestId}});
    result=status;
   });

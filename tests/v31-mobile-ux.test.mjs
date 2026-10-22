@@ -21,6 +21,7 @@ test('V3.1: layouts reais cabem em telas mobile sem overflow', {timeout:100000},
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto('http://127.0.0.1:4178/qa/v31-mobile.html',{waitUntil:'domcontentloaded'});
    await page.getByText('Escala de folgas').waitFor();
+   await page.getByText('Conferência individual e pendências anteriores',{exact:true}).click();
    await page.getByRole('button',{name:'Enviar conferência'}).waitFor();
    await page.getByText('Perdas, avarias e vencimentos').waitFor();
    const dimensions=await page.evaluate(()=>({viewport:window.innerWidth,document:document.documentElement.scrollWidth,body:document.body.scrollWidth}));

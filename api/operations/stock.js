@@ -1,3 +1,7 @@
+import {intervalFromBalance} from '../../server/operations/inventory-summary.js';
+import shipments from '../../server/operations/shipments.js';
+import investigation from '../../server/operations/investigation.js';
+import {signalUnitChange} from '../../server/live-signal.js';
 import kitchenV3 from '../../server/operations/v3-service.js';
 import packageConferenceHandler from '../../server/operations/handlers/package-conference.js';
 import packageReviewHandler from '../../server/operations/handlers/package-review.js';
@@ -32,6 +36,8 @@ function error(res,e){
 export default async function handler(req,res){
  if(typeof req.body?.action==='string'&&req.body.action.startsWith('v3'))return kitchenV3(req,res);
  const subaction=req.body?.action;
+ if(['shipmentsList','shipmentInspect','shipmentApprove','shipmentReject'].includes(subaction))return shipments(req,res);
+ if(['investigationGet','investigationSave','investigationApprove','investigationReject'].includes(subaction))return investigation(req,res);
  if(subaction==='packageRecord'||subaction==='packagePreview'||subaction==='packageApply'){
   req.body.action=({packageRecord:'record',packagePreview:'preview',packageApply:'apply'})[subaction];
   return ({packageRecord:packageConferenceHandler,packagePreview:packageReviewHandler,packageApply:packageApplyHandler})[subaction](req,res);
@@ -190,7 +196,7 @@ export default async function handler(req,res){
    const record={...payload,...(commercial||{}),productId,productName:p.name,unit:unitName,
     actorUid:actor.uid,actorName:current.displayName||current.name||actor.email||actor.uid,
     unitId:m.unitId,at:now,kind:action,
-    ...(action==='count'?{difference:balanceSnap?.exists?Math.round((balanceSnap.data().total-payload.reserve-payload.rotation)*1000)/1000:null}:{} )};
+    ...(action==='count'?{inventorySummary:intervalFromBalance(balanceSnap?.data()),difference:balanceSnap?.exists?Math.round((balanceSnap.data().total-payload.reserve-payload.rotation)*1000)/1000:null}:{} )};
    if(existing.exists){
     const old=existing.data();
     if(old.actorUid!==actor.uid||old.productId!==productId||Object.keys(payload).some(k=>old[k]!==payload[k]))throw Error('CONFLICT');
@@ -230,6 +236,7 @@ export default async function handler(req,res){
       lastReceiptId:requestId,updatedAt:now},{merge:true});
    }
    tx.create(ref,record);
+   signalUnitChange(tx,db,m.unitId);
    tx.create(auditRef,{event:action==='receive'?'physical.received':'physical.counted',unitId:m.unitId,
     productId,actorUid:actor.uid,operationId:requestId,details:payload,at:now});
    result={id:requestId,duplicate:false,record};

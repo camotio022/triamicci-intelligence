@@ -8,7 +8,7 @@ const sameUnit = (value, unit) => value?.unit === unit;
 const isNonnegative = (value, unit) => validQuantity(value, {allowZero:true, unit});
 
 export function calculateDailyInventory({unit, current, previous=null, entries=[], outflows=[]} = {}) {
-  if (!['kg','g','L','ml','un'].includes(unit)) throw new Error('INVALID_UNIT');
+  if (!['kg','g','L','ml','mL','un','porcao','pacote','duzia'].includes(unit)) throw new Error('INVALID_UNIT');
   if (!current || !validDate(current.at) || !sameUnit(current,unit) ||
       !isNonnegative(current.reserve,unit) || !isNonnegative(current.rotation,unit))
     throw new Error('INVALID_CURRENT_COUNT');

@@ -1,6 +1,6 @@
-import {doc,onSnapshot} from 'firebase/firestore';
+import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {auth,db} from './firebase.js';
+import {auth} from './firebase.js';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import {rosterToday,liveShiftState} from '../server/schedules/restaurant-today.js';
 async function request(module,action,extra={}){
@@ -19,8 +19,8 @@ export default function TeamTodayV31({unitId}){
   setStaff((c.registry||[]).filter(x=>x.status==='active'));
   setError('');
  }catch(e){setError(e.message)}finally{if(!silent)setBusy(false)}},[]);
- useEffect(()=>{if(!unitId)return;let initial=true;return onSnapshot(doc(db,'units',unitId,'live','attendance'),()=>{if(initial){initial=false;return;}refresh({silent:true})},()=>{});},[unitId,refresh]);
- useEffect(()=>{refresh();const onVisible=()=>{if(document.visibilityState==='visible')refresh({silent:true})};const timer=setInterval(onVisible,60000);document.addEventListener('visibilitychange',onVisible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',onVisible)}},[refresh]);
+ useUnitLive(unitId,()=>refresh({silent:true}));
+ useEffect(()=>{refresh();const timer=setInterval(()=>{setClock(new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));setToday(restaurantDay())},30000);return()=>clearInterval(timer)},[refresh]);
  const submitCorrection=async e=>{e.preventDefault();if(correctionBusy)return;setCorrectionBusy(true);setCorrectionNotice('');setError('');try{
   const result=await request('attendanceV31','correct',{...correction,requestId:crypto.randomUUID()});setCorrectionNotice(result.message);setCorrection(p=>({...p,reason:''}));await refresh()
  }catch(e){setError(e.message)}finally{setCorrectionBusy(false)}};

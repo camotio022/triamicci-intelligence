@@ -1,3 +1,6 @@
+import {intervalFromBalance} from './inventory-summary.js';
+import {operationalBalance,writeOperationalBalance} from './shared-balance.js';
+import {signalUnitChange} from '../live-signal.js';
 // Novo ledger isolado: não mistura os saldos legados nem converte kg em porções.
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -12,7 +15,7 @@ const active=(d,u,roles)=>d.exists&&d.data().status==='active'&&d.data().unitId=
 const hashed=s=>createHash('sha256').update(s).digest('hex');
 const snapMap=s=>({id:s.id,...s.data()});
 const now=()=>new Date();
-const audit=(tx,db,event,unitId,uid,details)=>tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid:uid,at:now(),details});
+const audit=(tx,db,event,unitId,uid,details)=>{signalUnitChange(tx,db,unitId);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid:uid,at:now(),details});};
 function debitLotDocs(docs,location,amount,today){
  let remaining=amount,updates=[];
  for(const d of docs){
@@ -34,7 +37,7 @@ export default async function v3Ledger(req,res){
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!m?.unitId)return send(res,403,'Vínculo ativo necessário.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId),products=unit.collection('products'),profiles=unit.collection('operationalProfiles'),
-   balances=unit.collection('v3PhysicalBalances'),lotRoots=unit.collection('v3PhysicalLots'),orders=unit.collection('purchaseOrdersV3'),
+   balances=unit.collection('physicalBalances'),lotRoots=unit.collection('physicalLots'),orders=unit.collection('purchaseOrdersV3'),
    actorRef=db.doc('memberships/'+actor.uid),action=req.body?.action;
   if(action==='v3Lots'){
    const {productId}=req.body||{};if(!idOk(productId))return send(res,400,'Insumo inválido.');
@@ -99,7 +102,7 @@ export default async function v3Ledger(req,res){
     if(report.data().status==='approved'&&oldOperation.exists){duplicate=true;return;}
     if(report.data().status!=='pending'||oldOperation.exists)throw Error('CONFLICT');
     const data=report.data(),balRef=balances.doc(data.productId),profileRef=profiles.doc(data.productId),productRef=products.doc(data.productId);
-    const [bal,profile,product]=await Promise.all([tx.get(balRef),tx.get(profileRef),tx.get(productRef)]);
+    const [bal,profile,product]=await Promise.all([operationalBalance(tx,balRef),tx.get(profileRef),tx.get(productRef)]);
     if(!bal.exists||!profile.exists||!product.exists||product.data().status!=='active'||profile.data().controlMode!=='quantitative')throw Error('MISSING');
     if(profile.data().countUnit!==bal.data().unit||data.unit!==bal.data().unit||!number(data.quantity,data.unit)||!profile.data().locations.includes(data.location)||bal.data()[data.location]<data.quantity)throw Error('QUANTITY');
     const lots=product.data().trackExpiry?await tx.get(lotRoots.doc(data.productId).collection('lots').orderBy('expiryDate').limit(101)):null;
@@ -117,9 +120,10 @@ export default async function v3Ledger(req,res){
     }
     const at=now();
     for(const l of lotUpdates)tx.update(l.ref,{[data.location]:l.locationAfter,availableQuantity:l.totalAfter,updatedAt:at});
-    tx.update(balRef,{[data.location]:round(bal.data()[data.location]-data.quantity),total:round(bal.data().total-data.quantity),lastOperationId:reportId,updatedAt:at,quality:'ESTIMATED_BY_MOVEMENTS'});
+    writeOperationalBalance(tx,balRef,{[data.location]:round(bal.data()[data.location]-data.quantity),total:round(bal.data().total-data.quantity),lastOperationId:reportId,updatedAt:at,quality:'ESTIMATED_BY_MOVEMENTS'},{},bal.data());
     tx.update(ref,{status:'approved',approvedBy:actor.uid,approvedAt:at});
     tx.create(operation,{kind:'loss',productId:data.productId,location:data.location,quantity:data.quantity,unit:data.unit,notes:data.reason,actorUid:actor.uid,unitId:m.unitId,reportId,at});
+    tx.create(unit.collection('physicalOutflows').doc(reportId),{productId:data.productId,quantity:data.quantity,unit:data.unit,location:data.location,reason:'loss',notes:data.reason,actorUid:actor.uid,unitId:m.unitId,at});
     audit(tx,db,'v3.loss_approved',m.unitId,actor.uid,{reportId,productId:data.productId,quantity:data.quantity,location:data.location});
    });
    return send(res,200,duplicate?'Perda já aprovada.':'Perda aprovada; saldo atualizado com rastreabilidade.',{duplicate});
@@ -213,7 +217,7 @@ export default async function v3Ledger(req,res){
    let duplicate=false;
    await db.runTransaction(async tx=>{
     const [authSnap,product,profile,balance,existing,order,approval]=await Promise.all([
-     tx.get(actorRef),tx.get(pr),tx.get(profileRef),tx.get(balRef),tx.get(recordRef),orderRef?tx.get(orderRef):Promise.resolve(null),approvalRef?tx.get(approvalRef):Promise.resolve(null)]);
+     tx.get(actorRef),tx.get(pr),tx.get(profileRef),operationalBalance(tx,balRef),tx.get(recordRef),orderRef?tx.get(orderRef):Promise.resolve(null),approvalRef?tx.get(approvalRef):Promise.resolve(null)]);
     if(!active(authSnap,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
     if(!approval?.exists||approval.data().status!=='pending'||approval.data().unitId!==m.unitId||approval.data().fingerprint!==fingerprint)throw Error('CONFLICT');
     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
@@ -235,9 +239,9 @@ export default async function v3Ledger(req,res){
     if(lotRef&&batch.exists&&batch.data().unit!==cfg.countUnit)throw Error('UNIT');
     if(isCounted){
      const newLoc=round((old[location]||0)+stockQuantity);
-     tx.set(balRef,{productId,unit:cfg.countUnit,reserva:location==='reserva'?newLoc:old.reserva||0,
+     writeOperationalBalance(tx,balRef,{productId,unit:cfg.countUnit,reserva:location==='reserva'?newLoc:old.reserva||0,
       giro:location==='giro'?newLoc:old.giro||0,total:round((old.total||0)+stockQuantity),
-      updatedAt:now(),lastOperationId:requestId,quality:'ESTIMATED_BY_MOVEMENTS'},{merge:true});
+      updatedAt:now(),lastOperationId:requestId,quality:'ESTIMATED_BY_MOVEMENTS'},{merge:true},old);
      if(lotRef){
       const oldLot=batch?.data()||{};
       const lo=round((oldLot[location]||0)+stockQuantity);
@@ -259,6 +263,7 @@ export default async function v3Ledger(req,res){
     tx.create(recordRef,{kind:'receipt',actorUid:actor.uid,at:now(),unitId:m.unitId,productId,
      commercialQuantity,commercialUnit,stockQuantity: isCounted?stockQuantity:null,stockUnit:isCounted?cfg.countUnit:null,
      location,orderId,lot,expiryDate,supplier,notes,fingerprint});
+    if(isCounted)tx.create(unit.collection('physicalReceipts').doc(requestId),{productId,productName:product.data().name,physicalQuantity:stockQuantity,unit:cfg.countUnit,supplier,orderId,commercialQuantity,commercialUnit,lot,expiryDate,actorUid:actor.uid,unitId:m.unitId,at:now()});
     audit(tx,db,'v3.received',m.unitId,actor.uid,{requestId,productId,orderId,commercialQuantity,commercialUnit,stockQuantity});
    });
    return send(res,200,duplicate?'Recebimento já registrado.':'Recebimento salvo.',{duplicate,id:requestId});
@@ -269,7 +274,7 @@ export default async function v3Ledger(req,res){
     typeof notes!=='string'||notes.length>240||!Array.isArray(lotCounts)||lotCounts.length>100)return send(res,400,'Contagem incompleta.');
    const pr=products.doc(productId),cfgRef=profiles.doc(productId),balanceRef=balances.doc(productId),ref=unit.collection('v3Operations').doc(requestId);
    await db.runTransaction(async tx=>{
-    const [a,p,cfg,balance,record]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),tx.get(balanceRef),tx.get(ref)]);
+    const [a,p,cfg,balance,record]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),operationalBalance(tx,balanceRef),tx.get(ref)]);
     if(!active(a,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
     if(record.exists){const old=record.data();if(old.kind==='count'&&old.actorUid===actor.uid&&old.sessionId===sessionId&&old.productId===productId&&old.location===location&&old.quantity===quantity&&old.notes===notes)return;throw Error('CONFLICT');}
     if(!p.exists||!cfg.exists||cfg.data().controlMode!=='quantitative'||!cfg.data().locations.includes(location))throw Error('MISSING');
@@ -299,12 +304,13 @@ export default async function v3Ledger(req,res){
      }
     }
     const after=round(quantity+(prior[location==='reserva'?'giro':'reserva']||0));
-    tx.set(balanceRef,{productId,unit:u,[location]:quantity,[location==='reserva'?'giro':'reserva']:prior[location==='reserva'?'giro':'reserva']||0,total:after,updatedAt:now(),
+    writeOperationalBalance(tx,balanceRef,{productId,unit:u,[location]:quantity,[location==='reserva'?'giro':'reserva']:prior[location==='reserva'?'giro':'reserva']||0,total:after,updatedAt:now(),
       lastCountAtByArea:{...(prior.lastCountAtByArea||{}),[location]:now()},
       countSessions:{...(prior.countSessions||{}),[location]:sessionId},
-      quality:'PARTIAL_LOCATION_COUNT',lastOperationId:requestId},{merge:true});
+      quality:'PARTIAL_LOCATION_COUNT',lastOperationId:requestId},{merge:true},prior);
     tx.create(ref,{kind:'count',actorUid:actor.uid,at:now(),productId,location,sessionId,quantity,unit:u,
       before:prior[location]||0,difference:round(quantity-(prior[location]||0)),notes});
+    if(prior.countSessions?.[location==='reserva'?'giro':'reserva']===sessionId){const reserve=location==='reserva'?quantity:prior.reserva,rotation=location==='giro'?quantity:prior.giro;const at=now();tx.set(balanceRef,{countedReserve:reserve,countedRotation:rotation,countedTotal:after,countId:requestId,entriesSinceCount:0,exitsSinceCount:0,at,quality:'PHYSICAL_COUNT'},{merge:true});tx.create(unit.collection('physicalCounts').doc(requestId),{inventorySummary:intervalFromBalance(prior),productId,unit:u,reserve,rotation,total:after,sessionId,actorUid:actor.uid,unitId:m.unitId,at});}
     audit(tx,db,'v3.counted',m.unitId,actor.uid,{requestId,productId,location,quantity,sessionId});
    });
    return send(res,200,'Contagem registrada.');
@@ -314,7 +320,7 @@ export default async function v3Ledger(req,res){
    if(!reqOk(requestId)||!idOk(productId)||!locations.includes(from)||!locations.includes(to)||from===to)return send(res,400,'Transferência inválida.');
    const ref=unit.collection('v3Operations').doc(requestId),pr=products.doc(productId),cfgRef=profiles.doc(productId),balRef=balances.doc(productId);
    await db.runTransaction(async tx=>{
-    const [a,p,cfg,b,existing]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),tx.get(balRef),tx.get(ref)]);
+    const [a,p,cfg,b,existing]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),operationalBalance(tx,balRef),tx.get(ref)]);
     if(!active(a,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
     if(existing.exists)throw Error('CONFLICT');
     if(!p.exists||!cfg.exists||!b.exists||cfg.data().controlMode!=='quantitative'||!cfg.data().locations.includes(from)||!cfg.data().locations.includes(to))throw Error('MISSING');
@@ -331,8 +337,9 @@ export default async function v3Ledger(req,res){
      });
     }
     for(const c of changes)tx.update(c.ref,c.after);
-    tx.update(balRef,{[from]:round(prior[from]-quantity),[to]:round(prior[to]+quantity),lastOperationId:requestId,updatedAt:now(),quality:'ESTIMATED_BY_MOVEMENTS'});
+    writeOperationalBalance(tx,balRef,{[from]:round(prior[from]-quantity),[to]:round(prior[to]+quantity),lastOperationId:requestId,updatedAt:now(),quality:'ESTIMATED_BY_MOVEMENTS'},{},prior);
     tx.create(ref,{kind:'transfer',actorUid:actor.uid,at:now(),productId,from,to,quantity,unit:u});
+    tx.create(unit.collection('physicalTransfers').doc(requestId),{productId,from,to,quantity,unit:u,actorUid:actor.uid,unitId:m.unitId,at:now()});
     audit(tx,db,'v3.transferred',m.unitId,actor.uid,{requestId,productId,from,to,quantity});
    });
    return send(res,200,'Transferência registrada. O total não mudou.');
@@ -341,7 +348,7 @@ export default async function v3Ledger(req,res){
    const {requestId,outputProductId,outputQuantity,outputLocation='reserva',inputs,lot='',expiryDate='',notes='',alternativeReason=''}=req.body||{};
    if(!reqOk(requestId)||!idOk(outputProductId)||!locations.includes(outputLocation)||!Array.isArray(inputs)||!inputs.length||inputs.length>12||
       inputs.some(i=>!idOk(i?.productId)||!locations.includes(i.location)||typeof i.quantity!=='number')||
-      new Set(inputs.map(i=>i.productId)).size!==inputs.length||typeof notes!=='string'||notes.length>240||
+      (inputs.some(i=>i.productId===outputProductId)||new Set(inputs.map(i=>i.productId)).size!==inputs.length)||typeof notes!=='string'||notes.length>240||
       typeof alternativeReason!=='string'||alternativeReason.length>240)return send(res,400,'Revise a produção.');
    const outputRef=products.doc(outputProductId),outputProfileRef=profiles.doc(outputProductId),outputBalanceRef=balances.doc(outputProductId);
    const recordRef=unit.collection('v3Operations').doc(requestId);
@@ -349,8 +356,8 @@ export default async function v3Ledger(req,res){
    const fingerprint=hashed(JSON.stringify({outputProductId,outputQuantity,outputLocation,inputs,lot,expiryDate,notes,alternativeReason}));
    let duplicate=false;
    await db.runTransaction(async tx=>{
-    const snaps=await Promise.all([tx.get(actorRef),tx.get(recordRef),tx.get(outputRef),tx.get(outputProfileRef),tx.get(outputBalanceRef),
-     ...sourceRefs.map(r=>tx.get(r)),...sourceProfiles.map(r=>tx.get(r)),...sourceBalances.map(r=>tx.get(r))]);
+    const snaps=await Promise.all([tx.get(actorRef),tx.get(recordRef),tx.get(outputRef),tx.get(outputProfileRef),operationalBalance(tx,outputBalanceRef),
+     ...sourceRefs.map(r=>tx.get(r)),...sourceProfiles.map(r=>tx.get(r)),...sourceBalances.map(r=>operationalBalance(tx,r))]);
     const [a,existing,outProduct,outProfile,outBalance]=snaps;
     if(!active(a,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
@@ -390,16 +397,16 @@ export default async function v3Ledger(req,res){
     const newLoc=round((before[outputLocation]||0)+outputQuantity);
     for(let i=0;i<n;i++){
      const b=sBal[i].data(),item=inputs[i];
-     tx.update(sourceBalances[i],{[item.location]:round(b[item.location]-item.quantity),
-      total:round(b.total-item.quantity),lastOperationId:requestId,updatedAt:now(),quality:'ESTIMATED_BY_MOVEMENTS'});
+     writeOperationalBalance(tx,sourceBalances[i],{[item.location]:round(b[item.location]-item.quantity),
+      total:round(b.total-item.quantity),lastOperationId:requestId,updatedAt:now(),quality:'ESTIMATED_BY_MOVEMENTS'},{},b);
     }
     for(const upd of sourceLotUpdates){
      tx.update(upd.ref,{[inputs.find(i=>upd.ref.path.includes('/'+i.productId+'/'))?.location||'giro']:upd.value,
       availableQuantity:upd.total,updatedAt:now()});
     }
-    tx.set(outputBalanceRef,{productId:outputProductId,unit:outUnit,
+    writeOperationalBalance(tx,outputBalanceRef,{productId:outputProductId,unit:outUnit,
      [outputLocation]:newLoc,[outputLocation==='reserva'?'giro':'reserva']:before[outputLocation==='reserva'?'giro':'reserva']||0,
-     total:round(before.total+outputQuantity),lastOperationId:requestId,updatedAt:now(),quality:'ESTIMATED_BY_MOVEMENTS'},{merge:true});
+     total:round(before.total+outputQuantity),lastOperationId:requestId,updatedAt:now(),quality:'ESTIMATED_BY_MOVEMENTS'},{merge:true},before);
     if(outputLotRef){
      const old=destLot.data()||{},updated=round((old[outputLocation]||0)+outputQuantity);
      const other=old[outputLocation==='reserva'?'giro':'reserva']||0;
@@ -409,6 +416,7 @@ export default async function v3Ledger(req,res){
     tx.create(recordRef,{kind:'production',actorUid:actor.uid,at:now(),productId:outputProductId,
      outputQuantity,outputUnit:outUnit,outputLocation,inputs:inputs.map((i,k)=>({...i,unit:sCfg[k].data().countUnit})),
      lot,expiryDate,alternativeReason:alternativeReason.trim(),notes,fingerprint,recipeProfileVersion:ocfg.version});
+    tx.create(unit.collection('productionRuns').doc(requestId),{recipeId:'operational-profile-'+outputProductId,recipeName:outProduct.data().name,outputProductId,outputUnit:outUnit,portions:outputQuantity,destinationArea:outputLocation,items:inputs.map((item,i)=>({productId:item.productId,productName:sP[i].data().name,quantity:item.quantity,unit:sCfg[i].data().countUnit,location:item.location})),actorUid:actor.uid,unitId:m.unitId,at:now()});
     audit(tx,db,'v3.produced',m.unitId,actor.uid,{requestId,outputProductId,inputs,outputQuantity,outputUnit:outUnit});
    });
    return send(res,200,duplicate?'Produção já registrada.':'Produção concluída e saldos atualizados.',{duplicate,id:requestId});

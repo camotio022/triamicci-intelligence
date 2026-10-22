@@ -1,3 +1,4 @@
+import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {auth} from './firebase.js';
 import {Award,Star,Sparkles,Clock3,CheckCircle2,UserRound,Pencil,Target,Send,ShieldCheck} from 'lucide-react';
@@ -26,8 +27,8 @@ export default function MyProfessionalProfile({membership,attendance=null}){
  const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const data=await api('myProfile');
  setProfile(data.professional);setAvatar(data.avatar||null);if(!editingRef.current)setPersonal({...blank,...(data.personal||{})});setRecognition(data.recognition);setSyncedAt(new Date());
  }catch(e){if(!silent)setError(e.message)}finally{if(!silent)setLoading(false)}},[]);
- useEffect(()=>{load();const poll=()=>{if(document.visibilityState==='visible')load(true)};const timer=setInterval(poll,15000);
- window.addEventListener('focus',poll);return()=>{clearInterval(timer);window.removeEventListener('focus',poll)}},[load]);
+ useUnitLive(membership?.unitId,()=>load(true));
+ useEffect(()=>{load()},[load]);
  const uploadAvatar=event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;
   if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>15_000_000){notify('Escolha uma foto JPG, PNG ou WebP de até 15 MB.','error');return;}
   setPhotoFile(file);
@@ -82,11 +83,11 @@ export default function MyProfessionalProfile({membership,attendance=null}){
       <p><Clock3 size={17}/> <strong>Turno preferido:</strong> {shifts[personal.preferredShift]||'Não informado'}</p></div>}
      <p className="ti-premium-footnote">Estas preferências não alteram seu cargo, permissões ou escala oficial.</p>
     </section>
-    <section className="ti-premium-card"><h2><Clock3 size={21}/> Minha jornada habitual</h2>
+    <section className="ti-premium-card"><h2><Clock3 size={21}/> Horários habituais cadastrados</h2>
      {profile?.availability?.length?<div className="ti-premium-schedule">{profile.availability.map(d=><div key={d.day}>
       <strong>{days[d.day]||d.day}</strong><span>{d.start}–{d.end}</span><small>Pausa {d.breakStart}–{d.breakEnd}</small></div>)}</div>:<p>Jornada ainda não cadastrada pela gerência.</p>}
     </section>
-    <MyCoverageProposals/>
+    <MyCoverageProposals unitId={membership.unitId}/>
     <section className="ti-premium-card"><h2><UserRound size={21}/> Vincular minha ficha ao Cadastro Mestre</h2><p>Peça à gerência o código da sua ficha. A vinculação somente ocorrerá após confirmação da identidade pela gerência; suas permissões não mudam.</p><form className="ti-premium-form" onSubmit={requestRegistryLink}><label>Código da ficha<input required maxLength={128} pattern="[A-Za-z0-9_-]+" value={registryCode} onChange={e=>setRegistryCode(e.target.value)} placeholder="Código fornecido pela gerência"/></label><button type="submit" disabled={claiming||!registryCode.trim()}>Solicitar vínculo</button></form></section>
     <section className="ti-premium-card"><h2><Send size={21}/> Quero desenvolver uma habilidade</h2>
      <p>Conte à gerência qual habilidade gostaria de ter revisada. O pedido não confirma a habilidade automaticamente.</p>

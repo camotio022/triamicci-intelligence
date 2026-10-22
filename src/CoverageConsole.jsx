@@ -1,3 +1,4 @@
+import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import {rateRoleFor} from '../server/coverage/engine.js';
@@ -13,7 +14,8 @@ export default function CoverageConsole({membership}){
  const [requestNotes,setRequestNotes]=useState({});
  const [note,setNote]=useState(''),[consentEvidence,setConsentEvidence]=useState(''),[legalChecked,setLegalChecked]=useState(false),[consentVerified,setConsentVerified]=useState(false);
  const [ratesEdit,setRatesEdit]=useState(null),[requirements,setRequirements]=useState([]),[newRequirement,setNewRequirement]=useState({sector:'cozinha',weekday:6,start:'12:00',end:'14:00',minimum:4,skill:''});
- const load=useCallback(async()=>{try{const result=await request('dashboard');setData(result);setRatesEdit(result.rates);setRequirements(result.requirements||[]);setRateRole(old=>old==='other'?rateRoleFor(result.people.find(p=>p.status==='active')):old);setPlanId(id=>id||result.plans[0]?.id||'');setStaffId(id=>id||result.people.find(p=>p.status==='active')?.uid||'');setError('')}catch(e){setError(e.message)}},[]);
+ const load=useCallback(async(silent=false)=>{try{const result=await request('dashboard');setData(result);if(!silent){setRatesEdit(result.rates);setRequirements(result.requirements||[]);}setRateRole(old=>old==='other'?rateRoleFor(result.people.find(p=>p.status==='active')):old);setPlanId(id=>id||result.plans[0]?.id||'');setStaffId(id=>id||result.people.find(p=>p.status==='active')?.uid||'');setError('')}catch(e){setError(e.message)}},[]);
+ useUnitLive(membership?.unitId,()=>load(true));
  useEffect(()=>{load()},[load]);
  const plan=useMemo(()=>data?.plans.find(p=>p.id===planId),[data,planId]);
  const run=async(fn)=>{setBusy(true);setError('');setNotice('');try{const d=await fn();setNotice(d.message);await load();return d}catch(e){setError(e.message)}finally{setBusy(false)}};
@@ -31,8 +33,8 @@ export default function CoverageConsole({membership}){
    <label>Setor<select value={sector} onChange={e=>setSector(e.target.value)}>{Object.entries(sectors).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
    <label>Habilidade confirmada (opcional)<input placeholder="Ex.: chapa, montagem, preparo" value={requiredSkill} onChange={e=>setRequiredSkill(e.target.value.trim().toLowerCase())}/></label>
    <label>Mínimo de pessoas<input type="number" min="1" max="30" value={required} onChange={e=>setRequired(e.target.value)}/></label>
-   <button type="button" disabled={busy||!planId||!date||windowEnd<=windowStart} onClick={simulate}>Analisar cobertura</button>
-   {simulation&&<div className="ti-cov-result"><strong>{simulation.covered} confirmados para {simulation.windowStart}–{simulation.windowEnd} · {simulation.required} necessários</strong><p>{simulation.shortage?'Faltam '+simulation.shortage+' pessoa(s) para o mínimo informado.':'Quantidade mínima atendida.'}</p><p>{simulation.unverifiedOrUnavailable} escalados sem jornada comprovada para toda a faixa ou em intervalo.</p><h4>Possíveis reforços (inclui colaboradores da manhã)</h4>{simulation.candidates.map(p=><article key={p.uid}><strong>{p.name}</strong><span>{p.alreadyScheduled?'Já está escalado — avaliar dobra':'Fora da escala — avaliar convocação'} · {p.skillConfirmed?'Habilidade confirmada ou não exigida':'Habilidade não confirmada'} · {money(p.estimatedPracticePayment)} · Exige análise de jornada</span><button type="button" onClick={()=>{setStaffId(p.uid);setRateRole(rateRoleFor(data.people.find(x=>x.uid===p.uid)));setExternal(false)}}>Preparar proposta</button></article>)}</div>}
+   <button type="button" disabled={busy||!planId||!date||windowEnd===windowStart} onClick={simulate}>Analisar cobertura</button>
+   {simulation&&<div className="ti-cov-result"><strong>{simulation.covered} confirmados para {simulation.windowStart}–{simulation.windowEnd} · {simulation.required} necessários</strong><p>{simulation.shortage?'Faltam '+simulation.shortage+' pessoa(s) para o mínimo informado.':'Quantidade mínima atendida.'}</p><p>{simulation.unverifiedOrUnavailable} escalados sem jornada comprovada para toda a faixa ou em intervalo.</p>{(simulation.timeline||[]).map((r,i)=><p key={i}>{r.start}–{r.end} · {r.covered}/{r.minimum} pessoas{r.deficit?' · déficit '+r.deficit:' · coberto'}</p>)}<h4>Possíveis reforços (inclui colaboradores da manhã)</h4>{simulation.candidates.map(p=><article key={p.uid}><strong>{p.name}</strong><span>{p.alreadyScheduled?'Já está escalado — avaliar dobra':'Fora da escala — avaliar convocação'} · {p.skillConfirmed?'Habilidade confirmada ou não exigida':'Habilidade não confirmada'} · {money(p.estimatedPracticePayment)} · Exige análise de jornada</span><button type="button" onClick={()=>{setStaffId(p.uid);setRateRole(rateRoleFor(data.people.find(x=>x.uid===p.uid)));setExternal(false)}}>Preparar proposta</button></article>)}</div>}
   </section>
   <section className="ti-cov-panel"><h3>2 · Propor cobertura</h3><p>Informe os horários reais. Dobras com conflito são bloqueadas; as demais exigem análise humana.</p>
    <label>Colaborador<select value={staffId} onChange={e=>{setStaffId(e.target.value);setRateRole(rateRoleFor(data?.people.find(p=>p.uid===e.target.value)));setExternal(false)}}>{(data?.people||[]).filter(p=>p.status==='active').map(p=><option key={p.uid} value={p.uid}>{p.name} · {p.jobTitle||'Cargo pendente'}</option>)}</select></label>
@@ -57,7 +59,7 @@ export default function CoverageConsole({membership}){
   <label>Mínimo<input type="number" min="1" max="30" value={newRequirement.minimum} onChange={e=>setNewRequirement(x=>({...x,minimum:Number(e.target.value)}))}/></label>
   <label>Habilidade obrigatória (opcional)<input value={newRequirement.skill} onChange={e=>setNewRequirement(x=>({...x,skill:e.target.value.toLowerCase()}))} placeholder="Ex.: chapa"/></label>
  </div>
- <button type="button" disabled={busy||newRequirement.end<=newRequirement.start||newRequirement.minimum<1} onClick={()=>setRequirements(v=>[...v,newRequirement])}>Adicionar regra à lista</button>
+ <button type="button" disabled={busy||newRequirement.end===newRequirement.start||newRequirement.minimum<1} onClick={()=>setRequirements(v=>[...v,newRequirement])}>Adicionar regra à lista</button>
  {requirements.map((x,i)=><article className="ti-cov-proposal" key={i}><span>{sectors[x.sector]} · {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][x.weekday]} {x.start}–{x.end} · mínimo {x.minimum} · {x.skill||'qualquer habilidade'}</span><button type="button" disabled={busy} onClick={()=>setRequirements(v=>v.filter((_,j)=>j!==i))}>Remover</button></article>)}
  <button type="button" disabled={busy||requirements.length>84} onClick={()=>run(()=>request('requirementsSet',{requirements}))}>Salvar regras da unidade</button>
  </section>}

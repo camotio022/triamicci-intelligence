@@ -1,3 +1,5 @@
+import {operationalView} from './shared-balance.js';
+import {signalUnitChange} from '../live-signal.js';
 import v3Ledger from './v3-ledger.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -15,7 +17,7 @@ const obj=s=>({id:s.id,...s.data()});
 const now=()=>new Date();
 const dateOk=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(x+'T12:00:00Z'))&&new Date(x+'T12:00:00Z').toISOString().slice(0,10)===x;
 const quantity=(v,unit,zero=false)=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&(zero||v>0)&&v<=100000&&(!['un','porcao','pacote','duzia'].includes(unit)||Number.isInteger(v))&&Math.abs(Math.round(v*1000)-v*1000)<1e-7;
-const newAudit=(tx,db,event,unitId,actorUid,details)=>tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid,details,at:now()});
+const newAudit=(tx,db,event,unitId,actorUid,details)=>{signalUnitChange(tx,db,unitId);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid,details,at:now()});};
 const verify=(a,unitId,allowed)=>a.exists&&a.data().status==='active'&&a.data().unitId===unitId&&allowed.includes(a.data().role);
 const productPath=(unit,id)=>unit.collection('products').doc(id);
 const limitText=(x,max=240)=>typeof x==='string'&&x.length<=max;
@@ -28,7 +30,7 @@ export default async function kitchenV3(req,res){
   const user=await authenticate(req),member=await membership(user.uid);
   if(!member?.unitId)return send(res,403,'Usuário sem unidade ativa.');
   const db=getDb(),unitId=member.unitId,unit=db.collection('units').doc(unitId);
-  const products=unit.collection('products'),profiles=unit.collection('operationalProfiles'),issues=unit.collection('stockSignals'),orders=unit.collection('purchaseOrdersV3'),balances=unit.collection('v3PhysicalBalances');
+  const products=unit.collection('products'),profiles=unit.collection('operationalProfiles'),issues=unit.collection('stockSignals'),orders=unit.collection('purchaseOrdersV3'),balances=unit.collection('physicalBalances');
   const actorRef=db.doc('memberships/'+user.uid),action=req.body?.action;
   if(action==='v3Alerts'){
    const [s,o]=await Promise.all([issues.limit(201).get(),orders.limit(201).get()]);
@@ -41,7 +43,8 @@ export default async function kitchenV3(req,res){
    const [a,b,c,d,e]=await Promise.all([products.limit(201).get(),profiles.limit(201).get(),issues.limit(201).get(),orders.limit(201).get(),balances.limit(201).get()]);
    if([a,b,c,d,e].some(s=>s.size>200))return send(res,409,'Limite de consulta atingido. Paginação necessária.');
    const pm=new Map(b.docs.map(obj).map(p=>[p.id,p]));
-   const bm=new Map(e.docs.map(obj).map(p=>[p.id,p]));
+   const legacy=await unit.collection('v3PhysicalBalances').limit(201).get();if(legacy.size>200)return send(res,409,'Limite de consulta atingido.');
+   const bm=new Map(legacy.docs.map(obj).map(p=>[p.id,operationalView(p)]));for(const doc of e.docs)bm.set(doc.id,operationalView(obj(doc)));
    return send(res,200,'Painel operacional carregado.',{
     products:a.docs.map(s=>{const data={...obj(s),profile:pm.get(s.id)||null,v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
     signals:c.docs.map(obj).filter(s=>s.status!=='resolved'),
@@ -67,13 +70,14 @@ export default async function kitchenV3(req,res){
     if(sourceIds.length){const sourceDocs=await Promise.all(sourceIds.map(id=>tx.get(products.doc(id))));if(sourceDocs.some(d=>!d.exists||d.data().status!=='active'))throw Error('INVALID_SOURCE');}
     if(prior.exists&&prior.data().version!==expectedVersion||!prior.exists&&expectedVersion!==null)throw Error('STALE');
     if(p.data().status!=='active')throw Error('INACTIVE');
-    if(balance.exists&&balance.data().total>0&&prior.exists&&prior.data().countUnit!==profile.countUnit)throw Error('UNIT_LOCKED');
+    if(balance.exists&&balance.data().total>0&&balance.data().unit!==profile.countUnit)throw Error('UNIT_LOCKED');
     // A configuração NÃO altera saldo legado nem unidades de movimentos já gravados.
     const next={displayName:profile.displayName.trim(),aliases:(profile.aliases||[]).map(x=>x.trim()),controlMode:profile.controlMode,origin:profile.origin,
       countUnit:profile.countUnit||null,locations:profile.locations,receivingPresentation:profile.receivingPresentation||null,
       sourceProductIds:profile.sourceProductIds||[],alternativeProductIds:profile.alternativeProductIds||[],
       trackingNote:(profile.trackingNote||'').slice(0,240),version:(prior.data()?.version||0)+1,updatedAt:now(),updatedBy:user.uid};
     version=next.version;tx.set(ref,next);
+    if(profile.controlMode==='quantitative'&&['kg','g','L','ml','mL','un','porcao','pacote','duzia'].includes(profile.countUnit))tx.update(pref,{operationalUnitOverride:profile.countUnit,updatedAt:now()});
     newAudit(tx,db,'v3.profile_saved',unitId,user.uid,{productId,before:prior.data()||null,after:next});
    });
    return send(res,200,'Configuração operacional salva.',{version});

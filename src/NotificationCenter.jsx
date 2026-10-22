@@ -1,3 +1,4 @@
+import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {auth} from './firebase.js';
 import './notifications.css';
@@ -9,16 +10,15 @@ async function call(action,payload={}){
  const res=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
  const data=await res.json();if(!res.ok)throw Error(data.message||'Erro na consulta.');return data;
 }
-export default function NotificationCenter({openProfile,openKitchen}){
+export default function NotificationCenter({unitId,openProfile,openKitchen}){
  const panelRef=useRef(null);
  const {notify}=useFeedback(),[open,setOpen]=useState(false),[items,setItems]=useState([]),[busy,setBusy]=useState(false),[supplyAlerts,setSupplyAlerts]=useState({signals:[],deliveries:[]});
  const load=useCallback(async()=>{try{const data=await call('notifications');setItems(data.notifications||[])}catch(e){notify(e.message,'error')}},[notify]);
- useEffect(()=>{load();const poll=()=>{if(document.visibilityState==='visible')load()};const timer=setInterval(poll,15000);window.addEventListener('focus',poll);return()=>{clearInterval(timer);window.removeEventListener('focus',poll)}},[load]);
+ useEffect(()=>{load()},[load]);
+ useUnitLive(unitId,async()=>{await load();await loadSupply()});
  useEffect(()=>{if(!open)return;const outside=e=>{if(!panelRef.current?.contains(e.target))setOpen(false)};const key=e=>{if(e.key==='Escape')setOpen(false)};document.addEventListener('pointerdown',outside);document.addEventListener('keydown',key);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',key)}},[open]);
- useEffect(()=>{let live=true;const loadSupply=async()=>{try{const user=auth.currentUser;if(!user)return;const token=await user.getIdToken();
-  const r=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'v3Alerts'})});
-  if(r.ok){const d=await r.json();if(live)setSupplyAlerts({signals:d.signals||[],deliveries:d.deliveries||[]})}}catch{ /* indisponibilidade não bloqueia outras notificações */ }};
-  loadSupply();const timer=setInterval(()=>{if(document.visibilityState==='visible')loadSupply()},60000);return()=>{live=false;clearInterval(timer)}},[]);
+ const loadSupply=async()=>{try{const user=auth.currentUser;if(!user)return;const token=await user.getIdToken();const r=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'v3Alerts'})});if(r.ok){const d=await r.json();setSupplyAlerts({signals:d.signals||[],deliveries:d.deliveries||[]})}}catch{}};
+ useEffect(()=>{loadSupply()},[unitId]);
  const read=async id=>{setBusy(true);try{await call('notificationRead',{id});setItems(old=>old.map(x=>x.id===id?{...x,read:true}:x))}catch(e){notify(e.message,'error')}finally{setBusy(false)}};
  const unread=items.filter(x=>!x.read).length+supplyAlerts.signals.length;
  return <div className="ti-bell-wrap" ref={panelRef}>

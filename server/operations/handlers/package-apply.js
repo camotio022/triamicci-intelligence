@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../../live-signal.js';
 // Aplicação transacional restrita. Revalida estado dentro da transação.
 // Por segurança, somente produtos sem controle de lotes e sem embalagens abertas
 // podem ser ajustados aqui. Casos complexos permanecem bloqueados.
@@ -59,6 +60,7 @@ export default async function handler(req,res){
     entriesSinceCount:null,exitsSinceCount:null});
    tx.create(recordRef,{productId,conferenceId,unitId:m.unitId,actorUid:user.uid,payloadHash,at:now,
     area:conf.area,unit:unitName,profileVersion:cfg.version,change:plan.change,before:plan.before,after:plan.after});
+   signalUnitChange(tx,db,m.unitId);
    tx.create(db.collection('auditLogs').doc(),{event:'physical.package_adjusted',productId,unitId:m.unitId,
     actorUid:user.uid,operationId:requestId,at:now,details:{conferenceId,area:conf.area,profileVersion:cfg.version,before:plan.before,after:plan.after}});
    after=plan.after;

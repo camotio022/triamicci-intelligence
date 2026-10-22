@@ -1,14 +1,14 @@
 // Regras puras compartilhadas pelo endpoint e pelos testes.
 export const individualCatalogIds=new Set(['alcatra-bife','alcatra-cubos','frango-file-120g']);
 export function countUnit(product,catalog){
- if(['kg','g','L','ml','un'].includes(product.operationalUnitOverride))return product.operationalUnitOverride;
- if(['kg','g','L','ml','un'].includes(catalog?.operationalUnit))return catalog.operationalUnit;
- if(['kg','g','L','ml','un'].includes(product.operationalUnit))return product.operationalUnit;
+ if(['kg','g','L','ml','mL','un','porcao','pacote','duzia'].includes(product.operationalUnitOverride))return product.operationalUnitOverride;
+ if(['kg','g','L','ml','mL','un','porcao','pacote','duzia'].includes(catalog?.operationalUnit))return catalog.operationalUnit;
+ if(['kg','g','L','ml','mL','un','porcao','pacote','duzia'].includes(product.operationalUnit))return product.operationalUnit;
  return individualCatalogIds.has(product.catalogId)?'un':product.unit;
 }
 export function validQuantity(x,{allowZero=false,unit='kg'}={}){
  if(typeof x!=='number'||!Number.isFinite(x)||x<0||(!allowZero&&x===0)||x>100000)return false;
- if(unit==='un')return Number.isInteger(x);
+ if(['un','porcao','pacote','duzia'].includes(unit))return Number.isInteger(x);
  return Math.abs(Math.round(x*1000)-x*1000)<1e-7;
 }
 export function reconcile({previousTotal,currentTotal,entries,allUnitsCompatible,historyComplete}){

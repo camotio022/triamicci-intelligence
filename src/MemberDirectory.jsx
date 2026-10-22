@@ -1,8 +1,11 @@
+import {useDialogFocus} from './useDialogFocus.js';
+import {useUnitLive} from './useUnitLive.js';
+import {useViewState} from './useViewState.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { auth } from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 
-const roleLabels = {admin:'Administrador',manager:'Gerente',cook:'Cozinheiro',auxiliar:'Auxiliar'};
+const roleLabels = {admin:'Administrador',manager:'Gerente',submanager:'Subgerente',cook:'Cozinheiro',auxiliar:'Auxiliar'};
 const roles = Object.entries(roleLabels);
 const statuses = {active:'Ativo',inactive:'Desativado'};
 
@@ -26,15 +29,16 @@ export default function MemberDirectory({user,membership}) {
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
   const [notice,setNotice] = useState('');
-  const [query,setQuery] = useState('');
+  const [query,setQuery]=useViewState('MemberDirectory.jsx:query',membership.unitId,'');
   const [editing,setEditing] = useState(null);
   const [role,setRole] = useState('auxiliar');
   const [status,setStatus] = useState('active');
   const [saving,setSaving] = useState(false);
-  const isAdmin = membership.role === 'admin';
+  const dialog=useRef(null);useDialogFocus(dialog,!!editing,()=>{if(!saving)setEditing(null)});
+ const isAdmin = membership.role === 'admin';
 
-  const load = useCallback(async () => {
-    setLoading(true);setError('');
+  const load = useCallback(async (silent=false) => {
+    if(!silent)setLoading(true);setError('');
     try {
       const data = await request('list');
       setMembers(data.members || []);
@@ -42,6 +46,7 @@ export default function MemberDirectory({user,membership}) {
     finally {setLoading(false);}
   },[]);
   useEffect(() => {load();},[load]);
+ useUnitLive(membership.unitId,()=>load(true));
 
   const filtered = useMemo(() => members.filter(item =>
     ((item.name || '') + ' ' + (item.email || '') + ' ' + (roleLabels[item.role] || '')).toLocaleLowerCase('pt-BR')
@@ -91,7 +96,7 @@ export default function MemberDirectory({user,membership}) {
       </article>)}
       {!loading && !error && filtered.length === 0 && <p>Nenhum colaborador encontrado.</p>}
     </div>
-    {editing && <form className="team-edit-form" onSubmit={save}>
+    {editing && <div className="ti-unified-modal-backdrop"><div ref={dialog} className="ti-unified-modal" role="dialog" aria-modal="true" aria-label="Gerir acesso"><form className="team-edit-form" onSubmit={save}>
       <h3>Gerir acesso</h3>
       <p>{editing.email} · unidade {membership.unitId}</p>
       <label htmlFor="member-role">Função</label>
@@ -103,11 +108,11 @@ export default function MemberDirectory({user,membership}) {
       <select id="member-status" value={status} onChange={event => setStatus(event.target.value)}>
         <option value="active">Ativo</option><option value="inactive">Desativado</option>
       </select>
-      <p className="team-note">Desativar bloqueia novas verificações de acesso. Uma sessão já aberta pode precisar ser atualizada para refletir a mudança.</p>
+      <p className="team-note">Desativar bloqueia novas verificações de acesso. O vínculo é acompanhado em tempo real para atualizar sessões abertas.</p>
       <div className="team-edit-actions">
         <button type="submit" disabled={saving}>{saving?'Salvando...':'Salvar alterações'}</button>
         <button type="button" className="team-secondary" disabled={saving} onClick={() => setEditing(null)}>Cancelar</button>
       </div>
-    </form>}
+    </form></div></div>}
   </section>;
 }

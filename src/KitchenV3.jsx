@@ -1,3 +1,5 @@
+import {useViewState} from './useViewState.js';
+import {useUnitLive} from './useUnitLive.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
@@ -23,20 +25,21 @@ const longDate=x=>x?new Date(x).toLocaleString('pt-BR'):'—';
 export default function KitchenV3({membership}){
  const {notify}=useFeedback();
  const canManage=isManagement(membership.role);
- const [tab,setTab]=useState('overview'),[products,setProducts]=useState([]),[signals,setSignals]=useState([]),[orders,setOrders]=useState([]);
- const [selected,setSelected]=useState(''),[search,setSearch]=useState(''),[location,setLocation]=useState('reserva'),[showArchived,setShowArchived]=useState(false),[newName,setNewName]=useState(''),[newCategory,setNewCategory]=useState('Proteínas'),[newUnit,setNewUnit]=useState('kg'),[newExpiry,setNewExpiry]=useState(false),[resolutionById,setResolutionById]=useState({});
+ const [tab,setTab]=useViewState('KitchenV3.jsx:tab',membership.unitId,'overview'),[products,setProducts]=useState([]),[signals,setSignals]=useState([]),[orders,setOrders]=useState([]);
+ const [selected,setSelected]=useState(''),[search,setSearch]=useViewState('KitchenV3.jsx:search',membership.unitId,''),[location,setLocation]=useState('reserva'),[showArchived,setShowArchived]=useState(false),[newName,setNewName]=useState(''),[newCategory,setNewCategory]=useState('Proteínas'),[newUnit,setNewUnit]=useState('kg'),[newExpiry,setNewExpiry]=useState(false),[resolutionById,setResolutionById]=useState({});
  const [observation,setObservation]=useState('missing'),[note,setNote]=useState('');
- const [overviewFilter,setOverviewFilter]=useState('alerts'),[showAllOrders,setShowAllOrders]=useState(false);
+ const [overviewFilter,setOverviewFilter]=useViewState('KitchenV3.jsx:overviewFilter',membership.unitId,'alerts'),[showAllOrders,setShowAllOrders]=useState(false);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [editId,setEditId]=useState(''),[step,setStep]=useState(0),[mode,setMode]=useState('availability'),
   [origin,setOrigin]=useState('supplier'),[countUnit,setCountUnit]=useState('un'),[locs,setLocs]=useState(['reserva']),[presentation,setPresentation]=useState(''),[trackingNote,setTrackingNote]=useState(''),[displayName,setDisplayName]=useState(''),[aliases,setAliases]=useState(''),[sourceIds,setSourceIds]=useState([]),[altIds,setAltIds]=useState([]);
  const [supplier,setSupplier]=useState(''),[eta,setEta]=useState(''),[orderLines,setOrderLines]=useState([{productId:'',quantity:'',unit:'kg'}]),[orderNote,setOrderNote]=useState('');
- const load=useCallback(async()=>{
-  setLoading(true);setError('');
+ const load=useCallback(async(silent=false)=>{
+  if(!silent)setLoading(true);setError('');
   try{const d=await api('v3Dashboard');setProducts(d.products||[]);setSignals(d.signals||[]);setOrders(d.orders||[]);}
   catch(e){setError(e.message);}
   finally{setLoading(false);}
  },[]);
+ useUnitLive(membership?.unitId,()=>load(true));
  useEffect(()=>{load();},[load]);
  const active=useMemo(()=>products.filter(p=>(showArchived||p.status==='active')&&(p.name+' '+(p.profile?.displayName||'')+' '+(p.profile?.aliases||[]).join(' ')).toLowerCase().includes(search.trim().toLowerCase())),[products,search,showArchived]);
  const chosen=products.find(p=>p.id===selected);

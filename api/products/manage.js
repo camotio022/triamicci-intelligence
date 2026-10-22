@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../../server/live-signal.js';
 import measurementsHandler from '../../server/operations/handlers/measurements.js';
 import { createHash } from 'node:crypto';
 import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
@@ -57,6 +58,7 @@ export default async function handler(req,res) {
        const old=product.data();
        tx.update(productRef,{operationalUnitOverride:operationalUnit,receivingUnitOverride:receivingUnit,
         unitCorrectionAt:now,unitCorrectionBy:actor.uid,updatedAt:now});
+       signalUnitChange(tx,db,m.unitId);
        tx.create(db.collection('auditLogs').doc(),{event:'product.units_corrected',
         unitId:m.unitId,productId,actorUid:actor.uid,at:now,
         before:{stockUnit:old.unit,operationalUnitOverride:old.operationalUnitOverride||null,
@@ -88,6 +90,7 @@ export default async function handler(req,res) {
           throw new Error('FORBIDDEN');
         if (existing.exists) throw new Error('DUPLICATE');
         tx.create(ref,{...payload,quantity:0,status:'active',createdAt:now,createdBy:actor.uid,updatedAt:now});
+        signalUnitChange(tx,db,m.unitId);
         tx.create(auditRef,{event:'product.created',unitId:m.unitId,productId:id,actorUid:actor.uid,at:now,details:payload});
       });
       return send(res,201,'Insumo cadastrado.',{id});
@@ -114,6 +117,7 @@ export default async function handler(req,res) {
       if (createHash('sha256').update(safeName.toLocaleLowerCase('pt-BR')).digest('hex').slice(0,40) !== productId)
         throw new Error('RENAME_NOT_SUPPORTED');
       tx.update(ref,{...payload,status,updatedAt:now,updatedBy:actor.uid});
+      signalUnitChange(tx,db,m.unitId);
       tx.create(auditRef,{event:'product.updated',unitId:m.unitId,productId,actorUid:actor.uid,at:now,
         before:{name:previous.name,category:previous.category,unit:previous.unit,minStock:previous.minStock,trackExpiry:previous.trackExpiry,status:previous.status},
         after:{...payload,status}});

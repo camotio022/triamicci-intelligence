@@ -1,3 +1,4 @@
+import ShipmentReceiving from './ShipmentReceiving.jsx';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import React,{useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
@@ -9,9 +10,9 @@ async function invoke(action,payload={}){
  const d=await r.json();if(!r.ok)throw Error(d.message||'Operação não realizada.');return d;
 }
 function Field({name,children}){return <label>{name}{children}</label>}
-export default function KitchenV3Workflows({kind,products,orders,membership,onChange,onConfigure}){
+export default function KitchenV3Workflows({kind,products,orders,membership,onChange,onConfigure,initialProductId=null}){
  const {notify}=useFeedback();const managers=isManagement(membership.role);
- const [productId,setProductId]=useState(''),[location,setLocation]=useState('reserva'),[supplier,setSupplier]=useState(''),
+ const [productId,setProductId]=useState(initialProductId||''),[location,setLocation]=useState('reserva'),[supplier,setSupplier]=useState(''),
  [commercialUnit,setCommercialUnit]=useState('kg'),[commercialQuantity,setCommercialQuantity]=useState(''),
  [stockQuantity,setStockQuantity]=useState(''),[orderId,setOrderId]=useState(''),[lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),
  [notes,setNotes]=useState(''),[quantity,setQuantity]=useState(''),[sessionId,setSessionId]=useState(()=>crypto.randomUUID()),
@@ -79,7 +80,9 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  const relevantProduct=prepared?out:chosen;
  const locations=relevantProduct?.profile?.locations||['reserva','giro'];
  const showLot=(kind==='receive'&&chosen?.trackExpiry)||(prepared&&out?.trackExpiry);
- return <section className="v3-card v3-workflow">
+ return <section className="v3-page v3-card v3-workflow">
+  {kind==='receive'&&<ShipmentReceiving products={products} orders={orders} membership={membership} onChange={onChange}/>}
+  <details open={kind!=='receive'}><summary>{kind==='receive'?'Conferência individual e pendências anteriores':'Detalhes da operação'}</summary>
   <h2>{({receive:'Receber mercadoria',count:'Conferir estoque',transfer:'Abastecer Giro ou devolver à Reserva',produce:'Registrar produção concluída'})[kind]}</h2>
   <p>{({receive:'Confira o que realmente chegou. Um pedido não é estoque antes de ser recebido.',count:'Registre o que encontrou fisicamente. Uma diferença não significa automaticamente venda ou produção.',transfer:'Mova quantidades entre locais sem baixar o total da cozinha.',produce:'Escolha a origem real da matéria-prima e informe o rendimento realmente preparado. Não fazemos conversões presumidas.'})[kind]}</p>
   {error&&<p role="alert" className="v3-error">{error}</p>}
@@ -139,5 +142,5 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    </button>
   </form>
   {kind==='receive'&&managers&&<section className="v3-approval-list" aria-label="Conferências aguardando aprovação"><h3>Aguardando aprovação gerencial</h3><p>Somente aprovar após verificar os dados conferidos. O estoque ainda não foi atualizado.</p><button type="button" className="v3-secondary" onClick={loadPending}>Atualizar pendências</button>{pendingError&&<p role="alert">{pendingError}</p>}{inspections.length===0?<p>Nenhuma conferência pendente encontrada.</p>:inspections.map(item=><article key={item.id} className="v3-card"><strong>{products.find(p=>p.id===item.productId)?.name||"Insumo"} · {item.supplier}</strong><p>Recebido: {item.commercialQuantity} {item.commercialUnit} · Saldo aferido: {item.stockQuantity} · {item.location}</p>{item.lot&&<p>Lote: {item.lot} · validade: {item.expiryDate}</p>}{item.notes&&<p>{item.notes}</p>}<button type="button" disabled={busy} onClick={()=>approve(item.id)}>{busy?"Processando…":"Aprovar entrada no estoque"}</button><button type="button" className="v3-secondary" disabled={busy} aria-expanded={rejectionId===item.id} onClick={()=>{setRejectionId(id=>id===item.id?"":item.id);setRejectionReason("")}}>Rejeitar conferência</button>{rejectionId===item.id&&<form onSubmit={e=>{e.preventDefault();reject(item.id,rejectionReason)}}><Field name="Justificativa da rejeição"><textarea required minLength={8} maxLength={240} value={rejectionReason} onChange={e=>setRejectionReason(e.target.value)}/></Field><button type="submit" disabled={busy||rejectionReason.trim().length<8}>Confirmar rejeição</button></form>}</article>)}</section>}
- </section>;
+ </details></section>;
 }
