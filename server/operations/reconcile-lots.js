@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../live-signal.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {countUnit,validQuantity} from './logic.js';
@@ -72,6 +73,7 @@ export default async function handler(req,res){
    tx.create(ref,{productId,actorUid:actor.uid,unitId:m.unitId,payloadHash,at:now,
      before:existingLots.docs.map(d=>({id:d.id,reserva:d.data().reserva??null,giro:d.data().giro??null})),
      after:items,reason:'physical_lot_reconciliation'});
+   signalUnitChange(tx,db,m.unitId);
    tx.create(db.collection('auditLogs').doc(),{event:'physical.lots_reconciled',
     productId,actorUid:actor.uid,unitId:m.unitId,operationId:requestId,at:now});
   });

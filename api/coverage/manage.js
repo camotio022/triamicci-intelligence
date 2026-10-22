@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../../server/live-signal.js';
 import {randomUUID} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 import {evaluateCoverage,paymentFor,rateRoleFor,checkDoubleShift,approvalGate,DEFAULT_RATES} from '../../server/coverage/engine.js';
@@ -47,6 +48,7 @@ export default async function handler(req,res){
     const who=await tx.get(db.collection('memberships').doc(actor.uid));
     if(!who.exists||who.data().status!=='active'||who.data().unitId!==member.unitId)throw Error('FORBIDDEN');
     tx.create(staffRequests.doc(requestId),{staffId:linked.docs[0].id,accountUid:actor.uid,name:linked.docs[0].data().name||'',kind,date,reason:reason.trim(),status:'pending',createdAt:now,updatedAt:now,unitId:member.unitId});
+    signalUnitChange(tx,db,member.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.change_requested',requestId,unitId:member.unitId,actorUid:actor.uid,at:now});
    });
    return send(res,201,'Solicitação enviada à gerência. Nenhuma escala foi alterada.',{id:requestId});
@@ -61,6 +63,7 @@ export default async function handler(req,res){
     const person=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
     if(!person.exists||person.data().status!=='active'||person.data().accountUid!==actor.uid)throw Error('FORBIDDEN');
     tx.update(ref,{status:decision==='accepted'?'pending_approval':'declined',...(decision==='accepted'?{acceptedAt:now}:{declinedAt:now}),updatedAt:now,respondedBy:actor.uid});
+    signalUnitChange(tx,db,member.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.'+decision,proposalId:id,unitId:member.unitId,actorUid:actor.uid,at:now});
    });
    return send(res,200,'Resposta registrada. A escala publicada não foi alterada.');
@@ -76,6 +79,7 @@ export default async function handler(req,res){
     if(!who.exists||who.data().status!=='active'||who.data().unitId!==member.unitId||!roles.has(who.data().role))throw Error('FORBIDDEN');
     if(!old.exists||old.data().status!=='pending'||old.data().accountUid===actor.uid)throw Error('CONFLICT');
     tx.update(ref,{status:decision,note:note.trim(),decidedBy:actor.uid,decidedAt:now,updatedAt:now});
+    signalUnitChange(tx,db,member.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.change_'+decision,requestId,unitId:member.unitId,actorUid:actor.uid,at:now,note:note.trim()});
    });
    return send(res,200,'Solicitação analisada. A escala oficial continua inalterada até sua atualização e publicação.');
@@ -91,6 +95,7 @@ export default async function handler(req,res){
     const m=await tx.get(db.collection('memberships').doc(actor.uid));
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||m.data().role!=='admin')throw Error('FORBIDDEN');
     tx.set(policyRef,{requirements:clean,updatedAt:now,updatedBy:actor.uid});
+    signalUnitChange(tx,db,member.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.requirements_updated',actorUid:actor.uid,unitId:member.unitId,count:clean.length,at:now});
    });
    return send(res,200,'Regras de cobertura salvas. Escalas publicadas preservadas.');
@@ -104,6 +109,7 @@ export default async function handler(req,res){
     const m=await tx.get(db.collection('memberships').doc(actor.uid));
     if(!m.exists||m.data().status!=='active'||m.data().role!=='admin'||m.data().unitId!==member.unitId)throw Error('FORBIDDEN');
     tx.set(settings,{rates:updated,updatedAt:now,updatedBy:actor.uid});
+    signalUnitChange(tx,db,member.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.rates_updated',unitId:member.unitId,actorUid:actor.uid,rates:updated,at:now});
    });
    return send(res,200,'Tabela operacional atualizada; históricos preservados.');
@@ -137,6 +143,7 @@ export default async function handler(req,res){
     tx.create(proposal,{staffId,name:person.data().name||'',date,first,second,external,rateRole,reason:reason.trim(),practicePayment:payment,
       legalEstimate:null,legalValidated:false,reviewReasons:review.reasons,status:person.data().accountUid?'pending_acceptance':'pending_approval',consentPending:!person.data().accountUid,
       createdAt:now,updatedAt:now,createdBy:actor.uid,unitId:member.unitId});
+    signalUnitChange(tx,db,member.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.proposed',unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,practicePayment:payment});
    });
    return send(res,201,'Proposta registrada; depende de aceite, verificação trabalhista e aprovação.',{id});
@@ -158,6 +165,7 @@ export default async function handler(req,res){
      if(gate)throw Error(gate);
     }
     tx.update(ref,{status:decision,decisionNote:note.trim(),legalValidated:false,legalReviewConfirmed:decision==='approved',consentVerified:decision==='approved',consentEvidence:decision==='approved'?req.body.consentEvidence.trim():null,decidedBy:actor.uid,decidedAt:now,updatedAt:now});
+    signalUnitChange(tx,db,member.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.'+decision,unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,note:note.trim()});
    });
    return send(res,200,'Decisão registrada. Aprovação não altera automaticamente a escala oficial.');

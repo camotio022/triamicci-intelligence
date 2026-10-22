@@ -1,3 +1,4 @@
+import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import './operations-planning.css';
@@ -19,13 +20,16 @@ const dateLabel=value=>{
 export default function LeaveRequests({membership}){
  const [requests,setRequests]=useState([]),[date,setDate]=useState(''),[reason,setReason]=useState(''),[notes,setNotes]=useState({}),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[notice,setNotice]=useState('');
  const [reviewId,setReviewId]=useState(null),[showForm,setShowForm]=useState(false),[filter,setFilter]=useState('pending');
+ const [context,setContext]=useState(null);
+ useEffect(()=>{let active=true;setContext(null);if(date)api('leaveContext',{date}).then(d=>{if(active)setContext(d)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[date,membership.unitId]);
  const manager=['admin','manager','submanager'].includes(membership.role);
- const load=useCallback(async()=>{
-  setLoading(true);
+ const load=useCallback(async(silent=false)=>{
+  if(!silent)setLoading(true);
   try{const d=await api('leaveList');setRequests(d.requests||[]);setError('');}
   catch(e){setError(e.message);}
   finally{setLoading(false);}
  },[membership.unitId]);
+ useUnitLive(membership?.unitId,()=>load(true));
  useEffect(()=>{setRequests([]);setReviewId(null);setNotes({});setError('');setNotice('');load();},[load]);
  const filtered=useMemo(()=>manager&&filter!=='all'?requests.filter(x=>x.status===filter):requests,[requests,manager,filter]);
  const pendingCount=requests.filter(x=>x.status==='pending').length;
@@ -61,8 +65,9 @@ export default function LeaveRequests({membership}){
    <p>Informe a data desejada e o motivo. A disponibilidade depende da escala oficial e da aprovação.</p>
    <form onSubmit={submit}>
     <label>Data desejada<input required type="date" min={todayInUnit()} value={date} onChange={e=>setDate(e.target.value)}/></label>
+    {date&&context&&<p role="status" className="receiving-notice">{context.official?'Escala oficial: pedidos comuns encerrados. Utilize troca ou cobertura.':context.pending?'Já existe um pedido em análise para esta data.':context.entry?('Programação: '+({work:'trabalho',off:'folga',monthly_sunday:'domingo de folga',leave:'ausência'})[context.entry.type]):'Sem escala oficial para esta data. O pedido será analisado no planejamento.'}{context.nextOff&&' Próxima folga publicada: '+dateLabel(context.nextOff)+'.'}</p>}
     <label>Justificativa<textarea required minLength={10} maxLength={400} rows={3} value={reason} onChange={e=>setReason(e.target.value)}/></label>
-    <button type="submit" className="ti-leave-v4-primary" disabled={busy||reason.trim().length<10||!date}> {busy?'Enviando...':'Revisar e enviar pedido'}</button>
+    <button type="submit" className="ti-leave-v4-primary" disabled={busy||reason.trim().length<10||!date||context?.official||context?.pending}> {busy?'Enviando...':'Revisar e enviar pedido'}</button>
    </form>
   </section>}
   <section className="ti-planning-card ti-leave-v4-requests">

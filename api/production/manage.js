@@ -1,3 +1,5 @@
+import {hasRecipeCycle} from '../../server/production/recipe-graph.js';
+import {signalUnitChange} from '../../server/live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 import dayListHandler from '../../server/production/day-list.js';
 import {countUnit,validQuantity} from '../../server/operations/logic.js';
@@ -51,10 +53,14 @@ export default async function handler(req,res){
      const balance=await tx.get(unit.collection('physicalBalances').doc(outputProductId));
      const catalog=output.data().catalogId?await tx.get(db.collection('productCatalog').doc(output.data().catalogId)):null;
      if(!balance.exists||countUnit(output.data(),catalog?.data())!=='un'||balance.data().unit!=='un'||!Number.isFinite(balance.data().reserve)||!Number.isFinite(balance.data().total))throw Error('INVALID_OUTPUT');}
+    const graph=await tx.get(recipes.limit(101));
+    if(graph.size>100)throw Error('RECIPE_GRAPH_LIMIT');
+    if(hasRecipeCycle([...graph.docs.filter(d=>d.id!==id&&d.data().active!==false).map(d=>d.data()),{outputProductId,lines}]))throw Error('RECIPE_CYCLE');
     const now=new Date();
     tx.set(ref,{name:name.trim(),outputProductId,yieldQuantity,lines:lines.map(x=>({productId:x.productId,
       quantity:x.quantity,substitutes:x.substitutes||[]})),version:(prev.data()?.version||0)+1,
       updatedAt:now,updatedBy:actor.uid,active:true});
+    signalUnitChange(tx,db,member.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'production.recipe_saved',unitId:member.unitId,
       recipeId:id,actorUid:actor.uid,at:now});
    });
@@ -106,7 +112,7 @@ export default async function handler(req,res){
    const lots=await Promise.all(items.map((item,index)=>productDocs[index].data().trackExpiry?
     tx.get(unit.collection('physicalLots').doc(item.productId).collection('lots').orderBy('expiryDate').limit(101)):Promise.resolve(null)));
    if(transformed){
-    const unitMap=Object.fromEntries(productDocs.map((p,i)=>[items[i].productId,countUnit(p,centralDocs[i]?.data())]));
+    const unitMap=Object.fromEntries(productDocs.map((p,i)=>[items[i].productId,countUnit(p.data(),centralDocs[i]?.data())]));
     const check=transformationPreview(recipeData,portions,unitMap);
     if(!check.valid||check.inputs.some((x,i)=>x.productId!==items[i].productId||Math.abs(x.quantity-items[i].quantity)>0.000001))throw Error('INVALID_TRANSFORMATION');
     const outputUnit=countUnit(outputDoc.data(),outputCatalog?.data());
@@ -152,11 +158,14 @@ export default async function handler(req,res){
    tx.create(ref,record);
    if(taskRef){const progress=progressAfterProduction(task.data(),portions);
     tx.update(taskRef,{...progress,...(progress.status==='completed'?{completedAt:now}:{}),completedBy:actor.uid,productionRunId:requestId});}
+   signalUnitChange(tx,db,member.unitId);
    tx.create(db.collection('auditLogs').doc(),{event:'production.finished',unitId:member.unitId,
     operationId:requestId,actorUid:actor.uid,at:now,details:record});
   });
   return send(res,200,duplicate?'Produção já registrada.':'Produção registrada com os saldos atualizados.',{duplicate});
  }catch(e){
+  if(e.message==='RECIPE_CYCLE')return send(res,409,'As fichas formam um ciclo de preparações. Revise as origens.');
+  if(e.message==='RECIPE_GRAPH_LIMIT')return send(res,409,'Mais de cem fichas: revisão administrativa necessária.');
   const errors={FORBIDDEN:[403,'Sem permissão.'],PRODUCT_NOT_FOUND:[409,'Produto da receita não está ativo.'],
    LEGACY_CUT:[409,'Alcatra genérica é cadastro legado; selecione bife ou cubos de alcatra com contagem própria.'],
    INVALID_UNIT_QUANTITY:[409,'Peças devem ser inteiras; revise a quantidade da ficha técnica.'],

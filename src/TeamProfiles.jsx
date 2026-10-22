@@ -1,3 +1,4 @@
+import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState,useRef} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -20,9 +21,10 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  const [requests,setRequests]=useState([]);const [members,setMembers]=useState([]),[tab,setTab]=useState(initialTab),[selected,setSelected]=useState(''),
  [form,setForm]=useState(blank()),[error,setError]=useState(''),[notice,setNotice]=useState(''),
  [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[search,setSearch]=useState('');
- const load=useCallback(async()=>{setLoading(true);setError('');
+ const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');
   try{const [reg,q]=await Promise.all([api('masterRegistryPreview'),api('skillReviewList')]);const registered=(reg.registry||[]).map(p=>({uid:p.id,name:p.name,status:p.status,registry:true,role:p.jobTitle==='Cozinheiro'?'cook':p.jobTitle==='Auxiliar de cozinha'?'auxiliar':'staff',professional:{sector:p.sector,jobTitle:p.jobTitle,shift:p.shift,availability:p.availability||[],skills:p.skills||[],certifications:p.certifications||[],notes:p.notes||'',sectorExceptions:[]}}));setMembers(registered);setRequests(q.requests||[])}
   catch(e){setError(e.message)}finally{setLoading(false)}},[]);
+ useUnitLive(membership?.unitId,()=>load(true));
  useEffect(()=>{load()},[load]);
  useEffect(()=>{setTab(initialTab);setSelected('');setError('')},[initialTab]);
  const filtered=useMemo(()=>members.filter(m=>(m.name+' '+m.email+' '+(m.professional?.jobTitle||'')).toLowerCase().includes(search.toLowerCase())),[members,search]);

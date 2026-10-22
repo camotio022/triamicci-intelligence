@@ -1,3 +1,4 @@
+import {useUnitLive} from './useUnitLive.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import { auth } from './firebase.js';
@@ -37,12 +38,13 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const [detailId,setDetailId] = useState(null);
   const canEdit = ['admin','manager'].includes(membership.role);
   const administration = mode === 'catalog';
-  const load = useCallback(async () => {
-    setLoading(true);setError('');
+  const load = useCallback(async (silent=false) => {
+    if(!silent)setLoading(true);setError('');
     try { const data = await call('list');setProducts(data.products || []); }
     catch(e) {setError(e.message);}
     finally {setLoading(false);}
   },[]);
+ useUnitLive(membership?.unitId,()=>load(true));
   useEffect(()=>{load();},[load]);
   const countDay=p=>{const at=p.physicalBalance?.at;if(!at)return null;const date=new Date(at);return Number.isNaN(date.getTime())?null:restaurantDay(date)};
   const todays=products.filter(p=>countDay(p)===today);
@@ -76,7 +78,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
     <h1>{administration?'Administração · Catálogo':'Estoque físico da cozinha'}</h1>
     <p>{administration?'Revise cadastros, aprovações e configurações sem misturar essas tarefas com a rotina de estoque.':'Consulte a última contagem de reserva e giro. Sem contagem, mostramos o saldo legado identificado, não uma quantidade física confirmada.'}</p>
     {administration&&<div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>}
-    {!administration&&<div className="ti-stock-overview" aria-label="Resumo do estoque"><div><strong>{products.length}</strong><span>Insumos</span></div><div><strong>{todays.length}</strong><span>Contados hoje</span></div><div><strong>{products.filter(p=>!p.physicalBalance?.at).length}</strong><span>Sem contagem</span></div></div>}
+    {!administration&&<div className="ti-stock-overview" aria-label="Resumo do estoque"><button type="button" aria-pressed={countFilter==='all'} onClick={()=>setCountFilter('all')}><strong>{products.length}</strong><span>Insumos</span></button><button type="button" aria-pressed={countFilter==='today'} onClick={()=>setCountFilter('today')}><strong>{todays.length}</strong><span>Contados hoje</span></button><button type="button" aria-pressed={countFilter==='uncounted'} onClick={()=>setCountFilter('uncounted')}><strong>{products.filter(p=>!p.physicalBalance?.at).length}</strong><span>Sem contagem</span></button></div>}
     {!administration&&<p className="ti-stock-day-label"><strong>Hoje · {new Date(today+"T12:00:00Z").toLocaleDateString("pt-BR",{timeZone:"UTC"})}</strong> · A data indica a última contagem, não o saldo após movimentações.</p>}
     {administration&&canEdit&&<MeasurementEditor products={products}/>}
     {administration && membership.role === 'admin' && <CatalogV2Review />}

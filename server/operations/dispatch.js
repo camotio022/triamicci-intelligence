@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {countUnit,validQuantity} from './logic.js';
 import {areaTotals,allocateFEFO} from './lot-logic.js';
@@ -88,6 +89,7 @@ export default async function handler(req,res){
      lotId:l.id,lot:l.lot,expiryDate:l.expiryDate,quantity:l.quantity
     }))};
    tx.create(movementRef,record);
+   signalUnitChange(tx,db,m.unitId);
    tx.create(auditRef,{event:'physical.dispatched',unitId:m.unitId,productId,operationId:requestId,
     actorUid:actor.uid,details:record,at:now});
   });

@@ -2,7 +2,7 @@ import {monthDates} from './rules.js';
 export const WEEKDAY_LABELS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 export function weekdayOf(date){return new Date(date+'T12:00:00Z').getUTCDay()}
 export function weekdayOccurrences(period,weekday){return monthDates(period).filter(date=>weekdayOf(date)===weekday)}
-export function generateMonthlyRoster({period,members,fixedOffDays={},sundayOffDays={}}){
+export function generateMonthlyRoster({period,members,fixedOffDays={},sundayOffDays={},approvedLeaves=[]}){
  const dates=monthDates(period);
  if(!dates.length)throw Error('Mês inválido.');
  const employees=members.filter(m=>m.status==='active');
@@ -13,6 +13,6 @@ export function generateMonthlyRoster({period,members,fixedOffDays={},sundayOffD
   const sunday=sundayOffDays[m.uid];
   if(!sunday||!dates.includes(sunday)||weekdayOf(sunday)!==0)throw Error('Selecione um domingo mensal válido para '+(m.name||m.uid));
  }
- return employees.flatMap(m=>dates.map(date=>({uid:m.uid,date,type:date===sundayOffDays[m.uid]?'monthly_sunday':weekdayOf(date)===fixedOffDays[m.uid]?'off':'work'})))
+ return employees.flatMap(m=>dates.map(date=>({uid:m.uid,date,type:approvedLeaves.some(r=>r.status==='approved'&&(r.uid===m.uid||r.uid===m.accountUid)&&r.date===date)?'leave':date===sundayOffDays[m.uid]?'monthly_sunday':weekdayOf(date)===fixedOffDays[m.uid]?'off':'work'})))
   .sort((a,b)=>a.date.localeCompare(b.date)||a.uid.localeCompare(b.uid));
 }

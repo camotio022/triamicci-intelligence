@@ -1,3 +1,5 @@
+import investigation from '../../server/operations/investigation.js';
+import {signalUnitChange} from '../../server/live-signal.js';
 import kitchenV3 from '../../server/operations/v3-service.js';
 import packageConferenceHandler from '../../server/operations/handlers/package-conference.js';
 import packageReviewHandler from '../../server/operations/handlers/package-review.js';
@@ -32,6 +34,7 @@ function error(res,e){
 export default async function handler(req,res){
  if(typeof req.body?.action==='string'&&req.body.action.startsWith('v3'))return kitchenV3(req,res);
  const subaction=req.body?.action;
+ if(['investigationGet','investigationSave','investigationApprove','investigationReject'].includes(subaction))return investigation(req,res);
  if(subaction==='packageRecord'||subaction==='packagePreview'||subaction==='packageApply'){
   req.body.action=({packageRecord:'record',packagePreview:'preview',packageApply:'apply'})[subaction];
   return ({packageRecord:packageConferenceHandler,packagePreview:packageReviewHandler,packageApply:packageApplyHandler})[subaction](req,res);
@@ -230,6 +233,7 @@ export default async function handler(req,res){
       lastReceiptId:requestId,updatedAt:now},{merge:true});
    }
    tx.create(ref,record);
+   signalUnitChange(tx,db,m.unitId);
    tx.create(auditRef,{event:action==='receive'?'physical.received':'physical.counted',unitId:m.unitId,
     productId,actorUid:actor.uid,operationId:requestId,details:payload,at:now});
    result={id:requestId,duplicate:false,record};

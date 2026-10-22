@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {canApproveClosure,closureDay} from './inventory-closure-rules.js';
 const productPattern=/^[a-f0-9]{40}$/;
@@ -68,6 +69,7 @@ export default async function inventoryClosure(req,res) {
       balanceMovementAt:toIso(b.data().lastMovementAt)||toIso(b.data().at),
       status:'pending',submittedBy:actor.uid,submittedAt:now};
     tx.create(ref,data);
+    signalUnitChange(tx,db,membershipData.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'inventory.close_requested',unitId:membershipData.unitId,
       productId,countId:requestId,actorUid:actor.uid,at:now,details:{day}});
     result={id:ref.id,status:'pending',duplicate:false};
@@ -97,6 +99,7 @@ export default async function inventoryClosure(req,res) {
        throw Error('CONFLICT');
     }
     tx.update(ref,{status:next,decidedBy:actor.uid,decidedAt:now,reason:reason.trim()});
+    signalUnitChange(tx,db,membershipData.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:next==='approved'?'inventory.close_approved':'inventory.close_rejected',
       unitId:membershipData.unitId,productId,countId:requestId,actorUid:actor.uid,at:now,
       details:{day:current.day,reason:reason.trim()}});

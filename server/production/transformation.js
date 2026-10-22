@@ -22,7 +22,7 @@ export function transformationPreview(recipe,quantity,unitsByProduct={}){
  for(const line of recipe.lines){
   const raw=line.quantity*quantity/recipe.yieldQuantity;
   const unit=unitsByProduct[line.productId];
-  if(!['un','kg','g','L','mL'].includes(unit))
+  if(!['un','kg','g','L','mL','ml'].includes(unit))
    return {valid:false,reason:'UNCONFIRMED_UNIT'};
   // Nunca arredondar uma peça fracionária para cima sem ficha validada.
   if(unit==='un'&&!Number.isInteger(raw))

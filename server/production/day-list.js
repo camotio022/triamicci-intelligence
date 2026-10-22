@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const recipePattern=/^[a-z0-9-]{3,64}$/;
 const datePattern=/^\d{4}-\d{2}-\d{2}$/;
@@ -31,6 +32,7 @@ export default async function handler(req,res){
     if(!recipeDoc.exists||recipeDoc.data().active!==true)throw Error('RECIPE_NOT_FOUND');
     const now=new Date();
     tx.create(taskRef,{recipeId,recipeName:recipeDoc.data().name,plannedQuantity,status:'pending',day,unitId:m.unitId,createdBy:actor.uid,createdAt:now});
+    signalUnitChange(tx,db,m.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'production.task_added',unitId:m.unitId,day,taskId:taskRef.id,recipeId,actorUid:actor.uid,at:now});
    });
    return send(res,200,'Preparação adicionada à lista do dia.',{taskId:taskRef.id});

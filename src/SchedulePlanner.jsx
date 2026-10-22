@@ -1,3 +1,4 @@
+import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {generateMonthlyRoster,weekdayOccurrences,weekdayOf,WEEKDAY_LABELS} from '../server/schedules/generator.js';
 import {auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';
@@ -9,18 +10,20 @@ async function call(action,extra={}){
  const d=await r.json();if(!r.ok)throw Error([d.message,...(d.issues||[]).slice(0,5)].join(' · '));return d;
 }
 async function membersApi(){
- const token=await auth.currentUser?.getIdToken();const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'profiles'})});const d=await r.json();if(!r.ok)throw Error(d.message);const staff=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryPreview'})});const sd=await staff.json();if(!staff.ok)throw Error(sd.message||'Cadastro Mestre indisponível.');return {activated:!!sd.activated,registeredCount:(sd.registry||[]).filter(p=>p.status==='active').length,people:sd.activated?(sd.registry||[]).filter(p=>p.status==='active').map(p=>({uid:p.id,name:p.name,status:p.status,professional:{sector:p.sector,shift:p.shift,jobTitle:p.jobTitle,skills:p.skills||[],certifications:p.certifications||[]},fixedWeekday:p.fixedWeekday,registry:true})):d.members||[]};
+ const token=await auth.currentUser?.getIdToken();const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'profiles'})});const d=await r.json();if(!r.ok)throw Error(d.message);const staff=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryPreview'})});const sd=await staff.json();if(!staff.ok)throw Error(sd.message||'Cadastro Mestre indisponível.');return {activated:!!sd.activated,registeredCount:(sd.registry||[]).filter(p=>p.status==='active').length,people:sd.activated?(sd.registry||[]).filter(p=>p.status==='active').map(p=>({uid:p.id,accountUid:p.accountUid||null,name:p.name,status:p.status,professional:{sector:p.sector,shift:p.shift,jobTitle:p.jobTitle,skills:p.skills||[],certifications:p.certifications||[]},fixedWeekday:p.fixedWeekday,registry:true})):d.members||[]};
 }
 const labels={draft:'Rascunho',in_review:'Em análise',approved:'Aprovada',published:'Publicada',work:'Trabalho',off:'Folga',leave:'Ausência',monthly_sunday:'Domingo mensal adicional'};
 export default function SchedulePlanner({membership}){
  const {notify}=useFeedback(),[plans,setPlans]=useState([]),[people,setPeople]=useState([]),[selected,setSelected]=useState(''),[title,setTitle]=useState('Escala da equipe'),[period,setPeriod]=useState(restaurantDay().slice(0,7)),[entries,setEntries]=useState([]);
  const [fixedOff,setFixedOff]=useState({}),[sundayOff,setSundayOff]=useState({}),[savingFixed,setSavingFixed]=useState(''),[selectedPerson,setSelectedPerson]=useState(''),[matrixSector,setMatrixSector]=useState('todos');
+ const [approvedLeaves,setApprovedLeaves]=useState([]);
  const [registryState,setRegistryState]=useState({activated:false,registeredCount:0});
  const [today,setToday]=useState(()=>restaurantDay());
  useEffect(()=>{const interval=setInterval(()=>setToday(restaurantDay()),60000);return()=>clearInterval(interval)},[]);
  const [uid,setUid]=useState(''),[date,setDate]=useState(''),[type,setType]=useState('work'),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const allowed=['admin','manager','submanager'].includes(membership.role);
- const refresh=useCallback(async()=>{setLoading(true);setError('');try{const [p,m,f]=await Promise.all([call('list'),membersApi(),call('fixedOffList')]);setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})})}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
+ const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,f,l]=await Promise.all([call('list'),membersApi(),call('fixedOffList'),call('leaveList')]);setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})})}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
+ useUnitLive(membership?.unitId,()=>refresh(true));
  useEffect(()=>{refresh()},[refresh]);
  const chosen=plans.find(x=>x.id===selected);
  const legacyIds=useMemo(()=>registryState.activated?entries.filter(e=>!people.some(p=>p.uid===e.uid)).length:0,[entries,people,registryState.activated]);
@@ -39,7 +42,7 @@ export default function SchedulePlanner({membership}){
  const generate=()=>{
   if(entries.length&&!window.confirm('Gerar uma nova proposta substituirá os lançamentos deste rascunho. Continuar?'))return;
   try{
-   const generated=generateMonthlyRoster({period,members:people,fixedOffDays:fixedOff,sundayOffDays:sundayOff});
+   const generated=generateMonthlyRoster({period,members:people,fixedOffDays:fixedOff,sundayOffDays:sundayOff,approvedLeaves});
    setEntries(generated);setError('Proposta gerada. Revise a cobertura por turno e setor antes de enviar para aprovação.');
   }catch(e){setError(e.message);notify(e.message,'error')}
  };
@@ -47,7 +50,7 @@ export default function SchedulePlanner({membership}){
  const save=async()=>{if(legacyIds)return setError('Este rascunho contém contas antigas; gere uma nova proposta com a equipe real.');setBusy(true);try{const d=await call('saveDraft',{id:selected||undefined,period,title,entries});notify(d.message,'success');await refresh();setSelected(d.id)}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
  const transition=async action=>{setBusy(true);try{const d=await call(action,{id:selected});notify(d.message,'success');await refresh()}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
  if(!allowed)return <section className="ti-planning"><h1>Escalas</h1><p>Consulte suas escalas publicadas no Mural.</p></section>;
- return <section className="ti-planning"><p className="eyebrow">ADMINISTRAÇÃO · PACOTE 06</p><h1>Planejamento de escalas</h1><p>Crie o rascunho, revise conflitos, solicite aprovação e publique. Disponibilidade habitual não é escala oficial.</p>
+ return <section className="ti-planning"><p className="eyebrow">ADMINISTRAÇÃO · EQUIPE</p><h1>Planejamento de escalas</h1><p>Crie o rascunho, revise conflitos, solicite aprovação e publique. Disponibilidade habitual não é escala oficial.</p>
  {!registryState.activated&&registryState.registeredCount>0&&<aside className="ti-roster-attention" role="status"><strong>{registryState.registeredCount} fichas profissionais aguardam ativação.</strong><span>O planejador ainda está usando contas de acesso, que podem incluir contas de teste. Ative o Cadastro Mestre após conferir a equipe para planejar com os funcionários reais.</span><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent("ti-navigate",{detail:"master-registry"}))}>Abrir Cadastro Mestre</button></aside>}
  {legacyIds>0&&<aside className="ti-roster-attention" role="alert"><strong>Rascunho com {legacyIds} lançamento(s) de contas antigas.</strong><span>Após ativar o Cadastro Mestre, a nova escala usa IDs das fichas profissionais. Para preservar o histórico, rascunhos antigos não são convertidos automaticamente. Crie uma proposta nova e confira as folgas antes de salvar.</span></aside>}
  <div className="ti-planning-grid"><section className="ti-planning-card"><div className="ti-planning-heading"><h2>Escalas da unidade</h2><button onClick={refresh} disabled={busy||loading}>Atualizar</button></div>{loading?<p>Carregando...</p>:plans.length?plans.map(x=><button type="button" key={x.id} className={'ti-planning-row'+(selected===x.id?' selected':'')} onClick={()=>open(x)}><strong>{x.title}</strong><span>{x.period} · {labels[x.status]||x.status} · v{x.revision}</span></button>):<p>Nenhuma escala cadastrada.</p>}<button type="button" onClick={reset}>Nova escala</button></section>

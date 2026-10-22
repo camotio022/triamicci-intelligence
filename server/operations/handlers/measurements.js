@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../../live-signal.js';
 // Cadastro de apresentações por unidade. Não altera saldo, lote ou histórico.
 import {getDb,authenticate,membership,checkRequest,send} from '../../_lib.js';
 import {isPresentation,unitInfo} from '../unit-engine.js';
@@ -61,6 +62,7 @@ export default async function handler(req,res){
    const record={version,packages:validated.packages,countingMethod:countValidation.method,note,updatedAt:now,updatedBy:actor.uid,
     stockUnitAtReview:product.data().operationalUnitOverride||product.data().operationalUnit||product.data().unit};
    tx.set(profileRef,record);
+   signalUnitChange(tx,db,member.unitId);
    tx.create(db.collection('auditLogs').doc(),{event:'product.measurement_profile_saved',unitId:member.unitId,productId,actorUid:actor.uid,at:now,
      before:old.exists?{version:oldVersion,packages:old.data().packages||[]}:null,after:{version,packages:validated.packages,countingMethod:countValidation.method},note});
   });

@@ -1,3 +1,4 @@
+import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -33,6 +34,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
    setMore({receipts:!!h.hasMore_receipts,counts:!!h.hasMore_counts,outflows:!!h.hasMore_outflows,transfers:!!h.hasMore_transfers,productions:!!h.hasMore_productions});
   }catch(e){setStatus(e.message)}
  },[]);
+ useUnitLive(membership?.unitId,()=>load(true));
  useEffect(()=>{load()},[load]);
  useEffect(()=>{if(initialProductId)setProductId(initialProductId)},[initialProductId]);
  useEffect(()=>{

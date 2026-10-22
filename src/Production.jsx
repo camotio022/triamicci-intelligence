@@ -1,7 +1,8 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {BookOpen,ClipboardList,RefreshCw,History} from 'lucide-react';
 import './production-v4.css';
-import {startVisibleRefresh} from './visible-refresh.js';
+import {useUnitLive} from './useUnitLive.js';
+import LiveStatus from './LiveStatus.jsx';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {suggestedQuantity} from '../server/production/logic.js';
@@ -25,17 +26,18 @@ export default function Production({membership}){
  const [dailyTasks,setDailyTasks]=useState([]),[plannedRecipe,setPlannedRecipe]=useState(''),[plannedQuantity,setPlannedQuantity]=useState(''),[activeTaskId,setActiveTaskId]=useState(null),[taskLoading,setTaskLoading]=useState(false);
  const admin=['admin','manager','submanager'].includes(membership.role);
  const canPlan=['admin','manager','submanager','cook'].includes(membership.role);
- const loadTasks=useCallback(async()=>{try{const r=await call('/api/production/manage','dayList');setDailyTasks(r.tasks||[]);}catch(e){notify(e.message,'error')}},[notify,membership?.unitId]);
+ const loadTasks=useCallback(async()=>{try{const r=await call('/api/production/manage','dayList');setDailyTasks(r.tasks||[]);return true;}catch(e){setStatus(e.message);return false}},[notify,membership?.unitId]);
  const addDailyTask=async e=>{e.preventDefault();if(taskLoading||!plannedRecipe)return;setTaskLoading(true);try{await call('/api/production/manage','dayAdd',{recipeId:plannedRecipe,plannedQuantity:plannedQuantity?Number(plannedQuantity):null});setPlannedRecipe('');setPlannedQuantity('');await loadTasks();notify('Preparação adicionada à lista.','success')}catch(e){notify(e.message,'error')}finally{setTaskLoading(false)}};
- const load=useCallback(async()=>{
-  setLoading(true);try{
+ const load=useCallback(async(silent=false)=>{
+  if(!silent)setLoading(true);try{
    const [p,r]=await Promise.all([call('/api/products/manage','list'),call('/api/production/manage','list')]);
-   setProducts(p.products||[]);setRecipes(r.recipes||[]);setRuns(r.runs||[]);
-  }catch(e){setStatus(e.message)}finally{setLoading(false)}
+   setProducts(p.products||[]);setRecipes(r.recipes||[]);setRuns(r.runs||[]);return true;
+  }catch(e){setStatus(e.message);return false}finally{setLoading(false)}
  },[membership?.unitId]);
  useEffect(()=>{setProducts([]);setRecipes([]);setRuns([]);setDailyTasks([]);setRecipeId('');setActiveTaskId(null);},[membership?.unitId]);
  useEffect(()=>{load();loadTasks()},[load,loadTasks]);
- useEffect(()=>startVisibleRefresh(loadTasks,{document,setInterval,clearInterval}),[loadTasks]);
+ const live=useUnitLive(membership?.unitId,()=>Promise.all([load(true),loadTasks()]));
+ useEffect(()=>{const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=id=>{
   setRecipeId(id);setRequestId(null);setConfirmed(false);setActiveTaskId(null);
@@ -67,7 +69,7 @@ export default function Production({membership}){
  const option=(id)=>products.find(p=>p.id===id);
  return <section className="inventory-page production-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId.toUpperCase()}</p>
-  <h1>Produção da cozinha</h1><p>Consulte o que já foi preparado e registre uma nova produção. Fichas com produto final cadastrado transformam ingredientes da reserva em preparação na reserva; fichas antigas continuam consumindo do giro.</p>
+  <h1>Produção da cozinha</h1><LiveStatus state={live}/><p>Consulte o que já foi preparado e registre uma nova produção. Fichas com produto final cadastrado transformam ingredientes da reserva em preparação na reserva; fichas antigas continuam consumindo do giro.</p>
   {status&&<p role="status" className="receiving-notice">{status}</p>}
   <section className="receiving-card ti-v4-daily-tasks"><h2>Lista de produção de hoje</h2><p>Planejamento compartilhado da cozinha. Só a confirmação da quantidade realmente produzida movimenta o estoque.</p>
    {canPlan&&<form className="ti-v4-daily-task-form" onSubmit={addDailyTask}><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional (porções)<input type="number" min="1" max="10000" step="1" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading}>Adicionar à lista</button></form>}

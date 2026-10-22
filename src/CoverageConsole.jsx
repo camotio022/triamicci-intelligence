@@ -1,3 +1,4 @@
+import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import {rateRoleFor} from '../server/coverage/engine.js';
@@ -13,7 +14,8 @@ export default function CoverageConsole({membership}){
  const [requestNotes,setRequestNotes]=useState({});
  const [note,setNote]=useState(''),[consentEvidence,setConsentEvidence]=useState(''),[legalChecked,setLegalChecked]=useState(false),[consentVerified,setConsentVerified]=useState(false);
  const [ratesEdit,setRatesEdit]=useState(null),[requirements,setRequirements]=useState([]),[newRequirement,setNewRequirement]=useState({sector:'cozinha',weekday:6,start:'12:00',end:'14:00',minimum:4,skill:''});
- const load=useCallback(async()=>{try{const result=await request('dashboard');setData(result);setRatesEdit(result.rates);setRequirements(result.requirements||[]);setRateRole(old=>old==='other'?rateRoleFor(result.people.find(p=>p.status==='active')):old);setPlanId(id=>id||result.plans[0]?.id||'');setStaffId(id=>id||result.people.find(p=>p.status==='active')?.uid||'');setError('')}catch(e){setError(e.message)}},[]);
+ const load=useCallback(async(silent=false)=>{try{const result=await request('dashboard');setData(result);if(!silent){setRatesEdit(result.rates);setRequirements(result.requirements||[]);}setRateRole(old=>old==='other'?rateRoleFor(result.people.find(p=>p.status==='active')):old);setPlanId(id=>id||result.plans[0]?.id||'');setStaffId(id=>id||result.people.find(p=>p.status==='active')?.uid||'');setError('')}catch(e){setError(e.message)}},[]);
+ useUnitLive(membership?.unitId,()=>load(true));
  useEffect(()=>{load()},[load]);
  const plan=useMemo(()=>data?.plans.find(p=>p.id===planId),[data,planId]);
  const run=async(fn)=>{setBusy(true);setError('');setNotice('');try{const d=await fn();setNotice(d.message);await load();return d}catch(e){setError(e.message)}finally{setBusy(false)}};

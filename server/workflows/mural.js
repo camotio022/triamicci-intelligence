@@ -1,7 +1,8 @@
+import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 const txt=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.trim().length<=max;
-const serialize=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,updatedAt:d.data().updatedAt?.toDate?.()?.toISOString?.()||null});
+const serialize=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,updatedAt:d.data().updatedAt?.toDate?.()?.toISOString?.()||null,publishedAt:d.data().publishedAt?.toDate?.()?.toISOString?.()||null});
 const allowedKinds=['preparation','notice'];
 function normalize(v){
  if(!v||!allowedKinds.includes(v.kind)||!txt(v.title,100)||!txt(v.body,3000))return null;
@@ -9,7 +10,8 @@ function normalize(v){
  if(v.kind==='preparation'&&(!Array.isArray(ingredients)||ingredients.length<1||ingredients.length>40||
    !ingredients.every(x=>x&&txt(x.name,90)&&typeof x.amount==='number'&&x.amount>0&&x.amount<=100000&&['g','kg','ml','L','un'].includes(x.unit))))return null;
  if(v.kind==='preparation'&&(!txt(v.yieldText,100)||!Array.isArray(v.allergens)||v.allergens.length>15||!v.allergens.every(x=>txt(x,80))))return null;
- return {kind:v.kind,title:v.title.trim(),body:v.body.trim(),ingredients:ingredients?.map(x=>({name:x.name.trim(),amount:x.amount,unit:x.unit}))||[],yieldText:v.kind==='preparation'?v.yieldText.trim():'',allergens:v.kind==='preparation'?v.allergens.map(x=>x.trim()):[]};
+ if(v.priority!==undefined&&!['normal','important','urgent'].includes(v.priority))return null;
+ return {priority:v.priority||'normal',kind:v.kind,title:v.title.trim(),body:v.body.trim(),ingredients:ingredients?.map(x=>({name:x.name.trim(),amount:x.amount,unit:x.unit}))||[],yieldText:v.kind==='preparation'?v.yieldText.trim():'',allergens:v.kind==='preparation'?v.allergens.map(x=>x.trim()):[]};
 }
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;res.setHeader('Cache-Control','no-store');
@@ -21,7 +23,7 @@ export default async function handler(req,res){
    // Consulta dedicada: não carrega receitas nem permite rascunhos no quadro de leitura.
    const docs=await items.where('kind','==','notice').limit(100).get();
    const published=docs.docs.filter(d=>d.data().status==='published').map(serialize)
-    .sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||''))).slice(0,12);
+    .sort((a,b)=>({urgent:2,important:1,normal:0}[b.priority||'normal']-({urgent:2,important:1,normal:0}[a.priority||'normal']))||String(b.publishedAt||b.updatedAt||'').localeCompare(String(a.publishedAt||a.updatedAt||''))).slice(0,12);
    return send(res,200,'Comunicados da unidade.',{items:published});
   }
   if(action==='list'){
@@ -41,6 +43,7 @@ export default async function handler(req,res){
     if(old.exists&&old.data().status!=='draft')throw Error('LOCKED');
     if(supersedesId&&(!prior?.exists||prior.data().status!=='published'||prior.data().kind!==normalized.kind))throw Error('LOCKED');
     tx.set(ref,{...normalized,supersedesId:supersedesId||old.data()?.supersedesId||null,status:'draft',version:(old.data()?.version||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
+    signalUnitChange(tx,db,m.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'mural.draft_saved',actorUid:actor.uid,unitId:m.unitId,at:now,itemId:ref.id});
    });
    return send(res,200,'Rascunho salvo sem publicação.',{id:ref.id});
@@ -58,7 +61,8 @@ export default async function handler(req,res){
     if(old.data().kind==='preparation'&&member.data().role!=='admin')throw Error('FORBIDDEN');
     if(old.data().kind==='preparation'&&old.data().createdBy===actor.uid)throw Error('SELF_APPROVAL');
     if(priorRef)tx.update(priorRef,{status:'superseded',supersededAt:now,supersededBy:id});
-    tx.update(ref,{status:'published',publishedAt:now,publishedBy:actor.uid,version:prior?prior.data().version+1:old.data().version});
+    tx.update(ref,{status:'published',publishedAt:now,publishedBy:actor.uid,publishedByName:actor.name||'Gestão da unidade',version:prior?prior.data().version+1:old.data().version});
+    signalUnitChange(tx,db,m.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'mural.published',unitId:m.unitId,actorUid:actor.uid,itemId:id,version:old.data().version,at:now});
    });
    return send(res,200,'Conteúdo aprovado e publicado no Mural.');

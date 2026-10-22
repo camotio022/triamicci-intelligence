@@ -1,3 +1,4 @@
+import {useUnitLive} from './useUnitLive.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
@@ -31,12 +32,13 @@ export default function KitchenV3({membership}){
  const [editId,setEditId]=useState(''),[step,setStep]=useState(0),[mode,setMode]=useState('availability'),
   [origin,setOrigin]=useState('supplier'),[countUnit,setCountUnit]=useState('un'),[locs,setLocs]=useState(['reserva']),[presentation,setPresentation]=useState(''),[trackingNote,setTrackingNote]=useState(''),[displayName,setDisplayName]=useState(''),[aliases,setAliases]=useState(''),[sourceIds,setSourceIds]=useState([]),[altIds,setAltIds]=useState([]);
  const [supplier,setSupplier]=useState(''),[eta,setEta]=useState(''),[orderLines,setOrderLines]=useState([{productId:'',quantity:'',unit:'kg'}]),[orderNote,setOrderNote]=useState('');
- const load=useCallback(async()=>{
-  setLoading(true);setError('');
+ const load=useCallback(async(silent=false)=>{
+  if(!silent)setLoading(true);setError('');
   try{const d=await api('v3Dashboard');setProducts(d.products||[]);setSignals(d.signals||[]);setOrders(d.orders||[]);}
   catch(e){setError(e.message);}
   finally{setLoading(false);}
  },[]);
+ useUnitLive(membership?.unitId,()=>load(true));
  useEffect(()=>{load();},[load]);
  const active=useMemo(()=>products.filter(p=>(showArchived||p.status==='active')&&(p.name+' '+(p.profile?.displayName||'')+' '+(p.profile?.aliases||[]).join(' ')).toLowerCase().includes(search.trim().toLowerCase())),[products,search,showArchived]);
  const chosen=products.find(p=>p.id===selected);

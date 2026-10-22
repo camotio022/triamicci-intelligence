@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../live-signal.js';
 // Novo ledger isolado: não mistura os saldos legados nem converte kg em porções.
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -12,7 +13,7 @@ const active=(d,u,roles)=>d.exists&&d.data().status==='active'&&d.data().unitId=
 const hashed=s=>createHash('sha256').update(s).digest('hex');
 const snapMap=s=>({id:s.id,...s.data()});
 const now=()=>new Date();
-const audit=(tx,db,event,unitId,uid,details)=>tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid:uid,at:now(),details});
+const audit=(tx,db,event,unitId,uid,details)=>{signalUnitChange(tx,db,unitId);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid:uid,at:now(),details});};
 function debitLotDocs(docs,location,amount,today){
  let remaining=amount,updates=[];
  for(const d of docs){

@@ -1,3 +1,4 @@
+import {signalUnitChange} from '../live-signal.js';
 import v3Ledger from './v3-ledger.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -15,7 +16,7 @@ const obj=s=>({id:s.id,...s.data()});
 const now=()=>new Date();
 const dateOk=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(x+'T12:00:00Z'))&&new Date(x+'T12:00:00Z').toISOString().slice(0,10)===x;
 const quantity=(v,unit,zero=false)=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&(zero||v>0)&&v<=100000&&(!['un','porcao','pacote','duzia'].includes(unit)||Number.isInteger(v))&&Math.abs(Math.round(v*1000)-v*1000)<1e-7;
-const newAudit=(tx,db,event,unitId,actorUid,details)=>tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid,details,at:now()});
+const newAudit=(tx,db,event,unitId,actorUid,details)=>{signalUnitChange(tx,db,unitId);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid,details,at:now()});};
 const verify=(a,unitId,allowed)=>a.exists&&a.data().status==='active'&&a.data().unitId===unitId&&allowed.includes(a.data().role);
 const productPath=(unit,id)=>unit.collection('products').doc(id);
 const limitText=(x,max=240)=>typeof x==='string'&&x.length<=max;
