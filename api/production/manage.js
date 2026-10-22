@@ -83,7 +83,7 @@ export default async function handler(req,res){
     duplicate=true;return;
    }
    if(!recipe.exists||recipe.data().active!==true)throw Error('RECIPE_NOT_FOUND');
-   if(taskRef&&(!task?.exists||task.data().recipeId!==recipeId||task.data().status!=='pending'))throw Error('TASK_NOT_PENDING');
+   if(taskRef&&(!task?.exists||task.data().recipeId!==recipeId||!['pending','partial'].includes(task.data().status)))throw Error('TASK_NOT_PENDING');
    const recipeData=recipe.data(),productDocs=docs.slice(0,items.length),balanceDocs=docs.slice(items.length);
    const transformed=Boolean(recipeData.outputProductId);
    const outputRef=transformed?unit.collection('products').doc(recipeData.outputProductId):null;
@@ -144,7 +144,8 @@ export default async function handler(req,res){
     actorName:a.data().displayName||a.data().name||actor.name||actor.email||actor.uid,
     unitId:member.unitId,at:now};
    tx.create(ref,record);
-   if(taskRef)tx.update(taskRef,{status:'completed',completedQuantity:portions,completedAt:now,completedBy:actor.uid,productionRunId:requestId});
+   if(taskRef){const totalDone=(task.data().completedQuantity||0)+portions;const target=task.data().plannedQuantity;const complete=target===null||target===undefined||totalDone>=target;
+    tx.update(taskRef,{status:complete?'completed':'partial',completedQuantity:totalDone,...(complete?{completedAt:now}:{}),completedBy:actor.uid,productionRunId:requestId});}
    tx.create(db.collection('auditLogs').doc(),{event:'production.finished',unitId:member.unitId,
     operationId:requestId,actorUid:actor.uid,at:now,details:record});
   });
