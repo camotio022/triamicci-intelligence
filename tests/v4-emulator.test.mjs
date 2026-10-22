@@ -61,4 +61,23 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  assert.deepEqual((await unit.collection('physicalBalances').doc(input).get()).data(),before,'Investigation must never move inventory');
  assert.equal((await call(investigation,outsider,'investigationGet',{productId:input})).investigations.length,0);
  const forbidden=await call(investigation,otherManager,'investigationSave',{...claim,allocations:[{reason:'loss',quantity:11,notes:'Quantidade acima do permitido'}]});assert.equal(forbidden.code,400);
+ const {default:ledger}=await import('../server/operations/v3-ledger.js');
+ const {default:productsApi}=await import('../api/products/manage.js');
+ await unit.collection('operationalProfiles').doc(input).set({controlMode:'quantitative',countUnit:'un',origin:'supplier',locations:['reserva','giro']});
+ await unit.collection('v3PhysicalBalances').doc(input).set({unit:'un',reserva:900,giro:0,total:900});
+ const inspectionId=randomUUID();
+ assert.equal((await call(ledger,cook,'v3InspectReceive',{requestId:inspectionId,productId:input,commercialQuantity:5,commercialUnit:'un',stockQuantity:5,location:'reserva',supplier:'Fornecedor de teste',notes:'Entrega experimental conferida'})).code,200);
+ assert.equal((await call(ledger,manager,'v3ApproveReceipt',{inspectionId})).code,200);
+ assert.equal((await unit.collection('physicalBalances').doc(input).get()).data().reserve,25,'Receipt adds to the same balance consumed by recipe production');
+ assert.equal((await unit.collection('v3PhysicalBalances').doc(input).get()).data().total,900,'Legacy experiment remains untouched and is never summed');
+ const catalog=await call(productsApi,cook,'list');assert.equal(catalog.products.find(p=>p.id===input).physicalBalance.total,25,'Main stock view sees operational receipt');
+ const round=randomUUID();
+ const countBefore=(await unit.collection('physicalCounts').get()).size;
+ assert.equal((await call(ledger,manager,'v3Count',{requestId:randomUUID(),sessionId:round,productId:input,location:'reserva',quantity:8})).code,200);
+ assert.equal((await unit.collection('physicalCounts').get()).size,countBefore,'Single-area count cannot pretend to be a full physical count');
+ assert.equal((await call(ledger,manager,'v3Count',{requestId:randomUUID(),sessionId:round,productId:input,location:'giro',quantity:2})).code,200);
+ const counted=(await unit.collection('physicalBalances').doc(input).get()).data();
+ assert.equal(counted.reserve,8);assert.equal(counted.rotation,2);assert.equal(counted.countedTotal,10);
+ assert.equal((await unit.collection('physicalCounts').get()).size,countBefore+1);
+
 });

@@ -3,6 +3,7 @@ import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import './receiving-experience.css';
+import KitchenV3Workflows from './KitchenV3Workflows.jsx';
 import PackageConference from './PackageConference.jsx';
 
 async function api(path,action,extra={}){
@@ -23,6 +24,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
  const [lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
  const [receiveStep,setReceiveStep]=useState(1);
+ const [operational,setOperational]=useState({products:[],orders:[]});
  const [summary,setSummary]=useState(null);
  const [lots,setLots]=useState([]);
  const [more,setMore]=useState({receipts:false,counts:false,outflows:false,transfers:false}),[loadingMore,setLoadingMore]=useState(false);
@@ -31,9 +33,10 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   try{
    const [p,h,c]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list'),api('/api/catalog/manage','list')]);
    setProducts(p.products||[]);setCatalog(c.catalog||[]);setHistory({receipts:h.receipts||[],counts:h.counts||[],outflows:h.outflows||[],transfers:h.transfers||[],productions:h.productions||[]});
+   if(mode==='receive'){const d=await api('/api/operations/stock','v3Dashboard');setOperational({products:d.products||[],orders:d.orders||[]});}
    setMore({receipts:!!h.hasMore_receipts,counts:!!h.hasMore_counts,outflows:!!h.hasMore_outflows,transfers:!!h.hasMore_transfers,productions:!!h.hasMore_productions});
   }catch(e){setStatus(e.message)}
- },[]);
+ },[mode]);
  useUnitLive(membership?.unitId,()=>load(true));
  useEffect(()=>{load()},[load]);
  useEffect(()=>{if(initialProductId)setProductId(initialProductId)},[initialProductId]);
@@ -100,7 +103,8 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   ...history.transfers.map(x=>({...x,kind:'transfer'})),...history.productions.map(x=>({...x,kind:'production'}))
  ].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)):mode==='receive'?history.receipts:history.counts)
  .filter(x=>!initialProductId||x.productId===initialProductId||x.kind==='production'&&x.items?.some(i=>i.productId===initialProductId));
- if(mode==='count'&&!canReceive)return <section className="ti-premium-card"><h2>Contagem oficial</h2><p>A contagem física que altera saldos é restrita à gestão. Comunique divergências pela Central de Insumos V3.</p></section>;
+ if(mode==='receive')return <section className="receiving-page"><p className="eyebrow">OPERAÇÃO · RECEBIMENTO</p><h1>Recebimento de mercadorias</h1><p>Confira o pedido e a entrega. A entrada no estoque depende da aprovação gerencial.</p>{status&&<p role="status">{status}</p>}<KitchenV3Workflows kind="receive" products={operational.products} orders={operational.orders} membership={membership} initialProductId={initialProductId} onChange={load} onConfigure={()=>window.dispatchEvent(new CustomEvent('ti-navigate',{detail:'kitchen-v3'}))}/><section className="receiving-card"><h2>Recebimentos recentes</h2>{history.receipts.length?history.receipts.map(r=><details key={r.id}><summary>{r.productName||'Produto'} · {qty(r.physicalQuantity)} {r.unit} · {fmt(r.at)}</summary><p>{r.supplier} · {r.orderId?'Vinculado a pedido':'Entrega não prevista'}</p>{r.lot&&<p>Lote {r.lot} · Validade {r.expiryDate}</p>}</details>):<p>Nenhum recebimento aprovado nesta consulta.</p>}</section></section>;
+ if(mode==='count'&&!canReceive)return <section className="ti-premium-card"><h2>Contagem oficial</h2><p>A contagem física que altera saldos é restrita à gestão. Comunique divergências pela Central de Insumos.</p></section>;
  return <section className="receiving-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId}</p>
   <h1>{mode==='history'?'Histórico da operação':mode==='receive'?'Recebimento de mercadorias':'Contagem diária — reserva e giro'}</h1>

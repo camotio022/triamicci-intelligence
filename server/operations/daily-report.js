@@ -46,8 +46,8 @@ export default async function dailyReport(req,res) {
    for(const item of r.items||[])if(item.productId===productId)
     outflows.push({at,unit:item.unit,quantity:item.quantity});
    // Transformação cria produto preparado em reserva: registrar entrada para conciliar contagens.
-   if(r.outputProductId===productId&&Number.isInteger(r.portions)&&r.portions>0)
-    entries.push({at,unit,quantity:r.portions});
+   if(r.outputProductId===productId&&Number.isFinite(r.portions)&&r.portions>0)
+    entries.push({at,unit:r.outputUnit||unit,quantity:r.portions});
   }
   try {
    const report=calculateDailyInventory({

@@ -9,9 +9,9 @@ async function invoke(action,payload={}){
  const d=await r.json();if(!r.ok)throw Error(d.message||'Operação não realizada.');return d;
 }
 function Field({name,children}){return <label>{name}{children}</label>}
-export default function KitchenV3Workflows({kind,products,orders,membership,onChange,onConfigure}){
+export default function KitchenV3Workflows({kind,products,orders,membership,onChange,onConfigure,initialProductId=null}){
  const {notify}=useFeedback();const managers=isManagement(membership.role);
- const [productId,setProductId]=useState(''),[location,setLocation]=useState('reserva'),[supplier,setSupplier]=useState(''),
+ const [productId,setProductId]=useState(initialProductId||''),[location,setLocation]=useState('reserva'),[supplier,setSupplier]=useState(''),
  [commercialUnit,setCommercialUnit]=useState('kg'),[commercialQuantity,setCommercialQuantity]=useState(''),
  [stockQuantity,setStockQuantity]=useState(''),[orderId,setOrderId]=useState(''),[lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),
  [notes,setNotes]=useState(''),[quantity,setQuantity]=useState(''),[sessionId,setSessionId]=useState(()=>crypto.randomUUID()),

@@ -23,25 +23,20 @@ Continuidade na PR #82. Fonte dos requisitos: Issue #76 e plano mestre da PR #77
 - Firebase Auth/Firestore em projeto demo isolado: concorrência de produção, repetição idempotente, acesso por unidade, leitura/escrita das Rules do sinal, duplicação de folga, mês publicado, investigação e ausência de movimentação de saldo.
 - Telas reais em Playwright com Firebase emulado e APIs de fixture: Mural, Produção, Inventário, Folgas, Minha Ficha e Cozinha, nas larguras 320/390/768/1280; ações de formulário e ausência de overflow. Isto não é homologação contra dados produtivos.
 
-## Bloqueio de integração dos saldos
+## Consolidação dos saldos experimentais — atualização após esclarecimento do responsável
 
-O código mantém **dois ledgers independentes**, explicitamente sem migração homologada:
+O responsável esclareceu que todos os registros são experimentais. O diagnóstico da versão anterior identificou estes caminhos independentes:
 
 | Fluxo | Fonte |
 |---|---|
 | Atalho Recebimento/Contagem, Estoque, Produção por ficha e Inventário | `physicalBalances`, `physicalReceipts`, `physicalCounts`, `productionRuns` |
 | Estoque e Insumos, pedidos de compra, inspeção/aprovação e produção operacional | `v3PhysicalBalances`, `v3ReceiptInspections`, `v3Operations`, `purchaseOrdersV3` |
 
-Não é correto conectar pedidos à tela principal mudando apenas o componente: isso pode gravar em um ledger e mostrar o outro. Também não é correto somar ou sobrescrever os dois saldos. Uma contagem física, unidade de medida e proveniência precisam determinar a reconciliação por produto.
+A continuação passa a usar `physicalBalances` e `physicalLots` para as novas operações dos dois caminhos. O adaptador traduz os nomes de locais usados pela interface operacional para os campos físicos, sem somar fontes. Documentos experimentais antigos de V3 permanecem preservados; quando não existe saldo canônico, a leitura compatível pode usar o saldo antigo, e a próxima operação escreve na fonte canônica. Havendo saldo canônico, ele prevalece. Não há limpeza, exclusão ou migração em massa.
 
-Auditoria somente leitura preparada: `node scripts/audit-ledger-sources.mjs UNIT_ID`, usando credencial de servidor disponibilizada no ambiente seguro. Lista produtos exclusivos, coincidentes e conflitantes; não grava nada. Não foi possível executar contra produção sem acesso ao Firestore. A consulta de metadados de ambiente Vercel também devolveu HTTP 403 no escopo da equipe.
+Recebimentos, transferências, perdas e produção operacional passam a gerar os eventos canônicos consultados pelo histórico/inventário. Contagens por local só geram uma contagem física conjunta quando reserva e giro pertencem à mesma rodada. O atalho principal de Recebimento reutiliza o mesmo componente de conferência/aprovação ligado a pedidos.
 
-### Próxima etapa segura após acesso de leitura
-
-1. Executar o diagnóstico por unidade e conferir lotes, unidades, datas de contagem e proveniência; identificar fonte efetiva de cada produto.
-2. Propor reconciliação explícita, cópia de segurança, simulação e reversão; não escolher saldo automaticamente por recência nem por tamanho.
-3. Consolidar os leitores e escritores, pedidos/recebimentos e histórico na mesma fonte homologada, com compatibilidade temporária para registros antigos.
-4. Testar recebimento parcial/multilinha, transformação e inventário cruzando todos os módulos; só então publicar o lote consolidado.
+O HTTP 403 da Vercel permanece uma limitação de acesso à configuração/publicação, **não um bloqueio para implementar ou testar com dados experimentais**. A consolidação é validada no Firebase emulado, sem depender de leitura produtiva. Produtos com lotes antigos incompatíveis continuam exigindo conferência explícita antes de movimentação; não se inventa disponibilidade de lote.
 
 ## Escopo que ainda não pode ser marcado concluído
 
