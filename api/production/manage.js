@@ -3,6 +3,7 @@ import {countUnit,validQuantity} from '../../server/operations/logic.js';
 import {areaTotals,allocateFEFO} from '../../server/operations/lot-logic.js';
 import {validProductionSelection} from '../../server/production/logic.js';
 import {transformationPreview} from '../../server/production/transformation.js';
+import {progressAfterProduction} from '../../server/production/daily-task.js';
 import {createHash} from 'node:crypto';
 
 const productIdPattern=/^[a-f0-9]{40}$/;
@@ -144,8 +145,8 @@ export default async function handler(req,res){
     actorName:a.data().displayName||a.data().name||actor.name||actor.email||actor.uid,
     unitId:member.unitId,at:now};
    tx.create(ref,record);
-   if(taskRef){const totalDone=(task.data().completedQuantity||0)+portions;const target=task.data().plannedQuantity;const complete=target===null||target===undefined||totalDone>=target;
-    tx.update(taskRef,{status:complete?'completed':'partial',completedQuantity:totalDone,...(complete?{completedAt:now}:{}),completedBy:actor.uid,productionRunId:requestId});}
+   if(taskRef){const progress=progressAfterProduction(task.data(),portions);
+    tx.update(taskRef,{...progress,...(progress.status==='completed'?{completedAt:now}:{}),completedBy:actor.uid,productionRunId:requestId});}
    tx.create(db.collection('auditLogs').doc(),{event:'production.finished',unitId:member.unitId,
     operationId:requestId,actorUid:actor.uid,at:now,details:record});
   });
