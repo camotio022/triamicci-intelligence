@@ -20,6 +20,7 @@ import KitchenHome from './KitchenHome.jsx';
 import Production from './Production.jsx';
 import KitchenV3 from './KitchenV3.jsx';
 import './kitchen.css';
+import './v4-foundation.css';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import Dashboard from './Dashboard.jsx';
