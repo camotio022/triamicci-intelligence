@@ -1,4 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck} from 'lucide-react';
 import {doc,onSnapshot} from 'firebase/firestore';
 import {auth,db} from './firebase.js';
 import PublishedRoster from './PublishedRoster.jsx';
@@ -52,27 +53,37 @@ export default function TeamMural({membership}){
  const nowTeam=roster.filter(x=>x.ongoing);
  const nextTeam=roster.filter(x=>!x.ongoing&&x.upcoming).sort((a,b)=>a.start.localeCompare(b.start));
  const withoutTime=roster.filter(x=>!x.start&&!x.ongoing);
- return <section className="ti-planning ti-mural-home" aria-label="Mural da equipe">
-  <header className="ti-mural-header"><div><span className="eyebrow">INFORMAÇÕES DA UNIDADE</span><h1>Mural da equipe</h1><p>Escalas e comunicados importantes, organizados para consulta.</p></div><button type="button" className="ti-mural-refresh" onClick={()=>{refresh();refreshPresence()}}>Atualizar</button></header>
+ const [showAllNotices,setShowAllNotices]=useState(false);
+ const visibleNotices=showAllNotices?notices:notices.slice(0,2);
+ const publishedCurrent=Boolean(current);
+ const scheduleLabel=publishedCurrent?'Escala do mês publicada':'Sem escala oficial para este mês';
+ return <section className="ti-planning ti-mural-home ti-mural-v4" aria-label="Mural da equipe">
+  <header className="ti-mural-header"><div><span className="eyebrow">INFORMAÇÕES DA UNIDADE</span><h1>Mural da equipe</h1><p>Comunicados, escala e informações do dia em um só lugar.</p></div><button type="button" className="ti-mural-refresh" aria-label="Atualizar informações do mural" title="Atualizar mural" onClick={()=>{refresh();refreshPresence()}}><RefreshCw size={17}/><span>Atualizar</span></button></header>
   {error&&<p role="alert" className="team-error">{error}</p>}
-  <div className="ti-mural-home-layout">
-   <section className="ti-mural-card ti-mural-roster" aria-labelledby="mural-roster-title">
-    <header className="ti-mural-section-header"><div><h2 id="mural-roster-title">Equipe de hoje</h2><p>Quem deveria estar em serviço e quem entra depois.</p></div></header>
-    <div className="ti-mural-now"><h3>Agora <small>{nowTeam.length} escalado(s)</small></h3>{nowTeam.length?<ul>{nowTeam.map(p=><li key={p.uid} className={p.source==='employee'?'ti-live-confirmed':''}><strong>{p.name}</strong><span>{p.area} · {p.shift}{p.start?' · '+p.start:''}</span><small>{p.status}</small></li>)}</ul>:<p>Ninguém com início previsto até agora.</p>}</div>
-    <div className="ti-mural-next"><h3>Próximos a entrar</h3>{nextTeam.length?<ul>{nextTeam.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift} · {p.start||'Horário não informado'}</span></li>)}</ul>:<p>Nenhuma próxima entrada identificada.</p>}</div>
-    {withoutTime.length>0&&<div className="ti-mural-next"><h3>Sem horário habitual informado <small>· por turno</small></h3><ul>{withoutTime.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift}</span></li>)}</ul></div>}
-    <details className="ti-mural-roster-details"><summary>Consultar escala completa e folgas</summary>
+  <div className="ti-mural-v4-sections">
+   <section className="ti-mural-card ti-mural-notices ti-v4-feature" aria-labelledby="mural-notices-title">
+    <header className="ti-v4-section-title"><div className="ti-v4-title-left"><Megaphone size={22} aria-hidden="true"/><div><h2 id="mural-notices-title">Comunicados</h2><p>Mensagens publicadas para a sua unidade.</p></div></div><span className="ti-v4-count" aria-label={notices.length+' comunicados'}>{notices.length}</span></header>
+    {loading?<p role="status">Carregando comunicados…</p>:notices.length===0?<p className="ti-mural-empty">Nenhum comunicado publicado no momento.</p>:<>
+     <ul className="ti-v4-notice-list">{visibleNotices.map(item=><li key={item.id} className="ti-v4-notice"><div className="ti-v4-notice-symbol"><Megaphone size={16} aria-hidden="true"/></div><div className="ti-v4-notice-copy"><strong>{item.title||'Comunicado da unidade'}</strong><p>{item.body}</p></div></li>)}</ul>
+     {notices.length>2&&<button type="button" className="ti-v4-secondary-link" aria-expanded={showAllNotices} onClick={()=>setShowAllNotices(v=>!v)}>{showAllNotices?'Mostrar menos':`Ver todos os ${notices.length} comunicados`} <ChevronRight size={16} aria-hidden="true"/></button>}
+    </>}
+   </section>
+   <section className="ti-mural-card ti-mural-roster ti-v4-feature" aria-labelledby="mural-roster-title">
+    <header className="ti-v4-section-title"><div className="ti-v4-title-left"><CalendarDays size={22} aria-hidden="true"/><div><h2 id="mural-roster-title">Escala da equipe</h2><p>{loading?'Carregando escala…':scheduleLabel}</p></div></div>{publishedCurrent&&<span className="ti-v4-official"><ShieldCheck size={14} aria-hidden="true"/> Oficial</span>}</header>
+    <div className="ti-v4-roster-summary">
+     <div className="ti-v4-roster-metric"><Users size={18} aria-hidden="true"/><div><strong>Equipe de hoje</strong><span>{!publishedCurrent?'Sem escala publicada':`${roster.length} escalado(s) para hoje`}</span></div></div>
+     <div className="ti-v4-roster-metric"><Clock3 size={18} aria-hidden="true"/><div><strong>Em andamento</strong><span>{!publishedCurrent?'Aguardando escala':nowTeam.length?`${nowTeam.length} com turno em andamento`:nextTeam.length?'Nenhum turno em andamento no momento':'Sem turno ativo ou próximo identificado'}</span></div></div>
+    </div>
+    {publishedCurrent&&nowTeam.length>0&&<div className="ti-mural-now"><h3>Agora <small>{nowTeam.length}</small></h3><ul>{nowTeam.map(p=><li key={p.uid} className={p.source==='employee'?'ti-live-confirmed':''}><strong>{p.name}</strong><span>{p.area} · {p.shift}{p.start?' · '+p.start:''}</span><small>{p.status}</small></li>)}</ul></div>}
+    {publishedCurrent&&nextTeam.length>0&&<div className="ti-mural-next"><h3>Próximos a entrar</h3><ul>{nextTeam.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift} · {p.start||'Horário não informado'}</span></li>)}</ul></div>}
+    {withoutTime.length>0&&<div className="ti-mural-next"><h3>Horário a definir <small>· por turno</small></h3><ul>{withoutTime.map(p=><li key={p.uid}><strong>{p.name}</strong><span>{p.area} · {p.shift}</span></li>)}</ul></div>}
+    <details className="ti-mural-roster-details ti-v4-roster-details"><summary><CalendarDays size={18} aria-hidden="true"/> Consultar escala mensal e folgas <ChevronRight size={17} aria-hidden="true"/></summary>
     {loading?<p role="status">Carregando escalas…</p>:schedules.length===0?<p className="ti-mural-empty">Nenhuma escala publicada.</p>:<>
      <div className="ti-mural-period-list">{schedules.slice(0,12).map(s=><button type="button" key={s.id} className={selected===s.id?'ti-mural-period active':'ti-mural-period'} aria-pressed={selected===s.id} onClick={()=>setExpanded(s.id)}>{monthLabel(s.period)}{s.id===current?.id&&<small>Mês atual</small>}</button>)}</div>
      {active?<PublishedRoster key={active.id} schedule={active} presence={presence}/>:<p>Escolha uma escala para consultar.</p>}
     </>}
     </details>
    </section>
-   <aside className="ti-mural-card ti-mural-notices" aria-labelledby="mural-notices-title">
-    <header className="ti-mural-section-header"><div><h2 id="mural-notices-title">Comunicados</h2><p>Informações publicadas para a equipe.</p></div><span className="ti-mural-count">{notices.length}</span></header>
-    {loading?<p role="status">Carregando comunicados…</p>:notices.length===0?<p className="ti-mural-empty">Nenhum comunicado publicado no momento.</p>:
-     <ul className="ti-mural-notice-list">{notices.map(item=><li key={item.id}><strong>{item.title}</strong><p>{item.body}</p></li>)}</ul>}
-   </aside>
   </div>
  </section>;
 }
