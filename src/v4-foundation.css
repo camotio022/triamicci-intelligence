@@ -1,0 +1,43 @@
+/* Triamicci Intelligence V4 — fundação visual.
+ * Tokens semânticos compartilhados. Escopo restrito às telas já migradas para V4:
+ * não substitui estados reais nem modifica dados/ações.
+ */
+:root{
+ --ti-v4-brand:#a71916;
+ --ti-v4-brand-soft:#fff3f1;
+ --ti-v4-danger:#b42318;
+ --ti-v4-danger-soft:#fff0ee;
+ --ti-v4-attention:#955c10;
+ --ti-v4-attention-soft:#fff3da;
+ --ti-v4-success:#116b41;
+ --ti-v4-success-soft:#e7f6eb;
+ --ti-v4-text:#273044;
+ --ti-v4-muted:#667085;
+ --ti-v4-border:#e7e9ee;
+ --ti-v4-surface:#fff;
+ --ti-v4-radius:12px;
+ --ti-v4-focus:rgba(167,25,22,.26);
+}
+:is(.ti-mural-v4,.ti-inventory-v4,.production-page,.ti-v4-stock-overview,.ti-receive-form) :is(button,select,input,textarea,summary):focus-visible{
+ outline:3px solid var(--ti-v4-focus);
+ outline-offset:2px;
+}
+:is(.ti-mural-v4,.ti-inventory-v4,.production-page,.ti-v4-stock-overview,.ti-receive-form) button:disabled{
+ cursor:not-allowed;
+ opacity:.6;
+}
+:is(.ti-mural-v4,.ti-inventory-v4,.production-page,.ti-v4-stock-overview,.ti-receive-form) :is(h1,h2,h3){
+ overflow-wrap:break-word;
+}
+:is(.ti-mural-v4,.ti-inventory-v4,.production-page,.ti-v4-stock-overview,.ti-receive-form) :is(input,select,textarea){
+ max-width:100%;
+ box-sizing:border-box;
+}
+@media(prefers-reduced-motion:reduce){
+ :is(.ti-mural-v4,.ti-inventory-v4,.production-page,.ti-v4-stock-overview,.ti-receive-form) *,
+ :is(.ti-mural-v4,.ti-inventory-v4,.production-page,.ti-v4-stock-overview,.ti-receive-form) *::before,
+ :is(.ti-mural-v4,.ti-inventory-v4,.production-page,.ti-v4-stock-overview,.ti-receive-form) *::after{
+  animation-duration:.01ms!important;
+  transition-duration:.01ms!important;
+ }
+}
