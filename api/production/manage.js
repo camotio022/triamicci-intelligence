@@ -47,7 +47,8 @@ export default async function handler(req,res){
     if(outputProductId){const output=await tx.get(unit.collection('products').doc(outputProductId));
      if(!output.exists||output.data().status!=='active'||output.data().trackExpiry)throw Error('INVALID_OUTPUT');
      const balance=await tx.get(unit.collection('physicalBalances').doc(outputProductId));
-     if(!balance.exists||countUnit(output.data())!=='un'||balance.data().unit!=='un'||!Number.isFinite(balance.data().reserve)||!Number.isFinite(balance.data().total))throw Error('INVALID_OUTPUT');}
+     const catalog=output.data().catalogId?await tx.get(db.collection('productCatalog').doc(output.data().catalogId)):null;
+     if(!balance.exists||countUnit(output.data(),catalog?.data())!=='un'||balance.data().unit!=='un'||!Number.isFinite(balance.data().reserve)||!Number.isFinite(balance.data().total))throw Error('INVALID_OUTPUT');}
     const now=new Date();
     tx.set(ref,{name:name.trim(),outputProductId,yieldQuantity,lines:lines.map(x=>({productId:x.productId,
       quantity:x.quantity,substitutes:x.substitutes||[]})),version:(prev.data()?.version||0)+1,
