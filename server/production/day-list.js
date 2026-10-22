@@ -1,4 +1,4 @@
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const recipePattern=/^[a-z0-9-]{3,64}$/;
 const datePattern=/^\d{4}-\d{2}-\d{2}$/;
 const formatDay=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -14,11 +14,11 @@ export default async function handler(req,res){
   const {action,day=formatDay()}=req.body||{};
   if(!datePattern.test(day)||day!==formatDay())return send(res,400,'A lista do dia deve corresponder à data atual da unidade.');
   const ref=unit.collection('productionDays').doc(day).collection('tasks');
-  if(action==='list'){
+  if(action==='dayList'){
    const snap=await ref.orderBy('createdAt','asc').limit(100).get();
    return send(res,200,'Lista de produção consultada.',{day,tasks:snap.docs.map(view),hasMore:snap.size===100});
   }
-  if(action==='add'){
+  if(action==='dayAdd'){
    if(!canPlan(m.role))return send(res,403,'Sem permissão para planejar produção.');
    const {recipeId,plannedQuantity=null}=req.body||{};
    if(!recipePattern.test(recipeId||'')||(plannedQuantity!==null&&(!Number.isInteger(plannedQuantity)||plannedQuantity<1||plannedQuantity>10000)))

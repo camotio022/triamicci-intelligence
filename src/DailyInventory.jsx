@@ -22,7 +22,7 @@ export default function DailyInventory({membership}){
  const [todayCounts,setTodayCounts]=useState([]),[todayCountComplete,setTodayCountComplete]=useState(true),[todayCountError,setTodayCountError]=useState('');
  const [closures,setClosures]=useState([]),[moreClosures,setMoreClosures]=useState(false),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const isManager=['admin','manager'].includes(membership.role);
- useEffect(()=>{let active=true;request('/api/operations/inventory-today','todayCounts').then(data=>{if(active){setTodayCounts(data.products||[]);setTodayCountComplete(!!data.complete)}}).catch(e=>{if(active)setTodayCountError(e.message)});return()=>{active=false}},[membership.unitId]);
+ useEffect(()=>{let active=true;request('/api/operations/stock','todayCounts').then(data=>{if(active){setTodayCounts(data.products||[]);setTodayCountComplete(!!data.complete)}}).catch(e=>{if(active)setTodayCountError(e.message)});return()=>{active=false}},[membership.unitId]);
  const [closureFilter,setClosureFilter]=useState('pending');
  const refreshClosures=async()=>{if(!isManager)return;const d=await request('/api/operations/stock','closeList');setClosures(d.closures||[]);setMoreClosures(!!d.hasMore)};
  const loadMoreClosures=async()=>{if(busy||!moreClosures||!closures.length)return;setBusy(true);try{const d=await request('/api/operations/stock','closeList',{before:closures.at(-1).submittedAt});setClosures(old=>[...old,...(d.closures||[])]);setMoreClosures(!!d.hasMore)}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};

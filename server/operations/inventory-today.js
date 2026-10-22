@@ -1,4 +1,4 @@
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
 const dayInUnit=at=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(at));
 export default async function handler(req,res){
