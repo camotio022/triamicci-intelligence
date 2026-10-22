@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, limit } from 'firebase/firestore';
-import { db, auth } from './firebase.js';
+import React, { useCallback, useEffect, useState } from 'react';
+import { auth } from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import MemberDirectory from './MemberDirectory.jsx';
 import TeamProfiles from './TeamProfiles.jsx';
@@ -54,6 +53,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
         setEmail('');
       }
       setFeedback(data.message);notify(data.message,'success');
+      await refreshInvitations();
     } catch(error) { setFeedback(error.message || 'Não foi possível enviar.');notify(error.message,'error'); }
     finally { setSubmitting(false); }
   };
@@ -91,24 +91,30 @@ export default function TeamManagement({ user, membership, accessOnly = false })
       if (!response.ok) throw new Error(data.message || 'Falha ao revogar convite.');
       setFeedback(data.message);
       setShareInvite(null);
+      await refreshInvitations();
     } catch (error) { setFeedback(error.message || 'Não foi possível revogar.');notify(error.message,'error'); }
     finally { setRevokingId(''); }
   };
 
-  useEffect(() => {
+  const refreshInvitations = useCallback(async () => {
     if (!allowed) return;
-    const ref = query(collection(db, 'units', membership.unitId, 'invitations'), limit(50));
-    return onSnapshot(ref, snapshot => {
-      setInvitations(snapshot.docs.map(item => ({ id: item.id, ...item.data() })));
-      setReadState('ready');
-      setReadError('');
-    }, error => {
-      setReadState('error');
-      setReadError(error.code === 'permission-denied'
-        ? 'A leitura de convites ainda não está autorizada. Confira se as regras do Firestore foram publicadas.'
-        : 'Não foi possível carregar os convites (' + (error.code || 'erro desconhecido') + ').');
-    });
-  }, [allowed, membership.unitId]);
+    setReadState('loading');
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const response = await fetch('/api/invitations/revoke', {
+        method:'POST',
+        headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+        body:JSON.stringify({action:'list',unitId:membership.unitId})
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Não foi possível consultar os convites.');
+      setInvitations(data.invitations||[]);
+      setReadState('ready');setReadError('');
+    } catch (error) {
+      setReadState('error');setReadError(error.message || 'Não foi possível consultar os convites.');
+    }
+  },[allowed,membership.unitId]);
+  useEffect(() => {refreshInvitations();},[refreshInvitations]);
 
   if (!allowed) return <section className="team-page"><h1>Gestão de colaboradores</h1><p>Esta área é reservada a gerentes e administradores.</p></section>;
 
