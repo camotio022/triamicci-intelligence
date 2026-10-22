@@ -85,7 +85,7 @@ export default function KitchenV3({membership}){
    })}
   </nav>
   {tab!=='overview'&&<nav className="ti-v4-stock-subnav" aria-label="Operações e consultas de estoque">
-   {(tab==='history'||tab==='catalog'?[['history','Histórico'],...(canManage?[['catalog','Configurar catálogo']]:[])]]:[['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['loss','Perdas e avarias'],...(canManage?[['count','Contagem oficial']]:[])]]).map(([key,label])=><button type="button" key={key} className={tab===key?'selected':''} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
+   {(tab==='history'||tab==='catalog'?[['history','Histórico'],...(canManage?[['catalog','Configurar catálogo']]:[])]:[['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['loss','Perdas e avarias'],...(canManage?[['count','Contagem oficial']]:[])]]).map(([key,label])=><button type="button" key={key} className={tab===key?'selected':''} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
   </nav>}
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {loading?<p role="status">Carregando dados reais da unidade…</p>:<>
