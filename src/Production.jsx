@@ -15,7 +15,7 @@ async function call(path,action,payload={}){
 export default function Production({membership}){
  const {notify}=useFeedback();
  const [recipes,setRecipes]=useState([]),[runs,setRuns]=useState([]),[products,setProducts]=useState([]);
- const [recipeId,setRecipeId]=useState(''),[name,setName]=useState(''),[yieldQuantity,setYield]=useState('1');
+ const [recipeId,setRecipeId]=useState(''),[name,setName]=useState(''),[yieldQuantity,setYield]=useState('1'),[outputProductId,setOutputProductId]=useState('');
  const [lines,setLines]=useState([{productId:'',quantity:'',substitutes:[]}]);
  const [portions,setPortions]=useState('1'),[items,setItems]=useState([]),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[status,setStatus]=useState('');
@@ -41,14 +41,14 @@ export default function Production({membership}){
   e.preventDefault();if(busy)return;setBusy(true);setStatus('');
   try{
    await call('/api/production/manage','saveRecipe',{
-    id:idFor(name),name,yieldQuantity:Number(yieldQuantity),
+    id:idFor(name),name,yieldQuantity:Number(yieldQuantity),outputProductId:outputProductId||null,
     lines:lines.map(l=>({productId:l.productId,quantity:Number(l.quantity),substitutes:l.substitutes}))});
    setStatus('Ficha técnica salva no Firebase.');notify('Ficha técnica salva com sucesso.','success');await load();
   }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const finish=async e=>{
   e.preventDefault();if(busy||!confirmed)return;
-  if(!window.confirm('Confirmar a produção e descontar agora os ingredientes realmente utilizados do giro?'))return;
+  if(!window.confirm(selected?.outputProductId?'Confirmar a transformação? Os ingredientes sairão da reserva e o produto preparado entrará na reserva.':'Confirmar a produção e descontar agora os ingredientes realmente utilizados do giro?'))return;
   setBusy(true);setStatus('');
   const id=requestId||crypto.randomUUID();setRequestId(id);
   try{
@@ -81,7 +81,7 @@ export default function Production({membership}){
       <label>Porções produzidas<input type="number" required min="1" step="1" value={portions} onChange={e=>{const n=Number(e.target.value);setPortions(e.target.value);setRequestId(null);setConfirmed(false);
        if(n>0&&selected)setItems(selected.lines.map(line=>({productId:line.productId,
         quantity:String(suggestedQuantity(line.quantity,n,selected.yieldQuantity,{individual:option(line.productId)?.physicalUnit==='un'})??'')})))}}/></label>
-      <p>Revise as quantidades reais. Os valores iniciais vêm da ficha técnica e podem ser corrigidos.</p>
+      <p>{selected.outputProductId?'Esta ficha transforma itens da reserva em um produto preparado na reserva. As quantidades precisam respeitar a ficha validada.':'Revise as quantidades reais. Os valores iniciais vêm da ficha técnica e podem ser corrigidos.'}</p>
       {items.map((item,i)=>{
        const original=selected.lines[i];const allowed=[original.productId,...(original.substitutes||[])];
        return <div className="stock-lot-row" key={i}>
@@ -93,7 +93,7 @@ export default function Production({membership}){
        </div>})}
       <label>Observações<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setRequestId(null);setConfirmed(false)}}/></label>
       <label className="production-confirm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Conferi os ingredientes e as quantidades reais utilizadas, não apenas as sugestões da ficha.</label>
-      <button type="submit" className="stock-action-save" disabled={busy||!items.length||!confirmed}>{busy?'Registrando...':'Finalizar e descontar do giro'}</button>
+      <button type="submit" className="stock-action-save" disabled={busy||!items.length||!confirmed}>{busy?'Registrando...':selected?.outputProductId?'Confirmar transformação na reserva':'Finalizar e descontar do giro'}</button>
      </>}
     </form>
    </section>
@@ -104,6 +104,9 @@ export default function Production({membership}){
     <form className="stock-action-form" onSubmit={saveRecipe}>
      <label>Nome da preparação<input required minLength={3} maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label>
      <label>Rendimento padrão (porções)<input type="number" min="1" step="1" value={yieldQuantity} onChange={e=>setYield(e.target.value)}/></label>
+     <label>Produto preparado que entrará na reserva (opcional)<select value={outputProductId} onChange={e=>setOutputProductId(e.target.value)}><option value="">Ficha antiga: apenas consumo do giro</option>{products.filter(p=>p.status==="active"&&!p.trackExpiry).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+     {outputProductId&&<p>Ficha transformacional: os ingredientes deverão existir na reserva; ao confirmar produção, o preparado entrará na reserva na mesma transação. Produtos com controle de validade exigem fluxo específico.</p>}
+
      {lines.map((line,i)=><div className="stock-lot-row" key={i}>
       <label>Insumo principal<select required value={line.productId} onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,productId:e.target.value}:x))}>
        <option value="">Selecionar insumo</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
