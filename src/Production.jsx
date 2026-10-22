@@ -24,14 +24,15 @@ export default function Production({membership}){
  const [dailyTasks,setDailyTasks]=useState([]),[plannedRecipe,setPlannedRecipe]=useState(''),[plannedQuantity,setPlannedQuantity]=useState(''),[activeTaskId,setActiveTaskId]=useState(null),[taskLoading,setTaskLoading]=useState(false);
  const admin=['admin','manager'].includes(membership.role);
  const canPlan=['admin','manager','submanager','cook'].includes(membership.role);
- const loadTasks=useCallback(async()=>{try{const r=await call('/api/production/day-list','list');setDailyTasks(r.tasks||[]);}catch(e){notify(e.message,'error')}},[notify]);
+ const loadTasks=useCallback(async()=>{try{const r=await call('/api/production/day-list','list');setDailyTasks(r.tasks||[]);}catch(e){notify(e.message,'error')}},[notify,membership?.unitId]);
  const addDailyTask=async e=>{e.preventDefault();if(taskLoading||!plannedRecipe)return;setTaskLoading(true);try{await call('/api/production/day-list','add',{recipeId:plannedRecipe,plannedQuantity:plannedQuantity?Number(plannedQuantity):null});setPlannedRecipe('');setPlannedQuantity('');await loadTasks();notify('Preparação adicionada à lista.','success')}catch(e){notify(e.message,'error')}finally{setTaskLoading(false)}};
  const load=useCallback(async()=>{
   setLoading(true);try{
    const [p,r]=await Promise.all([call('/api/products/manage','list'),call('/api/production/manage','list')]);
    setProducts(p.products||[]);setRecipes(r.recipes||[]);setRuns(r.runs||[]);
   }catch(e){setStatus(e.message)}finally{setLoading(false)}
- },[]);
+ },[membership?.unitId]);
+ useEffect(()=>{setProducts([]);setRecipes([]);setRuns([]);setDailyTasks([]);setRecipeId('');setActiveTaskId(null);},[membership?.unitId]);
  useEffect(()=>{load();loadTasks()},[load,loadTasks]);
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=id=>{
