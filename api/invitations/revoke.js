@@ -8,6 +8,23 @@ export default async function handler(req, res) {
     const member = await membership(actor.uid);
     if (!member || !['admin','manager','submanager'].includes(member.role))
       return send(res,403,'Sem permissão para revogar convites.');
+    // Consultas de convites passam pela API: Rules públicas não precisam expor a coleção.
+    // Devolver somente os campos necessários à interface, nunca tokenHash.
+    if (req.body?.action === 'list') {
+      const unitId = req.body?.unitId;
+      if (unitId !== member.unitId) return send(res,403,'Unidade não autorizada.');
+      const snap = await getDb().collection('units').doc(unitId).collection('invitations')
+        .orderBy('createdAt','desc').limit(50).get();
+      const invitations = snap.docs.filter(doc => member.role === 'admin' || doc.data().createdBy === actor.uid)
+        .map(doc => {
+          const value = doc.data();
+          return {id:doc.id,email:value.email||'',role:value.role||'',status:value.status||'',
+            deliveryMethod:value.deliveryMethod||'',createdBy:value.createdBy||'',
+            createdAt:value.createdAt?.toDate?.()?.toISOString?.() || null};
+        });
+      res.setHeader('Cache-Control','no-store');
+      return send(res,200,'Convites carregados.',{invitations});
+    }
     const { unitId, invitationId } = req.body || {};
     if (unitId !== member.unitId || typeof invitationId !== 'string' ||
         !/^[A-Za-z0-9_-]{1,128}$/.test(invitationId))
