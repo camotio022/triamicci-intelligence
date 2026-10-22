@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck} from 'lucide-react';
+import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck,ClipboardList} from 'lucide-react';
 import {doc,onSnapshot} from 'firebase/firestore';
 import {auth,db} from './firebase.js';
 import PublishedRoster from './PublishedRoster.jsx';
@@ -18,7 +18,7 @@ const monthLabel=period=>new Intl.DateTimeFormat('pt-BR',{month:'long',year:'num
 const todayInSaoPaulo=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 
 export default function TeamMural({membership}){
- const [schedules,setSchedules]=useState([]),[notices,setNotices]=useState([]),[presence,setPresence]=useState({}),[today,setToday]=useState(todayInSaoPaulo);
+ const [schedules,setSchedules]=useState([]),[notices,setNotices]=useState([]),[presence,setPresence]=useState({}),[today,setToday]=useState(todayInSaoPaulo),[productionTasks,setProductionTasks]=useState([]);
  const [loading,setLoading]=useState(true),[error,setError]=useState(''),[expanded,setExpanded]=useState(null),[staff,setStaff]=useState([]),[clock,setClock]=useState('00:00');
  const refresh=useCallback(async()=>{
   try{
@@ -28,11 +28,12 @@ export default function TeamMural({membership}){
    setNotices(board.items||[]);setError('');
   }catch(e){setError(e.message)}finally{setLoading(false)}
  },[]);
+ const refreshProduction=useCallback(async()=>{try{const data=await read('production','dayList');setProductionTasks(data.tasks||[])}catch{setProductionTasks([])}},[]);
  const refreshPresence=useCallback(async()=>{
   try{const result=await read('attendanceV31','teamToday');setPresence(Object.fromEntries((result.presence||[]).map(x=>[x.uid,x])));}
   catch{/* A escala permanece disponível se a presença não puder ser consultada. */}
  },[]);
- useEffect(()=>{refresh();refreshPresence();const onVisible=()=>{if(document.visibilityState==='visible'){setToday(todayInSaoPaulo());refresh();refreshPresence()}};document.addEventListener('visibilitychange',onVisible);const interval=setInterval(onVisible,60000);return()=>{document.removeEventListener('visibilitychange',onVisible);clearInterval(interval)}},[refresh,refreshPresence]);
+ useEffect(()=>{refresh();refreshPresence();refreshProduction();const onVisible=()=>{if(document.visibilityState==='visible'){setToday(todayInSaoPaulo());refresh();refreshPresence();refreshProduction()}};document.addEventListener('visibilitychange',onVisible);const interval=setInterval(onVisible,60000);return()=>{document.removeEventListener('visibilitychange',onVisible);clearInterval(interval)}},[refresh,refreshPresence,refreshProduction]);
  useEffect(()=>{if(!membership?.unitId)return;let first=true;return onSnapshot(doc(db,'units',membership.unitId,'live','attendance'),()=>{if(first){first=false;return}refreshPresence()},()=>{});},[membership?.unitId,refreshPresence]);
  useEffect(()=>{const tick=()=>setClock(new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));tick();const timer=setInterval(tick,30000);return()=>clearInterval(timer)},[]);
  const current=useMemo(()=>schedules.find(x=>x.period===today.slice(0,7)),[schedules,today]);
@@ -68,6 +69,7 @@ export default function TeamMural({membership}){
      {notices.length>2&&<button type="button" className="ti-v4-secondary-link" aria-expanded={showAllNotices} onClick={()=>setShowAllNotices(v=>!v)}>{showAllNotices?'Mostrar menos':`Ver todos os ${notices.length} comunicados`} <ChevronRight size={16} aria-hidden="true"/></button>}
     </>}
    </section>
+   <section className="ti-mural-card ti-v4-feature ti-v4-production-mural" aria-labelledby="mural-production-title"><header className="ti-v4-section-title"><div className="ti-v4-title-left"><ClipboardList size={22} aria-hidden="true"/><div><h2 id="mural-production-title">Produção de hoje</h2><p>Planejamento compartilhado da cozinha.</p></div></div></header>{productionTasks.length===0?<p className="ti-mural-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-mural-tasks">{productionTasks.map(task=><li key={task.id}><span><strong>{task.recipeName}</strong><small>{task.plannedQuantity?task.plannedQuantity+" porções planejadas":"Quantidade livre"}</small></span><em className={task.status==="completed"?"complete":""}>{task.status==="completed"?"Concluída":"Pendente"}</em></li>)}</ul>}</section>
    <section className="ti-mural-card ti-mural-roster ti-v4-feature" aria-labelledby="mural-roster-title">
     <header className="ti-v4-section-title"><div className="ti-v4-title-left"><CalendarDays size={22} aria-hidden="true"/><div><h2 id="mural-roster-title">Escala da equipe</h2><p>{loading?'Carregando escala…':scheduleLabel}</p></div></div>{publishedCurrent&&<span className="ti-v4-official"><ShieldCheck size={14} aria-hidden="true"/> Oficial</span>}</header>
     <div className="ti-v4-roster-summary">
