@@ -1,3 +1,4 @@
+import {coverageTimeline} from '../../server/schedules/coverage-timeline.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import {randomUUID} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
@@ -21,7 +22,7 @@ export default async function handler(req,res){
    const [peopleSnap,plansSnap,rateSnap,proposalSnap,policySnap,requestSnap]=await Promise.all([
     unit.collection('staffRegistry').limit(200).get(),unit.collection('schedules').limit(120).get(),settings.get(),proposals.limit(100).get(),policyRef.get(),staffRequests.limit(100).get()
    ]);
-   const people=peopleSnap.docs.map(d=>({uid:d.id,name:d.data().name||'',status:d.data().status||'inactive',jobTitle:d.data().jobTitle||'',professional:{sector:d.data().sector,jobTitle:d.data().jobTitle,shift:d.data().shift,skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
+   const people=peopleSnap.docs.map(d=>({uid:d.id,name:d.data().name||'',status:d.data().status||'inactive',jobTitle:d.data().jobTitle||'',professional:{sector:d.data().sector,jobTitle:d.data().jobTitle,shift:d.data().shift,availability:d.data().availability||[],skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
    const plans=plansSnap.docs.map(d=>({id:d.id,...d.data()}));
    return send(res,200,'Painel de cobertura carregado.',{people,plans:plans.map(p=>({id:p.id,title:p.title,period:p.period,status:p.status,entries:p.entries||[]})),
     rates:{...DEFAULT_RATES,...(rateSnap.data()?.rates||{})},requirements:policySnap.data()?.requirements||[],
@@ -87,7 +88,7 @@ export default async function handler(req,res){
   if(action==='requirementsSet'){
    if(member.role!=='admin')return send(res,403,'Somente administradores configuram mínimos de cobertura.');
    const requirements=req.body?.requirements;
-   const valid=r=>r&&['cozinha','frente','caixa','apoio','gestao'].includes(r.sector)&&Number.isInteger(r.weekday)&&r.weekday>=0&&r.weekday<=6&&validTime(r.start)&&validTime(r.end)&&r.start<r.end&&Number.isInteger(r.minimum)&&r.minimum>=1&&r.minimum<=30&&typeof r.skill==='string'&&r.skill.length<=40;
+   const valid=r=>r&&['cozinha','frente','caixa','apoio','gestao'].includes(r.sector)&&Number.isInteger(r.weekday)&&r.weekday>=0&&r.weekday<=6&&validTime(r.start)&&validTime(r.end)&&r.start!==r.end&&Number.isInteger(r.minimum)&&r.minimum>=1&&r.minimum<=30&&typeof r.skill==='string'&&r.skill.length<=40;
    if(!Array.isArray(requirements)||requirements.length>84||!requirements.every(valid))return send(res,400,'Regras de cobertura inválidas.');
    const clean=requirements.map(r=>({sector:r.sector,weekday:r.weekday,start:r.start,end:r.end,minimum:r.minimum,skill:r.skill.trim().toLowerCase()}));
    const now=new Date();
@@ -116,11 +117,13 @@ export default async function handler(req,res){
   }
   if(action==='simulate'){
    const {planId,date,sector,requiredSkill,required,windowStart='',windowEnd=''}=req.body||{};
-   if(!idOk(planId)||!validDate(date)||typeof sector!=='string'||!['cozinha','frente','caixa','apoio','gestao'].includes(sector)||typeof requiredSkill!=='string'||requiredSkill.length>40||!Number.isInteger(required)||required<1||required>30||!validTime(windowStart)||!validTime(windowEnd)||windowEnd<=windowStart)return send(res,400,'Parâmetros ou faixa de horário inválidos.');
+   if(!idOk(planId)||!validDate(date)||typeof sector!=='string'||!['cozinha','frente','caixa','apoio','gestao'].includes(sector)||typeof requiredSkill!=='string'||requiredSkill.length>40||!Number.isInteger(required)||required<1||required>30||!validTime(windowStart)||!validTime(windowEnd)||windowEnd===windowStart)return send(res,400,'Parâmetros ou faixa de horário inválidos.');
    const [plan,peopleSnap,rateSnap]=await Promise.all([unit.collection('schedules').doc(planId).get(),unit.collection('staffRegistry').limit(200).get(),settings.get()]);
    if(!plan.exists||!date.startsWith(plan.data().period))return send(res,404,'Escala não encontrada para esta data.');
    const people=peopleSnap.docs.map(d=>({uid:d.id,...d.data(),professional:{sector:d.data().sector,availability:d.data().availability||[],certifications:d.data().certifications||[]}}));
    const result=evaluateCoverage({people,entries:plan.data().entries||[],date,sector,requiredSkill,required,windowStart,windowEnd});
+   result.timeline=coverageTimeline({date,entries:plan.data().entries||[],people,requirements:[{weekday:new Date(date+'T12:00:00Z').getUTCDay(),sector,skill:requiredSkill,start:windowStart,end:windowEnd,minimum:required}]});
+   result.covered=Math.min(...result.timeline.map(r=>r.covered));result.shortage=Math.max(0,required-result.covered);
    const rates={...DEFAULT_RATES,...(rateSnap.data()?.rates||{})};
    result.candidates=result.candidates.map(p=>{const person=people.find(x=>x.uid===p.uid);return {...p,estimatedPracticePayment:paymentFor({paymentRole:rateRoleFor(person)},rates)}});
    return send(res,200,'Simulação produzida sem alterar a escala.',{simulation:result});

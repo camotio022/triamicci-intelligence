@@ -16,7 +16,8 @@ export default async function investigation(req,res){
   const db=getDb(),unit=db.collection('units').doc(m.unitId);
   if(action==='investigationGet'){
    const docs=await unit.collection('inventoryInvestigations').where('productId','==',productId).limit(100).get();
-   return send(res,200,'Histórico de investigação.',{investigations:docs.docs.map(d=>({id:d.id,...d.data(),at:d.data().at?.toDate?.()?.toISOString?.(),decidedAt:d.data().decidedAt?.toDate?.()?.toISOString?.()||null})).sort((a,b)=>String(b.at).localeCompare(String(a.at)))});
+   const investigations=await Promise.all(docs.docs.map(async d=>{const versions=await d.ref.collection('versions').orderBy('version','desc').limit(20).get();return {id:d.id,...d.data(),at:d.data().at?.toDate?.()?.toISOString?.(),decidedAt:d.data().decidedAt?.toDate?.()?.toISOString?.()||null,versions:versions.docs.map(v=>({...v.data(),at:v.data().at?.toDate?.()?.toISOString?.()}))};}));
+   return send(res,200,'Histórico de investigação.',{investigations:investigations.sort((a,b)=>String(b.at).localeCompare(String(a.at)))});
   }
   const signal=await unit.collection('live').doc('attendance').get();
   let result,status=200;
@@ -34,14 +35,15 @@ export default async function investigation(req,res){
     if((old.data()?.version||0)!==expectedVersion||old.data()?.status==='approved')throw Error('CONFLICT');
     const normalized=allocations.map(a=>({reason:a.reason,quantity:a.quantity,notes:a.notes.trim()}));
     const explained=normalized.reduce((n,a)=>n+a.quantity,0);
-    tx.set(ref,{productId,countId:report.currentCountId,reportHash:hash,report,allocations:normalized,remaining:Math.round((Math.abs(report.divergence.quantity)-explained)*1000)/1000,status:'pending',version:expectedVersion+1,actorUid:actor.uid,unitId:m.unitId,at:now});
+    const revision={productId,countId:report.currentCountId,reportHash:hash,report,allocations:normalized,remaining:Math.round((Math.abs(report.divergence.quantity)-explained)*1000)/1000,status:'pending',version:expectedVersion+1,actorUid:actor.uid,unitId:m.unitId,at:now};
+    tx.set(ref,revision);tx.create(ref.collection('versions').doc(String(expectedVersion+1)),revision);
    }else{
     if(!manager(member.data().role))throw Error('FORBIDDEN');
-    if(!old.exists||old.data().status!=='pending'||old.data().actorUid===actor.uid||old.data().reportHash!==hash)throw Error('CONFLICT');
+    if(!old.exists||old.data().status!=='pending'||old.data().actorUid===actor.uid||old.data().reportHash!==hash||old.data().version!==expectedVersion)throw Error('CONFLICT');
     tx.update(ref,{status:action==='investigationApprove'?'approved':'rejected',decidedBy:actor.uid,decidedAt:now,note:note.trim()});
    }
    signalUnitChange(tx,db,m.unitId);
-   tx.create(db.collection('auditLogs').doc(),{event:action,unitId:m.unitId,actorUid:actor.uid,investigationId:ref.id,at:now,informationalOnly:true});
+   tx.create(db.collection('auditLogs').doc(),{event:action,unitId:m.unitId,actorUid:actor.uid,investigationId:ref.id,version:action==='investigationSave'?expectedVersion+1:expectedVersion,note:action==='investigationSave'?null:note.trim(),at:now,informationalOnly:true});
   });
   return send(res,200,'Investigação registrada. Nenhum saldo foi alterado.');
  }catch(e){

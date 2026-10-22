@@ -1,3 +1,4 @@
+import {coverageTimeline} from '../schedules/coverage-timeline.js';
 import {unitDay,publicationWindow} from '../schedules/temporal-policy.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,getAuth,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -115,7 +116,7 @@ export default async function handler(req,res){
   }
   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Somente gerência pode administrar escalas.');
   if(action==='saveDraft'){
-   const {period,entries,title,id}=req.body||{};
+   const {period,entries,title,id,expectedRevision}=req.body||{};
    if(!yyyyMm(period)||!Array.isArray(entries)||entries.length>1000||typeof title!=='string'||title.trim().length<3||title.length>100||id&&!idOk(id))
     return send(res,400,'Período, título ou escala inválidos.');
    if(!entries.every(e=>e&&idOk(e.uid)&&validDate(e.date)&&e.date.startsWith(period)&&['work','off','leave','monthly_sunday'].includes(e.type)))
@@ -126,16 +127,18 @@ export default async function handler(req,res){
    const staffSnap=await unit.collection('staffRegistry').limit(200).get();
    const active=new Set(masterActive?staffSnap.docs.filter(d=>d.data().status==='active').map(d=>d.id):membersSnap.docs.filter(d=>d.data().status==='active').map(d=>d.id));
    if(entries.some(e=>!active.has(e.uid)))return send(res,400,'A escala contém colaborador não ativo na unidade.');
-   const now=new Date();
+   const now=new Date();let revision;
    await db.runTransaction(async tx=>{
     const [actorSnap,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
     if(!actorSnap.exists||actorSnap.data().unitId!==m.unitId||actorSnap.data().status!=='active'||!['admin','manager','submanager'].includes(actorSnap.data().role))throw Error('FORBIDDEN');
     if(old.exists&&old.data().status!=='draft')throw Error('LOCKED');
+    if(old.exists&&old.data().revision!==expectedRevision)throw Error('CONFLICT');
+    revision=(old.data()?.revision||0)+1;
     tx.set(ref,{title:title.trim(),period,entries:entries.map(e=>({date:e.date,uid:e.uid,type:e.type})),status:'draft',revision:(old.data()?.revision||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
     signalUnitChange(tx,db,m.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'schedule.draft_saved',unitId:m.unitId,actorUid:actor.uid,scheduleId:ref.id,at:now});
    });
-   return send(res,200,'Rascunho salvo. Ainda não está visível no Mural.',{id:ref.id});
+   return send(res,200,'Rascunho salvo. Ainda não está visível no Mural.',{id:ref.id,revision});
   }
   if(['submit','approve','publish'].includes(action)){
    const id=req.body?.id;
@@ -149,12 +152,17 @@ export default async function handler(req,res){
    if(memberSnap.size>200)return send(res,409,'Equipe acima do limite.');
    const memberList=memberSnap.docs.filter(x=>x.data().status==='active').map(x=>({uid:x.id,...x.data()}));
    const registrySnap=await unit.collection('staffRegistry').limit(200).get();
-   const registryList=registrySnap.docs.filter(d=>d.data().status==='active').map(d=>({uid:d.id,role:d.data().jobTitle==='Cozinheiro'?'cook':d.data().jobTitle==='Auxiliar de cozinha'?'auxiliar':'staff',status:'active',name:d.data().name,accountUid:d.data().accountUid||null,professional:{sector:d.data().sector,shift:d.data().shift,jobTitle:d.data().jobTitle,skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
+   const registryList=registrySnap.docs.filter(d=>d.data().status==='active').map(d=>({uid:d.id,role:d.data().jobTitle==='Cozinheiro'?'cook':d.data().jobTitle==='Auxiliar de cozinha'?'auxiliar':'staff',status:'active',name:d.data().name,accountUid:d.data().accountUid||null,professional:{sector:d.data().sector,shift:d.data().shift,availability:d.data().availability||[],jobTitle:d.data().jobTitle,skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
    const profileRefs=memberList.map(x=>unit.collection('staffProfiles').doc(x.uid));
    const profiles=profileRefs.length?await db.getAll(...profileRefs):[];
    const members=memberList.map((x,i)=>({...x,professional:profiles[i]?.data()?.profile||null}));
    const issues=validateRosterSchedule({entries:snap.data().entries||[],members:masterActive?registryList:members,period:snap.data().period,complete:true,enforceCoverage:!masterActive});
    if(issues.length)return send(res,409,'A escala contém conflitos de cobertura ou folgas.',{issues});
+   const coveragePolicy=await unit.collection('configuration').doc('coverageRequirements').get();
+   const requirements=coveragePolicy.data()?.requirements||[];
+   if(action==='publish'&&!requirements.length)return send(res,409,'Configure mínimos por setor, horário e competência em Coberturas antes de publicar.');
+   const coverageIssues=[...new Set((snap.data().entries||[]).map(e=>e.date))].flatMap(date=>coverageTimeline({date,entries:snap.data().entries||[],people:masterActive?registryList:members,requirements})).filter(r=>r.deficit>0);
+   if(coverageIssues.length)return send(res,409,'Há intervalos sem cobertura mínima.',{issues:coverageIssues.slice(0,20).map(r=>r.date+' · '+r.sector+' · '+r.start+'–'+r.end+' · déficit '+r.deficit+(r.skill?' em '+r.skill:''))});
    const states={submit:'in_review',approve:'approved',publish:'published'},now=new Date();
    const lockRef=unit.collection('schedulePublicationState').doc(snap.data().period);
    await db.runTransaction(async tx=>{
@@ -162,6 +170,13 @@ export default async function handler(req,res){
     const previousId=action==='publish'?lock?.data()?.activeId:null;
     const previousRef=previousId&&previousId!==id?schedules.doc(previousId):null;
     const previous=previousRef?await tx.get(previousRef):null;
+    const latestPolicy=await tx.get(coveragePolicy.ref);if(JSON.stringify(latestPolicy.data()?.requirements||[])!==JSON.stringify(requirements))throw Error('CONFLICT');
+    const livePeople=masterActive?await tx.get(unit.collection('staffRegistry').limit(201)):await tx.get(unit.collection('staffProfiles').limit(201));
+    if(livePeople.size>200)throw Error('CONFLICT');
+    const latestRegistryConfig=await tx.get(config.ref);if((latestRegistryConfig.data()?.active===true)!==masterActive)throw Error('CONFLICT');
+    const currentPeople=masterActive?livePeople.docs.map(d=>({uid:d.id,...d.data(),professional:{sector:d.data().sector,availability:d.data().availability||[],certifications:d.data().certifications||[]}})):members.map(p=>({...p,professional:livePeople.docs.find(d=>d.id===p.uid)?.data()?.profile||null}));
+    if(validateRosterSchedule({entries:current.data()?.entries||[],members:currentPeople.filter(p=>p.status==='active'),period:current.data()?.period,complete:true,enforceCoverage:!masterActive}).length)throw Error('CONFLICT');
+    if([...new Set((current.data()?.entries||[]).map(e=>e.date))].some(date=>coverageTimeline({date,entries:current.data()?.entries||[],people:currentPeople,requirements}).some(r=>r.deficit>0)))throw Error('CONFLICT');
     if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
     if(['approve','publish'].includes(action)&&member.data().role!=='admin')throw Error('FORBIDDEN');
     const expected={submit:'draft',approve:'in_review',publish:'approved'}[action];

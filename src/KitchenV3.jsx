@@ -1,3 +1,4 @@
+import {useViewState} from './useViewState.js';
 import {useUnitLive} from './useUnitLive.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
@@ -24,10 +25,10 @@ const longDate=x=>x?new Date(x).toLocaleString('pt-BR'):'—';
 export default function KitchenV3({membership}){
  const {notify}=useFeedback();
  const canManage=isManagement(membership.role);
- const [tab,setTab]=useState('overview'),[products,setProducts]=useState([]),[signals,setSignals]=useState([]),[orders,setOrders]=useState([]);
- const [selected,setSelected]=useState(''),[search,setSearch]=useState(''),[location,setLocation]=useState('reserva'),[showArchived,setShowArchived]=useState(false),[newName,setNewName]=useState(''),[newCategory,setNewCategory]=useState('Proteínas'),[newUnit,setNewUnit]=useState('kg'),[newExpiry,setNewExpiry]=useState(false),[resolutionById,setResolutionById]=useState({});
+ const [tab,setTab]=useViewState('KitchenV3.jsx:tab',membership.unitId,'overview'),[products,setProducts]=useState([]),[signals,setSignals]=useState([]),[orders,setOrders]=useState([]);
+ const [selected,setSelected]=useState(''),[search,setSearch]=useViewState('KitchenV3.jsx:search',membership.unitId,''),[location,setLocation]=useState('reserva'),[showArchived,setShowArchived]=useState(false),[newName,setNewName]=useState(''),[newCategory,setNewCategory]=useState('Proteínas'),[newUnit,setNewUnit]=useState('kg'),[newExpiry,setNewExpiry]=useState(false),[resolutionById,setResolutionById]=useState({});
  const [observation,setObservation]=useState('missing'),[note,setNote]=useState('');
- const [overviewFilter,setOverviewFilter]=useState('alerts'),[showAllOrders,setShowAllOrders]=useState(false);
+ const [overviewFilter,setOverviewFilter]=useViewState('KitchenV3.jsx:overviewFilter',membership.unitId,'alerts'),[showAllOrders,setShowAllOrders]=useState(false);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [editId,setEditId]=useState(''),[step,setStep]=useState(0),[mode,setMode]=useState('availability'),
   [origin,setOrigin]=useState('supplier'),[countUnit,setCountUnit]=useState('un'),[locs,setLocs]=useState(['reserva']),[presentation,setPresentation]=useState(''),[trackingNote,setTrackingNote]=useState(''),[displayName,setDisplayName]=useState(''),[aliases,setAliases]=useState(''),[sourceIds,setSourceIds]=useState([]),[altIds,setAltIds]=useState([]);

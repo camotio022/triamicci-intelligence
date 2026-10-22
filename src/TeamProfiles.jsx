@@ -1,3 +1,4 @@
+import {useViewState} from './useViewState.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState,useRef} from 'react';
 import {auth} from './firebase.js';
@@ -20,7 +21,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  const dialogRef=useRef(null);
  const [requests,setRequests]=useState([]);const [members,setMembers]=useState([]),[tab,setTab]=useState(initialTab),[selected,setSelected]=useState(''),
  [form,setForm]=useState(blank()),[error,setError]=useState(''),[notice,setNotice]=useState(''),
- [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[search,setSearch]=useState('');
+ [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[search,setSearch]=useViewState('TeamProfiles.jsx:search',membership.unitId,'');
  const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');
   try{const [reg,q]=await Promise.all([api('masterRegistryPreview'),api('skillReviewList')]);const registered=(reg.registry||[]).map(p=>({uid:p.id,name:p.name,status:p.status,registry:true,role:p.jobTitle==='Cozinheiro'?'cook':p.jobTitle==='Auxiliar de cozinha'?'auxiliar':'staff',professional:{sector:p.sector,jobTitle:p.jobTitle,shift:p.shift,availability:p.availability||[],skills:p.skills||[],certifications:p.certifications||[],notes:p.notes||'',sectorExceptions:[]}}));setMembers(registered);setRequests(q.requests||[])}
   catch(e){setError(e.message)}finally{setLoading(false)}},[]);

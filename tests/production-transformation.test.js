@@ -5,7 +5,7 @@ const a='a'.repeat(40),b='b'.repeat(40),c='c'.repeat(40);
 const recipe={outputProductId:b,yieldQuantity:1,lines:[{productId:a,quantity:1}]};
 test('transformação reconhece origem de 30 parmegianas sem gravar estoque',()=>{
  const result=transformationPreview(recipe,30,{[a]:'un'});
- assert.equal(result.valid,true);assert.deepEqual(result.inputs,[{productId:a,quantity:30,unit:'un'}]);
+ assert.equal(result.valid,true);assert.deepEqual(result.inputs,[{productId:a,quantity:30,unit:'un',location:'reserva'}]);
  assert.deepEqual(result.output,{productId:b,quantity:30});
  assert.equal(result.sourceArea,'reserva');assert.equal(result.destinationArea,'reserva');
 });

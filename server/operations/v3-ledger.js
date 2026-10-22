@@ -1,3 +1,4 @@
+import {intervalFromBalance} from './inventory-summary.js';
 import {operationalBalance,writeOperationalBalance} from './shared-balance.js';
 import {signalUnitChange} from '../live-signal.js';
 // Novo ledger isolado: não mistura os saldos legados nem converte kg em porções.
@@ -309,7 +310,7 @@ export default async function v3Ledger(req,res){
       quality:'PARTIAL_LOCATION_COUNT',lastOperationId:requestId},{merge:true},prior);
     tx.create(ref,{kind:'count',actorUid:actor.uid,at:now(),productId,location,sessionId,quantity,unit:u,
       before:prior[location]||0,difference:round(quantity-(prior[location]||0)),notes});
-    if(prior.countSessions?.[location==='reserva'?'giro':'reserva']===sessionId){const reserve=location==='reserva'?quantity:prior.reserva,rotation=location==='giro'?quantity:prior.giro;const at=now();tx.set(balanceRef,{countedReserve:reserve,countedRotation:rotation,countedTotal:after,countId:requestId,entriesSinceCount:0,exitsSinceCount:0,at,quality:'PHYSICAL_COUNT'},{merge:true});tx.create(unit.collection('physicalCounts').doc(requestId),{productId,unit:u,reserve,rotation,total:after,sessionId,actorUid:actor.uid,unitId:m.unitId,at});}
+    if(prior.countSessions?.[location==='reserva'?'giro':'reserva']===sessionId){const reserve=location==='reserva'?quantity:prior.reserva,rotation=location==='giro'?quantity:prior.giro;const at=now();tx.set(balanceRef,{countedReserve:reserve,countedRotation:rotation,countedTotal:after,countId:requestId,entriesSinceCount:0,exitsSinceCount:0,at,quality:'PHYSICAL_COUNT'},{merge:true});tx.create(unit.collection('physicalCounts').doc(requestId),{inventorySummary:intervalFromBalance(prior),productId,unit:u,reserve,rotation,total:after,sessionId,actorUid:actor.uid,unitId:m.unitId,at});}
     audit(tx,db,'v3.counted',m.unitId,actor.uid,{requestId,productId,location,quantity,sessionId});
    });
    return send(res,200,'Contagem registrada.');

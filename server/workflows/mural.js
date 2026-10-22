@@ -20,11 +20,19 @@ export default async function handler(req,res){
   if(!m)return send(res,403,'Acesso não autorizado.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId),items=unit.collection('muralItems'),action=req.body?.action;
   if(action==='publicNotices'){
-   // Consulta dedicada: não carrega receitas nem permite rascunhos no quadro de leitura.
-   const docs=await items.where('kind','==','notice').limit(100).get();
-   const published=docs.docs.filter(d=>d.data().status==='published').map(serialize)
-    .sort((a,b)=>({urgent:2,important:1,normal:0}[b.priority||'normal']-({urgent:2,important:1,normal:0}[a.priority||'normal']))||String(b.publishedAt||b.updatedAt||'').localeCompare(String(a.publishedAt||a.updatedAt||''))).slice(0,12);
-   return send(res,200,'Comunicados da unidade.',{items:published});
+   const before=req.body?.before;if(before!==undefined&&!idOk(before))return send(res,400,'Cursor inválido.');
+   let query=items.orderBy('publishedAt','desc').orderBy('__name__','desc');
+   if(before){const cursor=await items.doc(before).get();if(!cursor.exists)return send(res,400,'Comunicado indisponível.');query=query.startAfter(cursor);}
+   const eligible=[];let cursor=null;
+   while(eligible.length<21){const page=await (cursor?query.startAfter(cursor):query).limit(100).get();for(const d of page.docs)if(d.data().kind==='notice'&&d.data().status==='published'){eligible.push(d);if(eligible.length===21)break;}if(page.size<100||eligible.length===21)break;cursor=page.docs.at(-1);}
+   const published=eligible.slice(0,20).map(serialize);
+   const reads=published.length?await db.getAll(...published.map(p=>unit.collection('muralReads').doc(actor.uid).collection('items').doc(p.id))):[];
+   return send(res,200,'Comunicados da unidade.',{items:published.map((p,i)=>({...p,read:reads[i]?.data()?.version===p.version})),hasMore:eligible.length>20,nextCursor:eligible.length>20?eligible[19].id:null});
+  }
+  if(action==='noticeRead'){
+   const id=req.body?.id;if(!idOk(id))return send(res,400,'Comunicado inválido.');
+   await db.runTransaction(async tx=>{const [account,item]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(items.doc(id))]);if(!account.exists||account.data().status!=='active'||account.data().unitId!==m.unitId)throw Error('FORBIDDEN');if(!item.exists||item.data().kind!=='notice'||item.data().status!=='published')throw Error('LOCKED');tx.set(unit.collection('muralReads').doc(actor.uid).collection('items').doc(id),{version:item.data().version,readAt:new Date(),uid:actor.uid});signalUnitChange(tx,db,m.unitId);});
+   return send(res,200,'Leitura registrada.');
   }
   if(action==='list'){
    const docs=await items.limit(150).get();

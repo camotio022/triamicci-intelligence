@@ -77,7 +77,7 @@ export default async function kitchenV3(req,res){
       sourceProductIds:profile.sourceProductIds||[],alternativeProductIds:profile.alternativeProductIds||[],
       trackingNote:(profile.trackingNote||'').slice(0,240),version:(prior.data()?.version||0)+1,updatedAt:now(),updatedBy:user.uid};
     version=next.version;tx.set(ref,next);
-    if(profile.controlMode==='quantitative'&&['kg','g','L','mL','un'].includes(profile.countUnit))tx.update(pref,{operationalUnitOverride:profile.countUnit==='mL'?'ml':profile.countUnit,updatedAt:now()});
+    if(profile.controlMode==='quantitative'&&['kg','g','L','ml','mL','un','porcao','pacote','duzia'].includes(profile.countUnit))tx.update(pref,{operationalUnitOverride:profile.countUnit,updatedAt:now()});
     newAudit(tx,db,'v3.profile_saved',unitId,user.uid,{productId,before:prior.data()||null,after:next});
    });
    return send(res,200,'Configuração operacional salva.',{version});

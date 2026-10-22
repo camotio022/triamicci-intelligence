@@ -1,4 +1,5 @@
 import React from 'react';
+import '../src/styles.css';
 import {createRoot} from 'react-dom/client';
 import {FeedbackProvider} from '../src/FeedbackProvider.jsx';
 import PublishedRoster from '../src/PublishedRoster.jsx';

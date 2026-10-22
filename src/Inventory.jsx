@@ -1,3 +1,4 @@
+import {useViewState} from './useViewState.js';
 import {useUnitLive} from './useUnitLive.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
@@ -28,8 +29,8 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState('');
   const [notice,setNotice] = useState('');
-  const [search,setSearch] = useState('');
-  const [countFilter,setCountFilter]=useState('all');
+  const [search,setSearch]=useViewState('Inventory.jsx:search',membership.unitId,'');
+  const [countFilter,setCountFilter]=useViewState('Inventory.jsx:countFilter',membership.unitId,'all');
   const [today,setToday]=useState(()=>restaurantDay());
   useEffect(()=>{const timer=setInterval(()=>setToday(restaurantDay()),60000);return()=>clearInterval(timer)},[]);
   const [form,setForm] = useState(blank);

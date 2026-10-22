@@ -57,7 +57,9 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  const before=(await unit.collection('physicalBalances').doc(input).get()).data();
  assert.equal((await call(investigation,cook,'investigationSave',claim)).code,200);
  assert.equal((await call(investigation,cook,'investigationApprove',{productId:input,note:'Revisão pela própria pessoa'})).code,400);
- assert.equal((await call(investigation,manager,'investigationApprove',{productId:input,note:'Conferência gerencial documentada'})).code,200);
+ assert.equal((await call(investigation,cook,'investigationSave',{...claim,expectedVersion:1})).code,200);
+ assert.equal((await call(investigation,cook,'investigationGet',{productId:input})).investigations[0].versions.length,2);
+ assert.equal((await call(investigation,manager,'investigationApprove',{productId:input,expectedVersion:2,note:'Conferência gerencial documentada'})).code,200);
  assert.deepEqual((await unit.collection('physicalBalances').doc(input).get()).data(),before,'Investigation must never move inventory');
  assert.equal((await call(investigation,outsider,'investigationGet',{productId:input})).investigations.length,0);
  const forbidden=await call(investigation,otherManager,'investigationSave',{...claim,allocations:[{reason:'loss',quantity:11,notes:'Quantidade acima do permitido'}]});assert.equal(forbidden.code,400);
@@ -79,5 +81,97 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  const counted=(await unit.collection('physicalBalances').doc(input).get()).data();
  assert.equal(counted.reserve,8);assert.equal(counted.rotation,2);assert.equal(counted.countedTotal,10);
  assert.equal((await unit.collection('physicalCounts').get()).size,countBefore+1);
+
+ // One shipment can contain multiple ordered products and lots. Inspection never moves stock.
+ const {default:shipments}=await import('../server/operations/shipments.js');
+ const orderId=randomUUID();
+ for(const id of [input,output])await unit.collection('operationalProfiles').doc(id).set({controlMode:'quantitative',countUnit:'un',origin:'supplier',locations:['reserva','giro']});
+ await unit.collection('purchaseOrdersV3').doc(orderId).set({supplier:'Fornecedor único',status:'expected',items:[{productId:input,quantity:10,unit:'un'},{productId:output,quantity:6,unit:'un'}],received:{}});
+ const shipmentId=randomUUID(),shipment={requestId:shipmentId,orderId,supplier:'Fornecedor único',notes:'Entrega parcial conferida',lines:[{productId:input,commercialQuantity:4,commercialUnit:'un',stockQuantity:4,location:'reserva',lot:'',expiryDate:''},{productId:output,commercialQuantity:3,commercialUnit:'un',stockQuantity:3,location:'giro',lot:'',expiryDate:''}]};
+ assert.equal((await call(shipments,cook,'shipmentInspect',{...shipment,lines:[null]})).code,400);
+ assert.equal((await call(shipments,cook,'shipmentInspect',shipment)).code,200);
+ assert.equal((await call(shipments,cook,'shipmentInspect',shipment)).duplicate,true);
+ assert.equal((await unit.collection('physicalBalances').doc(input).get()).data().total,10);
+ assert.equal((await call(shipments,cook,'shipmentApprove',{requestId:shipmentId})).code,403);
+ assert.equal((await call(shipments,outsider,'shipmentApprove',{requestId:shipmentId})).code,403);
+ // Revalidation failure must leave ALL products and the purchase order untouched.
+ await unit.collection('products').doc(output).update({status:'inactive'});
+ assert.equal((await call(shipments,manager,'shipmentApprove',{requestId:shipmentId})).code,409);
+ assert.equal((await unit.collection('physicalBalances').doc(input).get()).data().total,10);
+ assert.deepEqual((await unit.collection('purchaseOrdersV3').doc(orderId).get()).data().received,{});
+ await unit.collection('products').doc(output).update({status:'active'});
+ const approvals=await Promise.all([call(shipments,manager,'shipmentApprove',{requestId:shipmentId}),call(shipments,otherManager,'shipmentApprove',{requestId:shipmentId})]);
+ assert.deepEqual(approvals.map(r=>r.code),[200,200]);assert.equal(approvals.filter(r=>r.duplicate).length,1);
+ assert.equal((await unit.collection('physicalBalances').doc(input).get()).data().total,14);
+ assert.equal((await unit.collection('physicalBalances').doc(output).get()).data().rotation,3);
+ assert.deepEqual((await unit.collection('purchaseOrdersV3').doc(orderId).get()).data().received,{[input]:4,[output]:3});
+ const rejectedId=randomUUID();assert.equal((await call(shipments,cook,'shipmentInspect',{...shipment,requestId:rejectedId})).code,200);
+ assert.equal((await call(shipments,manager,'shipmentReject',{requestId:rejectedId,reason:'Entrega recusada na conferência'})).code,200);
+ assert.equal((await unit.collection('physicalBalances').doc(input).get()).data().total,14);
+ // Decimal yields, per-ingredient source and a real output lot, without a prior output count.
+ const raw='e'.repeat(40),prepared='f'.repeat(40);
+ await unit.collection('products').doc(raw).set({name:'Molho base',unit:'kg',status:'active',trackExpiry:false});
+ await unit.collection('products').doc(prepared).set({name:'Molho final',unit:'kg',status:'active',trackExpiry:true});
+ await unit.collection('physicalBalances').doc(raw).set({unit:'kg',reserve:1,rotation:5,total:6});
+ const decimalRecipe={id:'molho-decimal',name:'Molho final',outputProductId:prepared,yieldQuantity:2.5,lines:[{productId:raw,quantity:1.25,location:'giro'}],method:'Misturar e conferir o rendimento real.'};
+ assert.equal((await call(production,manager,'saveRecipe',decimalRecipe)).code,200);
+ assert.equal((await call(production,manager,'saveRecipe',decimalRecipe)).code,409,'A stale recipe must not overwrite a revision');
+ assert.equal((await call(production,manager,'saveRecipe',{...decimalRecipe,expectedVersion:1})).code,200);
+ const decimalRun={recipeId:decimalRecipe.id,requestId:randomUUID(),portions:1.5,items:[{productId:raw,quantity:0.75}],outputLot:'PREPARO-TESTE',expiryDate:'2099-12-31'};
+ assert.equal((await call(production,cook,'finish',{...decimalRun,outputLot:''})).code,409);
+ assert.equal((await call(production,cook,'finish',decimalRun)).code,200);
+ assert.equal((await unit.collection('physicalBalances').doc(raw).get()).data().rotation,4.25);
+ assert.equal((await unit.collection('physicalBalances').doc(raw).get()).data().reserve,1);
+ assert.equal((await unit.collection('physicalBalances').doc(prepared).get()).data().reserve,1.5);
+ assert.equal((await unit.collection('physicalLots').doc(prepared).collection('lots').get()).docs[0].data().reserva,1.5);
+ assert.equal((await call(production,cook,'finish',decimalRun)).duplicate,true);
+ // Summary counters close the next count interval using canonical movements, irrespective of legacy volume.
+ const {default:reportApi}=await import('../server/operations/daily-report.js');
+ const countedAgain=randomUUID();await new Promise(r=>setTimeout(r,10));
+ assert.equal((await call(ledger,manager,'v3Count',{requestId:randomUUID(),sessionId:countedAgain,productId:input,location:'reserva',quantity:12})).code,200);
+ assert.equal((await call(ledger,manager,'v3Count',{requestId:randomUUID(),sessionId:countedAgain,productId:input,location:'giro',quantity:2})).code,200);
+ const summary=await call(reportApi,cook,'dailyReport',{productId:input});
+ assert.equal(summary.code,200);assert.equal(summary.report.source,'transactional_summary');assert.equal(summary.report.entriesTotal,4);assert.equal(summary.report.divergence,null);
+ const {default:todayApi}=await import('../server/operations/inventory-today.js');
+ assert.equal((await call(todayApi,cook,'todayCounts')).products.find(p=>p.productId===input).state,'clear');
+ // Notice pagination, personal read state and tenant isolation.
+ const {default:mural}=await import('../server/workflows/mural.js');
+ for(let i=0;i<23;i++)await unit.collection('muralItems').doc('notice-'+String(i).padStart(2,'0')).set({kind:'notice',title:'Aviso '+i,body:'Conteúdo experimental',status:'published',version:1,publishedAt:new Date(Date.now()+i)});
+ const notices=await call(mural,cook,'publicNotices');assert.equal(notices.items.length,20);assert.ok(notices.nextCursor);
+ assert.equal((await call(mural,cook,'publicNotices',{before:notices.nextCursor})).items.length,3);
+ assert.equal((await call(mural,cook,'noticeRead',{id:notices.items[0].id})).code,200);
+ assert.equal((await call(mural,cook,'publicNotices')).items[0].read,true);
+ assert.equal((await call(mural,manager,'publicNotices')).items[0].read,false);
+ assert.equal((await call(mural,outsider,'publicNotices')).items.length,0);
+ // Draft edits require the revision the editor actually opened.
+ const draft=await call(schedules,manager,'saveDraft',{period:'2099-03',title:'Rascunho de teste',entries:[]});assert.equal(draft.code,200);
+ assert.equal((await call(schedules,manager,'saveDraft',{id:draft.id,period:'2099-03',title:'Edição atual',entries:[],expectedRevision:1})).code,200);
+ assert.equal((await call(schedules,manager,'saveDraft',{id:draft.id,period:'2099-03',title:'Edição atrasada',entries:[],expectedRevision:1})).code,409);
+
+ // Compatibility report traverses more than 500 legacy events without truncating the result.
+ const legacyNow=new Date(Date.now()+2000),legacyBefore=new Date(Date.now()-60000);
+ await unit.collection('physicalCounts').doc(randomUUID()).set({productId:raw,unit:'kg',reserve:10,rotation:0,at:legacyBefore});
+ await unit.collection('physicalCounts').doc(randomUUID()).set({productId:raw,unit:'kg',reserve:9.851,rotation:0,at:legacyNow});
+ for(let offset=0;offset<601;offset+=200){const batch=db.batch();for(let i=offset;i<Math.min(offset+200,601);i++)batch.set(unit.collection('physicalReceipts').doc('legacy-'+i),{productId:raw,unit:'kg',physicalQuantity:0.001,at:new Date()});await batch.commit();}
+ const legacyReport=await call(reportApi,cook,'dailyReport',{productId:raw});assert.equal(legacyReport.complete,true);assert.equal(legacyReport.report.entriesTotal,.601);assert.equal(legacyReport.report.divergence,null);
+
+ // Full draft -> independent approval -> publication, revalidating real Sunday pauses.
+ const {generateMonthlyRoster}=await import('../server/schedules/generator.js');
+ const {unitDay}=await import('../server/schedules/temporal-policy.js');
+ const period=unitDay().slice(0,7),administrator=await signup('admin');
+ const staff=[{uid:'staff-one',status:'active',name:'Equipe A'},{uid:'staff-two',status:'active',name:'Equipe B'}];
+ await unit.collection('configuration').doc('staffRegistry').set({active:true});
+ for(const p of staff)await unit.collection('staffRegistry').doc(p.uid).set({...p,jobTitle:'Cozinheiro',sector:'cozinha',availability:[{day:'dom',start:'09:00',end:'17:00',breakStart:'12:00',breakEnd:'13:00'}]});
+ const policy=unit.collection('configuration').doc('coverageRequirements');
+ const requirements=[{weekday:0,sector:'cozinha',start:'10:00',end:'11:00',minimum:1,skill:''}];await policy.set({requirements});
+ const roster=generateMonthlyRoster({period,members:staff,fixedOffDays:{'staff-one':1,'staff-two':2},autoSunday:true});
+ const planned=await call(schedules,manager,'saveDraft',{period,title:'Escala experimental completa',entries:roster});assert.equal(planned.code,200);
+ assert.equal((await call(schedules,manager,'submit',{id:planned.id})).code,200);
+ assert.equal((await call(schedules,administrator,'approve',{id:planned.id})).code,200);
+ await policy.set({requirements:[{...requirements[0],start:'12:00',end:'13:00'}]});
+ assert.equal((await call(schedules,administrator,'publish',{id:planned.id})).code,409,'A pause is not operational coverage');
+ assert.equal((await unit.collection('schedules').doc(planned.id).get()).data().status,'approved');
+ await policy.set({requirements});assert.equal((await call(schedules,administrator,'publish',{id:planned.id})).code,200);
+ assert.equal((await unit.collection('schedulePublicationState').doc(period).get()).data().activeId,planned.id);
 
 });

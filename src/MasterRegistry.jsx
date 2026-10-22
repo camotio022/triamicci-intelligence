@@ -1,4 +1,7 @@
-import React,{useCallback,useEffect,useState} from 'react';
+import {useDialogFocus} from './useDialogFocus.js';
+import {useUnitLive} from './useUnitLive.js';
+import {useViewState} from './useViewState.js';
+import React,{useCallback,useEffect,useState,useRef} from 'react';
 import {auth} from './firebase.js';
 import './master-registry.css';
 const skillOptions={cozinha:['preparo','montagem','chapa','recebimento','estoque','etiquetagem'],frente:['vitrine','vendas','ifood'],caixa:['caixa','vendas','ifood'],apoio:['recebimento','estoque','etiquetagem','montagem'],gestao:['lideranca','recebimento','estoque','etiquetagem']};
@@ -9,11 +12,14 @@ async function api(action,extra={}){
  const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
  const data=await r.json();if(!r.ok)throw Error(data.message||'Erro ao consultar cadastro.');return data;
 }
-export default function MasterRegistry(){
- const [query,setQuery]=useState(''),[statusFilter,setStatusFilter]=useState('active');
+export default function MasterRegistry({membership={}}){
+ const [query,setQuery]=useViewState('master:query',membership.unitId,''),[statusFilter,setStatusFilter]=useViewState('master:status',membership.unitId,'active');
+ const dialog=useRef(null);
  const [claims,setClaims]=useState([]),[editing,setEditing]=useState(null),[form,setForm]=useState({}),[data,setData]=useState(null),[selected,setSelected]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
- const refresh=useCallback(async()=>{setBusy(true);setError('');try{const v=await api('masterRegistryPreview');setData(v);const claimsData=await api('masterRegistryClaims');setClaims(claimsData.claims||[]);setSelected([])}catch(e){setError(e.message)}finally{setBusy(false)}},[]);
+ const refresh=useCallback(async(silent=false)=>{if(!silent)setBusy(true);setError('');try{const v=await api('masterRegistryPreview');setData(v);const claimsData=await api('masterRegistryClaims');setClaims(claimsData.claims||[]);if(!silent)setSelected([])}catch(e){setError(e.message)}finally{setBusy(false)}},[]);
  useEffect(()=>{refresh()},[refresh]);
+ useUnitLive(membership.unitId,()=>refresh(true));
+ useDialogFocus(dialog,!!editing,()=>{if(!busy)setEditing(null)});
  const selectable=(data?.people||[]).filter(p=>p.state==='new');
  const filteredRegistry=(data?.registry||[]).filter(p=>(statusFilter==='all'||p.status===statusFilter)&&[p.name,p.jobTitle,p.sector,p.shift].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'))));
  const activate=async()=>{if(!window.confirm('Confirmou os 12 colaboradores, cargos, folgas e vínculos? Ativar esta base como fonte de novas escalas?'))return;setBusy(true);setError('');try{const d=await api('masterRegistryActivate',{confirm:true});setNotice(d.message);await refresh()}catch(err){setError(err.message);notifyLocal(err.message)}finally{setBusy(false)}};
@@ -32,7 +38,7 @@ export default function MasterRegistry(){
   <p className="ti-master-hint">Confira as correspondências antes de importar. Contas de teste nunca entram na equipe automaticamente.</p>
   {error&&<p role="alert" style={{color:'#ad2727'}}>{error}</p>}
   {notice&&<p role="status">{notice}</p>}
-  <div className="ti-master-toolbar"><button type="button" onClick={refresh} disabled={busy}>Atualizar</button><button type="button" className="ti-master-primary" onClick={()=>setSelected(selectable.map(p=>p.name))} disabled={busy||!selectable.length}>Selecionar sem conflito</button></div>
+  <details className="ti-master-admin"><summary>Importação e vínculos · {selectable.length+claims.length+(data?.people||[]).filter(p=>['needs_review','ambiguous'].includes(p.state)).length} pendências</summary><div className="ti-master-toolbar"><button type="button" onClick={refresh} disabled={busy}>Atualizar</button><button type="button" className="ti-master-primary" onClick={()=>setSelected(selectable.map(p=>p.name))} disabled={busy||!selectable.length}>Selecionar sem conflito</button></div>
   <div className="ti-master-metrics"><div><strong>{data?.registry?.length||0}</strong><span>Fichas cadastradas</span></div><div><strong>{data?.accounts?.length||0}</strong><span>Contas da unidade</span></div><div><strong>{selectable.length}</strong><span>Sem conflito</span></div></div>
   <div className="ti-master-import-table">
    <table>
@@ -47,7 +53,7 @@ export default function MasterRegistry(){
   <h3>Vínculos solicitados pelos próprios usuários</h3>
   {!claims.length&&<p>Nenhuma solicitação pendente.</p>}
   {claims.map(claim=><article className="ti-master-claim" key={claim.id}><strong>{data?.registry?.find(p=>p.id===claim.registryId)?.name||data?.people?.find(p=>p.seedId===claim.registryId)?.name||'Ficha '+claim.registryId}</strong> · Conta {data?.accounts?.find(x=>x.uid===claim.accountUid)?.name||claim.accountUid}<p>Confirme a identidade do colaborador antes de vincular. Nome parecido não é comprovação.</p><button type="button" disabled={busy} onClick={()=>linkAccount(claim)}>Confirmar vínculo</button></article>)}
-  <h3>Equipe cadastrada</h3>
+  </details><h3>Equipe cadastrada</h3>
   <div className="ti-master-filters"><label>Buscar na equipe<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Nome, cargo, setor ou turno"/></label><label>Situação<select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="active">Ativos</option><option value="inactive">Inativos</option><option value="all">Todos</option></select></label></div>
   <p className="ti-master-result-count" role="status">{filteredRegistry.length} de {data?.registry?.length||0} colaboradores</p>
   {!data?.registry?.length&&<p>Nenhuma ficha cadastrada nesta unidade.</p>}
@@ -59,7 +65,7 @@ export default function MasterRegistry(){
    </article>)}
   </div>
   {data?.registry?.length>0&&filteredRegistry.length===0&&<p>Nenhum colaborador encontrado com os filtros selecionados.</p>}
-  {editing&&<div className="ti-unified-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setEditing(null)}}><div className="ti-unified-modal" role="dialog" aria-modal="true" aria-label="Editar ficha do Cadastro Mestre"><div className="ti-unified-modal-top"><strong>Editar ficha do Cadastro Mestre</strong><button type="button" aria-label="Fechar janela" onClick={()=>setEditing(null)}>×</button></div><form onSubmit={saveEdit} className="ti-master-editor">
+  {editing&&<div className="ti-unified-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setEditing(null)}}><div ref={dialog} className="ti-unified-modal" role="dialog" aria-modal="true" aria-label="Editar ficha do Cadastro Mestre"><div className="ti-unified-modal-top"><strong>Editar ficha do Cadastro Mestre</strong><button type="button" aria-label="Fechar janela" onClick={()=>setEditing(null)}>×</button></div><form onSubmit={saveEdit} className="ti-master-editor">
    <h3>Editar ficha · {data.registry.find(p=>p.id===editing)?.name}</h3>
    <label>Cargo <input required maxLength={80} value={form.jobTitle} onChange={e=>setForm(old=>({...old,jobTitle:e.target.value}))}/></label>
    <label>Setor <select value={form.sector} onChange={e=>setForm(old=>({...old,sector:e.target.value,skills:[],certifications:[]}))}>{[['cozinha','Cozinha'],['frente','Frente'],['caixa','Caixa'],['apoio','Apoio'],['gestao','Gestão']].map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>

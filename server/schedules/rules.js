@@ -37,7 +37,7 @@ export function validateRosterSchedule({entries,members,minKitchen=4,period=null
   if(!entry||!validDate(entry.date)||!known.has(entry.uid))continue;
   const key=entry.uid+'|'+weekKey(entry.date),arr=weeks.get(key)||[];arr.push(entry);weeks.set(key,arr);
  }
- for(const [key,week] of weeks){if(week.length===7&&week.filter(e=>e.type==='off').length!==1)errors.push('Semana 6x1 sem uma folga semanal: '+key)}
+ for(const [key,week] of weeks){if(week.length===7&&week.filter(e=>['off','leave','monthly_sunday'].includes(e.type)).length<1)errors.push('Semana 6x1 sem uma folga semanal: '+key)}
  for(const [date,day] of dates){
   const sun=new Date(date+'T12:00:00Z').getUTCDay()===0;
   const workers=day.filter(e=>e.type==='work').map(e=>known.get(e.uid)).filter(Boolean);
