@@ -18,7 +18,7 @@ const monthLabel=period=>new Intl.DateTimeFormat('pt-BR',{month:'long',year:'num
 const todayInSaoPaulo=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 
 export default function TeamMural({membership}){
- const [schedules,setSchedules]=useState([]),[notices,setNotices]=useState([]),[presence,setPresence]=useState({}),[today,setToday]=useState(todayInSaoPaulo),[productionTasks,setProductionTasks]=useState([]);
+ const [schedules,setSchedules]=useState([]),[notices,setNotices]=useState([]),[presence,setPresence]=useState({}),[today,setToday]=useState(todayInSaoPaulo),[productionTasks,setProductionTasks]=useState([]),[productionError,setProductionError]=useState('');
  const [loading,setLoading]=useState(true),[error,setError]=useState(''),[expanded,setExpanded]=useState(null),[staff,setStaff]=useState([]),[clock,setClock]=useState('00:00');
  const refresh=useCallback(async()=>{
   try{
@@ -28,7 +28,7 @@ export default function TeamMural({membership}){
    setNotices(board.items||[]);setError('');
   }catch(e){setError(e.message)}finally{setLoading(false)}
  },[]);
- const refreshProduction=useCallback(async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const response=await fetch('/api/production/day-list',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'list'})});if(!response.ok)throw Error('Produção indisponível');const data=await response.json();setProductionTasks(data.tasks||[])}catch{setProductionTasks([])}},[]);
+ const refreshProduction=useCallback(async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const response=await fetch('/api/production/day-list',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'list'})});if(!response.ok)throw Error('Produção indisponível');const data=await response.json();setProductionTasks(data.tasks||[]);setProductionError('')}catch{setProductionError('Não foi possível consultar o planejamento de hoje.')}},[]);
  const refreshPresence=useCallback(async()=>{
   try{const result=await read('attendanceV31','teamToday');setPresence(Object.fromEntries((result.presence||[]).map(x=>[x.uid,x])));}
   catch{/* A escala permanece disponível se a presença não puder ser consultada. */}
@@ -69,7 +69,7 @@ export default function TeamMural({membership}){
      {notices.length>2&&<button type="button" className="ti-v4-secondary-link" aria-expanded={showAllNotices} onClick={()=>setShowAllNotices(v=>!v)}>{showAllNotices?'Mostrar menos':`Ver todos os ${notices.length} comunicados`} <ChevronRight size={16} aria-hidden="true"/></button>}
     </>}
    </section>
-   <section className="ti-mural-card ti-v4-feature ti-v4-production-mural" aria-labelledby="mural-production-title"><header className="ti-v4-section-title"><div className="ti-v4-title-left"><ClipboardList size={22} aria-hidden="true"/><div><h2 id="mural-production-title">Produção de hoje</h2><p>Planejamento compartilhado da cozinha.</p></div></div></header>{productionTasks.length===0?<p className="ti-mural-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-mural-tasks">{productionTasks.map(task=><li key={task.id}><span><strong>{task.recipeName}</strong><small>{task.plannedQuantity?task.plannedQuantity+" porções planejadas":"Quantidade livre"}</small></span><em className={task.status==="completed"?"complete":""}>{task.status==="completed"?"Concluída":"Pendente"}</em></li>)}</ul>}</section>
+   <section className="ti-mural-card ti-v4-feature ti-v4-production-mural" aria-labelledby="mural-production-title"><header className="ti-v4-section-title"><div className="ti-v4-title-left"><ClipboardList size={22} aria-hidden="true"/><div><h2 id="mural-production-title">Produção de hoje</h2><p>Planejamento compartilhado da cozinha.</p></div></div></header>{productionError?<p role="status" className="ti-mural-empty">{productionError}</p>:productionTasks.length===0?<p className="ti-mural-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-mural-tasks">{productionTasks.map(task=><li key={task.id}><span><strong>{task.recipeName}</strong><small>{task.plannedQuantity?task.plannedQuantity+" porções planejadas":"Quantidade livre"}</small></span><em className={task.status==="completed"?"complete":""}>{task.status==="completed"?"Concluída":"Pendente"}</em></li>)}</ul>}</section>
    <section className="ti-mural-card ti-mural-roster ti-v4-feature" aria-labelledby="mural-roster-title">
     <header className="ti-v4-section-title"><div className="ti-v4-title-left"><CalendarDays size={22} aria-hidden="true"/><div><h2 id="mural-roster-title">Escala da equipe</h2><p>{loading?'Carregando escala…':scheduleLabel}</p></div></div>{publishedCurrent&&<span className="ti-v4-official"><ShieldCheck size={14} aria-hidden="true"/> Oficial</span>}</header>
     <div className="ti-v4-roster-summary">
