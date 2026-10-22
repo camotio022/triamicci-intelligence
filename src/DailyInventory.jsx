@@ -22,7 +22,6 @@ export default function DailyInventory({membership}){
  const [closures,setClosures]=useState([]),[moreClosures,setMoreClosures]=useState(false),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const isManager=['admin','manager'].includes(membership.role);
  const [closureFilter,setClosureFilter]=useState('pending');
- const [showClosureHistory,setShowClosureHistory]=useState(false);
  const refreshClosures=async()=>{if(!isManager)return;const d=await request('/api/operations/stock','closeList');setClosures(d.closures||[]);setMoreClosures(!!d.hasMore)};
  const loadMoreClosures=async()=>{if(busy||!moreClosures||!closures.length)return;setBusy(true);try{const d=await request('/api/operations/stock','closeList',{before:closures.at(-1).submittedAt});setClosures(old=>[...old,...(d.closures||[])]);setMoreClosures(!!d.hasMore)}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
  useEffect(()=>{if(isManager)refreshClosures().catch(e=>setError(e.message))},[membership.role]);
