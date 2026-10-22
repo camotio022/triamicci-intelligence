@@ -323,3 +323,30 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .operational-counts strong small{font-size:13px;font-weight:650;white-space:nowrap}
 .ti-stock-unit-warning{font-size:12px;line-height:1.5;color:#8c3e1d;background:#fff8e9;padding:9px 11px;border-radius:8px}
 @media(max-width:500px){.ti-stock-today{padding:12px}.ti-stock-filters button{font-size:12px}.operational-counts strong small{font-size:12px}}
+
+/* Estoque minimalista: uma lista escaneável com quantidades e unidades em contexto. */
+.ti-stock-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:17px 0 10px}
+.ti-stock-overview>div{padding:13px 12px;display:flex;flex-direction:column;gap:3px;background:#fff;border:1px solid #e1e4eb;border-radius:12px}
+.ti-stock-overview strong{color:#222b3e;font-size:23px;line-height:1.1}
+.ti-stock-overview span{font-size:12px;color:#667085}
+.ti-stock-day-label{font-size:12px!important;color:#687385;line-height:1.55}
+.ti-stock-list{border:1px solid #e3e7ed;border-radius:16px;background:#fff;overflow:hidden;margin:12px 0}
+.ti-stock-item{display:grid;grid-template-columns:minmax(0,1fr) auto 12px;gap:10px;padding:14px 15px;text-align:left;width:100%;border:0;border-bottom:1px solid #e9edf2;background:#fff;color:#263247;align-items:center;cursor:pointer;font:inherit}
+.ti-stock-item:last-child{border-bottom:0}.ti-stock-item:hover,.ti-stock-item:focus-visible{background:#f7f9fc;outline-offset:-3px}
+.ti-stock-item-main{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ti-stock-item-main>strong{font-size:15px;line-height:1.4}
+.ti-stock-item-main>small,.ti-stock-item-total>small{font-size:12px;color:#687385;line-height:1.35}
+.ti-stock-split{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+.ti-stock-split span{font-size:12px;color:#697385}.ti-stock-split b{color:#28354b;font-weight:700}
+.ti-stock-item-total{text-align:right;display:flex;flex-direction:column;gap:4px;white-space:nowrap}
+.ti-stock-item-total>strong{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:#263247}
+.ti-stock-item-total>strong small{font-size:12px;font-weight:600}
+.ti-stock-item-total .ti-stock-green{color:#187b4d;font-weight:700}
+.ti-stock-item-chevron{font-size:22px;color:#98a2b3}
+.ti-stock-item-today{box-shadow:inset 3px 0 #43a46d}
+.ti-stock-item .ti-stock-unit-warning{font-size:11px;color:#a15225;background:#fff7e6;padding:4px 6px;border-radius:7px}
+.ti-stock-empty{padding:20px;color:#697385}
+.ti-stock-detail-backdrop{position:fixed;inset:0;z-index:9998;padding:16px;background:rgba(20,27,40,.62);display:flex;align-items:center;justify-content:center}
+.ti-stock-detail-dialog{background:#fff;border-radius:16px;width:min(100%,820px);max-height:92dvh;overflow:auto;overscroll-behavior:contain;position:relative;padding:16px}
+.ti-stock-dialog-close{position:sticky;top:0;float:right;z-index:3;min-width:44px;min-height:44px;background:#fff;border:1px solid #d7dce5;border-radius:10px;color:#922824;font-size:26px}
+@media(max-width:600px){.ti-stock-detail-backdrop{padding:0}.ti-stock-detail-dialog{height:100dvh;max-height:100dvh;width:100%;border-radius:0}.ti-stock-item{padding:13px 12px;gap:7px}.ti-stock-overview>div{padding:11px 9px}.ti-stock-overview strong{font-size:20px}.ti-stock-item-total>strong{font-size:17px}.ti-stock-split{gap:8px}}
