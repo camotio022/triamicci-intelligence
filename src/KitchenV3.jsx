@@ -6,6 +6,8 @@ import KitchenV3Workflows from './KitchenV3Workflows.jsx';
 import KitchenV3Loss from './KitchenV3Loss.jsx';
 import KitchenV3History from './KitchenV3History.jsx';
 import './v3-kitchen.css';
+import './v4-stock-nav.css';
+import './v4-stock-overview.css';
 async function api(action,payload={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
  const token=await user.getIdToken();
@@ -24,6 +26,7 @@ export default function KitchenV3({membership}){
  const [tab,setTab]=useState('overview'),[products,setProducts]=useState([]),[signals,setSignals]=useState([]),[orders,setOrders]=useState([]);
  const [selected,setSelected]=useState(''),[search,setSearch]=useState(''),[location,setLocation]=useState('reserva'),[showArchived,setShowArchived]=useState(false),[newName,setNewName]=useState(''),[newCategory,setNewCategory]=useState('Proteínas'),[newUnit,setNewUnit]=useState('kg'),[newExpiry,setNewExpiry]=useState(false),[resolutionById,setResolutionById]=useState({});
  const [observation,setObservation]=useState('missing'),[note,setNote]=useState('');
+ const [overviewFilter,setOverviewFilter]=useState('alerts'),[showAllOrders,setShowAllOrders]=useState(false);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [editId,setEditId]=useState(''),[step,setStep]=useState(0),[mode,setMode]=useState('availability'),
   [origin,setOrigin]=useState('supplier'),[countUnit,setCountUnit]=useState('un'),[locs,setLocs]=useState(['reserva']),[presentation,setPresentation]=useState(''),[trackingNote,setTrackingNote]=useState(''),[displayName,setDisplayName]=useState(''),[aliases,setAliases]=useState(''),[sourceIds,setSourceIds]=useState([]),[altIds,setAltIds]=useState([]);
@@ -71,30 +74,43 @@ export default function KitchenV3({membership}){
  };
  return <section className="v3-page">
   <header className="v3-head"><div><p className="eyebrow">OPERAÇÃO · ESTOQUE E INSUMOS</p><h1>Estoque e insumos</h1><p>O que temos, o que falta e o que está previsto para chegar.</p></div><button type="button" className="v3-secondary" onClick={load} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></header>
-  <nav className="v3-tabs" aria-label="Seções de insumos">
-   {[['overview','Visão geral'],['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['loss','Perdas e avarias'],...(canManage?[['count','Contagem oficial']]:[]),['history','Histórico'],...(canManage?[['catalog','Configurar catálogo']]:[])].map(([key,label])=><button type="button" key={key} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
+  <nav className="ti-v4-stock-nav" aria-label="Seções de estoque e insumos">
+   {[
+    {id:'today',name:'Hoje',items:[['overview','Visão geral']]},
+    {id:'operations',name:'Operações',items:[['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['loss','Perdas e avarias'],...(canManage?[['count','Contagem oficial']]:[])]},
+    {id:'management',name:'Consultas e gestão',items:[['history','Histórico'],...(canManage?[['catalog','Configurar catálogo']]:[])]}
+   ].map(group=>{
+    const activeGroup=group.items.some(([key])=>key===tab);
+    return <button type="button" key={group.id} className={activeGroup?'ti-v4-stock-group selected':'ti-v4-stock-group'} aria-current={activeGroup?'page':undefined} onClick={()=>setTab(group.items[0][0])}>{group.name}</button>;
+   })}
   </nav>
+  {tab!=='overview'&&<nav className="ti-v4-stock-subnav" aria-label="Operações e consultas de estoque">
+   {(tab==='history'||tab==='catalog'?[['history','Histórico'],...(canManage?[['catalog','Configurar catálogo']]:[])]:[['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['loss','Perdas e avarias'],...(canManage?[['count','Contagem oficial']]:[])]).map(([key,label])=><button type="button" key={key} className={tab===key?'selected':''} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
+  </nav>}
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {loading?<p role="status">Carregando dados reais da unidade…</p>:<>
    {tab==='history'&&<KitchenV3History products={products}/>}
    {tab==='loss'&&<KitchenV3Loss membership={membership} products={products} onChange={load}/>}
    {['receive','produce','transfer','count'].includes(tab)&&<KitchenV3Workflows key={tab} kind={tab} products={products} orders={orders} membership={membership} onChange={load} onConfigure={p=>p?begin(p):setTab('catalog')}/>}
-   {tab==='overview'&&<div className="v3-columns">
-    <section className="v3-card"><h2>Avisos da equipe</h2>{signals.length===0?<p>Nenhuma falta em aberto.</p>:signals.map(s=><article className="v3-row" key={s.id}><div><strong>{s.productName}</strong><p>{s.location==='giro'?'Giro · 1º piso':'Reserva · 2º piso'} · {s.observation==='missing'?'Possível falta':'Estoque baixo'}</p><small>{s.reports?.length||1} relato(s)</small></div>{canManage&&<form className="v3-inline-resolve" onSubmit={e=>{e.preventDefault();update('v3ResolveSignal',{productId:s.productId,location:s.location,resolution:resolutionById[s.id]||''},'Aviso resolvido.')}}><label>Decisão<input required maxLength={240} value={resolutionById[s.id]||''} onChange={e=>setResolutionById(old=>({...old,[s.id]:e.target.value}))} placeholder="Ex.: conferido e localizado"/></label><button type="submit" disabled={busy}>Resolver</button></form>}</article>)}</section>
-    <section className="v3-card"><h2>Próximas entregas</h2>{orders.length===0?<p>Não há pedidos registrados.</p>:orders.slice(0,10).map(o=><article className="v3-row" key={o.id}><div><strong>{date(o.etaDate)} · {o.supplier}</strong><p>{o.items.map(i=>i.name+' '+i.quantity+' '+i.unit).join(' · ')}</p><small>{status[o.status]||o.status}</small></div></article>)}</section>
-    <section className="v3-card v3-span"><h2>Disponibilidade por insumo</h2><p>Quantidade mostrada com a origem correta. Sem conferência recente, não declaramos estoque confirmado.</p>
-     <div className="v3-tiles">{active.map(p=>{
-      const balance=p.v3Balance,sessions=balance?.countSessions||{};
-      const sameSession=Boolean(sessions.reserva&&sessions.giro&&sessions.reserva===sessions.giro&&balance.quality==='COUNTED_AT_LOCATION');
-      const reported=signals.filter(x=>x.productId===p.id);
-      return <article key={p.id} className="v3-tile">
-       <strong>{p.profile?.displayName||p.name}</strong>
-       <small>{p.profile?.controlMode==='quantitative'?'Contagem':p.profile?.controlMode==='on_demand'?'Sob demanda':'Disponibilidade'} · {p.profile?'Configurado':'Configuração pendente'}</small>
-       {p.profile?.controlMode==='quantitative'&&balance?<><div className="v3-stock-numbers"><span>Reserva <b>{balance.reserva??'—'}</b></span><span>Giro <b>{balance.giro??'—'}</b></span></div>
-        <strong>{balance.total} {balance.unit}</strong><small>{sameSession?'Conferido em uma rodada':'Saldo estimado / locais sem conferência conjunta'}</small></>:
-        <span>{reported.length?reported.some(x=>x.observation==='missing')?'Possível falta sinalizada':'Estoque baixo sinalizado':'Disponibilidade não verificada'}</span>}
-      </article>;
-    })}</div>
+   {tab==='overview'&&<div className="ti-v4-stock-overview">
+    <div className="ti-v4-stock-overview-stats" aria-label="Resumo de estoque">
+     <button type="button" onClick={()=>setOverviewFilter('alerts')} aria-pressed={overviewFilter==='alerts'} className={overviewFilter==='alerts'?'selected':''}><strong>{signals.length}</strong><span>Avisos da equipe</span></button>
+     <button type="button" onClick={()=>setTab('orders')}><strong>{orders.filter(o=>o.status==='overdue').length}</strong><span>Entregas atrasadas</span></button>
+     <button type="button" onClick={()=>setOverviewFilter('review')} aria-pressed={overviewFilter==='review'} className={overviewFilter==='review'?'selected':''}><strong>{active.filter(p=>!p.profile).length}</strong><span>Sem configuração</span></button>
+    </div>
+    <section className="v3-card ti-v4-stock-alerts"><header className="ti-v4-stock-section-head"><div><h2>Avisos da equipe</h2><p>Relatos da equipe que precisam de verificação.</p></div><span className="ti-v4-stock-pill">{signals.length}</span></header>
+     {signals.length===0?<p className="ti-v4-stock-empty">Nenhum aviso em aberto.</p>:<div className="ti-v4-stock-list">{signals.map(sig=><article className="ti-v4-stock-item" key={sig.id}><div className="ti-v4-stock-item-title"><div><strong>{sig.productName}</strong><small>{sig.location==='giro'?'Giro · 1º piso':'Reserva · 2º piso'} · {sig.reports?.length||1} relato(s)</small></div><span className="ti-v4-stock-pill attention">{sig.observation==='missing'?'Possível falta':'Estoque baixo'}</span></div>{canManage&&<details className="ti-v4-stock-action"><summary>Conferir aviso</summary><form className="v3-inline-resolve" onSubmit={e=>{e.preventDefault();update('v3ResolveSignal',{productId:sig.productId,location:sig.location,resolution:resolutionById[sig.id]||''},'Aviso resolvido.')}}><label>Decisão<input required maxLength={240} value={resolutionById[sig.id]||''} onChange={e=>setResolutionById(old=>({...old,[sig.id]:e.target.value}))} placeholder="Ex.: conferido e localizado"/></label><button type="submit" disabled={busy}>Resolver</button></form></details>}</article>)}</div>}
+    </section>
+    <section className="v3-card ti-v4-stock-deliveries"><header className="ti-v4-stock-section-head"><div><h2>Entregas previstas</h2><p>Atrasadas e próximas entregas da unidade.</p></div><button type="button" className="v3-secondary" onClick={()=>setTab('orders')}>Ver agenda</button></header>
+     {orders.length===0?<p className="ti-v4-stock-empty">Não há pedidos cadastrados.</p>:<div className="ti-v4-stock-list">{[...orders].sort((a,b)=>(a.status==='overdue'?-1:0)-(b.status==='overdue'?-1:0)||String(a.etaDate||'').localeCompare(String(b.etaDate||''))).slice(0,showAllOrders?20:3).map(o=><article className="ti-v4-stock-item" key={o.id}><div className="ti-v4-stock-item-title"><div><strong>{o.supplier}</strong><small>{date(o.etaDate)} · {o.items.length} item(ns)</small></div><span className={'ti-v4-stock-pill '+(o.status==='overdue'?'attention':'')}>{status[o.status]||o.status}</span></div><details><summary>Ver itens</summary><p>{o.items.map(i=>i.name+' '+i.quantity+' '+i.unit).join(' · ')}</p></details></article>)}</div>}
+     {orders.length>3&&<button type="button" className="ti-v4-stock-more" onClick={()=>setShowAllOrders(v=>!v)}>{showAllOrders?'Mostrar menos':'Mostrar mais entregas'}</button>}
+    </section>
+    <section className="v3-card ti-v4-stock-availability"><header className="ti-v4-stock-section-head"><div><h2>Disponibilidade por insumo</h2><p>Informações declaradas ou estimadas não equivalem a contagem física confirmada.</p></div></header>
+     <div className="ti-v4-stock-filters" role="group" aria-label="Filtrar disponibilidade">{[['alerts','Sinalizados'],['review','A revisar'],['all','Todos']].map(([id,label])=><button type="button" key={id} aria-pressed={overviewFilter===id} className={overviewFilter===id?'selected':''} onClick={()=>setOverviewFilter(id)}>{label}</button>)}</div>
+     <label className="v3-search">Buscar insumo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome do insumo"/></label>
+     <div className="ti-v4-stock-list">{active.filter(p=>overviewFilter==='all'||(overviewFilter==='alerts'?signals.some(sig=>sig.productId===p.id):!p.profile)).slice(0,30).map(p=>{const balance=p.v3Balance,sessions=balance?.countSessions||{};const verified=Boolean(sessions.reserva&&sessions.giro&&sessions.reserva===sessions.giro&&balance?.quality==='COUNTED_AT_LOCATION');const hasSignal=signals.some(sig=>sig.productId===p.id);return <article className="ti-v4-stock-item" key={p.id}><div className="ti-v4-stock-item-title"><div><strong>{p.profile?.displayName||p.name}</strong><small>{p.profile?.controlMode==='quantitative'?'Contagem':p.profile?.controlMode==='on_demand'?'Sob demanda':'Disponibilidade'} · {p.profile?'Configurado':'Configuração pendente'}</small></div><span className={'ti-v4-stock-pill '+(hasSignal?'attention':'')}>{hasSignal?'Sinalizado':verified?'Conferido':balance?'Estimado':'Não verificado'}</span></div>{balance&&p.profile?.controlMode==='quantitative'&&<small>Reserva {balance.reserva??'—'} · Giro {balance.giro??'—'} · Total {balance.total} {balance.unit} {verified?'(mesma rodada)':'(não confirmado em conjunto)'}</small>}</article>})}</div>
+     {active.filter(p=>overviewFilter==='all'||(overviewFilter==='alerts'?signals.some(sig=>sig.productId===p.id):!p.profile)).length===0&&<p className="ti-v4-stock-empty">Nenhum insumo neste filtro.</p>}
+     {active.length>30&&<p className="ti-v4-stock-hint">Exibindo até 30 insumos. Use a busca para localizar um produto específico.</p>}
     </section>
    </div>}
    {tab==='availability'&&<div className="v3-card v3-narrow"><h2>Sinalizar falta ou estoque baixo</h2><p>Qualquer membro da equipe pode avisar. O aviso não zera nem altera o saldo.</p>

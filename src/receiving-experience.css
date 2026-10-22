@@ -48,3 +48,15 @@
  .ti-receive-form .inventory-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
  .ti-receive-form .inventory-fields label:last-child:nth-child(odd){grid-column:1/-1}
 }
+
+/* V4: recebimento guiado, sem expor os três formulários simultaneamente. */
+.ti-receive-stepbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:-6px 0 10px}
+.ti-receive-stepbar span{height:6px;background:#eaedf0;border-radius:99px}
+.ti-receive-stepbar span.active{background:#a71916}
+.ti-receive-next,.ti-receive-back{min-height:46px;border-radius:11px;padding:11px 14px;font-size:14px;font-weight:750;cursor:pointer}
+.ti-receive-next{border:1px solid #a71916;background:#a71916;color:#fff}
+.ti-receive-next:disabled{opacity:.5;cursor:not-allowed}
+.ti-receive-back{border:1px solid #d9dee7;background:#fff;color:#4b5565}
+.ti-receive-navigation{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:9px}
+.ti-receive-next:focus-visible,.ti-receive-back:focus-visible{outline:3px solid #a71916;outline-offset:3px}
+@media(max-width:440px){.ti-receive-navigation{grid-template-columns:1fr}}
