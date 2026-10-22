@@ -139,7 +139,7 @@ export default async function handler(req,res){
    const now=new Date();
    for(const x of lotUpdates)tx.update(x.ref,x.data);
    for(const x of updates)tx.update(x.ref,x.data);
-   if(transformed){const b=outputBalanceDoc.data();tx.update(outputBalanceRef,{reserve:round(b.reserve+portions),total:round(b.total+portions),lastProductionId:requestId,lastMovementAt:now});}
+   if(transformed){const b=outputBalanceDoc.data();tx.update(outputBalanceRef,{reserve:round(b.reserve+portions),total:round(b.total+portions),...(Number.isFinite(b.countedTotal)?{entriesSinceCount:round((b.entriesSinceCount||0)+portions)}:{}),lastProductionId:requestId,lastMovementAt:now});}
    const record={recipeId,recipeName:recipeData.name,recipeVersion:recipeData.version,
     portions,items:used,outputProductId:recipeData.outputProductId||null,sourceArea:transformed?'reserva':'giro',destinationArea:transformed?'reserva':null,payloadHash,notes,actorUid:actor.uid,
     actorName:a.data().displayName||a.data().name||actor.name||actor.email||actor.uid,
