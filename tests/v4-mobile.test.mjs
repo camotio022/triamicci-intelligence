@@ -12,7 +12,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     return route.fulfill({contentType:'application/json',body:JSON.stringify(base)});
    });
    await page.goto('http://127.0.0.1:4179/qa/v4-mobile.html');await page.waitForTimeout(500);assert.deepEqual(errors,[],errors.join('\n'));
-   for(const screen of ['Mural','Produção','Inventário','Folgas','Minha ficha','Cozinha','Recebimento','Cadastro','Navegação']){
+   for(const screen of ['Mural','Produção','Inventário','Folgas','Minha ficha','Cozinha','Recebimento','Recebimento pendente','Cadastro','Navegação']){
     await page.getByRole('navigation',{name:'Telas de teste'}).getByRole('button',{name:screen,exact:true}).click();
     await page.waitForTimeout(120);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${screen} overflows at ${width}`);
@@ -29,6 +29,16 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      await page.getByRole('button',{name:'Revisar conferência',exact:true}).click();
      assert.equal(await page.getByText('Revisar antes de enviar',{exact:true}).count(),1);
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`Recebimento review overflows at ${width}`);
+    }
+    if(screen==='Recebimento pendente'){
+     await page.getByRole('combobox',{name:'Entrega',exact:true}).selectOption('11111111-1111-4111-8111-111111111111');
+     await page.getByRole('button',{name:'Conferir itens',exact:true}).click();
+     assert.equal(await page.getByLabel('Produto do item 1').inputValue(),'c'.repeat(40),'The ordered product must remain selected without an operational profile');
+     assert.match(await page.getByRole('alert').innerText(),/precisa de configuração para recebimento/);
+     await page.getByLabel('Quantidade comercial recebida').fill('1');
+     assert.equal(await page.getByRole('button',{name:'Revisar conferência',exact:true}).isDisabled(),true);
+     assert.equal(await page.getByRole('button',{name:'Configurar produto do pedido',exact:true}).count(),1);
+     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`Pending receipt overflows at ${width}`);
     }
     if(screen==='Cadastro'){
      await page.getByLabel('Buscar na equipe').fill('Pessoa');await page.getByRole('button',{name:'Abrir ficha',exact:true}).click();
