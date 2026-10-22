@@ -70,7 +70,7 @@ export default function Production({membership}){
  const option=(id)=>products.find(p=>p.id===id);
  return <section className="inventory-page production-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId.toUpperCase()}</p>
-  <h1>Produção da cozinha</h1><LiveStatus state={live}/><p>Consulte o que já foi preparado e registre uma nova produção. Fichas com produto final cadastrado transformam ingredientes da reserva em preparação na reserva; fichas antigas continuam consumindo do giro.</p>
+  <h1>Produção da cozinha</h1><LiveStatus state={live}/><p>Consulte o que já foi preparado e registre uma nova produção. Fichas com produto final cadastrado consomem ingredientes dos locais definidos na ficha e creditam o preparo na reserva; fichas antigas continuam consumindo do giro.</p>
   {status&&<p role="status" className="receiving-notice">{status}</p>}
   <section className="receiving-card ti-v4-daily-tasks"><h2>Lista de produção de hoje</h2><p>Planejamento compartilhado da cozinha. Só a confirmação da quantidade realmente produzida movimenta o estoque.</p>
    {canPlan&&<form className="ti-v4-daily-task-form" onSubmit={addDailyTask}><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional ({recipes.find(r=>r.id===plannedRecipe)?.outputUnit||'un'})<input type="number" min="0.001" max="10000" step="0.001" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading}>Adicionar à lista</button></form>}

@@ -81,7 +81,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  const locations=relevantProduct?.profile?.locations||['reserva','giro'];
  const showLot=(kind==='receive'&&chosen?.trackExpiry)||(prepared&&out?.trackExpiry);
  return <section className="v3-page v3-card v3-workflow">
-  {kind==='receive'&&<ShipmentReceiving products={products} orders={orders} membership={membership} onChange={onChange}/>}
+  {kind==='receive'&&<ShipmentReceiving products={products} orders={orders} membership={membership} onChange={onChange} onConfigure={onConfigure}/>}
   <details open={kind!=='receive'}><summary>{kind==='receive'?'Conferência individual e pendências anteriores':'Detalhes da operação'}</summary>
   <h2>{({receive:'Receber mercadoria',count:'Conferir estoque',transfer:'Abastecer Giro ou devolver à Reserva',produce:'Registrar produção concluída'})[kind]}</h2>
   <p>{({receive:'Confira o que realmente chegou. Um pedido não é estoque antes de ser recebido.',count:'Registre o que encontrou fisicamente. Uma diferença não significa automaticamente venda ou produção.',transfer:'Mova quantidades entre locais sem baixar o total da cozinha.',produce:'Escolha a origem real da matéria-prima e informe o rendimento realmente preparado. Não fazemos conversões presumidas.'})[kind]}</p>

@@ -16,8 +16,8 @@ export function useUnitLive(unitId, refresh) {
    running=true;
    try{
     do{queued=false;const result=await latest.current?.();if(result===false||Array.isArray(result)&&result.includes(false))throw Error('REFRESH_FAILED');}while(alive&&queued);
-    if(alive)setState({status:connected?'live':'reconnecting',updatedAt:new Date()});
-   }catch{if(alive)setState(s=>({...s,status:'error'}));}
+    if(alive)setState({status:connected?'live':'reconnecting',updatedAt:new Date(),errorCode:null});
+   }catch{if(alive)setState(s=>({...s,status:'error',errorCode:'refresh-failed'}));}
    finally{running=false;}
   };
   let revision;
@@ -28,7 +28,7 @@ export function useUnitLive(unitId, refresh) {
    const next=(snapshot.data()?.revision||'initial')+':'+(snapshot.data()?.updatedAt?.toMillis?.()||0);
    if(connected&&(next!==revision||revision===undefined||!wasConnected)){revision=next;load();}
    else if(connected&&!running)setState(s=>({...s,status:s.status==='error'?'error':s.updatedAt?'live':'connecting'}));
-  },()=>{connected=false;if(alive)setState(s=>({...s,status:'error'}));});
+  },error=>{connected=false;const code=typeof error?.code==='string'?error.code:'unknown';console.warn('Unit live listener failed:',code);if(alive)setState(s=>({...s,status:'error',errorCode:code}));});
   const offline=()=>{connected=false;setState(s=>({...s,status:'reconnecting'}));};
   const online=()=>{setState(s=>({...s,status:'connecting'}));load();};
   window.addEventListener('offline',offline);window.addEventListener('online',online);
