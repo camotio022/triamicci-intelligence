@@ -3,14 +3,13 @@ const recipePattern=/^[a-z0-9-]{3,64}$/;
 const datePattern=/^\d{4}-\d{2}-\d{2}$/;
 const formatDay=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const canPlan=role=>['admin','manager','submanager','cook'].includes(role);
-const canRead=role=>['admin','manager','submanager','cook','auxiliar','employee'].includes(role);
 const view=d=>({id:d.id,recipeId:d.data().recipeId,recipeName:d.data().recipeName,plannedQuantity:d.data().plannedQuantity??null,status:d.data().status||'pending',completedQuantity:d.data().completedQuantity??null,createdBy:d.data().createdBy,createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,completedAt:d.data().completedAt?.toDate?.()?.toISOString?.()||null});
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
-  if(!m?.unitId||!canRead(m.role))return send(res,403,'Sem acesso à produção desta unidade.');
+  if(!m?.unitId)return send(res,403,'Sem acesso à produção desta unidade.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId);
   const {action,day=formatDay()}=req.body||{};
   if(!datePattern.test(day)||day!==formatDay())return send(res,400,'A lista do dia deve corresponder à data atual da unidade.');
