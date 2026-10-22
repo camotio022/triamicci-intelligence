@@ -7,7 +7,7 @@ export function validateTransformationRecipe(recipe){
    !Number.isInteger(recipe.yieldQuantity)||recipe.yieldQuantity<1||
    !Array.isArray(recipe.lines)||!recipe.lines.length)return {valid:false,reason:'INVALID_RECIPE'};
  if(recipe.lines.some(line=>!productId.test(line.productId||'')||
-  line.productId===recipe.outputProductId||!Number.isFinite(line.quantity)||line.quantity<=0))
+  (line.productId===recipe.outputProductId||line.substitutes?.includes(recipe.outputProductId))||!Number.isFinite(line.quantity)||line.quantity<=0))
   return {valid:false,reason:'INVALID_INGREDIENT'};
  const ids=recipe.lines.map(line=>line.productId);
  if(new Set(ids).size!==ids.length)return {valid:false,reason:'DUPLICATE_INGREDIENT'};
