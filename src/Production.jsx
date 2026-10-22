@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {BookOpen,ClipboardList,RefreshCw,History} from 'lucide-react';
+import './production-v4.css';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {suggestedQuantity} from '../server/production/logic.js';
