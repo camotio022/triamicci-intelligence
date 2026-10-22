@@ -36,7 +36,7 @@ export default async function handler(req,res){
     !Array.isArray(lines)||lines.length<1||lines.length>12||!lines.every(validLine)||
     new Set(lines.map(x=>x.productId)).size!==lines.length||
     lines.some(x=>x.substitutes?.includes(x.productId))||
-    (outputProductId!==null&&(!productIdPattern.test(outputProductId)||lines.some(x=>x.productId===outputProductId))))return send(res,400,'Revise a ficha técnica.');
+    (outputProductId!==null&&(!productIdPattern.test(outputProductId)||lines.some(x=>x.productId===outputProductId||x.substitutes?.includes(outputProductId)))))return send(res,400,'Revise a ficha técnica.');
    const ref=recipes.doc(id),actorRef=db.doc('memberships/'+actor.uid);
    await db.runTransaction(async tx=>{
     const [a,prev,...products]=await Promise.all([tx.get(actorRef),tx.get(ref),
@@ -44,7 +44,9 @@ export default async function handler(req,res){
     if(!a.exists||a.data().status!=='active'||!['admin','manager','submanager'].includes(a.data().role)||a.data().unitId!==member.unitId)throw Error('FORBIDDEN');
     if(products.some(x=>!x.exists||x.data().status!=='active'))throw Error('PRODUCT_NOT_FOUND');
     if(outputProductId){const output=await tx.get(unit.collection('products').doc(outputProductId));
-     if(!output.exists||output.data().status!=='active'||output.data().trackExpiry)throw Error('INVALID_OUTPUT');}
+     if(!output.exists||output.data().status!=='active'||output.data().trackExpiry)throw Error('INVALID_OUTPUT');
+     const balance=await tx.get(unit.collection('physicalBalances').doc(outputProductId));
+     if(!balance.exists||countUnit(output.data())!=='un'||balance.data().unit!=='un'||!Number.isFinite(balance.data().reserve)||!Number.isFinite(balance.data().total))throw Error('INVALID_OUTPUT');}
     const now=new Date();
     tx.set(ref,{name:name.trim(),outputProductId,yieldQuantity,lines:lines.map(x=>({productId:x.productId,
       quantity:x.quantity,substitutes:x.substitutes||[]})),version:(prev.data()?.version||0)+1,
@@ -96,7 +98,7 @@ export default async function handler(req,res){
    if(transformed){
     const unitMap=Object.fromEntries(productDocs.map((p,i)=>[items[i].productId,countUnit(p,centralDocs[i]?.data())]));
     const check=transformationPreview(recipeData,portions,unitMap);
-    if(!check.valid||check.inputs.some((x,i)=>x.productId!==items[i].productId||x.quantity!==items[i].quantity))throw Error('INVALID_TRANSFORMATION');
+    if(!check.valid||check.inputs.some((x,i)=>x.productId!==items[i].productId||Math.abs(x.quantity-items[i].quantity)>0.000001))throw Error('INVALID_TRANSFORMATION');
     const outputUnit=countUnit(outputDoc.data());
     if(outputUnit!=='un'||outputBalanceDoc.data().unit!==outputUnit||!Number.isFinite(outputBalanceDoc.data().reserve)||!Number.isFinite(outputBalanceDoc.data().total))throw Error('INVALID_OUTPUT');
    }
