@@ -95,8 +95,8 @@ export default async function handler(req,res){
     tx.get(unit.collection('physicalLots').doc(item.productId).collection('lots').orderBy('expiryDate').limit(101)):Promise.resolve(null)));
    if(transformed){
     const unitMap=Object.fromEntries(productDocs.map((p,i)=>[items[i].productId,countUnit(p,centralDocs[i]?.data())]));
-    const check=transformationPreview({...recipeData,lines:items},portions,unitMap);
-    if(!check.valid||check.inputs.some((x,i)=>x.quantity!==items[i].quantity))throw Error('INVALID_TRANSFORMATION');
+    const check=transformationPreview(recipeData,portions,unitMap);
+    if(!check.valid||check.inputs.some((x,i)=>x.productId!==items[i].productId||x.quantity!==items[i].quantity))throw Error('INVALID_TRANSFORMATION');
     const outputUnit=countUnit(outputDoc.data());
     if(outputUnit!=='un'||outputBalanceDoc.data().unit!==outputUnit||!Number.isFinite(outputBalanceDoc.data().reserve)||!Number.isFinite(outputBalanceDoc.data().total))throw Error('INVALID_OUTPUT');
    }
