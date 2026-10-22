@@ -1,4 +1,5 @@
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
+import dayListHandler from '../../server/production/day-list.js';
 import {countUnit,validQuantity} from '../../server/operations/logic.js';
 import {areaTotals,allocateFEFO} from '../../server/operations/lot-logic.js';
 import {validProductionSelection} from '../../server/production/logic.js';
@@ -17,6 +18,7 @@ function validLine(x){
   (x?.substitutes===undefined||Array.isArray(x.substitutes)&&x.substitutes.length<=4&&x.substitutes.every(id=>productIdPattern.test(id)));
 }
 export default async function handler(req,res){
+ if(['dayList','dayAdd'].includes(req.body?.action))return dayListHandler(req,res);
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
  try{
