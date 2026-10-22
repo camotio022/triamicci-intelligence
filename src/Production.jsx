@@ -22,7 +22,7 @@ export default function Production({membership}){
  const [requestId,setRequestId]=useState(null);
  const [confirmed,setConfirmed]=useState(false);
  const [dailyTasks,setDailyTasks]=useState([]),[plannedRecipe,setPlannedRecipe]=useState(''),[plannedQuantity,setPlannedQuantity]=useState(''),[activeTaskId,setActiveTaskId]=useState(null),[taskLoading,setTaskLoading]=useState(false);
- const admin=['admin','manager'].includes(membership.role);
+ const admin=['admin','manager','submanager'].includes(membership.role);
  const canPlan=['admin','manager','submanager','cook'].includes(membership.role);
  const loadTasks=useCallback(async()=>{try{const r=await call('/api/production/day-list','list');setDailyTasks(r.tasks||[]);}catch(e){notify(e.message,'error')}},[notify,membership?.unitId]);
  const addDailyTask=async e=>{e.preventDefault();if(taskLoading||!plannedRecipe)return;setTaskLoading(true);try{await call('/api/production/day-list','add',{recipeId:plannedRecipe,plannedQuantity:plannedQuantity?Number(plannedQuantity):null});setPlannedRecipe('');setPlannedQuantity('');await loadTasks();notify('Preparação adicionada à lista.','success')}catch(e){notify(e.message,'error')}finally{setTaskLoading(false)}};
@@ -65,7 +65,7 @@ export default function Production({membership}){
  const option=(id)=>products.find(p=>p.id===id);
  return <section className="inventory-page production-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId.toUpperCase()}</p>
-  <h1>Produção da cozinha</h1><p>Consulte o que já foi preparado e registre uma nova produção. O consumo de ingredientes segue as regras atuais até a integração da reserva na V4.</p>
+  <h1>Produção da cozinha</h1><p>Consulte o que já foi preparado e registre uma nova produção. Fichas com produto final cadastrado transformam ingredientes da reserva em preparação na reserva; fichas antigas continuam consumindo do giro.</p>
   {status&&<p role="status" className="receiving-notice">{status}</p>}
   <section className="receiving-card ti-v4-daily-tasks"><h2>Lista de produção de hoje</h2><p>Planejamento compartilhado da cozinha. Só a confirmação da quantidade realmente produzida movimenta o estoque.</p>
    {canPlan&&<form className="ti-v4-daily-task-form" onSubmit={addDailyTask}><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional (porções)<input type="number" min="1" max="10000" step="1" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading}>Adicionar à lista</button></form>}
