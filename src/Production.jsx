@@ -1,4 +1,5 @@
 import React,{useCallback,useEffect,useState} from 'react';
+import {BookOpen,ClipboardList,RefreshCw,History} from 'lucide-react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {suggestedQuantity} from '../server/production/logic.js';
@@ -58,11 +59,18 @@ export default function Production({membership}){
  const option=(id)=>products.find(p=>p.id===id);
  return <section className="inventory-page production-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId.toUpperCase()}</p>
-  <h1>Produção da cozinha</h1><p>Registre as quantidades realmente utilizadas. O estoque de giro só é debitado depois da confirmação final.</p>
+  <h1>Produção da cozinha</h1><p>Consulte o que já foi preparado e registre uma nova produção. O consumo de ingredientes segue as regras atuais até a integração da reserva na V4.</p>
   {status&&<p role="status" className="receiving-notice">{status}</p>}
-  <div className="production-layout">
+  <section className="receiving-card"><div className="inventory-list-header"><h2><History size={19} aria-hidden="true"/> Produções registradas</h2><button type="button" onClick={load} aria-label="Atualizar produções"><RefreshCw size={16} aria-hidden="true"/> Atualizar</button></div>
+   {loading?<p>Consultando Firebase...</p>:runs.length===0?<p className="ti-v4-production-empty">Nenhuma produção finalizada foi registrada. A lista de tarefas planejadas será integrada nesta etapa seguinte da V4.</p>:
+    <div className="production-history">{runs.map(r=><article key={r.id}><strong>{r.recipeName}</strong>
+     <span>{r.portions} porções · {r.at?new Date(r.at).toLocaleString('pt-BR'):'—'}</span>
+     <small>{r.items?.map(i=>i.productName+' '+i.quantity+' '+i.unit).join(' · ')}</small>
+     <small>Responsável: {r.actorName||r.actorUid}</small></article>)}</div>}
+  </section>
+  <div className="production-layout ti-v4-production-layout">
    <section className="receiving-card">
-    <h2>Finalizar produção</h2>
+    <h2><ClipboardList size={19} aria-hidden="true"/> Registrar produção</h2>
     <form className="stock-action-form" onSubmit={finish}>
      <label>Preparação<select required value={recipeId} onChange={e=>choose(e.target.value)}>
       <option value="">Selecione a preparação</option>
@@ -88,7 +96,8 @@ export default function Production({membership}){
      </>}
     </form>
    </section>
-   {admin&&<section className="receiving-card">
+   {admin&&<details className="receiving-card ti-v4-recipe-details">
+    <summary><BookOpen size={20} aria-hidden="true"/><span>Gerenciar fichas técnicas <small>Cadastro e ingredientes das preparações</small></span></summary>
     <h2>Nova ficha técnica</h2>
     <p>Defina uma preparação validada, com quantidades por rendimento. Não invente pesos nem conversões entre kg e peças.</p>
     <form className="stock-action-form" onSubmit={saveRecipe}>
@@ -109,14 +118,8 @@ export default function Production({membership}){
      <button type="button" disabled={lines.length>=12} onClick={()=>setLines(a=>[...a,{productId:'',quantity:'',substitutes:[]}])}>Adicionar ingrediente</button>
      <button type="submit" className="stock-action-save" disabled={busy||!name.trim()}>{busy?'Salvando...':'Salvar ficha técnica'}</button>
     </form>
-   </section>}
+   </details>}
   </div>
-  <section className="receiving-card"><div className="inventory-list-header"><h2>Produções registradas</h2><button type="button" onClick={load}>Atualizar</button></div>
-   {loading?<p>Consultando Firebase...</p>:runs.length===0?<p>Nenhuma produção finalizada.</p>:
-    <div className="production-history">{runs.map(r=><article key={r.id}><strong>{r.recipeName}</strong>
-     <span>{r.portions} porções · {r.at?new Date(r.at).toLocaleString('pt-BR'):'—'}</span>
-     <small>{r.items?.map(i=>i.productName+' '+i.quantity+' '+i.unit).join(' · ')}</small>
-     <small>Responsável: {r.actorName||r.actorUid}</small></article>)}</div>}
-  </section>
+
  </section>;
 }
