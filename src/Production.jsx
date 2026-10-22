@@ -90,7 +90,8 @@ export default function Production({membership}){
        if(n>0&&selected)setItems(selected.lines.map(line=>({productId:line.productId,
         quantity:String(suggestedQuantity(line.quantity,n,selected.yieldQuantity,{individual:option(line.productId)?.physicalUnit==='un'})??'')})))}}/></label>
       <p>{selected.outputProductId?'Esta ficha transforma itens da reserva em um produto preparado na reserva. As quantidades precisam respeitar a ficha validada.':'Revise as quantidades reais. Os valores iniciais vêm da ficha técnica e podem ser corrigidos.'}</p>
-      {items.map((item,i)=>{
+      {selected.outputProductId&&<div className="ti-v4-conversion-summary"><strong>{selected.name} → {option(selected.outputProductId)?.name||'Preparação final'}</strong><p>Destino: reserva · {portions||'—'} unidades preparadas.</p><small>Insumos previstos conforme ficha técnica:</small><ul>{items.map((item,i)=><li key={i}>{option(item.productId)?.name||item.productId}: {item.quantity||'—'} {option(item.productId)?.physicalUnit||option(item.productId)?.unit||''} da reserva</li>)}</ul></div>}
+      {!selected.outputProductId&&items.map((item,i)=>{
        const original=selected.lines[i];const allowed=[original.productId,...(original.substitutes||[])];
        return <div className="stock-lot-row" key={i}>
         <label>Ingrediente {i+1}<select value={item.productId} onChange={e=>selectProduct(i,e.target.value)}>
@@ -100,7 +101,7 @@ export default function Production({membership}){
           onChange={e=>{setItems(a=>a.map((x,j)=>j===i?{...x,quantity:e.target.value}:x));setRequestId(null);setConfirmed(false)}}/></label>
        </div>})}
       <label>Observações<input maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setRequestId(null);setConfirmed(false)}}/></label>
-      <label className="production-confirm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Conferi os ingredientes e as quantidades reais utilizadas, não apenas as sugestões da ficha.</label>
+      <label className="production-confirm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> {selected.outputProductId?'Confirmo a quantidade produzida e a transformação da reserva conforme ficha técnica validada.':'Conferi os ingredientes e as quantidades reais utilizadas, não apenas as sugestões da ficha.'}</label>
       <button type="submit" className="stock-action-save" disabled={busy||!items.length||!confirmed}>{busy?'Registrando...':selected?.outputProductId?'Confirmar transformação na reserva':'Finalizar e descontar do giro'}</button>
      </>}
     </form>
