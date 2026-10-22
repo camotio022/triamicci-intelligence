@@ -97,6 +97,7 @@ export default async function handler(req,res){
    if(productDocs.some(p=>p.data().catalogId==='alcatra'))throw Error('LEGACY_CUT');
    if(!validProductionSelection(recipeData.lines,items))
       throw Error('UNAUTHORIZED_SUBSTITUTE');
+   if(transformed&&items.some((item,i)=>item.productId!==recipeData.lines[i].productId))throw Error('INVALID_TRANSFORMATION');
    // Fetch all lot snapshots and catalog definitions BEFORE any transaction writes.
    const centralDocs=await Promise.all(productDocs.map(p=>p.data().catalogId?
      tx.get(db.collection('productCatalog').doc(p.data().catalogId)):Promise.resolve(null)));
