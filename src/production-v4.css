@@ -1,0 +1,11 @@
+/* UX V4: reforço de hierarquia sem alterar a regra de produção existente. */
+.production-page .inventory-list-header h2,.production-page .ti-v4-production-layout h2{display:flex;align-items:center;gap:8px}
+.production-page .inventory-list-header button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px}
+.production-page .ti-v4-production-empty{padding:16px;border:1px dashed #e0e4eb;border-radius:12px;color:#5d687a;background:#fafbfc}
+.production-page .ti-v4-production-layout{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.production-page .ti-v4-production-layout>.receiving-card{width:100%;box-sizing:border-box}
+.production-page .ti-v4-recipe-details>summary{cursor:pointer;display:flex;align-items:center;gap:11px;font-size:15px;font-weight:750;color:#a71916;padding:3px 0;list-style:none}
+.production-page .ti-v4-recipe-details>summary::-webkit-details-marker{display:none}
+.production-page .ti-v4-recipe-details>summary small{display:block;font-size:12px;font-weight:400;color:#687487;margin-top:3px}
+.production-page .ti-v4-recipe-details>h2{margin-top:20px}
+.production-page .ti-v4-recipe-details>summary:focus-visible{outline:3px solid #a71916;outline-offset:6px;border-radius:4px}
