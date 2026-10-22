@@ -19,8 +19,10 @@ export default function DailyInventory({membership}){
  const [products,setProducts]=useState([]),[productId,setProductId]=useState('');
  const [result,setResult]=useState(null),[loading,setLoading]=useState(false);
  const [error,setError]=useState('');
+ const [todayCounts,setTodayCounts]=useState([]),[todayCountComplete,setTodayCountComplete]=useState(true),[todayCountError,setTodayCountError]=useState('');
  const [closures,setClosures]=useState([]),[moreClosures,setMoreClosures]=useState(false),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const isManager=['admin','manager'].includes(membership.role);
+ useEffect(()=>{let active=true;request('/api/operations/inventory-today','todayCounts').then(data=>{if(active){setTodayCounts(data.products||[]);setTodayCountComplete(!!data.complete)}}).catch(e=>{if(active)setTodayCountError(e.message)});return()=>{active=false}},[membership.unitId]);
  const [closureFilter,setClosureFilter]=useState('pending');
  const refreshClosures=async()=>{if(!isManager)return;const d=await request('/api/operations/stock','closeList');setClosures(d.closures||[]);setMoreClosures(!!d.hasMore)};
  const loadMoreClosures=async()=>{if(busy||!moreClosures||!closures.length)return;setBusy(true);try{const d=await request('/api/operations/stock','closeList',{before:closures.at(-1).submittedAt});setClosures(old=>[...old,...(d.closures||[])]);setMoreClosures(!!d.hasMore)}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
@@ -63,6 +65,7 @@ export default function DailyInventory({membership}){
     </article>)}</div>}
    {moreClosures&&<button type="button" className="ti-inventory-v4-more" disabled={busy} onClick={loadMoreClosures}>Carregar fechamentos anteriores</button>}
   </section>}
+  <section className="receiving-card ti-v4-inventory-today"><h2>Produtos contados hoje</h2><p>Toque em um item para investigar as últimas contagens e movimentações.</p>{todayCountError&&<p role="alert">{todayCountError}</p>}{!todayCountComplete&&<p role="status">Há mais de 400 registros recentes; a lista abaixo pode estar incompleta. Não use como fechamento geral.</p>}{!todayCounts.length?<p className="ti-inventory-v4-empty">Nenhuma contagem de hoje foi encontrada nesta consulta.</p>:<div className="ti-v4-today-list">{todayCounts.map(p=><button type="button" key={p.productId} aria-pressed={productId===p.productId} onClick={()=>setProductId(p.productId)}><strong>{p.name}</strong><span>Última contagem: {date(p.at)}</span></button>)}</div>}</section>
   <section className="receiving-card ti-inventory-v4-report" aria-labelledby="inventory-report-title">
    <div className="ti-v4-inventory-heading"><Search size={21} aria-hidden="true"/><div><h2 id="inventory-report-title">Investigar produto</h2><p>Consulte a apuração disponível para qualquer produto da unidade.</p></div></div>
    <label>Produto para investigar
