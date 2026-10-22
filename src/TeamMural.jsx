@@ -2,6 +2,7 @@ import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck,ClipboardList} from 'lucide-react';
 import {doc,onSnapshot} from 'firebase/firestore';
 import {auth,db} from './firebase.js';
+import {startVisibleRefresh} from './visible-refresh.js';
 import PublishedRoster from './PublishedRoster.jsx';
 import {rosterToday,liveShiftState} from '../server/schedules/restaurant-today.js';
 import './operations-planning.css';
@@ -34,8 +35,8 @@ export default function TeamMural({membership}){
   catch{/* A escala permanece disponível se a presença não puder ser consultada. */}
  },[membership?.unitId]);
  useEffect(()=>{setSchedules([]);setNotices([]);setStaff([]);setPresence({});setProductionTasks([]);setLoading(true);},[membership?.unitId]);
- useEffect(()=>{refresh();refreshPresence();refreshProduction();const onVisible=()=>{if(document.visibilityState==='visible'){setToday(todayInSaoPaulo());refresh();refreshPresence();refreshProduction()}};document.addEventListener('visibilitychange',onVisible);const interval=setInterval(onVisible,60000);return()=>{document.removeEventListener('visibilitychange',onVisible);clearInterval(interval)}},[refresh,refreshPresence,refreshProduction]);
- useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible')refreshProduction()},30000);return()=>clearInterval(timer)},[refreshProduction]);
+ useEffect(()=>{refresh();refreshPresence();refreshProduction();const onVisible=()=>{if(document.visibilityState==='visible'){setToday(todayInSaoPaulo());refresh();refreshPresence()}};document.addEventListener('visibilitychange',onVisible);const interval=setInterval(onVisible,60000);return()=>{document.removeEventListener('visibilitychange',onVisible);clearInterval(interval)}},[refresh,refreshPresence,refreshProduction]);
+ useEffect(()=>startVisibleRefresh(refreshProduction,{document,setInterval,clearInterval}),[refreshProduction]);
  useEffect(()=>{if(!membership?.unitId)return;let first=true;return onSnapshot(doc(db,'units',membership.unitId,'live','attendance'),()=>{if(first){first=false;return}refreshPresence()},()=>{});},[membership?.unitId,refreshPresence]);
  useEffect(()=>{const tick=()=>setClock(new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));tick();const timer=setInterval(tick,30000);return()=>clearInterval(timer)},[]);
  const current=useMemo(()=>schedules.find(x=>x.period===today.slice(0,7)),[schedules,today]);
@@ -61,7 +62,7 @@ export default function TeamMural({membership}){
  const publishedCurrent=Boolean(current);
  const scheduleLabel=publishedCurrent?'Escala do mês publicada':'Sem escala oficial para este mês';
  return <section className="ti-planning ti-mural-home ti-mural-v4" aria-label="Mural da equipe">
-  <header className="ti-mural-header"><div><span className="eyebrow">INFORMAÇÕES DA UNIDADE</span><h1>Mural da equipe</h1><p>Comunicados, escala e informações do dia em um só lugar.</p></div><button type="button" className="ti-mural-refresh" aria-label="Atualizar informações do mural" title="Atualizar mural" onClick={()=>{refresh();refreshPresence();refreshProduction()}}><RefreshCw size={17}/><span>Atualizar</span></button></header>
+  <header className="ti-mural-header"><div><span className="eyebrow">INFORMAÇÕES DA UNIDADE</span><h1>Mural da equipe</h1><p>Comunicados, escala e informações do dia em um só lugar.</p></div><button type="button" className="ti-mural-refresh" aria-label="Atualizar informações do mural" title="Atualizar mural" onClick={()=>{refresh();refreshPresence()}}><RefreshCw size={17}/><span>Atualizar</span></button></header>
   {error&&<p role="alert" className="team-error">{error}</p>}
   <div className="ti-mural-v4-sections">
    <section className="ti-mural-card ti-mural-notices ti-v4-feature" aria-labelledby="mural-notices-title">

@@ -1,6 +1,7 @@
 import React,{useCallback,useEffect,useState} from 'react';
 import {BookOpen,ClipboardList,RefreshCw,History} from 'lucide-react';
 import './production-v4.css';
+import {startVisibleRefresh} from './visible-refresh.js';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {suggestedQuantity} from '../server/production/logic.js';
@@ -34,7 +35,7 @@ export default function Production({membership}){
  },[membership?.unitId]);
  useEffect(()=>{setProducts([]);setRecipes([]);setRuns([]);setDailyTasks([]);setRecipeId('');setActiveTaskId(null);},[membership?.unitId]);
  useEffect(()=>{load();loadTasks()},[load,loadTasks]);
- useEffect(()=>{const refresh=()=>{if(document.visibilityState==='visible')loadTasks()};const timer=setInterval(refresh,30000);document.addEventListener('visibilitychange',refresh);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh)}},[loadTasks]);
+ useEffect(()=>startVisibleRefresh(loadTasks,{document,setInterval,clearInterval}),[loadTasks]);
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=id=>{
   setRecipeId(id);setRequestId(null);setConfirmed(false);setActiveTaskId(null);
