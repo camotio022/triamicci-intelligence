@@ -57,21 +57,24 @@ export default async function handler(req,res){
    return send(res,200,'Ficha técnica salva.');
   }
   if(action!=='finish')return send(res,400,'Ação inválida.');
-  const {recipeId,requestId,portions,items,notes=''}=req.body||{};
+  const {recipeId,requestId,portions,items,notes='',taskId=null}=req.body||{};
   if(!idPattern.test(recipeId||'')||!requestPattern.test(requestId||'')||
    !Number.isInteger(portions)||portions<1||portions>10000||
    !Array.isArray(items)||items.length<1||items.length>12||
    items.some(i=>!productIdPattern.test(i?.productId||'')||!validQuantity(i.quantity))||
    new Set(items.map(i=>i.productId)).size!==items.length||
-   typeof notes!=='string'||notes.length>240)return send(res,400,'Revise os insumos realmente utilizados.');
+   typeof notes!=='string'||notes.length>240||
+   (taskId!==null&&(typeof taskId!=='string'||!/^[A-Za-z0-9]{20}$/.test(taskId))))return send(res,400,'Revise os insumos realmente utilizados.');
   const ref=runs.doc(requestId);
-  const payloadHash=createHash('sha256').update(JSON.stringify({recipeId,portions,items,notes})).digest('hex');
+  const payloadHash=createHash('sha256').update(JSON.stringify({recipeId,portions,items,notes,taskId})).digest('hex');
   let duplicate=false;
   await db.runTransaction(async tx=>{
    const recipeRef=recipes.doc(recipeId),actorRef=db.doc('memberships/'+actor.uid);
    const productRefs=items.map(i=>unit.collection('products').doc(i.productId));
    const balanceRefs=items.map(i=>unit.collection('physicalBalances').doc(i.productId));
-   const [a,recipe,existing,...docs]=await Promise.all([tx.get(actorRef),tx.get(recipeRef),tx.get(ref),
+   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+   const taskRef=taskId?unit.collection('productionDays').doc(today).collection('tasks').doc(taskId):null;
+   const [a,recipe,existing,task,...docs]=await Promise.all([tx.get(actorRef),tx.get(recipeRef),tx.get(ref),taskRef?tx.get(taskRef):Promise.resolve(null),
     ...productRefs.map(p=>tx.get(p)),...balanceRefs.map(b=>tx.get(b))]);
    if(!a.exists||a.data().status!=='active'||a.data().unitId!==member.unitId||
      !['admin','manager','submanager','cook','auxiliar'].includes(a.data().role))throw Error('FORBIDDEN');
@@ -80,6 +83,7 @@ export default async function handler(req,res){
     duplicate=true;return;
    }
    if(!recipe.exists||recipe.data().active!==true)throw Error('RECIPE_NOT_FOUND');
+   if(taskRef&&(!task?.exists||task.data().recipeId!==recipeId||task.data().status!=='pending'))throw Error('TASK_NOT_PENDING');
    const recipeData=recipe.data(),productDocs=docs.slice(0,items.length),balanceDocs=docs.slice(items.length);
    const transformed=Boolean(recipeData.outputProductId);
    const outputRef=transformed?unit.collection('products').doc(recipeData.outputProductId):null;
@@ -140,6 +144,7 @@ export default async function handler(req,res){
     actorName:a.data().displayName||a.data().name||actor.name||actor.email||actor.uid,
     unitId:member.unitId,at:now};
    tx.create(ref,record);
+   if(taskRef)tx.update(taskRef,{status:'completed',completedQuantity:portions,completedAt:now,completedBy:actor.uid,productionRunId:requestId});
    tx.create(db.collection('auditLogs').doc(),{event:'production.finished',unitId:member.unitId,
     operationId:requestId,actorUid:actor.uid,at:now,details:record});
   });
@@ -154,7 +159,8 @@ export default async function handler(req,res){
    LOTS_NOT_READY:[409,'Concilie os lotes do ingrediente antes de confirmar a produção.'],
    LOT_LIMIT:[409,'Há muitos lotes para baixa automática.'],CONFLICT:[409,'Identificador já utilizado.'],
    INVALID_OUTPUT:[409,'Produto final indisponível ou estoque sem unidade válida.'],
-   INVALID_TRANSFORMATION:[409,'Revise as quantidades e unidades de transformação da ficha técnica.']};
+   INVALID_TRANSFORMATION:[409,'Revise as quantidades e unidades de transformação da ficha técnica.'],
+   TASK_NOT_PENDING:[409,'Tarefa inexistente, já concluída ou incompatível com a preparação.']};
   if(errors[e.message])return send(res,...errors[e.message]);
   console.error('Production:',e.message);return send(res,500,'Não foi possível registrar a produção.');
  }
