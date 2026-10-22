@@ -25,3 +25,10 @@ test('calcula ingredientes por rendimento declarado',()=>{
  const result=transformationPreview({outputProductId:c,yieldQuantity:10,lines:[{productId:a,quantity:2.5}]},20,{[a]:'kg'});
  assert.equal(result.inputs[0].quantity,5);
 });
+
+test('bloqueia produto preparado se ele aparecer como substituto',()=>{
+ assert.equal(validateTransformationRecipe({...recipe,lines:[{productId:a,quantity:1,substitutes:[b]}]}).reason,'INVALID_INGREDIENT');
+});
+test('não permite consumo de frações de unidade nem arredondamento implícito',()=>{
+ assert.equal(transformationPreview({...recipe,yieldQuantity:3},1,{[a]:'un'}).reason,'FRACTIONAL_PIECES');
+});
