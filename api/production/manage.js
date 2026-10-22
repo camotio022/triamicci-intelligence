@@ -91,6 +91,7 @@ export default async function handler(req,res){
    const outputBalanceRef=transformed?unit.collection('physicalBalances').doc(recipeData.outputProductId):null;
    const [outputDoc,outputBalanceDoc]=transformed?await Promise.all([tx.get(outputRef),tx.get(outputBalanceRef)]):[null,null];
    if(transformed&&(!outputDoc.exists||outputDoc.data().status!=='active'||outputDoc.data().trackExpiry||!outputBalanceDoc.exists))throw Error('INVALID_OUTPUT');
+   const outputCatalog=transformed&&outputDoc.data().catalogId?await tx.get(db.collection('productCatalog').doc(outputDoc.data().catalogId)):null;
    if(productDocs.some(p=>!p.exists||p.data().status!=='active')||balanceDocs.some(b=>!b.exists))throw Error('MISSING_STOCK');
    if(productDocs.some(p=>p.data().catalogId==='alcatra'))throw Error('LEGACY_CUT');
    if(!validProductionSelection(recipeData.lines,items))
@@ -104,7 +105,7 @@ export default async function handler(req,res){
     const unitMap=Object.fromEntries(productDocs.map((p,i)=>[items[i].productId,countUnit(p,centralDocs[i]?.data())]));
     const check=transformationPreview(recipeData,portions,unitMap);
     if(!check.valid||check.inputs.some((x,i)=>x.productId!==items[i].productId||Math.abs(x.quantity-items[i].quantity)>0.000001))throw Error('INVALID_TRANSFORMATION');
-    const outputUnit=countUnit(outputDoc.data());
+    const outputUnit=countUnit(outputDoc.data(),outputCatalog?.data());
     if(outputUnit!=='un'||outputBalanceDoc.data().unit!==outputUnit||!Number.isFinite(outputBalanceDoc.data().reserve)||!Number.isFinite(outputBalanceDoc.data().total))throw Error('INVALID_OUTPUT');
    }
    const updates=[],lotUpdates=[],used=[];
