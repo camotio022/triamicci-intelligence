@@ -21,6 +21,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
  const [amount,setAmount]=useState(''),[orderedQuantity,setOrderedQuantity]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
  const [lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[status,setStatus]=useState('');
+ const [receiveStep,setReceiveStep]=useState(1);
  const [summary,setSummary]=useState(null);
  const [lots,setLots]=useState([]);
  const [more,setMore]=useState({receipts:false,counts:false,outflows:false,transfers:false}),[loadingMore,setLoadingMore]=useState(false);
@@ -107,14 +108,16 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   {mode==='history'?null:mode==='receive'&&!canReceive?<p>Somente administrador ou gerente pode registrar recebimentos.</p>:
   <form className={mode==='receive'?'ti-receive-form':'receiving-card'} onSubmit={submit}>
    {mode==='receive'?<>
-    <div className="ti-receive-hero"><div><small>RECEBIMENTO · PASSO A PASSO</small><h2>Conferir mercadoria</h2><p>Selecione o produto e registre a quantidade real. O sistema nunca deve presumir o conteúdo de uma caixa ou pacote.</p></div><span className="ti-receive-progress">3 etapas</span></div>
-    <section className="ti-receive-stage">
+    <div className="ti-receive-hero"><div><small>RECEBIMENTO · PASSO A PASSO</small><h2>Conferir mercadoria</h2><p>Selecione o produto e registre a quantidade real. O sistema nunca deve presumir o conteúdo de uma caixa ou pacote.</p></div><span className="ti-receive-progress">Etapa {receiveStep} de 3</span></div>
+    <div className="ti-receive-stepbar" aria-label={`Etapa ${receiveStep} de 3`}>{[1,2,3].map(n=><span key={n} className={n<=receiveStep?"active":""}/>)}</div>
+    {receiveStep===1&&<section className="ti-receive-stage">
      <h3><span>1</span> Qual mercadoria chegou?</h3>
      <label className="ti-receive-field">Produto recebido<select required value={productId} onChange={e=>{setProductId(e.target.value);setPendingId(null);setStatus('')}}><option value="">Escolher produto da unidade</option>{products.filter(x=>x.status==='active').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
      {p&&<p>Unidade do saldo atualmente configurada: <strong>{physicalUnit}</strong>. Unidade comercial registrada: <strong>{receivingUnit}</strong>.</p>}
      <label className="ti-receive-field">Fornecedor<input required minLength={1} maxLength={160} value={supplier} onChange={e=>{setSupplier(e.target.value);setPendingId(null)}} /></label>
-    </section>
-    <section className="ti-receive-stage">
+     <button type="button" className="ti-receive-next" disabled={!productId||!supplier.trim()} onClick={()=>setReceiveStep(2)}>Continuar para quantidades</button>
+    </section>}
+    {receiveStep===2&&<section className="ti-receive-stage">
      <h3><span>2</span> Quanto foi entregue?</h3>
      {p&&weightToPieces&&<div className="ti-receive-warning" role="status">Pedido em kg e estoque por peças: registre o peso realmente entregue e a contagem efetiva de peças. Não calculamos peças automaticamente a partir de kg.</div>}
      {p&&proteinMismatch&&<div className="ti-receive-warning" role="status">Confira a unidade configurada neste produto. Não modificaremos saldos antigos automaticamente.</div>}
@@ -125,15 +128,17 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
       <label>{weightToPieces?'Peso entregue (kg) — obrigatório':'Peso entregue (kg), se medido'}<input required={weightToPieces} type="number" min="0.001" step="0.001" value={weight} onChange={e=>{setWeight(e.target.value);setPendingId(null)}}/></label>
      </div>
      {deliveredCommercial!==null&&orderedQuantity!==''&&amount!==''&&(receivingUnit===physicalUnit||weight!=='')&&<p>Diferença do pedido: <strong>{qty(deliveredCommercial-Number(orderedQuantity))} {receivingUnit}</strong>.</p>}
-    </section>
-    <section className="ti-receive-stage">
+     <div className="ti-receive-navigation"><button type="button" className="ti-receive-back" onClick={()=>setReceiveStep(1)}>Voltar</button><button type="button" className="ti-receive-next" disabled={!Number.isFinite(Number(orderedQuantity))||Number(orderedQuantity)<=0||!Number.isFinite(Number(amount))||Number(amount)<=0||(weightToPieces&&(!Number.isFinite(Number(weight))||Number(weight)<=0))||(receivingUnit!==physicalUnit&&!weightToPieces)} onClick={()=>setReceiveStep(3)}>Revisar entrega</button></div>
+    </section>}
+    {receiveStep===3&&<section className="ti-receive-stage">
      <h3><span>3</span> Conferir e registrar</h3>
      {p?.trackExpiry&&<div className="inventory-fields"><label>Lote<input required maxLength={80} value={lot} onChange={e=>{setLot(e.target.value);setPendingId(null)}}/></label><label>Validade<input required type="date" value={expiry} onChange={e=>{setExpiry(e.target.value);setPendingId(null)}}/></label></div>}
      <label className="ti-receive-field ti-receive-notes">Observações (opcional)<textarea rows={3} maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setPendingId(null)}} placeholder="Ex.: caixas conferidas com fornecedor"/></label>
      {p&&<div className="ti-receive-summary"><span>Resumo da entrega</span><b>{p.name}</b><span>{amount||'—'} {physicalUnit} recebidos · pedido de {orderedQuantity||'—'} {receivingUnit}</span><span>Registro vinculado ao responsável e à unidade atual.</span></div>}
+     <button type="button" className="ti-receive-back" onClick={()=>setReceiveStep(2)}>Voltar às quantidades</button>
      <button className="ti-receive-primary" type="submit" disabled={busy||!productId||(receivingUnit!==physicalUnit&&!weightToPieces)}>{busy?'Registrando...':'Confirmar recebimento'}</button>
      {status&&<p role="status">{status}</p>}
-    </section>
+    </section>}
    </>:<>
     <h2>Registrar contagem</h2>
     <div className="inventory-fields">
