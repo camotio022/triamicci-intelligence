@@ -28,7 +28,7 @@ export default function TeamMural({membership}){
    setNotices(board.items||[]);setError('');
   }catch(e){setError(e.message)}finally{setLoading(false)}
  },[]);
- const refreshProduction=useCallback(async()=>{try{const data=await read('production','dayList');setProductionTasks(data.tasks||[])}catch{setProductionTasks([])}},[]);
+ const refreshProduction=useCallback(async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const response=await fetch('/api/production/day-list',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'list'})});if(!response.ok)throw Error('Produção indisponível');const data=await response.json();setProductionTasks(data.tasks||[])}catch{setProductionTasks([])}},[]);
  const refreshPresence=useCallback(async()=>{
   try{const result=await read('attendanceV31','teamToday');setPresence(Object.fromEntries((result.presence||[]).map(x=>[x.uid,x])));}
   catch{/* A escala permanece disponível se a presença não puder ser consultada. */}
@@ -59,7 +59,7 @@ export default function TeamMural({membership}){
  const publishedCurrent=Boolean(current);
  const scheduleLabel=publishedCurrent?'Escala do mês publicada':'Sem escala oficial para este mês';
  return <section className="ti-planning ti-mural-home ti-mural-v4" aria-label="Mural da equipe">
-  <header className="ti-mural-header"><div><span className="eyebrow">INFORMAÇÕES DA UNIDADE</span><h1>Mural da equipe</h1><p>Comunicados, escala e informações do dia em um só lugar.</p></div><button type="button" className="ti-mural-refresh" aria-label="Atualizar informações do mural" title="Atualizar mural" onClick={()=>{refresh();refreshPresence()}}><RefreshCw size={17}/><span>Atualizar</span></button></header>
+  <header className="ti-mural-header"><div><span className="eyebrow">INFORMAÇÕES DA UNIDADE</span><h1>Mural da equipe</h1><p>Comunicados, escala e informações do dia em um só lugar.</p></div><button type="button" className="ti-mural-refresh" aria-label="Atualizar informações do mural" title="Atualizar mural" onClick={()=>{refresh();refreshPresence();refreshProduction()}}><RefreshCw size={17}/><span>Atualizar</span></button></header>
   {error&&<p role="alert" className="team-error">{error}</p>}
   <div className="ti-mural-v4-sections">
    <section className="ti-mural-card ti-mural-notices ti-v4-feature" aria-labelledby="mural-notices-title">
