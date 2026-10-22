@@ -28,13 +28,14 @@ export default function TeamMural({membership}){
    setNotices(board.items||[]);setError('');
   }catch(e){setError(e.message)}finally{setLoading(false)}
  },[membership?.unitId]);
- const refreshProduction=useCallback(async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const response=await fetch('/api/production/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'dayList'})});if(!response.ok)throw Error('Produção indisponível');const data=await response.json();setProductionTasks(data.tasks||[]);setProductionError('')}catch{setProductionError('Não foi possível consultar o planejamento de hoje.')}},[]);
+ const refreshProduction=useCallback(async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const response=await fetch('/api/production/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'dayList'})});if(!response.ok)throw Error('Produção indisponível');const data=await response.json();setProductionTasks(data.tasks||[]);setProductionError('')}catch{setProductionError('Não foi possível consultar o planejamento de hoje.')}},[membership?.unitId]);
  const refreshPresence=useCallback(async()=>{
   try{const result=await read('attendanceV31','teamToday');setPresence(Object.fromEntries((result.presence||[]).map(x=>[x.uid,x])));}
   catch{/* A escala permanece disponível se a presença não puder ser consultada. */}
  },[membership?.unitId]);
  useEffect(()=>{setSchedules([]);setNotices([]);setStaff([]);setPresence({});setProductionTasks([]);setLoading(true);},[membership?.unitId]);
  useEffect(()=>{refresh();refreshPresence();refreshProduction();const onVisible=()=>{if(document.visibilityState==='visible'){setToday(todayInSaoPaulo());refresh();refreshPresence();refreshProduction()}};document.addEventListener('visibilitychange',onVisible);const interval=setInterval(onVisible,60000);return()=>{document.removeEventListener('visibilitychange',onVisible);clearInterval(interval)}},[refresh,refreshPresence,refreshProduction]);
+ useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible')refreshProduction()},30000);return()=>clearInterval(timer)},[refreshProduction]);
  useEffect(()=>{if(!membership?.unitId)return;let first=true;return onSnapshot(doc(db,'units',membership.unitId,'live','attendance'),()=>{if(first){first=false;return}refreshPresence()},()=>{});},[membership?.unitId,refreshPresence]);
  useEffect(()=>{const tick=()=>setClock(new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));tick();const timer=setInterval(tick,30000);return()=>clearInterval(timer)},[]);
  const current=useMemo(()=>schedules.find(x=>x.period===today.slice(0,7)),[schedules,today]);
