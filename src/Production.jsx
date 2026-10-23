@@ -123,10 +123,11 @@ export default function Production({membership}){
 
      <label>Modo de preparo<textarea maxLength={2000} value={method} onChange={e=>setMethod(e.target.value)}/></label>
      {lines.map((line,i)=><div className="stock-lot-row" key={i}>
-      <label>Insumo principal<select required value={line.productId} onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,productId:e.target.value}:x))}>
+      <p className="v3-info" role="note">Confira a unidade física de cada insumo e o rendimento real da ficha antes de salvar. O sistema não converte kg, peças ou porções por suposição.</p>
+     <label>Insumo principal<select required value={line.productId} onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,productId:e.target.value}:x))}>
        <option value="">Selecionar insumo</option>{products.filter(p=>p.status==='active'||p.id===line.productId).map(p=><option key={p.id} value={p.id} disabled={p.status!=='active'||p.id===outputProductId}>{p.name}{p.status!=='active'?' (inativo)':''}</option>)}
       </select></label>
-      <label>Quantidade por rendimento<input required type="number" min={option(line.productId)?.physicalUnit==='un'?'1':'.001'} step={option(line.productId)?.operationalUnitOverride==='un'||option(line.productId)?.unit==='un'?'1':'.001'} value={line.quantity}
+      <label>Quantidade por rendimento ({option(line.productId)?.operationalUnitOverride||option(line.productId)?.physicalUnit||option(line.productId)?.unit||'unidade a conferir'})<input required type="number" min={option(line.productId)?.physicalUnit==='un'?'1':'.001'} step={option(line.productId)?.operationalUnitOverride==='un'||option(line.productId)?.unit==='un'?'1':'.001'} value={line.quantity}
        onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,quantity:e.target.value}:x))}/></label>
       <label>Local de origem<select value={line.location||(outputProductId?'reserva':'giro')} onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,location:e.target.value}:x))}><option value="reserva">Reserva</option><option value="giro">Giro</option></select></label>
       <label>Substituto autorizado<select value={line.substitutes[0]||''}
