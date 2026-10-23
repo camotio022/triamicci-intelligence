@@ -25,7 +25,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      await page.getByLabel('Produto do item 1',{exact:true}).selectOption('c'.repeat(40));
      await page.getByLabel('Quanto chegou?').fill('5');
      if(await page.getByLabel('Quantidade física conferida (un)').count())await page.getByLabel('Quantidade física conferida (un)').fill('5'); // Unidades iguais: quantidade física acompanha o peso/contagem informada.
-     await page.getByLabel('Lote',{exact:true}).fill('TESTE-123');await page.getByLabel('Validade',{exact:true}).fill('2099-12-31');
+     assert.equal(await page.getByLabel('Lote',{exact:true}).count(),0,'Recebimento padrão não deve exigir lote individual');
      await page.getByRole('button',{name:'Revisar conferência',exact:true}).click();
      assert.equal(await page.getByText('Revisar antes de enviar',{exact:true}).count(),1);
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`Recebimento review overflows at ${width}`);
