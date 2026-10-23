@@ -161,7 +161,7 @@ export default async function handler(req,res){
   const auditRef=db.collection('auditLogs').doc();
   const balanceRef=unit.collection('physicalBalances').doc(productId);
   const lotRef=unit.collection('physicalLots').doc(productId).collection('lots');
-  const batchRef=action==='receive'&&typeof req.body?.lot==='string'&&typeof req.body?.expiryDate==='string' ? lotRef.doc(createHash('sha256').update(req.body.lot.trim()+'|'+req.body.expiryDate).digest('hex')) : null;
+  const batchRef=action==='receive'&&typeof req.body?.lot==='string'&&req.body.lot.trim()&&typeof req.body?.expiryDate==='string'&&req.body.expiryDate ? lotRef.doc(createHash('sha256').update(req.body.lot.trim()+'|'+req.body.expiryDate).digest('hex')) : null;
   const payload= action==='receive'?
    {supplier:req.body.supplier,orderedQuantity:req.body.orderedQuantity,deliveredWeightKg:req.body.deliveredWeightKg,physicalQuantity:req.body.physicalQuantity,lot:req.body.lot,expiryDate:req.body.expiryDate,notes:req.body.notes||''}:
    {reserve:req.body.reserve,rotation:req.body.rotation,notes:req.body.notes||''};
