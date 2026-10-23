@@ -126,7 +126,7 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  assert.equal((await unit.collection('physicalLots').doc(prepared).collection('lots').get()).docs[0].data().reserva,1.5);
  assert.equal((await call(production,cook,'finish',decimalRun)).duplicate,true);
  // A product with expiry metadata but no per-lot policy uses aggregate stock.
- const aggregateRaw='h'.repeat(40),aggregateOutput='g'.repeat(40);
+ const aggregateRaw='9'.repeat(40),aggregateOutput='8'.repeat(40);
  await unit.collection('products').doc(aggregateRaw).set({name:'Ingrediente acumulado',unit:'kg',status:'active',trackExpiry:true});
  await unit.collection('products').doc(aggregateOutput).set({name:'Preparo acumulado',unit:'kg',status:'active',trackExpiry:true});
  await unit.collection('physicalBalances').doc(aggregateRaw).set({unit:'kg',reserve:0,rotation:3,total:3});
