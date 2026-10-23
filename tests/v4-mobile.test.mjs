@@ -19,12 +19,12 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     if(screen==='Mural'){await page.getByText('Publicar comunicado',{exact:true}).click();await page.getByLabel('Título',{exact:true}).fill('Comunicado de teste');}
     if(screen==='Produção'){await page.getByRole('button',{name:'Registrar execução'}).click();await page.getByLabel('Quantidade produzida (un)',{exact:true}).fill('10');}
     if(screen==='Recebimento'){
-     await page.getByLabel('Fornecedor',{exact:true}).fill('Fornecedor teste');
+     await page.getByLabel('Fornecedor da entrega não prevista',{exact:true}).fill('Fornecedor teste');
      await page.getByLabel('Por que a entrega não estava prevista?').fill('Compra experimental autorizada');
      await page.getByRole('button',{name:'Conferir itens',exact:true}).click();await page.screenshot({path:'/tmp/v4-receive-step-'+width+'.png',fullPage:true});
      await page.getByLabel('Produto do item 1',{exact:true}).selectOption('c'.repeat(40));
-     await page.getByLabel('Quantidade comercial recebida').fill('5');
-     await page.getByLabel('Quantidade física conferida (un)').fill('5');
+     await page.getByLabel('Quanto chegou?').fill('5');
+     if(await page.getByLabel('Quantidade física conferida (un)').count())await page.getByLabel('Quantidade física conferida (un)').fill('5'); // Unidades iguais: quantidade física acompanha o peso/contagem informada.
      await page.getByLabel('Lote',{exact:true}).fill('TESTE-123');await page.getByLabel('Validade',{exact:true}).fill('2099-12-31');
      await page.getByRole('button',{name:'Revisar conferência',exact:true}).click();
      assert.equal(await page.getByText('Revisar antes de enviar',{exact:true}).count(),1);
@@ -35,7 +35,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      await page.getByRole('button',{name:'Conferir itens',exact:true}).click();
      assert.equal(await page.getByLabel('Produto do item 1').inputValue(),'c'.repeat(40),'The ordered product must remain selected without an operational profile');
      assert.match(await page.getByRole('alert').innerText(),/precisa de configuração para recebimento/);
-     await page.getByLabel('Quantidade comercial recebida').fill('1');
+     await page.getByLabel('Quanto chegou?').fill('1');
      assert.equal(await page.getByRole('button',{name:'Revisar conferência',exact:true}).isDisabled(),true);
      assert.equal(await page.getByRole('button',{name:'Configurar produto do pedido',exact:true}).count(),1);
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`Pending receipt overflows at ${width}`);
