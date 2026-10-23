@@ -113,11 +113,11 @@ export default async function handler(req,res){
    // Fetch all lot snapshots and catalog definitions BEFORE any transaction writes.
    const centralDocs=await Promise.all(productDocs.map(p=>p.data().catalogId?
      tx.get(db.collection('productCatalog').doc(p.data().catalogId)):Promise.resolve(null)));
-   const lots=await Promise.all(items.map((item,index)=>productDocs[index].data().trackExpiry?
+   const lots=await Promise.all(items.map((item,index)=>productDocs[index].data().lotTrackingMode==='per_lot'?
     tx.get(unit.collection('physicalLots').doc(item.productId).collection('lots').orderBy('expiryDate').limit(101)):Promise.resolve(null)));
    const outputUnit=transformed?countUnit(outputDoc.data(),outputCatalog?.data()):'un';
    if(!validQuantity(portions,{unit:outputUnit}))throw Error('INVALID_UNIT_QUANTITY');
-   const trackedOutput=transformed&&outputDoc.data().trackExpiry;
+   const trackedOutput=transformed&&outputDoc.data().lotTrackingMode==='per_lot';
    if(trackedOutput&&(!outputLot.trim()||!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)||!Number.isFinite(Date.parse(expiryDate+'T12:00:00Z'))||new Date(expiryDate+'T12:00:00Z').toISOString().slice(0,10)!==expiryDate||expiryDate<today))throw Error('OUTPUT_LOT_REQUIRED');
    const outputLotRef=trackedOutput?unit.collection('physicalLots').doc(recipeData.outputProductId).collection('lots').doc(createHash('sha256').update(outputLot.trim()+'|'+expiryDate).digest('hex')):null;
    const outputLotDoc=outputLotRef?await tx.get(outputLotRef):null;
@@ -137,7 +137,7 @@ export default async function handler(req,res){
     if(!validQuantity(item.quantity,{unit:physicalUnit})||b.unit!==physicalUnit||
       b[sourceField]<item.quantity||b.total<item.quantity)throw Error('INSUFFICIENT');
     const allocations=[];
-    if(p.trackExpiry){
+    if(p.lotTrackingMode==='per_lot'){
      const snap=lots[i];if(snap.size>100)throw Error('LOT_LIMIT');
      const list=snap.docs.map(d=>({id:d.id,...d.data()}));
      const totals=areaTotals(list);
