@@ -138,7 +138,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
     </section>}
     {receiveStep===3&&<section className="ti-receive-stage">
      <h3><span>3</span> Conferir e registrar</h3>
-     {p?.lotTrackingMode==='per_lot'&&<div className="inventory-fields"><label>Lote<input required maxLength={80} value={lot} onChange={e=>{setLot(e.target.value);setPendingId(null)}}/></label><label>Validade<input required type="date" value={expiry} onChange={e=>{setExpiry(e.target.value);setPendingId(null)}}/></label></div>}
+     {p?.trackExpiry&&p?.lotTrackingMode!=='per_lot'&&<div className="inventory-fields"><label>Validade da entrega (opcional)<input type="date" value={expiry} onChange={e=>{setExpiry(e.target.value);setPendingId(null)}}/></label></div>}{p?.lotTrackingMode==='per_lot'&&<div className="inventory-fields"><label>Lote<input required maxLength={80} value={lot} onChange={e=>{setLot(e.target.value);setPendingId(null)}}/></label><label>Validade<input required type="date" value={expiry} onChange={e=>{setExpiry(e.target.value);setPendingId(null)}}/></label></div>}
      <label className="ti-receive-field ti-receive-notes">Observações (opcional)<textarea rows={3} maxLength={240} value={notes} onChange={e=>{setNotes(e.target.value);setPendingId(null)}} placeholder="Ex.: caixas conferidas com fornecedor"/></label>
      {p&&<div className="ti-receive-summary"><span>Resumo da entrega</span><b>{p.name}</b><span>{amount||'—'} {physicalUnit} recebidos · pedido de {orderedQuantity||'—'} {receivingUnit}</span><span>Registro vinculado ao responsável e à unidade atual.</span></div>}
      <button type="button" className="ti-receive-back" onClick={()=>setReceiveStep(2)}>Voltar às quantidades</button>
