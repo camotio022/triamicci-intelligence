@@ -111,7 +111,7 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  // Decimal yields, per-ingredient source and a real output lot, without a prior output count.
  const raw='e'.repeat(40),prepared='f'.repeat(40);
  await unit.collection('products').doc(raw).set({name:'Molho base',unit:'kg',status:'active',trackExpiry:false});
- await unit.collection('products').doc(prepared).set({name:'Molho final',unit:'kg',status:'active',trackExpiry:true});
+ await unit.collection('products').doc(prepared).set({name:'Molho final',unit:'kg',status:'active',trackExpiry:true,lotTrackingMode:'per_lot'});
  await unit.collection('physicalBalances').doc(raw).set({unit:'kg',reserve:1,rotation:5,total:6});
  const decimalRecipe={id:'molho-decimal',name:'Molho final',outputProductId:prepared,yieldQuantity:2.5,lines:[{productId:raw,quantity:1.25,location:'giro'}],method:'Misturar e conferir o rendimento real.'};
  assert.equal((await call(production,manager,'saveRecipe',decimalRecipe)).code,200);
@@ -125,6 +125,19 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  assert.equal((await unit.collection('physicalBalances').doc(prepared).get()).data().reserve,1.5);
  assert.equal((await unit.collection('physicalLots').doc(prepared).collection('lots').get()).docs[0].data().reserva,1.5);
  assert.equal((await call(production,cook,'finish',decimalRun)).duplicate,true);
+ // A product with expiry metadata but no per-lot policy uses aggregate stock.
+ const aggregateRaw='9'.repeat(40),aggregateOutput='8'.repeat(40);
+ await unit.collection('products').doc(aggregateRaw).set({name:'Ingrediente acumulado',unit:'kg',status:'active',trackExpiry:true});
+ await unit.collection('products').doc(aggregateOutput).set({name:'Preparo acumulado',unit:'kg',status:'active',trackExpiry:true});
+ await unit.collection('physicalBalances').doc(aggregateRaw).set({unit:'kg',reserve:0,rotation:3,total:3});
+ const aggregateRecipe={id:'teste-saldo-acumulado',name:'Preparo sem lotes',outputProductId:aggregateOutput,yieldQuantity:1,lines:[{productId:aggregateRaw,quantity:1,location:'giro'}]};
+ assert.equal((await call(production,manager,'saveRecipe',aggregateRecipe)).code,200);
+ const aggregateRun={recipeId:aggregateRecipe.id,requestId:randomUUID(),portions:1,items:[{productId:aggregateRaw,quantity:1}]};
+ assert.equal((await call(production,cook,'finish',aggregateRun)).code,200,'Produção acumulada não deve exigir lote');
+ assert.equal((await unit.collection('physicalBalances').doc(aggregateRaw).get()).data().rotation,2);
+ assert.equal((await unit.collection('physicalBalances').doc(aggregateOutput).get()).data().reserve,1);
+ assert.equal((await unit.collection('physicalLots').doc(aggregateOutput).collection('lots').get()).size,0);
+
  // Summary counters close the next count interval using canonical movements, irrespective of legacy volume.
  const {default:reportApi}=await import('../server/operations/daily-report.js');
  const countedAgain=randomUUID();await new Promise(r=>setTimeout(r,10));

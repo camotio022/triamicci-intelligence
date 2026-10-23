@@ -161,7 +161,7 @@ export default async function handler(req,res){
   const auditRef=db.collection('auditLogs').doc();
   const balanceRef=unit.collection('physicalBalances').doc(productId);
   const lotRef=unit.collection('physicalLots').doc(productId).collection('lots');
-  const batchRef=action==='receive'&&typeof req.body?.lot==='string'&&typeof req.body?.expiryDate==='string' ? lotRef.doc(createHash('sha256').update(req.body.lot.trim()+'|'+req.body.expiryDate).digest('hex')) : null;
+  const batchRef=action==='receive'&&typeof req.body?.lot==='string'&&req.body.lot.trim()&&typeof req.body?.expiryDate==='string'&&req.body.expiryDate ? lotRef.doc(createHash('sha256').update(req.body.lot.trim()+'|'+req.body.expiryDate).digest('hex')) : null;
   const payload= action==='receive'?
    {supplier:req.body.supplier,orderedQuantity:req.body.orderedQuantity,deliveredWeightKg:req.body.deliveredWeightKg,physicalQuantity:req.body.physicalQuantity,lot:req.body.lot,expiryDate:req.body.expiryDate,notes:req.body.notes||''}:
    {reserve:req.body.reserve,rotation:req.body.rotation,notes:req.body.notes||''};
@@ -188,7 +188,7 @@ export default async function handler(req,res){
     physicalQuantity:payload.physicalQuantity,deliveredWeightKg:payload.deliveredWeightKg,
     receivingUnit,operationalUnit:unitName}):null;
    if(action==='receive'&&!commercial)throw Error('INVALID');
-   if(action==='receive'&&p.trackExpiry===true){
+   if(action==='receive'&&p.lotTrackingMode==='per_lot'){
     if(!validText(payload.lot,1,80)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(payload.expiryDate||'')||
      !Number.isFinite(Date.parse(payload.expiryDate+'T12:00:00Z'))||
      new Date(payload.expiryDate+'T12:00:00Z').toISOString().slice(0,10)!==payload.expiryDate||payload.expiryDate<now.toISOString().slice(0,10))throw Error('INVALID');
@@ -224,7 +224,7 @@ export default async function handler(req,res){
        supplier:payload.supplier,at:now.toISOString()},
       lastReceiptId:requestId,lastMovementAt:now});
    }
-   if(action==='receive'&&p.trackExpiry===true){
+   if(action==='receive'&&p.lotTrackingMode==='per_lot'){
     const oldAmount=lotSnap?.exists?lotSnap.data().receivedQuantity:0;
     if(!Number.isFinite(oldAmount)||oldAmount<0||oldAmount+payload.physicalQuantity>100000000)throw Error('INVALID');
     const priorReserve=Number.isFinite(lotSnap?.data()?.reserva)?lotSnap.data().reserva:0;
