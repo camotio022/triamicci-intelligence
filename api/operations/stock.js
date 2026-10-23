@@ -188,7 +188,7 @@ export default async function handler(req,res){
     physicalQuantity:payload.physicalQuantity,deliveredWeightKg:payload.deliveredWeightKg,
     receivingUnit,operationalUnit:unitName}):null;
    if(action==='receive'&&!commercial)throw Error('INVALID');
-   if(action==='receive'&&p.trackExpiry===true){
+   if(action==='receive'&&p.lotTrackingMode==='per_lot'){
     if(!validText(payload.lot,1,80)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(payload.expiryDate||'')||
      !Number.isFinite(Date.parse(payload.expiryDate+'T12:00:00Z'))||
      new Date(payload.expiryDate+'T12:00:00Z').toISOString().slice(0,10)!==payload.expiryDate||payload.expiryDate<now.toISOString().slice(0,10))throw Error('INVALID');
@@ -224,7 +224,7 @@ export default async function handler(req,res){
        supplier:payload.supplier,at:now.toISOString()},
       lastReceiptId:requestId,lastMovementAt:now});
    }
-   if(action==='receive'&&p.trackExpiry===true){
+   if(action==='receive'&&p.lotTrackingMode==='per_lot'){
     const oldAmount=lotSnap?.exists?lotSnap.data().receivedQuantity:0;
     if(!Number.isFinite(oldAmount)||oldAmount<0||oldAmount+payload.physicalQuantity>100000000)throw Error('INVALID');
     const priorReserve=Number.isFinite(lotSnap?.data()?.reserva)?lotSnap.data().reserva:0;
