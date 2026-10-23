@@ -47,8 +47,10 @@ export default function Production({membership}){
   setItems((r?.lines||[]).map(l=>({productId:l.productId,quantity:String(l.quantity)})));
  };
  const selectProduct=(i,value)=>{setItems(a=>a.map((x,j)=>j===i?{...x,productId:value}:x));setRequestId(null);setConfirmed(false)};
+ const recipeOutputConflict=Boolean(outputProductId&&lines.some(l=>l.productId===outputProductId||l.substitutes?.includes(outputProductId)));
+ const recipeDuplicateInputs=new Set(lines.map(l=>l.productId).filter(Boolean)).size!==lines.filter(l=>l.productId).length;
  const saveRecipe=async e=>{
-  e.preventDefault();if(busy)return;setBusy(true);setStatus('');
+  e.preventDefault();if(busy)return;if(recipeOutputConflict||recipeDuplicateInputs){setStatus('Revise a ficha: o produto final não pode ser ingrediente e cada ingrediente principal deve aparecer uma vez.');return;}setBusy(true);setStatus('');
   try{
    await call('/api/production/manage','saveRecipe',{
     id:editRecipeId||idFor(name),expectedVersion:recipeVersion,method,name,yieldQuantity:Number(yieldQuantity),outputProductId:outputProductId||null,
@@ -114,25 +116,27 @@ export default function Production({membership}){
     <form className="stock-action-form" onSubmit={saveRecipe}>
      <label>Nome da preparação<input required minLength={3} maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label>
      <label>Rendimento padrão ({option(outputProductId)?.physicalUnit||'un'})<input type="number" min="0.001" step="0.001" value={yieldQuantity} onChange={e=>setYield(e.target.value)}/></label>
-     <label>Produto preparado que entrará na reserva (opcional)<select value={outputProductId} onChange={e=>setOutputProductId(e.target.value)}><option value="">Ficha antiga: apenas consumo do giro</option>{products.filter(p=>p.status==="active").map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+     <label>Produto preparado que entrará na reserva (opcional)<select value={outputProductId} onChange={e=>setOutputProductId(e.target.value)}><option value="">Somente consumo de ingredientes (sem produto final)</option>{products.filter(p=>p.status==="active").map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+     {recipeOutputConflict&&<p role="alert" className="v3-error">O produto final também está selecionado como ingrediente ou substituto. Corrija antes de salvar.</p>}
+     {recipeDuplicateInputs&&<p role="alert" className="v3-error">Há ingredientes principais repetidos. Consolide a quantidade numa única linha.</p>}
      {outputProductId&&<p>Ficha transformacional: os ingredientes deverão existir nos locais de origem selecionados; ao confirmar produção, o preparado entrará na reserva na mesma transação. Se houver controle de validade, cada produção exigirá lote e validade reais.</p>}
 
      <label>Modo de preparo<textarea maxLength={2000} value={method} onChange={e=>setMethod(e.target.value)}/></label>
      {lines.map((line,i)=><div className="stock-lot-row" key={i}>
       <label>Insumo principal<select required value={line.productId} onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,productId:e.target.value}:x))}>
-       <option value="">Selecionar insumo</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+       <option value="">Selecionar insumo</option>{products.filter(p=>p.status==='active'||p.id===line.productId).map(p=><option key={p.id} value={p.id} disabled={p.status!=='active'||p.id===outputProductId}>{p.name}{p.status!=='active'?' (inativo)':''}</option>)}
       </select></label>
       <label>Quantidade por rendimento<input required type="number" min={option(line.productId)?.physicalUnit==='un'?'1':'.001'} step={option(line.productId)?.operationalUnitOverride==='un'||option(line.productId)?.unit==='un'?'1':'.001'} value={line.quantity}
        onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,quantity:e.target.value}:x))}/></label>
       <label>Local de origem<select value={line.location||(outputProductId?'reserva':'giro')} onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,location:e.target.value}:x))}><option value="reserva">Reserva</option><option value="giro">Giro</option></select></label>
       <label>Substituto autorizado<select value={line.substitutes[0]||''}
        onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,substitutes:e.target.value?[e.target.value]:[]}:x))}>
-       <option value="">Nenhum</option>{products.filter(p=>p.id!==line.productId).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+       <option value="">Nenhum</option>{products.filter(p=>(p.status==='active'||p.id===line.substitutes[0])&&p.id!==line.productId).map(p=><option key={p.id} value={p.id} disabled={p.status!=='active'||p.id===outputProductId}>{p.name}{p.status!=='active'?' (inativo)':''}</option>)}
       </select></label>
       {lines.length>1&&<button type="button" onClick={()=>setLines(a=>a.filter((_,j)=>j!==i))}>Excluir ingrediente</button>}
      </div>)}
      <button type="button" disabled={lines.length>=12} onClick={()=>setLines(a=>[...a,{productId:'',quantity:'',substitutes:[]}])}>Adicionar ingrediente</button>
-     <button type="submit" className="stock-action-save" disabled={busy||!name.trim()}>{busy?'Salvando...':'Salvar ficha técnica'}</button>
+     <button type="submit" className="stock-action-save" disabled={busy||!name.trim()||recipeOutputConflict||recipeDuplicateInputs}>{busy?'Salvando...':'Salvar ficha técnica'}</button>
     </form>
    </details>}
   </div>
