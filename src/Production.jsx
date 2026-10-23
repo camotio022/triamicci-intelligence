@@ -70,6 +70,8 @@ export default function Production({membership}){
   }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const option=(id)=>products.find(p=>p.id===id);
+ const inputUnit=id=>{const p=option(id);return p?.operationalUnitOverride||p?.physicalUnit||p?.unit||'un';};
+ const inputStep=id=>['un','pacote','porcao','duzia'].includes(inputUnit(id))?'1':'.001';
  return <section className="inventory-page production-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId.toUpperCase()}</p>
   <h1>Produção da cozinha</h1><LiveStatus state={live}/><p>Consulte o que já foi preparado e registre uma nova produção. Fichas com produto final cadastrado consomem ingredientes dos locais definidos na ficha e creditam o preparo na reserva; fichas antigas continuam consumindo do giro.</p>
@@ -91,14 +93,14 @@ export default function Production({membership}){
        if(n>0&&selected)setItems(selected.lines.map(line=>({productId:line.productId,
         quantity:String(suggestedQuantity(line.quantity,n,selected.yieldQuantity,{individual:false})??'')})))}}/></label>
       <p>{selected.outputProductId?'Esta ficha transforma os ingredientes dos locais definidos em um produto preparado na reserva. As quantidades precisam respeitar a ficha validada.':'Revise as quantidades reais. Os valores iniciais vêm da ficha técnica e podem ser corrigidos.'}</p>
-      {selected.outputProductId&&<div className="ti-v4-conversion-summary"><strong>{selected.name} → {option(selected.outputProductId)?.name||'Preparação final'}</strong><p>Destino: reserva · {portions||'—'} {selected.outputUnit||'un'} preparados.</p><small>Insumos previstos conforme ficha técnica:</small><ul>{items.map((item,i)=><li key={i}>{option(item.productId)?.name||item.productId}: {item.quantity||'—'} {option(item.productId)?.physicalUnit||option(item.productId)?.unit||''} de {selected.lines[i]?.location||'reserva'}</li>)}</ul></div>}
+      {selected.outputProductId&&<div className="ti-v4-conversion-summary"><strong>{selected.name} → {option(selected.outputProductId)?.name||'Preparação final'}</strong><p>Destino: reserva · {portions||'—'} {selected.outputUnit||'un'} preparados.</p><small>Insumos previstos conforme ficha técnica:</small><ul>{items.map((item,i)=><li key={i}>{option(item.productId)?.name||item.productId}: {item.quantity||'—'} {inputUnit(item.productId)} de {selected.lines[i]?.location||'reserva'}</li>)}</ul></div>}
       {!selected.outputProductId&&items.map((item,i)=>{
        const original=selected.lines[i];const allowed=[original.productId,...(original.substitutes||[])];
        return <div className="stock-lot-row" key={i}>
         <label>Ingrediente {i+1}<select value={item.productId} onChange={e=>selectProduct(i,e.target.value)}>
          {allowed.map(id=><option key={id} value={id}>{option(id)?.name||id}</option>)}
         </select></label>
-        <label>Quantidade realmente utilizada ({option(item.productId)?.operationalUnitOverride||option(item.productId)?.physicalUnit||option(item.productId)?.unit||'unidade a conferir'})<input type="number" required min={option(item.productId)?.physicalUnit==='un'?'1':'.001'} step={option(item.productId)?.operationalUnitOverride==='un'||option(item.productId)?.unit==='un'?'1':'.001'} value={item.quantity}
+        <label>Quantidade realmente utilizada ({inputUnit(item.productId)})<input type="number" required min={inputStep(item.productId)} step={inputStep(item.productId)} value={item.quantity}
           onChange={e=>{setItems(a=>a.map((x,j)=>j===i?{...x,quantity:e.target.value}:x));setRequestId(null);setConfirmed(false)}}/></label>
        </div>})}
       {selected.method&&<details><summary>Consultar modo de preparo</summary><p>{selected.method}</p></details>}
@@ -115,7 +117,7 @@ export default function Production({membership}){
     <p>Defina uma preparação validada, com quantidades por rendimento. Não invente pesos nem conversões entre kg e peças.</p>
     <form className="stock-action-form" onSubmit={saveRecipe}>
      <label>Nome da preparação<input required minLength={3} maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label>
-     <label>Rendimento padrão ({option(outputProductId)?.physicalUnit||'un'})<input type="number" min="0.001" step="0.001" value={yieldQuantity} onChange={e=>setYield(e.target.value)}/></label>
+     <label>Rendimento padrão ({inputUnit(outputProductId)})<input type="number" min="0.001" step="0.001" value={yieldQuantity} onChange={e=>setYield(e.target.value)}/></label>
      <label>Produto preparado que entrará na reserva (opcional)<select value={outputProductId} onChange={e=>setOutputProductId(e.target.value)}><option value="">Somente consumo de ingredientes (sem produto final)</option>{products.filter(p=>p.status==="active").map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
      {recipeOutputConflict&&<p role="alert" className="v3-error">O produto final também está selecionado como ingrediente ou substituto. Corrija antes de salvar.</p>}
      {recipeDuplicateInputs&&<p role="alert" className="v3-error">Há ingredientes principais repetidos. Consolide a quantidade numa única linha.</p>}
@@ -127,7 +129,7 @@ export default function Production({membership}){
      <label>Insumo principal<select required value={line.productId} onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,productId:e.target.value}:x))}>
        <option value="">Selecionar insumo</option>{products.filter(p=>p.status==='active'||p.id===line.productId).map(p=><option key={p.id} value={p.id} disabled={p.status!=='active'||p.id===outputProductId}>{p.name}{p.status!=='active'?' (inativo)':''}</option>)}
       </select></label>
-      <label>Quantidade por rendimento ({option(line.productId)?.operationalUnitOverride||option(line.productId)?.physicalUnit||option(line.productId)?.unit||'unidade a conferir'})<input required type="number" min={option(line.productId)?.physicalUnit==='un'?'1':'.001'} step={option(line.productId)?.operationalUnitOverride==='un'||option(line.productId)?.unit==='un'?'1':'.001'} value={line.quantity}
+      <label>Quantidade por rendimento ({inputUnit(line.productId)})<input required type="number" min={inputStep(line.productId)} step={inputStep(line.productId)} value={line.quantity}
        onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,quantity:e.target.value}:x))}/></label>
       <label>Local de origem<select value={line.location||(outputProductId?'reserva':'giro')} onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,location:e.target.value}:x))}><option value="reserva">Reserva</option><option value="giro">Giro</option></select></label>
       <label>Substituto autorizado<select value={line.substitutes[0]||''}
