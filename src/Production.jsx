@@ -98,7 +98,7 @@ export default function Production({membership}){
         <label>Ingrediente {i+1}<select value={item.productId} onChange={e=>selectProduct(i,e.target.value)}>
          {allowed.map(id=><option key={id} value={id}>{option(id)?.name||id}</option>)}
         </select></label>
-        <label>Quantidade utilizada<input type="number" required min={option(item.productId)?.physicalUnit==='un'?'1':'.001'} step={option(item.productId)?.operationalUnitOverride==='un'||option(item.productId)?.unit==='un'?'1':'.001'} value={item.quantity}
+        <label>Quantidade realmente utilizada ({option(item.productId)?.operationalUnitOverride||option(item.productId)?.physicalUnit||option(item.productId)?.unit||'unidade a conferir'})<input type="number" required min={option(item.productId)?.physicalUnit==='un'?'1':'.001'} step={option(item.productId)?.operationalUnitOverride==='un'||option(item.productId)?.unit==='un'?'1':'.001'} value={item.quantity}
           onChange={e=>{setItems(a=>a.map((x,j)=>j===i?{...x,quantity:e.target.value}:x));setRequestId(null);setConfirmed(false)}}/></label>
        </div>})}
       {selected.method&&<details><summary>Consultar modo de preparo</summary><p>{selected.method}</p></details>}
