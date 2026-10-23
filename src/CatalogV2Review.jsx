@@ -11,17 +11,16 @@ export default function CatalogV2Review(){
  const [selected,setSelected]=useState('alcatra-bife');
  const [show,setShow]=useState(false);
  const [plan,setPlan]=useState(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
- const sync=async action=>{
+ const sync=async()=>{
   if(busy)return;
-  if(action==='apply'&&!window.confirm('Aplicar somente metadados compatíveis do catálogo v2 ao Firebase? Nenhum saldo ou aprovação será alterado.'))return;
   setBusy(true);setNotice('');
   try{
    const token=await auth.currentUser.getIdToken();
    const res=await fetch('/api/catalog/sync-v2',{method:'POST',
     headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({action,confirm:action==='apply'?'APLICAR_CATALOGO_V2':undefined})});
+    body:JSON.stringify({action:'preview'})});
    const data=await res.json();if(!res.ok)throw Error(data.message);
-   setPlan(action==='apply'?null:data.plan);notify(data.message,'success');setNotice(data.message+(data.applied!==undefined?' Itens atualizados: '+data.applied+'. Gere uma nova prévia para conferir.':''));
+   setPlan(data.plan);notify(data.message,'success');setNotice(data.message);
   }catch(e){setNotice(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
 
@@ -37,7 +36,7 @@ export default function CatalogV2Review(){
   </div>
   <p>Proposta de {products.length} produtos e {proposal.productionRules.length} regras de preferência. Consulte a situação dos metadados no Firebase antes de qualquer aplicação; a prévia não altera saldos nem aprovações. Esta proposta é experimental e não representa cadastro validado pela cozinha.</p>
   <div className="inventory-actions">
-   <button type="button" onClick={()=>sync('preview')} disabled={busy}>{busy?'Aguarde...':'Conferir diferenças no Firebase'}</button>
+   <button type="button" onClick={sync} disabled={busy}>{busy?'Aguarde...':'Conferir diferenças no Firebase'}</button>
    <p role="status" className="v3-info">Aplicação automática indisponível nesta etapa: valide itens, unidades e preparações com a cozinha antes de qualquer sincronização. A conferência acima é somente leitura.</p>
   </div>
   {notice&&<p role="status">{notice}</p>}
