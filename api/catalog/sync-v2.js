@@ -12,9 +12,8 @@ export default async function handler(req,res){
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!m?.unitId||m.role!=='admin')return send(res,403,'Apenas administrador pode migrar.');
   const action=req.body?.action;
-  if(!['preview','apply'].includes(action))return send(res,400,'Ação inválida.');
+  if(action!=='preview')return send(res,409,'A aplicação do catálogo experimental está bloqueada até a homologação operacional. Use apenas a prévia.');
   const db=getDb(),catalog=db.collection('productCatalog');
-  const actorRef=db.doc('memberships/'+actor.uid);
   const proposed=proposal.products;
   const snapshots=await Promise.all(proposed.map(p=>catalog.doc(p.id).get()));
   const plan=proposed.map((p,i)=>{
@@ -28,41 +27,10 @@ export default async function handler(req,res){
   });
   const summary=plan.map(x=>({id:x.id,status:x.status,reason:x.reason||null}));
   if(action==='preview')return send(res,200,'Prévia sem alterações.',{plan:summary,schemaVersion:2});
-  if(req.body?.confirm!=='APLICAR_CATALOGO_V2')return send(res,400,'Confirmação explícita necessária.');
-  const ready=plan.filter(x=>x.status==='ready'||x.status==='new');
-  if(ready.length===0)return send(res,200,'Nenhuma atualização aditiva necessária.',{plan:summary,applied:0});
-  const now=new Date();let applied=0;
-  await db.runTransaction(async tx=>{
-   const [member,...docs]=await Promise.all([tx.get(actorRef),...ready.map(x=>tx.get(catalog.doc(x.id)))]);
-   const current=member.data();
-   if(!current||current.status!=='active'||current.role!=='admin'||current.unitId!==m.unitId)throw Error('FORBIDDEN');
-   for(let i=0;i<ready.length;i++){
-    const target=ready[i],p=proposed.find(x=>x.id===target.id),doc=docs[i],old=doc.data();
-    if(target.status==='new'){
-      if(doc.exists)throw Error('CONFLICT');
-      tx.create(catalog.doc(target.id),{...p,brandId:'triamicci',schemaVersion:2,
-        active:false,createdAt:now,createdBy:actor.uid});
-      tx.create(db.collection('auditLogs').doc(),{event:'catalog.v2_product_created',
-        unitId:m.unitId,catalogId:target.id,actorUid:actor.uid,at:now});
-      applied++;continue;
-    }
-    if(!old||old.stockUnit!==p.stockUnit||old.trackExpiry!==p.trackExpiry||
-      old.category!==p.category)throw Error('CONFLICT');
-    if(old.active===true&&old.schemaVersion===2&&!same(target.updates,Object.fromEntries(fields.filter(f=>Object.hasOwn(p,f)).map(f=>[f,old[f]]))))
-      throw Error('CONFLICT');
-    tx.update(catalog.doc(target.id),{...target.updates,schemaVersion:2,updatedAt:now,updatedBy:actor.uid});
-    tx.create(db.collection('auditLogs').doc(),{event:'catalog.v2_metadata_applied',
-      unitId:m.unitId,catalogId:target.id,actorUid:actor.uid,at:now,
-      before:Object.fromEntries(Object.keys(target.updates).map(k=>[k,old[k]??null])),
-      after:target.updates});
-    applied++;
-   }
-  });
-  return send(res,200,'Catálogo v2 atualizado sem alterar saldos.',{applied,plan:summary});
  }catch(e){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='CONFLICT')return send(res,409,'O catálogo mudou durante a revisão. Gere uma nova prévia.');
-  console.error('Catalog migration:',e.message);return send(res,500,'Falha na revisão do catálogo v2.');
+  console.error('Catalog migration:',e.message);return send(res,500,'Falha na prévia do catálogo experimental.');
  }
 }
