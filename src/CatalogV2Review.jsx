@@ -30,15 +30,15 @@ export default function CatalogV2Review(){
  const p=products.find(x=>x.id===selected);
  const names=Object.fromEntries(products.map(x=>[x.id,x.name]));
  const rules=proposal.productionRules.filter(r=>r.resultProductId===selected||r.preferredInputId===selected||r.alternativeInputIds.includes(selected));
- return <section className="inventory-form" aria-label="Revisão do Catálogo v2">
+ return <section className="inventory-form" aria-label="Revisão técnica de proposta de catálogo">
   <div className="inventory-list-header">
-   <h2>Catálogo v2 — revisão administrativa</h2>
+   <h2>Proposta de catálogo — conferência técnica</h2>
    <button type="button" onClick={()=>setShow(v=>!v)} aria-expanded={show}>{show?'Recolher':'Revisar proposta'}</button>
   </div>
-  <p>Proposta de {products.length} produtos e {proposal.productionRules.length} regras de preferência. Consulte a situação dos metadados no Firebase antes de qualquer aplicação; nenhum saldo ou aprovação é alterado por esta migração.</p>
+  <p>Proposta de {products.length} produtos e {proposal.productionRules.length} regras de preferência. Consulte a situação dos metadados no Firebase antes de qualquer aplicação; a prévia não altera saldos nem aprovações. Esta proposta é experimental e não representa cadastro validado pela cozinha.</p>
   <div className="inventory-actions">
    <button type="button" onClick={()=>sync('preview')} disabled={busy}>{busy?'Aguarde...':'Conferir diferenças no Firebase'}</button>
-   <button type="button" onClick={()=>sync('apply')} disabled={busy||!plan||!plan.some(x=>x.status==='ready'||x.status==='new')}>Aplicar apenas itens compatíveis</button>
+   <p role="status" className="v3-info">Aplicação automática indisponível nesta etapa: valide itens, unidades e preparações com a cozinha antes de qualquer sincronização. A conferência acima é somente leitura.</p>
   </div>
   {notice&&<p role="status">{notice}</p>}
   {plan&&<div><strong>Resultado da conferência:</strong> {['ready','new','unchanged','conflict','missing','pending'].map(k=><span key={k}> {({ready:'Prontos',new:'Novos',unchanged:'Atualizados',conflict:'Conflitos',missing:'Ausentes',pending:'Pendentes'})[k]}: {plan.filter(x=>x.status===k).length} ·</span>)}
@@ -56,7 +56,7 @@ export default function CatalogV2Review(){
     <p><strong>Origem:</strong> {origin(p.source)} · <strong>Categoria:</strong> {p.category}</p>
     <p><strong>Unidade base atual:</strong> {textUnit(p.stockUnit)} · <strong>Recebimento:</strong> {textUnit(p.receivingUnit)} · <strong>Contagem:</strong> {textUnit(p.operationalUnit)}</p>
     <p><strong>Método:</strong> {p.countingMethod==='individual'?'Contagem individual': 'A confirmar'} · <strong>Locais:</strong> {(p.countLocations||[]).join(' e ')||'A definir'}</p>
-    <p><strong>Validade:</strong> {p.trackExpiry?'Controle necessário':'Sem exigência cadastrada'} · <strong>Revisão:</strong> {p.reviewRequired?'Pendente explícita':'Ainda requer homologação do v2'}</p>
+    <p><strong>Validade:</strong> {p.trackExpiry?'Controle necessário':'Sem exigência cadastrada'} · <strong>Revisão:</strong> {p.reviewRequired?'Pendente explícita':'Sem homologação operacional registrada'}</p>
     {p.notes&&<p><strong>Observações:</strong> {p.notes}</p>}
     {rules.length>0&&<div><h4>Regras de produção associadas</h4>{rules.map(r=><p key={r.id}>Preparação: {names[r.resultProductId]}; preferencial: {names[r.preferredInputId]}; alternativa: {r.alternativeInputIds.map(id=>names[id]).join(', ')}. <strong>Sem baixa automática.</strong></p>)}</div>}
    </div>}
