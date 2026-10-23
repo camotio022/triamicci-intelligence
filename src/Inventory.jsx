@@ -9,6 +9,7 @@ import CatalogPicker from './CatalogPicker.jsx';
 import CatalogV2Review from './CatalogV2Review.jsx';
 import ProductDetails from './ProductDetails.jsx';
 import MeasurementEditor from './MeasurementEditor.jsx';
+import './catalog-admin-v41.css';
 
 const categories = ['Preparações','Proteínas','Hortifruti','Laticínios','Mercearia','Congelados','Bebidas','Limpeza','Descartáveis','Outros'];
 const units = ['kg','g','L','ml','un'];
@@ -37,6 +38,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const [editing,setEditing] = useState(null);
   const [saving,setSaving] = useState(false);
   const [detailId,setDetailId] = useState(null);
+ const [catalogArea,setCatalogArea]=useState('products');
   const canEdit = ['admin','manager'].includes(membership.role);
   const administration = mode === 'catalog';
   const load = useCallback(async (silent=false) => {
@@ -81,10 +83,11 @@ export default function Inventory({membership,mode='stock',onAction}) {
     {administration&&<div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>}
     {!administration&&<div className="ti-stock-overview" aria-label="Resumo do estoque"><button type="button" aria-pressed={countFilter==='all'} onClick={()=>setCountFilter('all')}><strong>{products.length}</strong><span>Insumos</span></button><button type="button" aria-pressed={countFilter==='today'} onClick={()=>setCountFilter('today')}><strong>{todays.length}</strong><span>Contados hoje</span></button><button type="button" aria-pressed={countFilter==='uncounted'} onClick={()=>setCountFilter('uncounted')}><strong>{products.filter(p=>!p.physicalBalance?.at).length}</strong><span>Sem contagem</span></button></div>}
     {!administration&&<p className="ti-stock-day-label"><strong>Hoje · {new Date(today+"T12:00:00Z").toLocaleDateString("pt-BR",{timeZone:"UTC"})}</strong> · A data indica a última contagem, não o saldo após movimentações.</p>}
-    {administration&&canEdit&&<MeasurementEditor products={products}/>}
-    {administration && membership.role === 'admin' && <CatalogV2Review />}
-    {administration && canEdit && <CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} />}
-    {administration && canEdit && editing && <form className="inventory-form" onSubmit={save}>
+    {administration&&<nav className="ti-catalog-v41-nav" aria-label="Áreas do catálogo">{[{id:'products',title:'Produtos',desc:'Consultar e editar cadastros'},{id:'packages',title:'Embalagens',desc:'Como produtos são recebidos e contados'},{id:'attach',title:'Adicionar produtos',desc:'Vincular e aprovar itens'},{id:'review',title:'Revisão avançada',desc:'Conferir mudanças técnicas'}].filter(x=>x.id!=='review'||membership.role==='admin').map(area=><button key={area.id} type="button" aria-current={catalogArea===area.id?'page':undefined} onClick={()=>{setCatalogArea(area.id);cancel()}}><strong>{area.title}</strong><small>{area.desc}</small></button>)}</nav>}
+    {administration&&catalogArea==='packages'&&canEdit&&<section className="ti-catalog-v41-pane"><h2>Embalagens e contagem</h2><MeasurementEditor products={products}/></section>}
+    {administration && catalogArea==='review' && membership.role === 'admin' && <section className="ti-catalog-v41-pane"><h2>Revisão técnica do catálogo</h2><CatalogV2Review /></section>}
+    {administration && catalogArea==='attach' && canEdit && <section className="ti-catalog-v41-pane"><h2>Adicionar ao catálogo da unidade</h2><CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} /></section>}
+    {administration && catalogArea==='products' && canEdit && editing && <form className="inventory-form" onSubmit={save}>
       <h2>{editing?'Editar insumo':'Cadastrar insumo'}</h2>
       <div className="inventory-fields">
         <label>Nome do insumo<input required maxLength={100} minLength={2} value={form.name} disabled={Boolean(editing)} onChange={e=>set('name',e.target.value)} placeholder="Ex.: Peito de frango"/></label>
@@ -117,10 +120,10 @@ export default function Inventory({membership,mode='stock',onAction}) {
      {!loading&&visible.length===0&&<p className="ti-stock-empty">Nenhum insumo corresponde aos filtros. Experimente “Todos”.</p>}
     </div>}
     {detail&&!administration&&<div className="ti-stock-detail-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setDetailId(null)}}><section className="ti-stock-detail-dialog" role="dialog" aria-modal="true" aria-label={"Detalhes de "+detail.name}><button type="button" className="ti-stock-dialog-close" onClick={()=>setDetailId(null)} aria-label="Fechar detalhes">×</button><ProductDetails product={detail} membership={membership} onBack={()=>{setDetailId(null);load()}} onAction={onAction} onRefresh={load}/></section></div>}
-    {administration && <div className="inventory-table-wrap"><table className="inventory-table"><thead><tr><th>INSUMO</th><th>CATEGORIA</th><th>CONTAGEM FÍSICA / SALDO LEGADO</th><th>MÍNIMO</th><th>VALIDADE</th><th>SITUAÇÃO</th>{canEdit && <th>AÇÃO</th>}</tr></thead><tbody>
+    {administration && catalogArea==='products' && <div className="inventory-table-wrap"><table className="inventory-table"><thead><tr><th>INSUMO</th><th>CATEGORIA</th><th>CONTAGEM FÍSICA / SALDO LEGADO</th><th>MÍNIMO</th><th>VALIDADE</th><th>SITUAÇÃO</th>{canEdit && <th>AÇÃO</th>}</tr></thead><tbody>
       {visible.map(p=><tr key={p.id}><td><strong>{p.name}</strong></td><td>{p.category}</td><td>{p.physicalBalance?<><strong>{p.physicalBalance.total} {p.physicalBalance.unit}</strong><small> Última contagem: {p.physicalBalance.reserve} reserva + {p.physicalBalance.rotation} giro</small></>:<><span>{p.quantity} {p.unit}</span><small> Saldo legado; sem contagem física registrada</small></>}</td><td>{p.minStock} {p.unit}</td><td>{p.trackExpiry?'Controlada':'Não exigida'}</td><td>{p.status==='active'?'Ativo':'Inativo'}</td>{canEdit && <td><button type="button" onClick={()=>edit(p)}>Editar</button></td>}</tr>)}
     </tbody></table>{!loading && !error && visible.length===0 && <p>Nenhum insumo encontrado.</p>}</div>}
-    {administration && <details className="inventory-form"><summary>Movimentações legadas (controle antigo)</summary><p>Este é o fluxo antigo e não atualiza o registro de recebimento e contagem física. Utilize Recebimento para novas entregas da cozinha.</p><StockMovements products={products} membership={membership} onUpdated={load}/></details>}
+    {administration && catalogArea==='review' && <details className="inventory-form"><summary>Movimentações legadas (controle antigo)</summary><p>Este é o fluxo antigo e não atualiza o registro de recebimento e contagem física. Utilize Recebimento para novas entregas da cozinha.</p><StockMovements products={products} membership={membership} onUpdated={load}/></details>}
     <p className="inventory-footnote">A contagem física registrada e o saldo legado permanecem separados até conciliação. Não confunda entrada legada com recebimento de mercadorias.</p>
   </section>;
 }
