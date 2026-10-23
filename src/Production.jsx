@@ -89,7 +89,7 @@ export default function Production({membership}){
       {recipes.map(r=><option key={r.id} value={r.id}>{r.name} · versão {r.version}</option>)}
      </select></label>
      {selected&&<>
-      <label>Quantidade produzida ({selected.outputUnit||'un'})<input type="number" required min="0.001" step={['un','porcao','pacote','duzia'].includes(selected.outputUnit||'un')?'1':'0.001'} value={portions} onChange={e=>{const n=Number(e.target.value);setPortions(e.target.value);setRequestId(null);setConfirmed(false);
+      <label>Quantidade produzida ({selected.outputUnit||'un'})<input type="number" required min={['un','porcao','pacote','duzia'].includes(selected.outputUnit||'un')?'1':'0.001'} step={['un','porcao','pacote','duzia'].includes(selected.outputUnit||'un')?'1':'0.001'} value={portions} onChange={e=>{const n=Number(e.target.value);setPortions(e.target.value);setRequestId(null);setConfirmed(false);
        if(n>0&&selected)setItems(selected.lines.map(line=>({productId:line.productId,
         quantity:String(suggestedQuantity(line.quantity,n,selected.yieldQuantity,{individual:false})??'')})))}}/></label>
       <p>{selected.outputProductId?'Esta ficha transforma os ingredientes dos locais definidos em um produto preparado na reserva. As quantidades precisam respeitar a ficha validada.':'Revise as quantidades reais. Os valores iniciais vêm da ficha técnica e podem ser corrigidos.'}</p>
