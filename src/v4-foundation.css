@@ -41,3 +41,55 @@
   transition-duration:.01ms!important;
  }
 }
+
+/* V4.1 shared control language — scoped to operational modules.
+   Keep navigation, icon-only controls, chips and destructive variants untouched. */
+:is(.inventory-page,.ti-premium,.ti-attendance-v31,.ti-product-v41,.team-page,.production-page,.ti-mural-v4,.ti-receive-form,.catalog-picker,.receiving-card,.stock-action-form) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select,textarea){
+ width:100%;
+ min-height:44px;
+ max-width:100%;
+ box-sizing:border-box;
+ border:1px solid #d1dae6;
+ border-radius:12px;
+ background:#fff;
+ color:var(--ti-v4-text);
+ font:inherit;
+ font-size:14px;
+ padding:10px 12px;
+}
+:is(.inventory-page,.ti-premium,.ti-attendance-v31,.ti-product-v41,.team-page,.production-page,.ti-mural-v4,.ti-receive-form,.catalog-picker,.receiving-card,.stock-action-form) textarea{min-height:96px;resize:vertical}
+:is(.inventory-page,.ti-premium,.ti-attendance-v31,.ti-product-v41,.team-page,.production-page,.ti-mural-v4,.ti-receive-form,.catalog-picker,.receiving-card,.stock-action-form) :is(input,select,textarea):disabled{background:#f5f6f8;color:#687385;cursor:not-allowed}
+:is(.inventory-page,.ti-premium,.ti-attendance-v31,.ti-product-v41,.team-page,.production-page,.ti-mural-v4,.ti-receive-form,.catalog-picker,.receiving-card,.stock-action-form) :is(input,select,textarea,button,summary):focus-visible{
+ outline:3px solid var(--ti-v4-focus);
+ outline-offset:2px;
+}
+:is(.inventory-page,.ti-premium,.ti-attendance-v31,.ti-product-v41,.team-page,.production-page,.ti-mural-v4,.ti-receive-form,.catalog-picker,.receiving-card,.stock-action-form) :is(button[type="submit"],.inventory-actions>button,.product-detail-actions>button,.stock-action-form button[type="button"]){
+ min-height:44px;
+ border-radius:12px;
+ border:1px solid #d7dfe9;
+ background:#fff;
+ color:var(--ti-v4-brand);
+ font:inherit;
+ font-size:14px;
+ font-weight:650;
+ padding:10px 14px;
+ cursor:pointer;
+}
+:is(.inventory-page,.ti-premium,.ti-attendance-v31,.ti-product-v41,.team-page,.production-page,.ti-mural-v4,.ti-receive-form,.catalog-picker,.receiving-card,.stock-action-form) button[type="submit"]:not(:disabled){
+ background:var(--ti-v4-brand);
+ border-color:var(--ti-v4-brand);
+ color:#fff;
+}
+:is(.inventory-page,.ti-premium,.ti-attendance-v31,.ti-product-v41,.team-page,.production-page,.ti-mural-v4,.ti-receive-form,.catalog-picker,.receiving-card,.stock-action-form) button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:600px){
+ :is(.inventory-page,.ti-premium,.ti-attendance-v31,.ti-product-v41,.team-page,.production-page,.ti-mural-v4,.ti-receive-form,.catalog-picker,.receiving-card,.stock-action-form) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){font-size:16px}
+}
+
+/* Coverage expansion: operational screens previously outside common form controls. */
+:is(.kitchen-home,.ti-leave-v4,.ti-stock-detail-dialog,.ti-daily-inventory,.ti-coverage-page,.ti-my-profile-page) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select,textarea){
+ box-sizing:border-box;max-width:100%;min-height:44px;border:1px solid #d1dae6;border-radius:12px;
+ padding:10px 12px;background:#fff;color:var(--ti-v4-text);font:inherit;font-size:14px;
+}
+:is(.kitchen-home,.ti-leave-v4,.ti-stock-detail-dialog,.ti-daily-inventory,.ti-coverage-page,.ti-my-profile-page) :is(input,select,textarea,button,summary):focus-visible{outline:3px solid var(--ti-v4-focus);outline-offset:2px}
+:is(.kitchen-home,.ti-leave-v4,.ti-stock-detail-dialog,.ti-daily-inventory,.ti-coverage-page,.ti-my-profile-page) :is(button[type="submit"],button.ti-leave-v4-primary){min-height:44px;border-radius:12px;background:var(--ti-v4-brand);color:white;border:1px solid var(--ti-v4-brand);padding:10px 14px;font:inherit;font-weight:650}
+@media(max-width:600px){:is(.kitchen-home,.ti-leave-v4,.ti-stock-detail-dialog,.ti-daily-inventory,.ti-coverage-page,.ti-my-profile-page) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){font-size:16px}}
