@@ -74,7 +74,7 @@ export default function Production({membership}){
  const inputStep=id=>['un','pacote','porcao','duzia'].includes(inputUnit(id))?'1':'.001';
  return <section className="inventory-page production-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId.toUpperCase()}</p>
-  <h1>Produção da cozinha</h1><LiveStatus state={live}/><p>Consulte o que já foi preparado e registre uma nova produção. Fichas com produto final cadastrado consomem ingredientes dos locais definidos na ficha e creditam o preparo na reserva; fichas antigas continuam consumindo do giro.</p>
+  <h1>Produção da cozinha</h1><LiveStatus state={live}/><p>Planeje o preparo, registre a quantidade produzida e consulte o histórico.</p>
   {status&&<p role="status" className="receiving-notice">{status}</p>}
   <section className="receiving-card ti-v4-daily-tasks"><h2>Lista de produção de hoje</h2><p>Planejamento compartilhado da cozinha. Só a confirmação da quantidade realmente produzida movimenta o estoque.</p>
    {canPlan&&<form className="ti-v4-daily-task-form" onSubmit={addDailyTask}><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional ({recipes.find(r=>r.id===plannedRecipe)?.outputUnit||'un'})<input type="number" min="0.001" max="10000" step="0.001" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading}>Adicionar à lista</button></form>}
@@ -86,7 +86,7 @@ export default function Production({membership}){
     <form className="stock-action-form" onSubmit={finish}>
      <label>Preparação<select required value={recipeId} onChange={e=>choose(e.target.value)}>
       <option value="">Selecione a preparação</option>
-      {recipes.map(r=><option key={r.id} value={r.id}>{r.name} · versão {r.version}</option>)}
+      {recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
      </select></label>
      {selected&&<>
       <label>Quantidade produzida ({selected.outputUnit||'un'})<input type="number" required min={['un','porcao','pacote','duzia'].includes(selected.outputUnit||'un')?'1':'0.001'} step={['un','porcao','pacote','duzia'].includes(selected.outputUnit||'un')?'1':'0.001'} value={portions} onChange={e=>{const n=Number(e.target.value);setPortions(e.target.value);setRequestId(null);setConfirmed(false);
