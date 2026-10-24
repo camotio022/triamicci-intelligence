@@ -91,3 +91,34 @@
  .main-content>.ti-mobile-context{position:relative;z-index:1}
  .topbar .top-avatar{overflow:hidden}
 }
+
+
+/* V4.3 — mobile operation presentation, preserving desktop tables. */
+.ti-v43-history-cards,.ti-v43-catalog-cards{display:none}
+@media(max-width:760px){
+ .ti-v43-history-table,.ti-v43-catalog-table{display:none!important}
+ .ti-v43-history-cards,.ti-v43-catalog-cards{display:grid;gap:10px;min-width:0;margin:12px 0}
+ .ti-v43-history-card,.ti-v43-catalog-card{display:grid;gap:9px;padding:15px;background:#fff;border:1px solid #e0e5ed;border-radius:13px;min-width:0;overflow-wrap:anywhere}
+ .ti-v43-history-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+ .ti-v43-history-head strong{color:#8f2722;font-size:13px}
+ .ti-v43-history-head time{color:#647084;font-size:12px}
+ .ti-v43-history-card h3,.ti-v43-catalog-card h3{margin:0;color:#202b3b;font-size:16px;line-height:1.35}
+ .ti-v43-history-card p{margin:0;font-size:14px;line-height:1.5;color:#263247}
+ .ti-v43-history-card small,.ti-v43-catalog-card small{font-size:12px;color:#667085;line-height:1.4}
+ .ti-v43-catalog-meta{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;align-items:baseline}
+ .ti-v43-catalog-meta>span{font-size:12px;color:#667085}
+ .ti-v43-catalog-meta>strong{font-size:17px;text-align:right;white-space:nowrap;color:#263247}
+ .ti-v43-catalog-meta>small{grid-column:1 / -1}
+ .ti-v43-catalog-card>button{justify-self:start;border:1px solid #e4c8c4;background:#fff7f6;color:#8d2621;border-radius:9px;padding:10px 14px;min-height:44px;font-weight:700}
+ .production-page>.eyebrow{margin-bottom:6px}
+ .production-page>h1{margin:4px 0 8px}
+ .production-page>p:not(.eyebrow):not([role=status]){font-size:14px;line-height:1.45;margin:9px 0 16px;color:#5f6979}
+ .production-page .ti-v4-daily-tasks>p{font-size:13px;line-height:1.45}
+ .production-page .ti-v4-daily-tasks{padding:14px}
+ .production-page .ti-v4-daily-tasks h2{margin-bottom:7px}
+ .production-page .receiving-card{margin-bottom:12px}
+ .inventory-page .inventory-search{margin-bottom:10px}
+ .ti-stock-filters{max-width:100%;scroll-padding:0 12px}
+ .ti-stock-filters>button{min-height:44px}
+ .ti-mobile-quicknav{scrollbar-width:none}
+}
