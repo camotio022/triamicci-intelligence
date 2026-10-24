@@ -2,12 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
+import TriamicciLogo from './TriamicciLogo.jsx';
+import { ShieldCheck, Package, CookingPot, Users, ArrowRight, AlertCircle } from 'lucide-react';
+import './auth-v41.css';
 
 export default function AuthGate({ children }) {
   const [user, setUser] = useState(undefined);
   const [membership, setMembership] = useState(undefined);
   const [membershipUid, setMembershipUid] = useState(null);
   const [error, setError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
   const [accessError, setAccessError] = useState('');
   const [accessReason, setAccessReason] = useState('');
   const [accessStatus, setAccessStatus] = useState('');
@@ -97,7 +101,8 @@ export default function AuthGate({ children }) {
     finally { setAccepting(false); }
   };
   const login = async () => {
-    setError('');
+    if (loggingIn) return;
+    setError('');setLoggingIn(true);
     try { await signInWithPopup(auth, new GoogleAuthProvider()); }
     catch (e) {
       const explanations = {
@@ -110,10 +115,25 @@ export default function AuthGate({ children }) {
       };
       setError(explanations[e.code] || `Não foi possível entrar (${e.code || 'erro desconhecido'}).`);
       console.error('Firebase login:', e.code, e.message);
-    }
+    } finally { setLoggingIn(false); }
   };
-  if (user === undefined || (user && (membership === undefined || membershipUid !== user.uid))) return <main className="auth-screen"><section className="auth-card">Verificando acesso...</section></main>;
-  if (!user) return <main className="auth-screen"><section className="auth-card"><h1>Triamicci Intelligence</h1><p>Entre com sua conta Google. O acesso às unidades depende de convite aprovado.</p><button onClick={login}>Entrar com Google</button>{error && <p role="alert">{error}</p>}</section></main>;
-  if (!membership) return <main className="auth-screen"><section className="auth-card"><h1>{accessError ? 'Erro ao verificar acesso' : accessStatus === 'inactive' ? 'Acesso desativado' : accessStatus === 'offline' ? 'Verificação indisponível' : 'Acesso pendente'}</h1><p>{user.email}</p><p>{accessError || accessReason || 'Esta conta ainda não tem vínculo ativo com uma unidade. Solicite um convite ao gerente ou administrador.'}</p>{invite && accessStatus === 'missing' && <><p>Existe um convite neste link. Confirme que entrou com o mesmo e-mail que recebeu o convite.</p><button type="button" onClick={acceptInvite} disabled={accepting}>{accepting ? 'Validando...' : 'Aceitar convite'}</button>{inviteFeedback && <p role="alert">{inviteFeedback}</p>}</>}{error && <p role="alert">{error}</p>}<button onClick={() => signOut(auth)}>Sair</button></section></main>;
+  const pending=user === undefined || (user && (membership === undefined || membershipUid !== user.uid));
+  if (pending || !user || !membership) {
+    const title=pending?'Verificando seu acesso':!user?'Bem-vindo ao Triamicci Intelligence':accessError?'Não foi possível verificar o acesso':accessStatus==='inactive'?'Acesso desativado':accessStatus==='offline'?'Verificação indisponível':'Acesso pendente';
+    return <main className="ti-auth-portal">
+      <div className="ti-auth-layout">
+        <section className="ti-auth-identity" aria-label="Triamicci Intelligence">
+          <div className="ti-auth-logo"><TriamicciLogo/><span>INTELLIGENCE</span></div>
+          <div className="ti-auth-intro"><span className="ti-auth-eyebrow">PLATAFORMA OPERACIONAL</span><h1>Sua operação começa aqui.</h1><p>Um ambiente para organizar a cozinha, conectar a equipe e acompanhar a operação.</p><div className="ti-auth-features"><span><Package size={17}/> Estoque</span><span><CookingPot size={17}/> Produção</span><span><Users size={17}/> Equipe</span></div></div>
+          <div className="ti-auth-footnote">TRIAMICCI INTELLIGENCE</div>
+        </section>
+        <section className="ti-auth-content" aria-label="Acesso ao sistema">
+          <div className="ti-auth-panel"><span className="ti-auth-section-tag">PORTAL DE ACESSO</span><h2>{title}</h2>
+          {pending?<p role="status">Estamos confirmando sua sessão e suas permissões.</p>:!user?<><p>Entre com sua conta Google para acessar seu ambiente de trabalho.</p><button type="button" className="ti-auth-primary" onClick={login} disabled={loggingIn}>{loggingIn?'Abrindo acesso...':'Entrar com Google'}<ArrowRight size={18} aria-hidden="true"/></button>{error&&<div className="ti-auth-alert" role="alert"><AlertCircle size={19} aria-hidden="true"/><span>{error}</span></div>}<div className="ti-auth-security"><ShieldCheck size={20} aria-hidden="true"/><span>O acesso depende de vínculo ativo e das permissões da unidade.</span></div></>:<><p className="ti-auth-email">{user.email}</p><p>{accessError||accessReason||'Esta conta ainda não tem vínculo ativo com uma unidade. Solicite um convite ao responsável.'}</p>{invite&&accessStatus==='missing'&&<div className="ti-auth-invite"><p>Existe um convite neste link. Confirme que você entrou com o e-mail convidado.</p><button type="button" className="ti-auth-primary" onClick={acceptInvite} disabled={accepting}>{accepting?'Validando convite...':'Aceitar convite'}<ArrowRight size={18} aria-hidden="true"/></button>{inviteFeedback&&<div role="alert" className="ti-auth-alert">{inviteFeedback}</div>}</div>}<button type="button" className="ti-auth-secondary" onClick={()=>signOut(auth)}>Sair desta conta</button></>}
+          </div>
+        </section>
+      </div>
+    </main>;
+  }
   return children({ user, membership, logout: () => signOut(auth) });
 }
