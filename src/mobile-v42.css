@@ -1,0 +1,56 @@
+/* Mobile V4.2: navigation and density only; no business logic changes. */
+.ti-mobile-brand,.ti-mobile-context{display:none}
+@media(max-width:760px){
+ .main-content{padding:0 14px calc(24px + env(safe-area-inset-bottom,0px));overflow-x:clip;min-width:0}
+ .topbar{display:flex;height:60px;min-height:60px;gap:10px;justify-content:flex-start;align-items:center;overflow:visible}
+ .topbar .mobile-menu{flex:0 0 44px;width:44px;height:44px;display:grid;place-items:center;padding:0;border-radius:11px}
+ .topbar .breadcrumb{display:flex;flex:1 1 0;min-width:0;margin:0;gap:5px;align-items:center;font-size:14px;overflow:hidden}
+ .topbar .breadcrumb .ti-mobile-brand{display:inline;font-weight:800;color:#a71916;flex:none}
+ .topbar .breadcrumb .ti-desktop-crumb,.topbar .breadcrumb>span:not(.ti-mobile-brand){display:none}
+ .topbar .breadcrumb>b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;font-size:12px;font-weight:650;color:#3a4354}
+ .topbar .top-actions{display:flex;flex:0 0 auto;gap:6px;min-width:0;align-items:center}
+ .topbar .top-actions .icon-button{flex:0 0 44px;width:44px;min-width:44px;min-height:44px;display:grid;place-items:center}
+ .topbar .profile-menu-wrap{display:block;flex:0 0 44px;width:44px;min-width:44px;min-height:44px}
+ .topbar .top-avatar{display:grid;place-items:center;flex:none!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;border-radius:50%;overflow:hidden;padding:0!important}
+ .topbar .top-avatar .ti-user-avatar-img{width:100%;height:100%;object-fit:cover;object-position:center}
+ .topbar .ti-current-day{display:none!important}
+ .ti-mobile-context{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#667085;font-size:12px;line-height:1.4;padding:5px 2px 9px;min-height:30px}
+ .ti-mobile-context span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .ti-mobile-context span:first-child{text-transform:capitalize}
+ .ti-mobile-context span:last-child{font-weight:650;color:#8d2923}
+ .ti-mobile-quicknav{margin:0 0 12px;scroll-padding-inline:1px;scrollbar-width:none}
+ .ti-mobile-quicknav::-webkit-scrollbar{display:none}
+ .ti-mobile-quicknav>button{min-height:42px;padding:9px 13px;font-size:13px}
+ .sidebar.sidebar-open{width:min(292px,86vw);max-width:86vw;padding:16px 14px calc(16px + env(safe-area-inset-bottom,0px))}
+ .sidebar.sidebar-open .brand-mark-official{padding:0 0 10px;gap:8px}
+ .sidebar.sidebar-open .brand-logo-stack{max-width:200px}
+ .sidebar.sidebar-open .workspace-unit-card{margin-bottom:14px;min-height:56px}
+ .sidebar.sidebar-open .nav-caption,.sidebar.sidebar-open .ti-nav-group-label{margin:12px 0 7px}
+ .sidebar.sidebar-open nav{gap:2px}
+ .sidebar.sidebar-open nav .nav-item{padding:9px 11px;min-height:44px;line-height:1.28;font-size:14px}
+ .sidebar.sidebar-open .sidebar-bottom{padding-top:12px}
+ .kitchen-header{margin-bottom:12px;gap:10px}
+ .kitchen-header h1{font-size:clamp(24px,6vw,29px);line-height:1.16}
+ .kitchen-header p{line-height:1.45}
+ .kitchen-actions{margin:12px 0 18px;gap:9px}
+ .kitchen-action{min-height:125px;padding:15px 12px;gap:7px}
+ .kitchen-action span{line-height:1.4}
+ .ti-stock-overview{margin:12px 0 8px}
+ .ti-stock-filters{margin:0 0 7px;gap:7px}
+ .ti-stock-list{margin-top:8px}
+ .ti-mural-v4 .ti-stock-filters{gap:7px}
+ .ti-mural-v4 .ti-stock-filters button{min-height:40px}
+ .inventory-list-header{margin:14px 0 10px}
+ .production-layout{margin-top:10px}
+ .page-heading{padding:16px 0}
+ .ti-mentor-context{max-width:100%}
+}
+@media(max-width:380px){
+ .main-content{padding-left:10px;padding-right:10px}
+ .topbar{gap:5px}
+ .topbar .breadcrumb .ti-mobile-brand{font-size:12px}
+ .topbar .breadcrumb>b{font-size:11px}
+ .topbar .top-actions{gap:3px}
+ .ti-mobile-context{font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){.ti-mobile-quicknav{scroll-behavior:auto}}
