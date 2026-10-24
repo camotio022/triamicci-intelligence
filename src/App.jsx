@@ -64,6 +64,7 @@ export function Workspace({ user, membership, logout }) {
  const [today,setToday]=useState(()=>restaurantDay());
  useEffect(()=>{const refresh=()=>setToday(restaurantDay());const timer=setInterval(refresh,60000);document.addEventListener('visibilitychange',refresh);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh)}},[]);
  const [menuOpen, setMenuOpen] = useState(false);
+ const [mobileExtraOpen,setMobileExtraOpen]=useState(false);
  const [mentorHint,setMentorHint]=useState(null);
  const [mentorSource,setMentorSource]=useState(null);
  const [actionProductId,setActionProductId] = useState(null);
@@ -83,6 +84,7 @@ export function Workspace({ user, membership, logout }) {
   {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
   <aside className={menuOpen ? "sidebar sidebar-open" : "sidebar"} id="primary-sidebar" aria-label="Menu principal">
     <div className="brand-mark brand-mark-official brand-signature"><div className="brand-logo-stack"><TriamicciLogo className="triamicci-logo"/><div className="brand-signature-bottom"><span className="brand-signature-line"/><span className="brand-product-name">INTELLIGENCE</span><span className="brand-signature-line"/></div></div><button type="button" className="sidebar-close" aria-label="Fechar menu" onClick={() => setMenuOpen(false)}><X size={20}/></button></div>
+    <div className="ti-drawer-mobile-brand"><div className="ti-drawer-icon"><TriamicciLogo/></div><div className="ti-drawer-brand-title"><strong>Triamicci</strong><span>INTELLIGENCE</span></div><button type="button" className="ti-drawer-close" aria-label="Fechar menu" onClick={()=>setMenuOpen(false)}><X size={21}/></button></div>
     <div className="workspace workspace-unit-card" aria-label={"Unidade atual: "+membership.unitId}><div className="workspace-unit-icon"><span className="workspace-dot"/></div><div className="workspace-unit-info"><small>UNIDADE ATUAL</small><strong>{membership.unitId}</strong></div><span className="workspace-unit-status">Ativa</span></div>
     <p className="nav-caption">ÁREA DE TRABALHO</p>
     <nav>
@@ -95,11 +97,14 @@ export function Workspace({ user, membership, logout }) {
       <button type="button" className={page === "production" ? "nav-item active" : "nav-item"} onClick={() => navigate("production")}><Boxes size={18}/> Produção</button>
       <button type="button" className={page === "daily-inventory" ? "nav-item active" : "nav-item"} onClick={() => navigate("daily-inventory")}><Boxes size={18}/> Inventário inteligente</button>
       <button data-mentor="mentor-history" type="button" className={page==="history"?"nav-item active":"nav-item"} onClick={()=>navigate("history")}><Clock3 size={18}/> Histórico</button>
+      <button type="button" className="ti-drawer-extras-trigger" onClick={()=>setMobileExtraOpen(x=>!x)} aria-expanded={mobileExtraOpen}>Administração e aprendizagem <ChevronDown size={17}/></button>
+      <div className={"ti-drawer-extra-groups"+(mobileExtraOpen?" is-open":"")}>
       {isManagement(membership.role)&&<p className="ti-nav-group-label">ADMINISTRAÇÃO</p>}
       {isManagement(membership.role)&&<button type="button" className={page==="catalog"?"nav-item active":"nav-item"} onClick={()=>navigate("catalog")}><Boxes size={18}/> Administração · Catálogo</button>}
       {isManagement(membership.role)&&<button data-mentor="mentor-people" type="button" className={["people","team","master-registry","skills","shifts","schedule-planning"].includes(page)?"nav-item active":"nav-item"} onClick={()=>navigate("people")}><Users size={18}/> Gestão de pessoas</button>}
       <p className="ti-nav-group-label">APRENDIZAGEM</p>
       <button type="button" className={page==="mentor"?"nav-item active":"nav-item"} onClick={()=>{navigate("mentor");setMentorHint(null)}}><BookOpen size={18}/> Triamicci Mentor</button>
+      </div>
     </nav>
     <div className="sidebar-bottom"><div className="help-card"><div className="help-icon"><Boxes size={18}/></div><b>Controle inteligente</b><p>Acompanhe os insumos e evite desperdícios na operação.</p></div><div className="user-row"><div className="avatar">{avatar?<img src={avatar} alt="Minha foto" className="ti-user-avatar-img"/>:(user.displayName||user.email||"U").slice(0,2).toUpperCase()}</div><div className="user-info"><b>{user.displayName || user.email}</b><span>{membership.role}</span></div><button type="button" onClick={logout} className="logout-button">Sair da conta</button></div></div>
   </aside>
