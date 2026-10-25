@@ -8,6 +8,14 @@
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="description" content="Painel inteligente de estoque e operação da cozinha Triamicci." />
     <title>Triamicci Intelligence</title>
+    <style>
+      .ti-prelaunch{display:none}
+      @media (display-mode:standalone) and (max-width:760px) and (pointer:coarse){
+        html,body,#root{margin:0;min-height:100%;background:#23191b}
+        .ti-prelaunch{display:flex;position:fixed;inset:0;background:#23191b;color:#fff;align-items:center;justify-content:center;flex-direction:column;gap:15px;font:750 13px system-ui,sans-serif;letter-spacing:.22em}
+        .ti-prelaunch img{width:82px;height:82px;border-radius:18px}
+      }
+    </style>
   </head>
-  <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
+  <body><div id="root"><div class="ti-prelaunch" aria-label="Iniciando Triamicci Intelligence"><img src="/favicon.svg" alt="Triamicci" /><span>INTELLIGENCE</span></div></div><script type="module" src="/src/main.jsx"></script></body>
 </html>
