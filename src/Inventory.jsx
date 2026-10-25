@@ -1,4 +1,5 @@
 import {useViewState} from './useViewState.js';
+import {readViewCache,writeViewCache} from './fastCache.js';
 import {useUnitLive} from './useUnitLive.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
@@ -26,8 +27,9 @@ async function call(action, payload={}) {
 }
 export default function Inventory({membership,mode='stock',onAction}) {
  const {notify}=useFeedback();
-  const [products,setProducts] = useState([]);
-  const [loading,setLoading] = useState(true);
+  const cachedProducts=useMemo(()=>readViewCache(auth.currentUser?.uid,membership.unitId,'inventory-products'),[membership.unitId]);
+  const [products,setProducts] = useState(()=>Array.isArray(cachedProducts)?cachedProducts:[]);
+  const [loading,setLoading] = useState(()=>!Array.isArray(cachedProducts));
   const [error,setError] = useState('');
   const [notice,setNotice] = useState('');
   const [search,setSearch]=useViewState('Inventory.jsx:search',membership.unitId,'');
@@ -43,12 +45,12 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const administration = mode === 'catalog';
   const load = useCallback(async (silent=false) => {
     if(!silent)setLoading(true);setError('');
-    try { const data = await call('list');setProducts(data.products || []); }
+    try { const data = await call('list');const fresh=data.products||[];setProducts(fresh);writeViewCache(auth.currentUser?.uid,membership.unitId,'inventory-products',fresh); }
     catch(e) {setError(e.message);}
     finally {setLoading(false);}
-  },[]);
+  },[membership.unitId]);
  useUnitLive(membership?.unitId,()=>load(true));
-  useEffect(()=>{load();},[load]);
+  useEffect(()=>{load(Array.isArray(cachedProducts));},[load]);
   const countDay=p=>{const at=p.physicalBalance?.at;if(!at)return null;const date=new Date(at);return Number.isNaN(date.getTime())?null:restaurantDay(date)};
   const todays=products.filter(p=>countDay(p)===today);
   const visible=useMemo(()=>products.filter(p=>{
