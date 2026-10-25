@@ -80,3 +80,14 @@
 .ti-unified-modal :is(input:not([type=checkbox]),select,textarea){width:100%;max-width:100%;min-height:44px;font-size:16px}
 .ti-unified-modal :is(button,input,select,textarea):focus-visible{outline:2px solid #a71916;outline-offset:2px}
 @media(max-width:600px){.ti-unified-modal-backdrop{padding:0}.ti-unified-modal{width:100%;height:100dvh;max-height:100dvh;border-radius:0;padding:0 16px 24px}}
+
+
+/* In the staff tab, navigation becomes a compact horizontal switcher. */
+@media(max-width:760px){
+ .ti-people-hub:has(.ti-master) .ti-people-hero{display:none}
+ .ti-people-hub:has(.ti-master) .ti-people-nav{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;gap:7px;padding:2px 1px 10px;scroll-snap-type:x proximity}
+ .ti-people-hub:has(.ti-master) .ti-people-nav::-webkit-scrollbar{display:none}
+ .ti-people-hub:has(.ti-master) .ti-people-nav button{flex:0 0 auto!important;min-width:0!important;width:auto!important;min-height:44px!important;padding:9px 13px!important;display:flex!important;align-items:center!important;gap:5px!important;border-radius:12px!important;scroll-snap-align:start}
+ .ti-people-hub:has(.ti-master) .ti-people-nav button small,.ti-people-hub:has(.ti-master) .ti-people-nav button span{display:none!important}
+ .ti-people-hub:has(.ti-master) .ti-people-nav button strong{font-size:13px!important;white-space:nowrap}
+}
