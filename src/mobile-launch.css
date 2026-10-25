@@ -1,0 +1,8 @@
+/* PWA installed on a touch phone: neutral, branded startup; no artificial waiting. */
+.ti-mobile-launch{min-height:100dvh;width:100%;background:#23191b;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:24px;box-sizing:border-box;position:relative}
+.ti-mobile-launch-brand{width:min(82vw,310px);display:flex;flex-direction:column;align-items:center;gap:14px}
+.ti-mobile-launch-brand svg{display:block;width:100%;height:auto;filter:drop-shadow(0 6px 18px rgba(0,0,0,.12))}
+.ti-mobile-launch-brand span{letter-spacing:.35em;font-weight:750;font-size:11px;color:#e9d0d0}
+.ti-mobile-launch-progress{width:24px;height:24px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:ti-mobile-launch-spin .9s linear infinite}
+@keyframes ti-mobile-launch-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.ti-mobile-launch-progress{animation:none;border-color:rgba(255,255,255,.55)}}
