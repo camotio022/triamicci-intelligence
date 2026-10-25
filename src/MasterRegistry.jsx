@@ -35,10 +35,23 @@ export default function MasterRegistry({membership={}}){
  const saveEdit=async e=>{e.preventDefault();setBusy(true);setError('');try{const r=await api('masterRegistryUpdate',{id:editing,changes:form});setNotice(r.message);setEditing(null);await refresh()}catch(err){setError(err.message)}finally{setBusy(false)}};
  return <section className="ti-planning-card ti-master">
   <div className="ti-master-hero"><p className="ti-master-eyebrow">PESSOAS · GESTÃO</p><h2>Cadastro Mestre</h2><p>Uma única base de colaboradores. Contas de acesso e fichas profissionais são independentes.</p></div>
-  <p className="ti-master-hint">Confira as correspondências antes de importar. Contas de teste nunca entram na equipe automaticamente.</p>
+  <div className="ti-master-directory-heading"><div><p className="ti-master-eyebrow">EQUIPE DA UNIDADE</p><h3>Colaboradores</h3><p>Consulte e edite as fichas da equipe.</p></div><button type="button" onClick={()=>refresh()} disabled={busy}>Atualizar</button></div>
+  <div className="ti-master-directory-stats"><span><strong>{(data?.registry||[]).filter(p=>p.status==='active').length}</strong> ativos</span><span><strong>{data?.accounts?.length||0}</strong> contas da unidade</span><span><strong>{(data?.registry||[]).filter(p=>!p.accountUid).length}</strong> sem conta vinculada</span></div>
+  <div className="ti-master-filters"><label>Buscar na equipe<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Nome, cargo, setor ou turno"/></label><label>Situação<select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="active">Ativos</option><option value="inactive">Inativos</option><option value="all">Todos</option></select></label></div>
+  <p className="ti-master-result-count" role="status">{filteredRegistry.length} de {data?.registry?.length||0} colaboradores</p>
+  {!data?.registry?.length&&<p>Nenhuma ficha cadastrada nesta unidade.</p>}
+  <div className="ti-master-cards">
+   {filteredRegistry.map(p=><article className="ti-master-person" key={p.id}>
+    <div className="ti-master-person-main"><strong>{p.name}</strong><span>{p.status==='inactive'?'Desligado':'Ativo'}</span></div>
+    <div className="ti-master-person-role">{p.jobTitle||'Cargo pendente'} · {p.shift==='manha'?'Manhã':p.shift==='noite'?'Noite':p.shift||'Turno pendente'}</div>
+    <div className="ti-master-person-secondary"><small>{p.sector} · Folga: {days[p.fixedWeekday]||'pendente'} · {p.accountUid?'Conta vinculada':'Sem conta vinculada'}</small></div><details className="ti-master-technical"><summary>Vincular conta existente</summary><p>Compartilhe este código apenas com o próprio colaborador.</p><code>{p.id}</code><button type="button" onClick={()=>navigator.clipboard?.writeText(p.id)}>Copiar código</button></details>
+    <button type="button" disabled={busy} onClick={()=>openEdit(p)}>Abrir ficha</button>
+   </article>)}
+  </div>
+  {data?.registry?.length>0&&filteredRegistry.length===0&&<p>Nenhum colaborador encontrado com os filtros selecionados.</p>}
   {error&&<p role="alert" style={{color:'#ad2727'}}>{error}</p>}
   {notice&&<p role="status">{notice}</p>}
-  <details className="ti-master-admin"><summary>Importação e vínculos · {selectable.length+claims.length+(data?.people||[]).filter(p=>['needs_review','ambiguous'].includes(p.state)).length} pendências</summary><div className="ti-master-toolbar"><button type="button" onClick={refresh} disabled={busy}>Atualizar</button><button type="button" className="ti-master-primary" onClick={()=>setSelected(selectable.map(p=>p.name))} disabled={busy||!selectable.length}>Selecionar sem conflito</button></div>
+  <details className="ti-master-admin ti-master-admin-secondary"><summary>Importação e vínculos · {selectable.length+claims.length+(data?.people||[]).filter(p=>['needs_review','ambiguous'].includes(p.state)).length} pendências</summary><div className="ti-master-toolbar"><button type="button" onClick={refresh} disabled={busy}>Atualizar</button><button type="button" className="ti-master-primary" onClick={()=>setSelected(selectable.map(p=>p.name))} disabled={busy||!selectable.length}>Selecionar sem conflito</button></div>
   <div className="ti-master-metrics"><div><strong>{data?.registry?.length||0}</strong><span>Fichas cadastradas</span></div><div><strong>{data?.accounts?.length||0}</strong><span>Contas da unidade</span></div><div><strong>{selectable.length}</strong><span>Sem conflito</span></div></div>
   <div className="ti-master-import-table">
    <table>
@@ -53,18 +66,7 @@ export default function MasterRegistry({membership={}}){
   <h3>Vínculos solicitados pelos próprios usuários</h3>
   {!claims.length&&<p>Nenhuma solicitação pendente.</p>}
   {claims.map(claim=><article className="ti-master-claim" key={claim.id}><strong>{data?.registry?.find(p=>p.id===claim.registryId)?.name||data?.people?.find(p=>p.seedId===claim.registryId)?.name||'Ficha '+claim.registryId}</strong> · Conta {data?.accounts?.find(x=>x.uid===claim.accountUid)?.name||claim.accountUid}<p>Confirme a identidade do colaborador antes de vincular. Nome parecido não é comprovação.</p><button type="button" disabled={busy} onClick={()=>linkAccount(claim)}>Confirmar vínculo</button></article>)}
-  </details><h3>Equipe cadastrada</h3>
-  <div className="ti-master-filters"><label>Buscar na equipe<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Nome, cargo, setor ou turno"/></label><label>Situação<select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="active">Ativos</option><option value="inactive">Inativos</option><option value="all">Todos</option></select></label></div>
-  <p className="ti-master-result-count" role="status">{filteredRegistry.length} de {data?.registry?.length||0} colaboradores</p>
-  {!data?.registry?.length&&<p>Nenhuma ficha cadastrada nesta unidade.</p>}
-  <div className="ti-master-cards">
-   {filteredRegistry.map(p=><article className="ti-master-person" key={p.id}>
-    <strong>{p.name}</strong> · {p.jobTitle||'Cargo pendente'} · {p.status==='inactive'?'Desligado':'Ativo'}
-    <div><small>{p.sector} · {p.shift} · {days[p.fixedWeekday]||'Folga pendente'} · {p.accountUid?'Conta vinculada':'Sem conta vinculada'}</small></div><details className="ti-master-technical"><summary>Vincular conta existente</summary><p>Compartilhe este código apenas com o próprio colaborador.</p><code>{p.id}</code><button type="button" onClick={()=>navigator.clipboard?.writeText(p.id)}>Copiar código</button></details>
-    <button type="button" disabled={busy} onClick={()=>openEdit(p)}>Abrir ficha</button>
-   </article>)}
-  </div>
-  {data?.registry?.length>0&&filteredRegistry.length===0&&<p>Nenhum colaborador encontrado com os filtros selecionados.</p>}
+  <p>Para pessoas com conta existente, compartilhe o código da ficha mostrado na prévia. O colaborador solicita o vínculo em Minha ficha; a gerência verifica a identidade e confirma aqui.</p><p>Colaboradores com correspondência ficam bloqueados para importação até conferirmos identidade e vínculo. Daniel e Geraldo não participam desta importação.</p>{selectable.length>0&&<button type="button" className="ti-master-primary" onClick={importSelected} disabled={busy||selected.length===0}>Criar {selected.length} ficha(s) selecionada(s)</button>}</details>
   {editing&&<div className="ti-unified-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setEditing(null)}}><div ref={dialog} className="ti-unified-modal" role="dialog" aria-modal="true" aria-label="Editar ficha do Cadastro Mestre"><div className="ti-unified-modal-top"><strong>Editar ficha do Cadastro Mestre</strong><button type="button" aria-label="Fechar janela" onClick={()=>setEditing(null)}>×</button></div><form onSubmit={saveEdit} className="ti-master-editor">
    <h3>Editar ficha · {data.registry.find(p=>p.id===editing)?.name}</h3>
    <label>Cargo <input required maxLength={80} value={form.jobTitle} onChange={e=>setForm(old=>({...old,jobTitle:e.target.value}))}/></label>
@@ -78,9 +80,6 @@ export default function MasterRegistry({membership={}}){
    <button type="submit" className="ti-master-primary" disabled={busy}>Salvar ficha</button>
    <button type="button" onClick={()=>setEditing(null)}>Cancelar</button>
   </form></div></div>}
-  <p>Para pessoas com conta existente, compartilhe o código da ficha mostrado na prévia. O colaborador solicita o vínculo em Minha ficha; a gerência verifica a identidade e confirma aqui.</p>
-  <p>Colaboradores com correspondência ficam bloqueados para importação até conferirmos identidade e vínculo. Daniel e Geraldo não participam desta importação.</p>
-  {selectable.length>0&&<button type="button" className="ti-master-primary" onClick={importSelected} disabled={busy||selected.length===0}>Criar {selected.length} ficha(s) selecionada(s)</button>}
-  
+
  </section>;
 }
