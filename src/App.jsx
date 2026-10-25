@@ -1,4 +1,4 @@
-import {useUnitLive} from './useUnitLive.js';
+import {readViewCache,writeViewCache} from './fastCache.js';
 import React, { useState, useEffect, useRef } from 'react';
 import {FeedbackProvider} from './FeedbackProvider.jsx';
 import NotificationCenter from './NotificationCenter.jsx';
@@ -71,10 +71,24 @@ export function Workspace({ user, membership, logout }) {
  const openProductAction=(target,id)=>{navigate(target,id)};
  const [profileOpen, setProfileOpen] = useState(false);
  const profileMenuRef=useRef(null);
- const [avatar,setAvatar]=useState(null);
- const avatarRefresh=useRef(()=>{});
- useUnitLive(membership.unitId,()=>avatarRefresh.current());
- useEffect(()=>{let active=true;const refresh=async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const response=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'myProfile'})});if(response.ok){const data=await response.json();if(active)setAvatar(data.avatar||null)}}catch{}};avatarRefresh.current=refresh;refresh();const onUpdate=()=>refresh();window.addEventListener('ti-avatar-updated',onUpdate);return()=>{active=false;window.removeEventListener('ti-avatar-updated',onUpdate)}},[user.uid,membership.unitId]);
+ const [avatar,setAvatar]=useState(()=>readViewCache(user.uid,membership.unitId,'avatar')??user.photoURL??null);
+ useEffect(()=>{
+  let active=true;
+  const cached=readViewCache(user.uid,membership.unitId,'avatar');
+  setAvatar(cached??user.photoURL??null);
+  const refresh=async()=>{try{
+   const token=await auth.currentUser?.getIdToken();if(!token)return;
+   const response=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'myProfile'})});
+   if(response.ok){const data=await response.json();if(active){
+    const next=data.avatar||null;setAvatar(next);
+    if(!next||next.length<160000)writeViewCache(user.uid,membership.unitId,'avatar',next,600000);
+   }}
+  }catch{/* Sem bloquear navegação por erro na foto. */}};
+  if(cached===null)refresh();
+  const onUpdate=()=>refresh();
+  window.addEventListener('ti-avatar-updated',onUpdate);
+  return()=>{active=false;window.removeEventListener('ti-avatar-updated',onUpdate)};
+ },[user.uid,membership.unitId,user.photoURL]);
  useEffect(()=>{if(!profileOpen)return;const outside=e=>{if(!profileMenuRef.current?.contains(e.target))setProfileOpen(false)};const escape=e=>{if(e.key==='Escape')setProfileOpen(false)};document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape)}},[profileOpen]);
  useEffect(()=>{const go=e=>{if(['master-registry','kitchen-v3'].includes(e.detail))navigate(e.detail)};window.addEventListener('ti-navigate',go);return()=>window.removeEventListener('ti-navigate',go)},[membership.unitId]);
  const navigate = (nextPage,productId=null) => {if(!routes.includes(nextPage))return;window.history.replaceState({...window.history.state,scroll:window.scrollY},'');const url=new URL(window.location.href);url.searchParams.set('page',nextPage);window.history.pushState({page:nextPage,productId,unit:membership.unitId,scroll:0},'',url);setActionProductId(productId);setPage(nextPage);setMenuOpen(false);setProfileOpen(false);window.scrollTo(0,0);};
