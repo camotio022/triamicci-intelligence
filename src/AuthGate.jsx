@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
+import {clearViewCache} from './fastCache.js';
 import TriamicciLogo from './TriamicciLogo.jsx';
 import { ShieldCheck, Package, CookingPot, Users, ArrowRight, AlertCircle } from 'lucide-react';
 import './auth-v41.css';
@@ -100,6 +101,7 @@ export default function AuthGate({ children }) {
     } catch(error) { setInviteFeedback(error.message || 'Não foi possível aceitar.'); }
     finally { setAccepting(false); }
   };
+  const logout = async () => { clearViewCache(user?.uid); await signOut(auth); };
   const login = async () => {
     if (loggingIn) return;
     setError('');setLoggingIn(true);
@@ -129,11 +131,11 @@ export default function AuthGate({ children }) {
         </section>
         <section className="ti-auth-content" aria-label="Acesso ao sistema">
           <div className="ti-auth-panel"><span className="ti-auth-section-tag">PORTAL DE ACESSO</span><h2>{title}</h2>
-          {pending?<p role="status">Estamos confirmando sua sessão e suas permissões.</p>:!user?<><p>Entre com sua conta Google para acessar seu ambiente de trabalho.</p><button type="button" className="ti-auth-primary" onClick={login} disabled={loggingIn}>{loggingIn?'Abrindo acesso...':'Entrar com Google'}<ArrowRight size={18} aria-hidden="true"/></button>{error&&<div className="ti-auth-alert" role="alert"><AlertCircle size={19} aria-hidden="true"/><span>{error}</span></div>}<div className="ti-auth-security"><ShieldCheck size={20} aria-hidden="true"/><span>O acesso depende de vínculo ativo e das permissões da unidade.</span></div></>:<><p className="ti-auth-email">{user.email}</p><p>{accessError||accessReason||'Esta conta ainda não tem vínculo ativo com uma unidade. Solicite um convite ao responsável.'}</p>{invite&&accessStatus==='missing'&&<div className="ti-auth-invite"><p>Existe um convite neste link. Confirme que você entrou com o e-mail convidado.</p><button type="button" className="ti-auth-primary" onClick={acceptInvite} disabled={accepting}>{accepting?'Validando convite...':'Aceitar convite'}<ArrowRight size={18} aria-hidden="true"/></button>{inviteFeedback&&<div role="alert" className="ti-auth-alert">{inviteFeedback}</div>}</div>}<button type="button" className="ti-auth-secondary" onClick={()=>signOut(auth)}>Sair desta conta</button></>}
+          {pending?<p role="status">Estamos confirmando sua sessão e suas permissões.</p>:!user?<><p>Entre com sua conta Google para acessar seu ambiente de trabalho.</p><button type="button" className="ti-auth-primary" onClick={login} disabled={loggingIn}>{loggingIn?'Abrindo acesso...':'Entrar com Google'}<ArrowRight size={18} aria-hidden="true"/></button>{error&&<div className="ti-auth-alert" role="alert"><AlertCircle size={19} aria-hidden="true"/><span>{error}</span></div>}<div className="ti-auth-security"><ShieldCheck size={20} aria-hidden="true"/><span>O acesso depende de vínculo ativo e das permissões da unidade.</span></div></>:<><p className="ti-auth-email">{user.email}</p><p>{accessError||accessReason||'Esta conta ainda não tem vínculo ativo com uma unidade. Solicite um convite ao responsável.'}</p>{invite&&accessStatus==='missing'&&<div className="ti-auth-invite"><p>Existe um convite neste link. Confirme que você entrou com o e-mail convidado.</p><button type="button" className="ti-auth-primary" onClick={acceptInvite} disabled={accepting}>{accepting?'Validando convite...':'Aceitar convite'}<ArrowRight size={18} aria-hidden="true"/></button>{inviteFeedback&&<div role="alert" className="ti-auth-alert">{inviteFeedback}</div>}</div>}<button type="button" className="ti-auth-secondary" onClick={logout}>Sair desta conta</button></>}
           </div>
         </section>
       </div>
     </main>;
   }
-  return children({ user, membership, logout: () => signOut(auth) });
+  return children({ user, membership, logout });
 }
