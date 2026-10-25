@@ -6,6 +6,9 @@ import {clearViewCache} from './fastCache.js';
 import TriamicciLogo from './TriamicciLogo.jsx';
 import { ShieldCheck, Package, CookingPot, Users, ArrowRight, AlertCircle } from 'lucide-react';
 import './auth-v41.css';
+import './mobile-launch.css';
+
+const installedMobile=()=>typeof window!=='undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone===true) && window.matchMedia?.('(max-width: 760px) and (pointer: coarse)').matches;
 
 export default function AuthGate({ children }) {
   const [user, setUser] = useState(undefined);
@@ -120,6 +123,9 @@ export default function AuthGate({ children }) {
     } finally { setLoggingIn(false); }
   };
   const pending=user === undefined || (user && (membership === undefined || membershipUid !== user.uid));
+  // Only the installed phone app gets a minimal branded launch while access is verified.
+  // Never expose Workspace until a server-confirmed, active membership is available.
+  if (pending && installedMobile()) return <main className="ti-mobile-launch" role="status" aria-live="polite" aria-label="Verificando acesso ao Triamicci Intelligence"><div className="ti-mobile-launch-brand"><TriamicciLogo/><span>INTELLIGENCE</span></div><span className="ti-mobile-launch-progress" aria-hidden="true"/></main>;
   if (pending || !user || !membership) {
     const title=pending?'Verificando seu acesso':!user?'Bem-vindo ao Triamicci Intelligence':accessError?'Não foi possível verificar o acesso':accessStatus==='inactive'?'Acesso desativado':accessStatus==='offline'?'Verificação indisponível':'Acesso pendente';
     return <main className="ti-auth-portal">
