@@ -22,8 +22,9 @@ export default async function shipments(req,res){
    if(before!==undefined&&!id(before))return send(res,400,'Cursor inválido.');
    let query=collection.orderBy('createdAt','desc').orderBy('__name__','desc');
    if(before){const cursor=await collection.doc(before).get();if(!cursor.exists)return send(res,400,'Cursor indisponível.');query=query.startAfter(cursor);}
-   const snap=await query.limit(21).get();
-   return send(res,200,'Conferências de entregas.',{shipments:snap.docs.slice(0,20).map(d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.(),decidedAt:d.data().decidedAt?.toDate?.()?.toISOString?.()||null})),hasMore:snap.size>20,nextCursor:snap.size>20?snap.docs[19].id:null});
+   const [snap,pendingSnap]=await Promise.all([query.limit(21).get(),collection.where('status','==','pending').limit(201).get()]);
+   const cleanShipment=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.(),decidedAt:d.data().decidedAt?.toDate?.()?.toISOString?.()||null});
+   return send(res,200,'Conferências de entregas.',{pendingShipments:pendingSnap.docs.slice(0,200).map(cleanShipment).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))),pendingComplete:pendingSnap.size<=200,shipments:snap.docs.slice(0,20).map(d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.(),decidedAt:d.data().decidedAt?.toDate?.()?.toISOString?.()||null})),hasMore:snap.size>20,nextCursor:snap.size>20?snap.docs[19].id:null});
   }
   if(!id(requestId)||!['shipmentInspect','shipmentApprove','shipmentReject'].includes(action))return send(res,400,'Conferência inválida.');
   if(action!=='shipmentInspect'&&!manager(m.role))return send(res,403,'Revisão reservada à gestão.');
