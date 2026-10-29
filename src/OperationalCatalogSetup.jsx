@@ -19,12 +19,13 @@ export default function OperationalCatalogSetup({onActivated}){
  const [notice,setNotice]=useState('');
  const [busy,setBusy]=useState(false);
  const [filter,setFilter]=useState('');
+ const [showRegistered,setShowRegistered]=useState(false);
  const refresh=async()=>{try{const r=await request('status');setEntries(r.items||[])}catch(e){setError(e.message)}};
  useEffect(()=>{refresh()},[]);
  const product=useMemo(()=>draft.products.find(p=>p.id===selected),[selected]);
  const choose=p=>{setSelected(p.id);setError('');setNotice('');setForm({name:p.name,category:p.category,stockUnit:p.stockUnit,receivingUnit:p.receivingUnit||'',operationalUnit:p.operationalUnit||p.stockUnit,source:p.source,trackExpiry:p.trackExpiry,minStock:0,countFrequency:'weekly',critical:false,reviewConfirmed:false})};
  const status=new Map(entries.map(p=>[p.id,p]));
- const shown=draft.products.filter(p=>p.name.toLocaleLowerCase('pt-BR').includes(filter.toLocaleLowerCase('pt-BR')));
+ const shown=draft.products.filter(p=>p.name.toLocaleLowerCase('pt-BR').includes(filter.toLocaleLowerCase('pt-BR')) && (showRegistered || !status.get(p.id)?.active));
  const count=entries.filter(p=>p.active).length;
  const set=(key,value)=>setForm(f=>({...f,[key]:value,reviewConfirmed:false}));
  const submit=async e=>{e.preventDefault();setError('');setNotice('');setBusy(true);try{await request('activate',{id:selected,...form});setNotice('Cadastro ativado para a unidade com saldo inicial zero.');await refresh();onActivated?.()}catch(err){setError(err.message)}finally{setBusy(false)}};
@@ -32,7 +33,8 @@ export default function OperationalCatalogSetup({onActivated}){
  <p>Revise os dados antes de ativar. Unidades pré-preenchidas são sugestões; não geram conversões automáticas nem lançamentos de estoque.</p>
  <p><strong>{count} de 56 ativos nesta unidade.</strong> Os cadastros experimentais não são apagados automaticamente.</p>
  <label>Buscar produto <input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Nome do produto"/></label>
- <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:8,margin:'12px 0'}}>{shown.map(p=><button type="button" key={p.id} onClick={()=>choose(p)} aria-pressed={selected===p.id} style={{textAlign:'left',padding:12,border:'1px solid #ccc',borderRadius:8,background:selected===p.id?'#edf2ff':'transparent'}}><strong>{p.name}</strong><br/><small>{status.get(p.id)?.active?'Ativo':'Pendente'} · {p.category}</small></button>)}</div>
+ <label><input type="checkbox" checked={showRegistered} onChange={e=>setShowRegistered(e.target.checked)}/> Mostrar também os já cadastrados</label>
+ <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:8,margin:'12px 0'}}>{shown.map(p=><button type="button" key={p.id} onClick={()=>choose(p)} disabled={Boolean(status.get(p.id)?.active)} aria-pressed={selected===p.id} style={{textAlign:'left',padding:12,border:'1px solid #ccc',borderRadius:8,background:selected===p.id?'#edf2ff':'transparent'}}><strong>{p.name}</strong><br/><small>{status.get(p.id)?.active?'Ativo':'Pendente'} · {p.category}</small></button>)}</div>
  {product&&form&&<form onSubmit={submit} className="inventory-form"><h3>Validar: {product.name}</h3>
  <label>Nome<input value={form.name} readOnly/></label><label>Categoria<input value={form.category} readOnly/></label>
  <label>Unidade de estoque<select value={form.stockUnit} onChange={e=>set('stockUnit',e.target.value)}>{units.map(u=><option key={u}>{u}</option>)}</select></label>
