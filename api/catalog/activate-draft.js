@@ -4,6 +4,7 @@ import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib
 const draft=JSON.parse(readFileSync(new URL('../../data/triamicci-product-catalog-56.staging.json',import.meta.url),'utf8')).products;
 const byId=new Map(draft.map(p=>[p.id,p]));
 const units=new Set(['kg','L','un']);
+const normalizeName=name=>String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,' ').toLocaleLowerCase('pt-BR');
 const hash=name=>createHash('sha256').update(name.trim().toLocaleLowerCase('pt-BR')).digest('hex').slice(0,40);
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;
@@ -13,8 +14,15 @@ export default async function handler(req,res){
   if(!m?.unitId||!['admin','manager','submanager'].includes(m.role))return send(res,403,'Acesso restrito à gestão.');
   const db=getDb(),catalog=db.collection('productCatalog'),unitProducts=db.collection('units').doc(m.unitId).collection('products');
   if(req.body?.action==='status'){
-   const ids=draft.map(p=>hash(p.name)),snaps=await Promise.all(ids.map(id=>unitProducts.doc(id).get()));
-   return send(res,200,'Situação da lista revisada.',{items:draft.map((p,i)=>({id:p.id,active:snaps[i].exists&&snaps[i].data().status==='active'&&snaps[i].data().catalogId===p.id}))});
+   const all=await unitProducts.limit(201).get();
+   if(all.size>200)return send(res,409,'Catálogo acima de 200 registros: conciliação paginada necessária.');
+   const rows=all.docs.map(doc=>({id:doc.id,...doc.data()}));
+   return send(res,200,'Situação e possíveis conflitos de cadastro.',{items:draft.map(p=>{
+    const matches=rows.filter(row=>row.catalogId===p.id||normalizeName(row.name)===normalizeName(p.name));
+    const active=matches.some(row=>row.catalogId===p.id&&row.status==='active'&&row.operationalCatalogVersion==='56-v1');
+    return {id:p.id,active,needsReconciliation:matches.length>0&&!active||matches.length>1,
+      matches:matches.map(row=>({id:row.id,name:row.name,catalogId:row.catalogId||null,status:row.status||null,version:row.operationalCatalogVersion||null}))};
+   })});
   }
   if(req.body?.action!=='activate')return send(res,400,'Ação inválida.');
   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Sem permissão.');
@@ -30,7 +38,9 @@ export default async function handler(req,res){
   const ref=unitProducts.doc(hash(name)),centralRef=catalog.doc(id),memberRef=db.collection('memberships').doc(actor.uid);
   const now=new Date();
   await db.runTransaction(async tx=>{
-   const [member,existing,central]=await Promise.all([tx.get(memberRef),tx.get(ref),tx.get(centralRef)]);
+   const [member,existing,central,all]=await Promise.all([tx.get(memberRef),tx.get(ref),tx.get(centralRef),tx.get(unitProducts.limit(201))]);
+   if(all.size>200)throw Error('CATALOG_LIMIT');
+   if(all.docs.some(doc=>doc.id!==ref.id&&(doc.data().catalogId===id||normalizeName(doc.data().name)===normalizeName(name))))throw Error('CATALOG_CONFLICT');
    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||
       !['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
    if(existing.exists&&existing.data().catalogId===id&&existing.data().status==='active')throw Error('ALREADY_ACTIVE');
@@ -53,6 +63,7 @@ export default async function handler(req,res){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='ALREADY_ACTIVE')return send(res,409,'Este insumo já está cadastrado e ativo; não é permitido duplicar.');
+  if(e.message==='CATALOG_LIMIT')return send(res,409,'Catálogo acima de 200 registros: concilie antes de ativar.');
   if(e.message==='CATALOG_CONFLICT')return send(res,409,'Produto experimental conflitante; não foi alterado.');
   console.error('Operational catalog setup:',e.message);
   return send(res,500,'Falha ao ativar o produto.');
