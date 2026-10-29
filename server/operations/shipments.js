@@ -1,3 +1,4 @@
+import {isOperationalProduct} from './catalog-identity.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {signalUnitChange} from '../live-signal.js';
@@ -50,7 +51,7 @@ export default async function shipments(req,res){
    const keys=new Set();
    for(const line of data.lines){
     const p=products.get(line.productId),profile=profiles.get(line.productId);
-    if(!p?.exists||p.data().status!=='active'||!profile?.exists||!['supplier','both'].includes(profile.data().origin))throw Error('PRODUCT');
+    if(!p?.exists||!isOperationalProduct(p.data())||!profile?.exists||!['supplier','both'].includes(profile.data().origin))throw Error('PRODUCT');
     const cfg=profile.data(),quantitative=cfg.controlMode==='quantitative';
     if(!['kg','g','L','ml','mL','un','porcao','pacote','duzia'].includes(line.commercialUnit)||!validQuantity(line.commercialQuantity,{unit:line.commercialUnit})||quantitative&&(!cfg.locations.includes(line.location)||!validQuantity(line.stockQuantity,{unit:cfg.countUnit}))||!quantitative&&line.stockQuantity!==0)throw Error('QUANTITY');
     const expected=order?.data()?.items.find(x=>x.productId===line.productId);

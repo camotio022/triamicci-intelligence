@@ -1,3 +1,4 @@
+import {isOperationalProduct} from './catalog-identity.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {countUnit,validQuantity} from './logic.js';
@@ -28,7 +29,7 @@ export default async function handler(req,res){
    if(!a||a.status!=='active'||a.unitId!==m.unitId||!['admin','manager','submanager','cook','auxiliar'].includes(a.role))throw Error('FORBIDDEN');
    if(!product.exists)throw Error('NOT_FOUND');
    const p=product.data();
-   if(p.status!=='active')throw Error('INACTIVE');
+   if(!isOperationalProduct(p))throw Error('INACTIVE');
    if(previous.exists){
     const old=previous.data();
     if(old.actorUid!==actor.uid||old.productId!==productId||old.quantity!==quantity||

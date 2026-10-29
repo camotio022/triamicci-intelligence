@@ -1,3 +1,4 @@
+import {isOperationalProduct,belongsToOperationalCatalog} from './catalog-identity.js';
 import {operationalView} from './shared-balance.js';
 import {signalUnitChange} from '../live-signal.js';
 import v3Ledger from './v3-ledger.js';
@@ -46,7 +47,7 @@ export default async function kitchenV3(req,res){
    const legacy=await unit.collection('v3PhysicalBalances').limit(201).get();if(legacy.size>200)return send(res,409,'Limite de consulta atingido.');
    const bm=new Map(legacy.docs.map(obj).map(p=>[p.id,operationalView(p)]));for(const doc of e.docs)bm.set(doc.id,operationalView(obj(doc)));
    return send(res,200,'Painel operacional carregado.',{
-    products:a.docs.map(s=>{const data={...obj(s),profile:pm.get(s.id)||null,v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
+    products:a.docs.filter(s=>isOperationalProduct(s.data())).map(s=>{const data={...obj(s),profile:pm.get(s.id)||null,v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
     signals:c.docs.map(obj).filter(s=>s.status!=='resolved'),
     orders:d.docs.map(obj).filter(o=>o.status!=='cancelled').map(x=>roles.includes(member.role)?x:redactFinancial(x)).sort((x,y)=>(x.etaDate||'').localeCompare(y.etaDate||'')),
    });
@@ -67,9 +68,9 @@ export default async function kitchenV3(req,res){
        allProducts.docs.some(d=>d.id!==productId&&!allProfiles.docs.find(p=>p.id===d.id)&&candidateNames.includes((d.data().name||'').trim().toLocaleLowerCase('pt-BR'))))throw Error('DUPLICATE_NAME');
     const sourceIds=[...(profile.sourceProductIds||[]),...(profile.alternativeProductIds||[])];
     if(sourceIds.includes(productId))throw Error('INVALID_SOURCE');
-    if(sourceIds.length){const sourceDocs=await Promise.all(sourceIds.map(id=>tx.get(products.doc(id))));if(sourceDocs.some(d=>!d.exists||d.data().status!=='active'))throw Error('INVALID_SOURCE');}
+    if(sourceIds.length){const sourceDocs=await Promise.all(sourceIds.map(id=>tx.get(products.doc(id))));if(sourceDocs.some(d=>!d.exists||!isOperationalProduct(d.data())))throw Error('INVALID_SOURCE');}
     if(prior.exists&&prior.data().version!==expectedVersion||!prior.exists&&expectedVersion!==null)throw Error('STALE');
-    if(p.data().status!=='active')throw Error('INACTIVE');
+    if(!isOperationalProduct(p.data()))throw Error('INACTIVE');
     if(balance.exists&&balance.data().total>0&&balance.data().unit!==profile.countUnit)throw Error('UNIT_LOCKED');
     // A configuração NÃO altera saldo legado nem unidades de movimentos já gravados.
     const next={displayName:profile.displayName.trim(),aliases:(profile.aliases||[]).map(x=>x.trim()),controlMode:profile.controlMode,origin:profile.origin,
@@ -92,6 +93,7 @@ export default async function kitchenV3(req,res){
      tx.get(actorRef),tx.get(pref),tx.get(physical),tx.get(v3),tx.get(orders.limit(201)),tx.get(issues.limit(201))]);
     if(!verify(a,unitId,roles))throw Error('FORBIDDEN');
     if(!p.exists)throw Error('NOT_FOUND');
+    if(restore&&!belongsToOperationalCatalog(p.data()))throw Error('NOT_FOUND');
     if(!restore){
      if(pendingOrders.size>200||openSignals.size>200)throw Error('TOO_MANY');
      if((p.data().quantity||0)>0||(oldPhysical.data()?.total||0)>0||(newPhysical.data()?.total||0)>0)throw Error('PRODUCT_HAS_STOCK');
@@ -110,7 +112,7 @@ export default async function kitchenV3(req,res){
    await db.runTransaction(async tx=>{
     const [actor,p,old]=await Promise.all([tx.get(actorRef),tx.get(productPath(unit,productId)),tx.get(ref)]);
     if(!verify(actor,unitId,TEAM_ROLES))throw Error('FORBIDDEN');
-    if(!p.exists||p.data().status!=='active')throw Error('NOT_FOUND');
+    if(!p.exists||!isOperationalProduct(p.data()))throw Error('NOT_FOUND');
     const previous=old.data()||{},reports=Array.isArray(previous.reports)?previous.reports.slice(-19):[];
     if(previous.status!=='resolved'&&reports.some(r=>r.actorUid===user.uid&&r.observation===observation))throw Error('ALREADY_REPORTED');
     reports.push({actorUid:user.uid,at:now(),observation,note:note.trim()});
@@ -146,7 +148,9 @@ export default async function kitchenV3(req,res){
     const [actor,old,...ps]=await Promise.all([tx.get(actorRef),tx.get(ref),...items.map(x=>tx.get(productPath(unit,x.productId)))]);
     if(!verify(actor,unitId,roles))throw Error('FORBIDDEN');
     if(old.exists){if(old.data().fingerprint!==fingerprint||old.data().createdBy!==user.uid)throw Error('CONFLICT');duplicate=true;return;}
-    if(ps.some(p=>!p.exists||p.data().status!=='active'))throw Error('NOT_FOUND');
+    if(ps.some(p=>!p.exists||!isOperationalProduct(p.data())))throw Error('NOT_FOUND');
+    const configs=await Promise.all(items.map(item=>tx.get(profiles.doc(item.productId))));
+    if(configs.some(cfg=>!cfg.exists||!['supplier','both'].includes(cfg.data().origin)))throw Error('NOT_FOUND');
     tx.create(ref,{etaDate,supplier:supplier.trim(),notes,items:items.map((x,i)=>({...x,name:ps[i].data().name})),status:'requested',
       channel:'whatsapp',createdAt:now(),createdBy:user.uid,fingerprint,delivered:[],updatedAt:now()});
     newAudit(tx,db,'v3.order_created',unitId,user.uid,{orderId:requestId,etaDate,items});

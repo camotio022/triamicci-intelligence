@@ -1,3 +1,4 @@
+import {isOperationalProduct} from '../../server/operations/catalog-identity.js';
 import {intervalFromBalance} from '../../server/operations/inventory-summary.js';
 import shipments from '../../server/operations/shipments.js';
 import investigation from '../../server/operations/investigation.js';
@@ -178,7 +179,7 @@ export default async function handler(req,res){
    if(!current||current.status!=='active'||current.unitId!==m.unitId||
     !['admin','manager','submanager'].includes(current.role))throw Error('FORBIDDEN');
    if(!pSnap.exists)throw Error('NOT_FOUND');
-   const p=pSnap.data();if(p.status!=='active')throw Error('INACTIVE');
+   const p=pSnap.data();if(!isOperationalProduct(p))throw Error('INACTIVE');
    const central=p.catalogId?await tx.get(db.collection('productCatalog').doc(p.catalogId)):null;
    const unitName=physicalUnit(p,central?.data());
    if(unitName==='un'&&(action==='receive'? !Number.isInteger(payload.physicalQuantity):

@@ -22,7 +22,7 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  };
  const input='c'.repeat(40),output='d'.repeat(40);
  for(const [id,total] of [[input,50],[output,0]]){
-  await unit.collection('products').doc(id).set({name:id===input?'Frango grelhado':'Parmegiana',status:'active',unit:'un',trackExpiry:false});
+  await unit.collection('products').doc(id).set({operationalCatalogVersion:'56-v1',name:id===input?'Frango grelhado':'Parmegiana',status:'active',unit:'un',trackExpiry:false});
   await unit.collection('physicalBalances').doc(id).set({reserve:total,rotation:0,total,unit:'un'});
  }
  const recipe={id:'parmegiana-v4',name:'Parmegiana de frango',yieldQuantity:1,outputProductId:output,lines:[{productId:input,quantity:1,substitutes:[]}]};
@@ -72,7 +72,8 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  assert.equal((await call(ledger,manager,'v3ApproveReceipt',{inspectionId})).code,200);
  assert.equal((await unit.collection('physicalBalances').doc(input).get()).data().reserve,25,'Receipt adds to the same balance consumed by recipe production');
  assert.equal((await unit.collection('v3PhysicalBalances').doc(input).get()).data().total,900,'Legacy experiment remains untouched and is never summed');
- const catalog=await call(productsApi,cook,'list');assert.equal(catalog.products.find(p=>p.id===input).physicalBalance.total,25,'Main stock view sees operational receipt');
+ await unit.collection('products').doc('7'.repeat(40)).set({name:'Experimento sem aprovação',status:'active',unit:'un'});
+ const catalog=await call(productsApi,cook,'list');assert.equal(catalog.products.some(p=>p.id==='7'.repeat(40)),false); assert.equal(catalog.products.find(p=>p.id===input).physicalBalance.total,25,'Main stock view sees operational receipt');
  const round=randomUUID();
  const countBefore=(await unit.collection('physicalCounts').get()).size;
  assert.equal((await call(ledger,manager,'v3Count',{requestId:randomUUID(),sessionId:round,productId:input,location:'reserva',quantity:8})).code,200);
@@ -110,8 +111,8 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  assert.equal((await unit.collection('physicalBalances').doc(input).get()).data().total,14);
  // Decimal yields, per-ingredient source and a real output lot, without a prior output count.
  const raw='e'.repeat(40),prepared='f'.repeat(40);
- await unit.collection('products').doc(raw).set({name:'Molho base',unit:'kg',status:'active',trackExpiry:false});
- await unit.collection('products').doc(prepared).set({name:'Molho final',unit:'kg',status:'active',trackExpiry:true,lotTrackingMode:'per_lot'});
+ await unit.collection('products').doc(raw).set({operationalCatalogVersion:'56-v1',name:'Molho base',unit:'kg',status:'active',trackExpiry:false});
+ await unit.collection('products').doc(prepared).set({operationalCatalogVersion:'56-v1',name:'Molho final',unit:'kg',status:'active',trackExpiry:true,lotTrackingMode:'per_lot'});
  await unit.collection('physicalBalances').doc(raw).set({unit:'kg',reserve:1,rotation:5,total:6});
  const decimalRecipe={id:'molho-decimal',name:'Molho final',outputProductId:prepared,yieldQuantity:2.5,lines:[{productId:raw,quantity:1.25,location:'giro'}],method:'Misturar e conferir o rendimento real.'};
  assert.equal((await call(production,manager,'saveRecipe',decimalRecipe)).code,200);
@@ -127,8 +128,8 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  assert.equal((await call(production,cook,'finish',decimalRun)).duplicate,true);
  // A product with expiry metadata but no per-lot policy uses aggregate stock.
  const aggregateRaw='9'.repeat(40),aggregateOutput='8'.repeat(40);
- await unit.collection('products').doc(aggregateRaw).set({name:'Ingrediente acumulado',unit:'kg',status:'active',trackExpiry:true});
- await unit.collection('products').doc(aggregateOutput).set({name:'Preparo acumulado',unit:'kg',status:'active',trackExpiry:true});
+ await unit.collection('products').doc(aggregateRaw).set({operationalCatalogVersion:'56-v1',name:'Ingrediente acumulado',unit:'kg',status:'active',trackExpiry:true});
+ await unit.collection('products').doc(aggregateOutput).set({operationalCatalogVersion:'56-v1',name:'Preparo acumulado',unit:'kg',status:'active',trackExpiry:true});
  await unit.collection('physicalBalances').doc(aggregateRaw).set({unit:'kg',reserve:0,rotation:3,total:3});
  const aggregateRecipe={id:'teste-saldo-acumulado',name:'Preparo sem lotes',outputProductId:aggregateOutput,yieldQuantity:1,lines:[{productId:aggregateRaw,quantity:1,location:'giro'}]};
  assert.equal((await call(production,manager,'saveRecipe',aggregateRecipe)).code,200);

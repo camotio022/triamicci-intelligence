@@ -36,7 +36,7 @@ test('Firebase V3.1: inspeção pendente, aprovação auditada, perda e presenç
  ]);
  const productId='a'.repeat(40);
  await Promise.all([
-  unit.collection('products').doc(productId).set({name:'Insumo de homologação',status:'active',trackExpiry:false}),
+  unit.collection('products').doc(productId).set({operationalCatalogVersion:'56-v1',name:'Insumo de homologação',status:'active',trackExpiry:false}),
   unit.collection('operationalProfiles').doc(productId).set({controlMode:'quantitative',countUnit:'un',locations:['reserva','giro'],origin:'supplier'})
  ]);
  const call=async(handler,person,action,payload={})=>{
@@ -46,7 +46,7 @@ test('Firebase V3.1: inspeção pendente, aprovação auditada, perda e presenç
  };
  const internalId='b'.repeat(40);
  await Promise.all([
-  unit.collection('products').doc(internalId).set({name:'Preparo interno',status:'active',trackExpiry:false}),
+  unit.collection('products').doc(internalId).set({operationalCatalogVersion:'56-v1',name:'Preparo interno',status:'active',trackExpiry:false}),
   unit.collection('operationalProfiles').doc(internalId).set({controlMode:'quantitative',countUnit:'un',locations:['reserva'],origin:'internal'})
  ]);
  const internalReceipt=await call(v3Ledger,worker,'v3InspectReceive',{requestId:randomUUID(),productId:internalId,commercialQuantity:1,commercialUnit:'un',stockQuantity:1,location:'reserva',supplier:'Fornecedor',notes:'Conferido'});
