@@ -23,6 +23,17 @@ export default function MyAttendanceV31({unitId}){
  const status=record?.status||'not_started';
  const events=record?.events||[];
  const hasEvent=action=>events.some(event=>event.action===action);
+ const eventDate=value=>{
+  if(!value)return null;
+  const seconds=value._seconds??value.seconds;
+  const parsed=typeof seconds==='number'?new Date(seconds*1000):new Date(value);
+  return Number.isNaN(parsed.getTime())?null:parsed;
+ };
+ const eventTime=action=>{
+  const event=[...events].reverse().find(item=>item.action===action);
+  const at=eventDate(event?.at);
+  return at?at.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}):'—';
+ };
  const returnedFromBreak=hasEvent('break_end');
  const next=status==='working'&&returnedFromBreak?['clock_out','Encerrar jornada']:actions[status];
  const operationalDay=day||new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());
@@ -52,7 +63,7 @@ export default function MyAttendanceV31({unitId}){
  return <section className="ti-attendance-v31 ti-attendance-v5" aria-label="Minha jornada">
   <div className="ti-attendance-v5-heading"><div><span className="ti-attendance-eyebrow">JORNADA DE HOJE · {day||'HOJE'}</span><h2>Minha jornada</h2><p>{status==='not_started'?(off?'Folga ou ausência na escala oficial':!todayEntry?'Sem escala oficial para hoje':live.label):status==='working'&&returnedFromBreak?'Retorno do intervalo registrado · jornada em andamento':labels[status]}</p></div><span className="ti-attendance-v5-state">{status==='finished'?'Encerrada':status==='not_started'?'Não iniciada':'Em andamento'}</span></div>
   <div className="ti-attendance-v5-schedule"><span>Horário previsto: <strong>{live.start||'Não informado'}{live.end?'–'+live.end:''}</strong></span><span>{todayEntry?'Escala: '+(typeLabel[todayEntry.type]||'Publicada'):'Sem escala oficial para hoje'}</span></div>
-  <div className="ti-attendance-v5-progress" aria-label="Etapas da jornada">{stages.map((stage,i)=><div key={stage.key} className={'ti-attendance-v5-milestone '+stage.kind}><span className="ti-attendance-v5-circle" aria-hidden="true"/><strong>{stage.title}</strong><small>{i===0?(live.start||'—'):i===1?(record?.clockInAt?new Date(record.clockInAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}):'Declarada'):i===2?(profile?.availability?.find?.(x=>x.day===['dom','seg','ter','qua','qui','sex','sab'][new Date(operationalDay+'T12:00:00Z').getUTCDay()])?.breakStart||'—'):i===3?(profile?.availability?.find?.(x=>x.day===['dom','seg','ter','qua','qui','sex','sab'][new Date(operationalDay+'T12:00:00Z').getUTCDay()])?.breakEnd||'—'):(live.end||'—')}</small></div>)}</div>
+  <div className="ti-attendance-v5-progress" aria-label="Etapas da jornada">{stages.map((stage,i)=><div key={stage.key} className={'ti-attendance-v5-milestone '+stage.kind}><span className="ti-attendance-v5-circle" aria-hidden="true"/><strong>{stage.title}</strong><small>{i===0?(live.start||'—'):eventTime(stage.key)}</small></div>)}</div>
   <div className="ti-attendance-actions ti-attendance-v5-actions">
    {next?.length>0&&<button className="ti-attendance-primary" type="button" onClick={()=>submit()} disabled={busy}>{busy?'Registrando…':next[1]}</button>}
    {status==='working'&&!returnedFromBreak&&<button className="ti-attendance-secondary" type="button" onClick={()=>submit('clock_out')} disabled={busy}>Encerrar jornada</button>}
@@ -60,7 +71,7 @@ export default function MyAttendanceV31({unitId}){
   {notice&&<p role="status" className="ti-attendance-notice">{notice}</p>}
   {error&&<p role="alert">{error}</p>}
   <button className="ti-attendance-v5-expand" type="button" onClick={()=>setExpandedTimeline(v=>!v)} aria-expanded={expandedTimeline}>{expandedTimeline?'Ocultar detalhes da jornada':'Ver detalhes da jornada'} <span aria-hidden="true">{expandedTimeline?'−':'+'}</span></button>
-  {expandedTimeline&&<div className="ti-attendance-v5-expanded"><section className="ti-journey-timeline" aria-label="Linha do tempo da jornada"><div className="ti-journey-heading"><strong>Eventos do dia</strong><span>Previstos e declarados</span></div><ol>{stages.map(stage=><li key={stage.key} className={'ti-journey-step ti-journey-'+stage.kind}><span className="ti-journey-dot" aria-hidden="true"/><div><strong>{stage.title}</strong><small>{stage.detail}</small></div></li>)}</ol></section><p>Horários previstos não são registros de ponto e declarações exigem validação presencial.</p></div>}
+  {expandedTimeline&&<div className="ti-attendance-v5-expanded"><section className="ti-journey-timeline" aria-label="Linha do tempo da jornada"><div className="ti-journey-heading"><strong>Eventos do dia</strong><span>Previstos e declarados</span></div><ol>{stages.map(stage=><li key={stage.key} className={'ti-journey-step ti-journey-'+stage.kind}><span className="ti-journey-dot" aria-hidden="true"/><div><strong>{stage.title}</strong><small>{stage.detail}{stage.key!=='schedule'&&eventTime(stage.key)!=='—'?' · '+eventTime(stage.key):''}</small></div></li>)}</ol></section><p>Os horários das marcações são extraídos dos eventos registrados. O horário da escala é previsto; declarações exigem validação presencial.</p></div>}
   <div className="ti-attendance-v5-bottom">   {upcoming.length>0&&<section className="ti-journey-upcoming" aria-label="Próximos dias publicados"><strong>Próximos dias</strong><div className="ti-journey-nextgrid">{upcoming.map(e=><article key={e.uid+e.date}><small>{dateLabel(e.date)}</small><b>{typeLabel[e.type]||'Escala'}</b></article>)}</div></section>}
    <section className="ti-journey-month">
     <button type="button" className="ti-journey-month-toggle" aria-expanded={expandedSchedule} onClick={()=>setExpandedSchedule(v=>!v)}><span><strong>Minha escala completa</strong><small>Calendário mensal, folgas e jornadas publicadas</small></span><span aria-hidden="true">{expandedSchedule?'−':'+'}</span></button>
