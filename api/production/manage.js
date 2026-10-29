@@ -1,3 +1,4 @@
+import {isOperationalProduct} from '../../server/operations/catalog-identity.js';
 import {hasRecipeCycle} from '../../server/production/recipe-graph.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
@@ -30,8 +31,29 @@ export default async function handler(req,res){
   const recipes=unit.collection('productionRecipes'),runs=unit.collection('productionRuns');
   const action=req.body?.action;
   if(action==='list'){
-   const [r,p]=await Promise.all([recipes.orderBy('name').limit(100).get(),runs.orderBy('at','desc').limit(30).get()]);
-   return send(res,200,'Produção carregada.',{recipes:r.docs.map(clean),runs:p.docs.map(clean)});
+   const [r,p,available]=await Promise.all([recipes.orderBy('name').limit(100).get(),runs.orderBy('at','desc').limit(30).get(),unit.collection('products').limit(201).get()]);
+   if(available.size>200)return send(res,409,'Catálogo acima do limite desta consulta.');
+   const ids=new Set(available.docs.filter(d=>isOperationalProduct(d.data())).map(d=>d.id));
+   return send(res,200,'Produção carregada.',{recipes:r.docs.filter(d=>d.data().active===true&&(d.data().lines||[]).every(line=>ids.has(line.productId))&&(!d.data().outputProductId||ids.has(d.data().outputProductId))).map(clean),runs:p.docs.map(clean)});
+  }
+  if(action==='archiveRecipe'){
+   if(!['admin','manager','submanager'].includes(member.role))return send(res,403,'Somente gestão pode arquivar fichas.');
+   const {id,expectedVersion}=req.body||{};
+   if(!idPattern.test(id||'')||!Number.isInteger(expectedVersion)||expectedVersion<1)return send(res,400,'Ficha ou versão inválida.');
+   const ref=recipes.doc(id),actorRef=db.doc('memberships/'+actor.uid);
+   await db.runTransaction(async tx=>{
+    const [a,old]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
+    if(!a.exists||a.data().status!=='active'||a.data().unitId!==member.unitId||
+       !['admin','manager','submanager'].includes(a.data().role))throw Error('FORBIDDEN');
+    if(!old.exists)throw Error('RECIPE_NOT_FOUND');
+    if(old.data().version!==expectedVersion)throw Error('CONFLICT');
+    if(old.data().active===false)throw Error('RECIPE_ARCHIVED');
+    const now=new Date();
+    tx.update(ref,{active:false,archivedAt:now,archivedBy:actor.uid,updatedAt:now});
+    tx.create(db.collection('auditLogs').doc(),{event:'production.recipe_archived',unitId:member.unitId,recipeId:id,actorUid:actor.uid,at:now});
+    signalUnitChange(tx,db,member.unitId);
+   });
+   return send(res,200,'Ficha arquivada, histórico preservado.');
   }
   if(action==='saveRecipe'){
    if(!['admin','manager','submanager'].includes(member.role))return send(res,403,'Somente administração pode definir preparações.');
@@ -47,11 +69,11 @@ export default async function handler(req,res){
     const [a,prev,...products]=await Promise.all([tx.get(actorRef),tx.get(ref),
      ...[...new Set(lines.flatMap(x=>[x.productId,...(x.substitutes||[])]))].map(id=>tx.get(unit.collection('products').doc(id)))]);
     if(!a.exists||a.data().status!=='active'||!['admin','manager','submanager'].includes(a.data().role)||a.data().unitId!==member.unitId)throw Error('FORBIDDEN');
-    if(products.some(x=>!x.exists||x.data().status!=='active'))throw Error('PRODUCT_NOT_FOUND');
+    if(products.some(x=>!x.exists||!isOperationalProduct(x.data())))throw Error('PRODUCT_NOT_FOUND');
     if(prev.exists&&expectedVersion!==prev.data().version)throw Error('CONFLICT');
     let outputUnit='un';
     if(outputProductId){const output=await tx.get(unit.collection('products').doc(outputProductId));
-     if(!output.exists||output.data().status!=='active')throw Error('INVALID_OUTPUT');
+     if(!output.exists||!isOperationalProduct(output.data()))throw Error('INVALID_OUTPUT');
      const balance=await tx.get(unit.collection('physicalBalances').doc(outputProductId));
      const catalog=output.data().catalogId?await tx.get(db.collection('productCatalog').doc(output.data().catalogId)):null;
      outputUnit=countUnit(output.data(),catalog?.data());
@@ -103,9 +125,9 @@ export default async function handler(req,res){
    const outputRef=transformed?unit.collection('products').doc(recipeData.outputProductId):null;
    const outputBalanceRef=transformed?unit.collection('physicalBalances').doc(recipeData.outputProductId):null;
    const [outputDoc,outputBalanceDoc]=transformed?await Promise.all([tx.get(outputRef),tx.get(outputBalanceRef)]):[null,null];
-   if(transformed&&(!outputDoc.exists||outputDoc.data().status!=='active'))throw Error('INVALID_OUTPUT');
+   if(transformed&&(!outputDoc.exists||!isOperationalProduct(outputDoc.data())))throw Error('INVALID_OUTPUT');
    const outputCatalog=transformed&&outputDoc.data().catalogId?await tx.get(db.collection('productCatalog').doc(outputDoc.data().catalogId)):null;
-   if(productDocs.some(p=>!p.exists||p.data().status!=='active')||balanceDocs.some(b=>!b.exists))throw Error('MISSING_STOCK');
+   if(productDocs.some(p=>!p.exists||!isOperationalProduct(p.data()))||balanceDocs.some(b=>!b.exists))throw Error('MISSING_STOCK');
    if(productDocs.some(p=>p.data().catalogId==='alcatra'))throw Error('LEGACY_CUT');
    if(!validProductionSelection(recipeData.lines,items))
       throw Error('UNAUTHORIZED_SUBSTITUTE');

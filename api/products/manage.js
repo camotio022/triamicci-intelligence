@@ -1,3 +1,4 @@
+import {isOperationalProduct,belongsToOperationalCatalog} from '../../server/operations/catalog-identity.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import measurementsHandler from '../../server/operations/handlers/measurements.js';
 import { createHash } from 'node:crypto';
@@ -35,7 +36,7 @@ export default async function handler(req,res) {
       if (snap.size > 200) return send(res,409,'Catálogo acima do limite inicial de 200 itens. Paginação necessária.');
       const balances=new Map(balanceSnap.docs.map(doc=>[doc.id,doc.data()]));
       const definitions=new Map(catalogSnap.docs.map(doc=>[doc.id,doc.data()]));
-      return send(res,200,'Catálogo carregado.',{products:snap.docs.map(doc=>{
+      return send(res,200,'Catálogo carregado.',{products:snap.docs.filter(doc=>belongsToOperationalCatalog(doc.data())).map(doc=>{
        const p=clean(doc),b=balances.get(doc.id);
        return {...p,physicalUnit:countUnit(p,definitions.get(p.catalogId)),physicalBalance:b?{reserve:b.reserve,rotation:b.rotation,total:b.total,
         unit:b.unit,at:b.at?.toDate?.()?.toISOString?.()||null}:null};
@@ -89,11 +90,11 @@ export default async function handler(req,res) {
         if (!current || current.status !== 'active' || current.unitId !== m.unitId || !['admin','manager','submanager'].includes(current.role))
           throw new Error('FORBIDDEN');
         if (existing.exists) throw new Error('DUPLICATE');
-        tx.create(ref,{...payload,quantity:0,status:'active',createdAt:now,createdBy:actor.uid,updatedAt:now});
+        tx.create(ref,{...payload,quantity:0,status:'inactive',countFrequency:'weekly',critical:false,reviewRequired:true,createdAt:now,createdBy:actor.uid,updatedAt:now});
         signalUnitChange(tx,db,m.unitId);
         tx.create(auditRef,{event:'product.created',unitId:m.unitId,productId:id,actorUid:actor.uid,at:now,details:payload});
       });
-      return send(res,201,'Insumo cadastrado.',{id});
+      return send(res,201,'Cadastro criado como pendente de revisão; não integra o catálogo operacional de 56 até conciliação.',{id});
     }
     const {productId,status} = req.body || {};
     if (typeof productId !== 'string' || !/^[a-f0-9]{40}$/.test(productId) ||
@@ -107,6 +108,7 @@ export default async function handler(req,res) {
         throw new Error('FORBIDDEN');
       if (!productSnap.exists) throw new Error('NOT_FOUND');
       const previous = productSnap.data();
+      if(status==='active'&&previous.operationalCatalogVersion!=='56-v1')throw new Error('REVIEW_REQUIRED');
       if (previous.catalogId && (safeName !== previous.name || safeCategory !== previous.category ||
           unit !== previous.unit || trackExpiry !== previous.trackExpiry))
         throw new Error('CATALOG_LOCKED');
@@ -127,6 +129,7 @@ export default async function handler(req,res) {
     if (e.message === 'UNAUTHENTICATED') return send(res,401,'Faça login.');
     if (e.message === 'FORBIDDEN') return send(res,403,'Sem permissão.');
     if (e.message === 'DUPLICATE') return send(res,409,'Já existe um insumo com este nome na unidade.');
+    if (e.message === 'REVIEW_REQUIRED') return send(res,409,'Cadastro pendente de conciliação; ative pela configuração dos 56 produtos após conferir vínculos e saldos.');
     if (e.message === 'NOT_FOUND') return send(res,404,'Insumo não encontrado.');
     if (e.message === 'EXPIRY_LOCKED') return send(res,409,'Não ative o controle de validade com saldo existente. Regularize o saldo antes de migrar para lotes.');
     if (e.message === 'CATALOG_LOCKED') return send(res,409,'Nome, categoria, unidade e validade pertencem ao catálogo central e não podem ser alterados na unidade.');

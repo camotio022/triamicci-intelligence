@@ -1,3 +1,4 @@
+import {isOperationalProduct} from './catalog-identity.js';
 import {intervalFromBalance} from './inventory-summary.js';
 import {operationalBalance,writeOperationalBalance} from './shared-balance.js';
 import {signalUnitChange} from '../live-signal.js';
@@ -43,7 +44,7 @@ export default async function v3Ledger(req,res){
    const {productId}=req.body||{};if(!idOk(productId))return send(res,400,'Insumo inválido.');
    const [a,p]=await Promise.all([actorRef.get(),products.doc(productId).get()]);
    if(!active(a,m.unitId,TEAM_ROLES))return send(res,403,'Sem permissão.');
-   if(!p.exists||p.data().status!=='active')return send(res,404,'Insumo não encontrado.');
+   if(!p.exists||!isOperationalProduct(p.data()))return send(res,404,'Insumo não encontrado.');
    const lots=await lotRoots.doc(productId).collection('lots').limit(101).get();
    if(lots.size>100)return send(res,409,'Muitos lotes: conferir paginação.');
    return send(res,200,'Lotes carregados.',{lots:lots.docs.map(snapMap)});
@@ -64,7 +65,7 @@ export default async function v3Ledger(req,res){
     const [member,product,profile,old]=await Promise.all([tx.get(actorRef),tx.get(products.doc(productId)),tx.get(profiles.doc(productId)),tx.get(ref)]);
     if(!active(member,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
     if(old.exists){if(old.data().fingerprint!==fingerprint||old.data().reportedBy!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
-    if(!product.exists||product.data().status!=='active'||!profile.exists||profile.data().controlMode!=='quantitative'||!profile.data().locations.includes(location))throw Error('MISSING');
+    if(!product.exists||!isOperationalProduct(product.data())||!profile.exists||profile.data().controlMode!=='quantitative'||!profile.data().locations.includes(location))throw Error('MISSING');
     if(!number(quantity,profile.data().countUnit))throw Error('QUANTITY');
     tx.create(ref,{productId,location,quantity,unit:profile.data().countUnit,reason:reason.trim(),status:'pending',fingerprint,reportedAt:now(),reportedBy:actor.uid,unitId:m.unitId});
     audit(tx,db,'v3.loss_reported',m.unitId,actor.uid,{requestId,productId,quantity,location});
@@ -103,7 +104,7 @@ export default async function v3Ledger(req,res){
     if(report.data().status!=='pending'||oldOperation.exists)throw Error('CONFLICT');
     const data=report.data(),balRef=balances.doc(data.productId),profileRef=profiles.doc(data.productId),productRef=products.doc(data.productId);
     const [bal,profile,product]=await Promise.all([operationalBalance(tx,balRef),tx.get(profileRef),tx.get(productRef)]);
-    if(!bal.exists||!profile.exists||!product.exists||product.data().status!=='active'||profile.data().controlMode!=='quantitative')throw Error('MISSING');
+    if(!bal.exists||!profile.exists||!product.exists||!isOperationalProduct(product.data())||profile.data().controlMode!=='quantitative')throw Error('MISSING');
     if(profile.data().countUnit!==bal.data().unit||data.unit!==bal.data().unit||!number(data.quantity,data.unit)||!profile.data().locations.includes(data.location)||bal.data()[data.location]<data.quantity)throw Error('QUANTITY');
     const lots=product.data().lotTrackingMode==='per_lot'?await tx.get(lotRoots.doc(data.productId).collection('lots').orderBy('expiryDate').limit(101)):null;
     if(lots?.size>100)throw Error('LOT');
@@ -143,7 +144,7 @@ export default async function v3Ledger(req,res){
      const [who,existing,product,profile,linkedOrder]=await Promise.all([tx.get(actorRef),tx.get(inspection),tx.get(products.doc(productId)),tx.get(profiles.doc(productId)),orderId?tx.get(orders.doc(orderId)):Promise.resolve(null)]);
      if(!active(who,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
      if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().inspectedBy!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
-     if(!product.exists||product.data().status!=='active'||!profile.exists)throw Error('MISSING');
+     if(!product.exists||!isOperationalProduct(product.data())||!profile.exists)throw Error('MISSING');
      const cfg=profile.data();
      if(!['supplier','both'].includes(cfg.origin))throw Error('RECEIPT_ORIGIN');
      if(!orderId&&notes.trim().length<8)throw Error('RECEIPT_REASON');
@@ -221,7 +222,7 @@ export default async function v3Ledger(req,res){
     if(!active(authSnap,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
     if(!approval?.exists||approval.data().status!=='pending'||approval.data().unitId!==m.unitId||approval.data().fingerprint!==fingerprint)throw Error('CONFLICT');
     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
-    if(!product.exists||product.data().status!=='active'||!profile.exists)throw Error('MISSING');
+    if(!product.exists||!isOperationalProduct(product.data())||!profile.exists)throw Error('MISSING');
     const cfg=profile.data(),isCounted=cfg.controlMode==='quantitative';
     if(!['supplier','both'].includes(cfg.origin))throw Error('RECEIPT_ORIGIN');
     if(!orderRef&&notes.trim().length<8)throw Error('RECEIPT_REASON');
@@ -277,7 +278,7 @@ export default async function v3Ledger(req,res){
     const [a,p,cfg,balance,record]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),operationalBalance(tx,balanceRef),tx.get(ref)]);
     if(!active(a,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
     if(record.exists){const old=record.data();if(old.kind==='count'&&old.actorUid===actor.uid&&old.sessionId===sessionId&&old.productId===productId&&old.location===location&&old.quantity===quantity&&old.notes===notes)return;throw Error('CONFLICT');}
-    if(!p.exists||!cfg.exists||cfg.data().controlMode!=='quantitative'||!cfg.data().locations.includes(location))throw Error('MISSING');
+    if(!p.exists||!isOperationalProduct(p.data())||!cfg.exists||cfg.data().controlMode!=='quantitative'||!cfg.data().locations.includes(location))throw Error('MISSING');
     const u=cfg.data().countUnit;if(!number(quantity,u,true))throw Error('QUANTITY');
     const prior=balance.data()||{reserva:0,giro:0,total:0,unit:u};
     if(prior.unit!==u)throw Error('UNIT');
@@ -323,7 +324,7 @@ export default async function v3Ledger(req,res){
     const [a,p,cfg,b,existing]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),operationalBalance(tx,balRef),tx.get(ref)]);
     if(!active(a,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
     if(existing.exists)throw Error('CONFLICT');
-    if(!p.exists||!cfg.exists||!b.exists||cfg.data().controlMode!=='quantitative'||!cfg.data().locations.includes(from)||!cfg.data().locations.includes(to))throw Error('MISSING');
+    if(!p.exists||!isOperationalProduct(p.data())||!cfg.exists||!b.exists||cfg.data().controlMode!=='quantitative'||!cfg.data().locations.includes(from)||!cfg.data().locations.includes(to))throw Error('MISSING');
     const u=cfg.data().countUnit,prior=b.data();
     if(!number(quantity,u)||prior.unit!==u||prior[from]<quantity)throw Error('QUANTITY');
     let changes=[];
@@ -361,13 +362,13 @@ export default async function v3Ledger(req,res){
     const [a,existing,outProduct,outProfile,outBalance]=snaps;
     if(!active(a,m.unitId,TEAM_ROLES))throw Error('FORBIDDEN');
     if(existing.exists){if(existing.data().fingerprint!==fingerprint||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
-    if(!outProduct.exists||outProduct.data().status!=='active'||!outProfile.exists||!['internal','both'].includes(outProfile.data().origin)||
+    if(!outProduct.exists||!isOperationalProduct(outProduct.data())||!outProfile.exists||!['internal','both'].includes(outProfile.data().origin)||
       outProfile.data().controlMode!=='quantitative'||!outProfile.data().locations.includes(outputLocation))throw Error('MISSING');
     const ocfg=outProfile.data(),outUnit=ocfg.countUnit;
     if(!number(outputQuantity,outUnit))throw Error('QUANTITY');
     if(outProduct.data().lotTrackingMode==='per_lot'&&(!lot.trim()||lot.length>80||!isoDay(expiryDate)||expiryDate<new Date().toISOString().slice(0,10)))throw Error('LOT');
     const n=inputs.length,sP=snaps.slice(5,5+n),sCfg=snaps.slice(5+n,5+2*n),sBal=snaps.slice(5+2*n,5+3*n);
-    if(sP.some(x=>!x.exists||x.data().status!=='active')||sCfg.some(x=>!x.exists)||sBal.some(x=>!x.exists))throw Error('MISSING');
+    if(sP.some(x=>!x.exists||!isOperationalProduct(x.data()))||sCfg.some(x=>!x.exists)||sBal.some(x=>!x.exists))throw Error('MISSING');
     let usesAlternative=false;
     for(let i=0;i<n;i++){
      const item=inputs[i],cfg=sCfg[i].data(),b=sBal[i].data();

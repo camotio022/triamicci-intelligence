@@ -1,3 +1,4 @@
+import {isOperationalProduct} from '../operations/catalog-identity.js';
 import {validQuantity} from '../operations/logic.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -31,9 +32,12 @@ export default async function handler(req,res){
     const [memberDoc,recipeDoc]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(recipeRef)]);
     if(!memberDoc.exists||memberDoc.data().status!=='active'||memberDoc.data().unitId!==m.unitId||!canPlan(memberDoc.data().role))throw Error('FORBIDDEN');
     if(!recipeDoc.exists||recipeDoc.data().active!==true)throw Error('RECIPE_NOT_FOUND');
-    const unit=recipeDoc.data().outputUnit||'un';if(plannedQuantity!==null&&!validQuantity(plannedQuantity,{unit}))throw Error('INVALID_QUANTITY');
+    const recipe=recipeDoc.data(),ids=[...new Set([...(recipe.lines||[]).map(line=>line.productId),recipe.outputProductId].filter(Boolean))];
+    const products=await Promise.all(ids.map(id=>tx.get(unit.collection('products').doc(id))));
+    if(products.some(p=>!p.exists||!isOperationalProduct(p.data())))throw Error('RECIPE_NOT_FOUND');
+    const outputUnit=recipeDoc.data().outputUnit||'un';if(plannedQuantity!==null&&!validQuantity(plannedQuantity,{unit:outputUnit}))throw Error('INVALID_QUANTITY');
     const now=new Date();
-    tx.create(taskRef,{recipeId,recipeName:recipeDoc.data().name,unit,plannedQuantity,status:'pending',day,unitId:m.unitId,createdBy:actor.uid,createdAt:now});
+    tx.create(taskRef,{recipeId,recipeName:recipeDoc.data().name,unit:outputUnit,plannedQuantity,status:'pending',day,unitId:m.unitId,createdBy:actor.uid,createdAt:now});
     signalUnitChange(tx,db,m.unitId);
     tx.create(db.collection('auditLogs').doc(),{event:'production.task_added',unitId:m.unitId,day,taskId:taskRef.id,recipeId,actorUid:actor.uid,at:now});
    });
