@@ -60,10 +60,10 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     if(screen==='Contagem'){
      await page.getByRole('button',{name:'Operações',exact:true}).click();
      await page.getByRole('button',{name:'Contagem oficial',exact:true}).click();
-     await page.getByLabel('Insumo',{exact:true}).selectOption('c'.repeat(40));
+     await page.getByRole('combobox',{name:'Insumo',exact:true}).selectOption('c'.repeat(40));
      const session=await page.getByLabel('Identificador da rodada de contagem').inputValue();
      for(const area of ['reserva','giro']){
-      await page.getByLabel('Onde está contando?',{exact:true}).selectOption(area);
+      await page.getByRole('combobox',{name:'Onde está contando?',exact:true}).selectOption(area);
       await page.getByLabel('Quantidade encontrada (kg)',{exact:true}).fill('1');
       await page.getByLabel('Lote físico inicial',{exact:true}).fill('TESTE-LOTE');
       await page.getByLabel('Validade do lote',{exact:true}).fill('2099-12-31');
@@ -71,7 +71,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       await page.waitForFunction(()=>Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Salvar contagem'&&!b.disabled));
       await page.getByRole('button',{name:'Salvar contagem',exact:true}).waitFor({state:'visible'});
       assert.equal(await page.getByLabel('Identificador da rodada de contagem').inputValue(),session,'Salvar não pode desmontar a rodada');
-      assert.equal(await page.getByLabel('Insumo',{exact:true}).inputValue(),'c'.repeat(40));
+      assert.equal(await page.getByRole('combobox',{name:'Insumo',exact:true}).inputValue(),'c'.repeat(40));
      }
      assert.equal(counts.length,2);assert.equal(counts[0].sessionId,counts[1].sessionId);
      assert.deepEqual(counts.map(c=>c.location),['reserva','giro']);
