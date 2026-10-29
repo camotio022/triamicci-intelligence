@@ -18,11 +18,11 @@ export default async function handler(req,res){
   }
   if(req.body?.action!=='activate')return send(res,400,'Ação inválida.');
   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Sem permissão.');
-  const {id,name,category,stockUnit,operationalUnit,receivingUnit,source,trackExpiry,reviewConfirmed}=req.body;
+  const {id,name,category,stockUnit,operationalUnit,receivingUnit,source,trackExpiry,minStock,countFrequency,critical,reviewConfirmed}=req.body;
   const candidate=byId.get(id);
   if(!candidate||name!==candidate.name||category!==candidate.category||!units.has(stockUnit)||
      !units.has(operationalUnit)||!['supplier','internal'].includes(source)||
-     (source==='supplier'&&!units.has(receivingUnit))||typeof trackExpiry!=='boolean'||reviewConfirmed!==true)
+     (source==='supplier'&&!units.has(receivingUnit))||typeof trackExpiry!=='boolean'||typeof minStock!=='number'||!Number.isFinite(minStock)||minStock<0||minStock>100000000||!['daily','weekly','on_demand'].includes(countFrequency)||typeof critical!=='boolean'||reviewConfirmed!==true)
    return send(res,400,'Confirme as informações do produto antes de ativar.');
   // Avoid automatic conversions between unlike units: configured receipt and count must match the stock unit.
   if(operationalUnit!==stockUnit||(source==='supplier'&&receivingUnit!==stockUnit))
@@ -41,8 +41,8 @@ export default async function handler(req,res){
     brandId:'triamicci',approvedBy:actor.uid,approvedAt:now,updatedAt:now};
    if(central.exists)tx.update(centralRef,record);else tx.create(centralRef,{...record,createdAt:now});
    if(existing.exists){
-     if(existing.data().status!=='active')tx.update(ref,{status:'active',updatedAt:now,updatedBy:actor.uid});
-   }else tx.create(ref,{name,category,unit:stockUnit,minStock:0,trackExpiry,quantity:0,status:'active',
+     tx.update(ref,{status:'active',minStock,countFrequency,critical,updatedAt:now,updatedBy:actor.uid});
+   }else tx.create(ref,{name,category,unit:stockUnit,minStock,countFrequency,critical,trackExpiry,quantity:0,status:'active',
      catalogId:id,productType:record.type,relatedCatalogIds:[],createdAt:now,createdBy:actor.uid,updatedAt:now});
    tx.create(db.collection('auditLogs').doc(),{event:'catalog.manual_activation',unitId:m.unitId,
      productId:ref.id,catalogId:id,actorUid:actor.uid,at:now});
