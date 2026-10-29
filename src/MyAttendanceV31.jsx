@@ -20,7 +20,11 @@ export default function MyAttendanceV31({unitId}){
  const refreshSchedule=async()=>{const token=await auth.currentUser?.getIdToken();if(!token)return;const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action:'mine'})});const d=await r.json();if(!r.ok)throw Error(d.message);setMySchedules(d.schedules||[])};
  useUnitLive(unitId,()=>Promise.all([reload(),refreshSchedule()]));
  useEffect(()=>{reload();refreshSchedule().catch(e=>setError(e.message))},[unitId,reload]);
- const status=record?.status||'not_started',next=actions[status];
+ const status=record?.status||'not_started';
+ const events=record?.events||[];
+ const hasEvent=action=>events.some(event=>event.action===action);
+ const returnedFromBreak=hasEvent('break_end');
+ const next=status==='working'&&returnedFromBreak?['clock_out','Encerrar jornada']:actions[status];
  const operationalDay=day||new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());
  const publishedEntries=mySchedules.flatMap(s=>s.entries||[]).sort((a,b)=>a.date.localeCompare(b.date));
  const todayEntry=publishedEntries.find(e=>e.date===operationalDay);
@@ -29,8 +33,8 @@ export default function MyAttendanceV31({unitId}){
  const stages=[
   {key:'schedule',title:'Escala oficial',detail:todayEntry?(todayEntry.type==='work'?'Dia de trabalho publicado':'Dia de folga ou ausência publicado'):'Sem escala publicada para hoje',kind:todayEntry?'planned':'unknown'},
   {key:'clock_in',title:'Entrada',detail:status==='not_started'?'Aguardando seu registro':'Entrada declarada pelo colaborador',kind:status==='not_started'?'pending':'declared'},
-  {key:'break_start',title:'Início do intervalo',detail:['on_break','finished'].includes(status)?'Intervalo declarado':'Aguardando declaração',kind:['on_break','finished'].includes(status)?'declared':'pending'},
-  {key:'break_end',title:'Retorno do intervalo',detail:status==='finished'?'Etapa anterior ao encerramento (ver histórico para confirmação)':'Não confirmado nesta visualização',kind:'unknown'},
+  {key:'break_start',title:'Início do intervalo',detail:hasEvent('break_start')?'Intervalo registrado':'Aguardando declaração',kind:hasEvent('break_start')?'declared':'pending'},
+  {key:'break_end',title:'Retorno do intervalo',detail:hasEvent('break_end')?'Retorno registrado':'Aguardando retorno',kind:hasEvent('break_end')?'declared':'pending'},
   {key:'clock_out',title:'Saída',detail:status==='finished'?'Saída declarada · confirmação presencial pendente':'Aguardando declaração',kind:status==='finished'?'declared':'pending'}
  ];
  const months=[...new Set(publishedEntries.map(e=>e.date.slice(0,7)))];
@@ -44,14 +48,14 @@ export default function MyAttendanceV31({unitId}){
 
  const live=liveShiftState({day:day||new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),clock,employee:todayEntry?.type==='work'?profile||{}:{},attendance:record});
  const labels={not_started:'Entrada ainda não registrada',working:'Entrada declarada · aguardando confirmação presencial',on_break:'Intervalo declarado',finished:'Saída declarada · aguardando confirmação'};
- const submit=async(action=next?.[0])=>{if(!action||busy)return;setBusy(true);setError('');setNotice('');try{const d=await call(action,{requestId:crypto.randomUUID()});setRecord(p=>({...p,status:d.status}));setNotice('Declaração registrada. A confirmação da presença física depende de validação no estabelecimento.');await reload()}catch(e){setError(e.message)}finally{setBusy(false)}};
+ const submit=async(action=next?.[0])=>{if(!action||busy)return;setBusy(true);setError('');setNotice('');try{const d=await call(action,{requestId:crypto.randomUUID()});setRecord(p=>({...p,status:d.status,events:[...(p?.events||[]),{action,at:new Date().toISOString()}]}));setNotice('Declaração registrada. A confirmação da presença física depende de validação no estabelecimento.');await reload()}catch(e){setError(e.message)}finally{setBusy(false)}};
  return <section className="ti-attendance-v31 ti-attendance-v5" aria-label="Minha jornada">
-  <div className="ti-attendance-v5-heading"><div><span className="ti-attendance-eyebrow">JORNADA DE HOJE · {day||'HOJE'}</span><h2>Minha jornada</h2><p>{status==='not_started'?(off?'Folga ou ausência na escala oficial':!todayEntry?'Sem escala oficial para hoje':live.label):labels[status]}</p></div><span className="ti-attendance-v5-state">{status==='finished'?'Encerrada':status==='not_started'?'Não iniciada':'Em andamento'}</span></div>
+  <div className="ti-attendance-v5-heading"><div><span className="ti-attendance-eyebrow">JORNADA DE HOJE · {day||'HOJE'}</span><h2>Minha jornada</h2><p>{status==='not_started'?(off?'Folga ou ausência na escala oficial':!todayEntry?'Sem escala oficial para hoje':live.label):status==='working'&&returnedFromBreak?'Retorno do intervalo registrado · jornada em andamento':labels[status]}</p></div><span className="ti-attendance-v5-state">{status==='finished'?'Encerrada':status==='not_started'?'Não iniciada':'Em andamento'}</span></div>
   <div className="ti-attendance-v5-schedule"><span>Horário previsto: <strong>{live.start||'Não informado'}{live.end?'–'+live.end:''}</strong></span><span>{todayEntry?'Escala: '+(typeLabel[todayEntry.type]||'Publicada'):'Sem escala oficial para hoje'}</span></div>
   <div className="ti-attendance-v5-progress" aria-label="Etapas da jornada">{stages.map((stage,i)=><div key={stage.key} className={'ti-attendance-v5-milestone '+stage.kind}><span className="ti-attendance-v5-circle" aria-hidden="true"/><strong>{stage.title}</strong><small>{i===0?(live.start||'—'):i===1?(record?.clockInAt?new Date(record.clockInAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}):'Declarada'):i===2?(profile?.availability?.find?.(x=>x.day===['dom','seg','ter','qua','qui','sex','sab'][new Date(operationalDay+'T12:00:00Z').getUTCDay()])?.breakStart||'—'):i===3?(profile?.availability?.find?.(x=>x.day===['dom','seg','ter','qua','qui','sex','sab'][new Date(operationalDay+'T12:00:00Z').getUTCDay()])?.breakEnd||'—'):(live.end||'—')}</small></div>)}</div>
   <div className="ti-attendance-actions ti-attendance-v5-actions">
    {next?.length>0&&<button className="ti-attendance-primary" type="button" onClick={()=>submit()} disabled={busy}>{busy?'Registrando…':next[1]}</button>}
-   {status==='working'&&<button className="ti-attendance-secondary" type="button" onClick={()=>submit('clock_out')} disabled={busy}>Encerrar jornada</button>}
+   {status==='working'&&!returnedFromBreak&&<button className="ti-attendance-secondary" type="button" onClick={()=>submit('clock_out')} disabled={busy}>Encerrar jornada</button>}
   </div>
   {notice&&<p role="status" className="ti-attendance-notice">{notice}</p>}
   {error&&<p role="alert">{error}</p>}

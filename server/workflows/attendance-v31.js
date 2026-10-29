@@ -73,6 +73,9 @@ export default async function attendanceWorkflow(req,res){
     if((old.events||[]).find(e=>e.requestId===requestId).action!==action)throw Error('CONFLICT');
     result=old.status;duplicate=true;return;
    }
+   // Uma jornada comporta um único intervalo. Depois do retorno, o próximo passo é a saída.
+   if(action==='break_start'&&(old.events||[]).some(e=>e.action==='break_start'))throw Error('BREAK_ALREADY_RECORDED');
+   if(action==='break_end'&&!(old.events||[]).some(e=>e.action==='break_start'))throw Error('INVALID_TRANSITION');
    const status=attendanceTransition(old.status,action);
    if(!status)throw Error('INVALID_TRANSITION');
    const at=new Date(),event={action,requestId,at,by:user.uid};
@@ -86,6 +89,7 @@ export default async function attendanceWorkflow(req,res){
  }catch(e){
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='UNFINISHED_SHIFT')return send(res,409,'Encerre primeiro sua jornada anterior.');
+  if(e.message==='BREAK_ALREADY_RECORDED')return send(res,409,'O intervalo já foi registrado nesta jornada. Registre a saída ao concluir.');
   if(e.message==='INVALID_TRANSITION')return send(res,409,'Esta ação não corresponde à sua situação atual.');
   if(e.message==='CONFLICT')return send(res,409,'Registro com identificador diferente.');
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
