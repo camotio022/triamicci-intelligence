@@ -1,7 +1,7 @@
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {auth} from './firebase.js';
-import {Award,Star,Sparkles,Clock3,CheckCircle2,UserRound,Pencil,Target,Send,ShieldCheck} from 'lucide-react';
+import {Award,Star,Sparkles,Clock3,CheckCircle2,UserRound,Pencil,Target,Send,ShieldCheck,Camera,CalendarDays,Building2,ChefHat} from 'lucide-react';
 import {useFeedback} from './FeedbackProvider.jsx';
 import './profile-premium.css';
 import './profile-v5.css';
@@ -22,6 +22,7 @@ export default function MyProfessionalProfile({membership,attendance=null}){
  const {notify}=useFeedback(),[profile,setProfile]=useState(null),[personal,setPersonal]=useState(blank),[recognition,setRecognition]=useState(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[editing,setEditing]=useState(false);
  const [section,setSection]=useState('overview');
+ const [photoMenu,setPhotoMenu]=useState(false);
  const editingRef=useRef(false);editingRef.current=editing;
  const [syncedAt,setSyncedAt]=useState(null);const [avatar,setAvatar]=useState(null);const [uploading,setUploading]=useState(false);
  const [photoFile,setPhotoFile]=useState(null);const [registryCode,setRegistryCode]=useState(''),[claiming,setClaiming]=useState(false);
@@ -46,25 +47,27 @@ export default function MyProfessionalProfile({membership,attendance=null}){
  const confirmed=new Set(profile?.certifications||[]);
  const name=personal.displayName||auth.currentUser?.displayName||auth.currentUser?.email?.split('@')[0]||'Colaborador';
  return <section className="ti-premium team-page ti-profile-v5">
-  <div className="ti-premium-hero">
-   <div className="ti-avatar-editor"><div className="ti-premium-avatar">{avatar?<img src={avatar} alt="Minha foto de perfil"/>:<UserRound size={35}/>}</div><label className="ti-avatar-change"> {uploading?'Enviando...':'Trocar foto'}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={uploadAvatar}/></label>{avatar&&<button type="button" className="ti-avatar-remove" onClick={removeAvatar} disabled={uploading}>Remover</button>}</div>
-   <div className="ti-premium-identity"><p>Meu espaço profissional <Sparkles size={17}/></p><h1>{name}</h1>
-    <span>{profile?.jobTitle||'Perfil em construção'} · {profile?.sector||'Sua equipe'} · {shifts[profile?.shift]||'Turno a definir'}</span>
+  <div className="ti-premium-hero ti-profile-v5-hero">
+   <div className="ti-profile-v5-mainline">
+    <div className="ti-avatar-editor"><div className="ti-premium-avatar">{avatar?<img src={avatar} alt="Minha foto de perfil"/>:<UserRound size={31}/>}</div><button type="button" className="ti-profile-v5-camera" aria-label="Alterar minha foto" onClick={()=>setPhotoMenu(v=>!v)}><Camera size={15}/></button>
+      {photoMenu&&<div className="ti-profile-v5-photoactions"><label>Trocar foto<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={e=>{uploadAvatar(e);setPhotoMenu(false)}}/></label>{avatar&&<button type="button" onClick={()=>{removeAvatar();setPhotoMenu(false)}} disabled={uploading}>Remover foto</button>}</div>}
+    </div>
+    <div className="ti-premium-identity"><p>Meu perfil profissional</p><h1>{name}</h1><span>{profile?.jobTitle||'Perfil em construção'} · {profile?.sector||'Sua equipe'} · {shifts[profile?.shift]||'Turno a definir'}</span></div>
+    <div className="ti-profile-v5-hero-actions"><span className="ti-profile-v5-active"><CheckCircle2 size={13}/> Meu perfil</span><button type="button" onClick={()=>setSection('settings')}><Pencil size={14}/> Editar perfil</button></div>
    </div>
-   <span className="ti-premium-unit">Triamicci Intelligence</span>
+   <div className="ti-profile-v5-identity-meta"><span><ChefHat size={18}/><small>Cargo</small><strong>{profile?.jobTitle||'Não informado'}</strong></span><span><Building2 size={18}/><small>Unidade</small><strong>{membership?.unitId||'—'}</strong></span><span><Clock3 size={18}/><small>Turno</small><strong>{shifts[profile?.shift]||'—'}</strong></span></div>
   </div>
-  <nav className="ti-profile-v5-nav" aria-label="Áreas da minha ficha">{[['overview','Visão geral'],['skills','Habilidades'],['requests','Solicitações'],['settings','Meu perfil']].map(([key,label])=><button type="button" key={key} className={section===key?'active':''} aria-pressed={section===key} onClick={()=>setSection(key)}>{label}</button>)}</nav>
   {photoFile&&<PhotoCropDialog file={photoFile} busy={uploading} onCancel={()=>setPhotoFile(null)} onSave={saveAvatar}/>}
   {loading&&<p role="status">Preparando sua jornada profissional...</p>}
   {error&&<p role="alert" className="team-error">{error} <button type="button" onClick={load}>Tentar novamente</button></p>}
-  {(section==='overview')&&attendance&&<div className="ti-my-profile-attendance">{attendance}<p className="ti-sync-status" role="status">{syncedAt?`Perfil atualizado · ${syncedAt.toLocaleTimeString("pt-BR")}`:"Sincronizando perfil…"}</p></div>}
+  {(['overview','journey','schedule'].includes(section))&&attendance&&<div className="ti-my-profile-attendance">{attendance}<p className="ti-sync-status" role="status">{syncedAt?`Perfil atualizado · ${syncedAt.toLocaleTimeString("pt-BR")}`:"Sincronizando perfil…"}</p></div>}
   {!loading&&!error&&<>
    {section==='skills'&&   <div className="ti-premium-stats">
     <article><Award size={23}/><strong>{recognition?.points??0}</strong><span>Pontos de evolução</span></article>
     <article><CheckCircle2 size={23}/><strong>{recognition?.confirmed??0}</strong><span>Habilidades confirmadas</span></article>
     <article><Star size={23}/><strong>{recognition?.assigned??0}</strong><span>Habilidades atribuídas</span></article>
    </div>}
-   {section==='overview'&&<section className="ti-profile-v5-overview"><h2>Meu dia, sem distrações</h2><p>Sua jornada e as próximas ações aparecem acima. Para consultar suas conquistas, solicitações ou configurações, escolha uma área.</p><div className="ti-profile-v5-shortcuts"><button type="button" onClick={()=>setSection('requests')}>Minhas solicitações</button><button type="button" onClick={()=>setSection('skills')}>Minhas habilidades</button></div></section>}
+   {section==='overview'&&<section className="ti-profile-v5-overview"><div><Star size={21}/><strong>Habilidades e conquistas</strong><button type="button" onClick={()=>setSection('skills')}>Ver todas ›</button></div><p>Competências revisadas e confirmadas pela gerência.</p><div className="ti-profile-v5-statcards"><article><Award size={20}/><strong>{recognition?.confirmed??0}</strong><small>Confirmadas</small></article><article><Target size={20}/><strong>{recognition?.points??0}</strong><small>Pontos de evolução</small></article><article><Star size={20}/><strong>{recognition?.assigned??0}</strong><small>Atribuídas</small></article></div><button type="button" className="ti-profile-v5-skill-link" onClick={()=>setSection('skills')}>Ver minhas habilidades <span>›</span></button></section>}
    <div className="ti-premium-content">
     {section==='skills'&&<section className="ti-premium-card ti-premium-skills">
      <div className="ti-premium-cardhead"><div><p className="ti-premium-kicker">MEU CRESCIMENTO</p><h2><Award size={22}/> Habilidades e conquistas</h2></div><span className="ti-premium-level">{recognition?.level||'Primeiros passos'}</span></div>
