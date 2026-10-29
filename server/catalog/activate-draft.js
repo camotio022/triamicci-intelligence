@@ -1,8 +1,8 @@
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {matchesCatalogProduct,operationalProfileFor,OPERATIONAL_CATALOG_VERSION} from '../../server/operations/catalog-identity.js';
-import {signalUnitChange} from '../../server/live-signal.js';
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
+import {matchesCatalogProduct,operationalProfileFor,OPERATIONAL_CATALOG_VERSION} from '../operations/catalog-identity.js';
+import {signalUnitChange} from '../live-signal.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const draft=JSON.parse(readFileSync(new URL('../../data/triamicci-product-catalog-56.staging.json',import.meta.url),'utf8')).products;
 const byId=new Map(draft.map(p=>[p.id,p]));
 const units=new Set(['kg','L','un']);
