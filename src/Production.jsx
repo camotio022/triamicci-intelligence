@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useState} from 'react';
-import {BookOpen,ClipboardList,RefreshCw,History} from 'lucide-react';
+import {BookOpen,ClipboardList} from 'lucide-react';
+import TriamicciHistory from './TriamicciHistory.jsx';
 import './production-v4.css';
 import {useUnitLive} from './useUnitLive.js';
 import LiveStatus from './LiveStatus.jsx';
@@ -158,13 +159,12 @@ export default function Production({membership}){
     </form>
    </details>}
   </div>
-  <section className="receiving-card"><div className="inventory-list-header"><h2><History size={19} aria-hidden="true"/> Produções registradas</h2><button type="button" onClick={load} aria-label="Atualizar produções"><RefreshCw size={16} aria-hidden="true"/> Atualizar</button></div>
-   {loading?<p>Consultando Firebase...</p>:runs.length===0?<p className="ti-v4-production-empty">Nenhuma produção registrada nesta consulta. Adicionar uma preparação à lista não movimenta estoque.</p>:
-    <div className="production-history">{runs.map(r=><article key={r.id}><strong>{r.recipeName}</strong>
-     <span>{r.portions} {r.outputUnit||'un'} · {r.at?new Date(r.at).toLocaleString('pt-BR'):'—'}</span>
-     <small>{r.items?.map(i=>i.productName+' '+i.quantity+' '+i.unit).join(' · ')}</small>
-     <small>Responsável: {r.actorName||r.actorUid}</small></article>)}</div>}
-  </section>
+  <section className="receiving-card"><TriamicciHistory title="Histórico de produção" records={runs} loading={loading}
+   getTitle={r=>r.recipeName||'Produção'} getDate={r=>r.at} getQuantity={r=>r.portions+' '+(r.outputUnit||'un')}
+   getDescription={r=>(r.items||[]).map(i=>i.productName+' · '+i.quantity+' '+i.unit).join(' · ')}
+   getPerson={r=>r.actorName||r.actorUid}
+   renderDetails={r=><>{r.notes&&<div>Observação: {r.notes}</div>}<div>Registro: {r.id}</div></>}
+   empty="Nenhuma produção registrada para o período. A lista planejada não movimenta estoque."/></section>
 
  </section>;
 }
