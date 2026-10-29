@@ -11,7 +11,7 @@ async function invoke(action,payload={}){
  const d=await r.json();if(!r.ok)throw Error(d.message||'Operação não realizada.');return d;
 }
 function Field({name,children}){return <label>{name}{children}</label>}
-export default function KitchenV3Workflows({kind,products,orders,membership,onChange,onConfigure,initialProductId=null}){
+export default function KitchenV3Workflows({kind,approvedReceipts=[],products,orders,membership,onChange,onConfigure,initialProductId=null}){
  const {notify}=useFeedback();const managers=isManagement(membership.role);
  const [productId,setProductId]=useState(initialProductId||''),[location,setLocation]=useState('reserva'),[supplier,setSupplier]=useState(''),
  [commercialUnit,setCommercialUnit]=useState('kg'),[commercialQuantity,setCommercialQuantity]=useState(''),
@@ -81,6 +81,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  const relevantProduct=prepared?out:chosen;
  const locations=relevantProduct?.profile?.locations||['reserva','giro'];
  const showLot=(kind==='receive'&&usesPhysicalLots(chosen))||(prepared&&out?.trackExpiry);
+ if(kind==='receive')return <ShipmentReceiving approvedReceipts={approvedReceipts} products={products} orders={orders} membership={membership} onChange={onChange} onConfigure={onConfigure}/>;
  return <section className="v3-page v3-card v3-workflow">
   {kind==='receive'&&<ShipmentReceiving products={products} orders={orders} membership={membership} onChange={onChange} onConfigure={onConfigure}/>}
   <details open={kind!=='receive'}><summary>{kind==='receive'?'Conferência individual e pendências anteriores':'Detalhes da operação'}</summary>
