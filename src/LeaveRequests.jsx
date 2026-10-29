@@ -1,5 +1,6 @@
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import TriamicciHistory from './TriamicciHistory.jsx';
 import {auth} from './firebase.js';
 import './operations-planning.css';
 import './leave-v4.css';
@@ -90,6 +91,12 @@ export default function LeaveRequests({membership}){
     </div>}
    </article>)}</div>}
   </section>
+  <section className="ti-planning-card"><TriamicciHistory title="Histórico de solicitações" records={requests.filter(x=>x.status==='approved'||x.status==='rejected')}
+    getId={x=>x.id} getTitle={x=>dateLabel(x.date)} getDate={x=>x.decidedAt||x.updatedAt||x.createdAt||null}
+    getQuantity={x=>statuses[x.status]||x.status} getDescription={x=>x.reason||'Solicitação de folga'}
+    getPerson={x=>x.actorName||x.requesterName||x.employeeName}
+    renderDetails={x=><div>{x.note?'Decisão: '+x.note:'Sem observações'} · ID: {x.id}</div>}
+    empty="Nenhuma solicitação concluída no período."/></section>
   {notice&&<p role="status" className="ti-leave-v4-message">{notice}</p>}
   {error&&<p role="alert" className="team-error">{error}</p>}
  </section>;
