@@ -12,7 +12,7 @@ async function call(action,extra={}){
 }
 export default function MyAttendanceV31({unitId}){
  const [mySchedules,setMySchedules]=useState([]);
- const [expandedSchedule,setExpandedSchedule]=useState(false),[expandedTimeline,setExpandedTimeline]=useState(false),[monthOffset,setMonthOffset]=useState(0);
+ const [expandedSchedule,setExpandedSchedule]=useState(true),[expandedTimeline,setExpandedTimeline]=useState(false),[monthOffset,setMonthOffset]=useState(0);
  const [profile,setProfile]=useState(null),[clock,setClock]=useState('00:00'),[record,setRecord]=useState(null),[day,setDay]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const reload=useCallback(async()=>{try{const d=await call('today');setRecord(d.record);setDay(d.day)}catch(e){setError(e.message)}},[]);
  useEffect(()=>{let active=true;const token=async()=>auth.currentUser?.getIdToken();token().then(t=>t&&fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify({module:'attendanceV31',action:'teamDirectory'})})).then(r=>r?.ok?r.json():null).then(d=>{if(active)setProfile((d?.registry||[]).find(p=>p.accountUid===auth.currentUser?.uid)||null)}).catch(()=>{});return()=>{active=false}},[unitId]);
@@ -62,7 +62,7 @@ export default function MyAttendanceV31({unitId}){
     <button type="button" className="ti-journey-month-toggle" aria-expanded={expandedSchedule} onClick={()=>setExpandedSchedule(v=>!v)}><span><strong>Minha escala completa</strong><small>Calendário mensal, folgas e jornadas publicadas</small></span><span aria-hidden="true">{expandedSchedule?'−':'+'}</span></button>
     {expandedSchedule&&<div className="ti-journey-month-body">
      <div className="ti-journey-monthnav"><button type="button" onClick={()=>setMonthOffset(v=>v-1)} disabled={baseMonthIndex+monthOffset<=0} aria-label="Mês anterior">‹</button><strong>{selectedMonth.split('-').reverse().join('/')}</strong><button type="button" onClick={()=>setMonthOffset(v=>v+1)} disabled={baseMonthIndex+monthOffset>=months.length-1} aria-label="Mês seguinte">›</button></div>
-     {monthEntries.length?<ul>{monthEntries.map(e=><li key={e.uid+e.date}><time dateTime={e.date}>{dateLabel(e.date)}</time><span className={e.type==='work'?'ti-journey-work':'ti-journey-off'}>{typeLabel[e.type]||'Escala'}</span></li>)}</ul>:<p>Nenhuma escala publicada para este mês.</p>}
+     {monthEntries.length?<div className="ti-v5-calendar" role="grid" aria-label="Dias da escala">{['D','S','T','Q','Q','S','S'].map((d,i)=><span key={'h'+i} className="ti-v5-cal-head">{d}</span>)}{Array.from({length:new Date(Number(selectedMonth.slice(0,4)),Number(selectedMonth.slice(5,7))-1,1).getDay()},(_,i)=><span key={'pad'+i}/>)}{Array.from({length:new Date(Number(selectedMonth.slice(0,4)),Number(selectedMonth.slice(5,7)),0).getDate()},(_,i)=>{const n=i+1,dt=selectedMonth+'-'+String(n).padStart(2,'0'),entry=monthEntries.find(e=>e.date===dt);return <span key={dt} title={entry?typeLabel[entry.type]||'Escala':'Não publicado'} className={'ti-v5-cal-day '+(dt===operationalDay?'today ':'')+(entry?.type==='work'?'work':entry?'off':'')}><b>{n}</b>{entry&&<i/>}</span>})}</div>:<p>Nenhuma escala publicada para este mês.</p>}
     </div>}
    </section>
   </div>
