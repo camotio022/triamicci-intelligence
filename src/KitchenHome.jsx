@@ -2,6 +2,7 @@ import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {PackageCheck,ClipboardCheck,Boxes,History,RefreshCw,AlertCircle,CookingPot} from 'lucide-react';
+import './triamicci-history.css';
 
 export default function KitchenHome({membership,navigate}){
  const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[],productions:[]}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
@@ -32,11 +33,11 @@ export default function KitchenHome({membership,navigate}){
   {error&&<p role="alert" className="receiving-notice"><AlertCircle size={16}/> {error}</p>}
   <div className="kitchen-summary">{[['all',products.length,'Produtos vinculados'],['counted',counted.length,'Com contagem física'],['uncounted',products.length-counted.length,'Aguardam contagem']].map(([key,n,label])=><button type="button" key={key} aria-pressed={filter===key} onClick={()=>setFilter(key)}><strong>{n}</strong><span>{label}</span></button>)}</div>
   <div className="inventory-list-header"><h2>Produção registrada</h2><button type="button" onClick={()=>navigate('production')}>Abrir produção</button></div>
-  {history.productions.length?<div className="kitchen-history">{history.productions.slice(0,5).map(r=><div key={r.id}><div><strong>{r.recipeName||'Preparo'}</strong><span>{r.portions} {r.outputUnit||'porções'}</span></div><span>{r.at?new Date(r.at).toLocaleString('pt-BR'):'—'}</span></div>)}</div>:<p>Nenhuma produção registrada nesta consulta.</p>}
+  {history.productions.length?<div className="ti-history-summary" aria-label="Últimas produções">{history.productions.slice(0,5).map(r=><button type="button" key={r.id} onClick={()=>navigate('production')} className="ti-history-summary-item"><span><strong>{r.recipeName||'Preparo'}</strong><small>{r.portions} {r.outputUnit||'un'}</small></span><time>{r.at?new Date(r.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</time></button>)}</div>:<p>Nenhuma produção registrada nesta consulta.</p>}
   <div className="inventory-list-header"><h2>Produtos da cozinha</h2><button type="button" onClick={()=>navigate('inventory')}>Ver todos no estoque</button></div>
   {loading?<p>Carregando dados…</p>:displayed.length===0?<p>Nenhum produto neste filtro.</p>:<div className="kitchen-history">{displayed.slice(0,6).map(p=><div key={p.id}><div><strong>{p.name}</strong><span>{p.physicalBalance?`Reserva ${p.physicalBalance.reserve} ${p.physicalBalance.unit} · Giro ${p.physicalBalance.rotation} ${p.physicalBalance.unit}`:'Sem contagem física'}</span></div><strong>{p.physicalBalance?`${p.physicalBalance.total} ${p.physicalBalance.unit}`:'Não verificado'}</strong></div>)}</div>}
   <div className="inventory-list-header"><h2>Atividade recente</h2><button type="button" onClick={()=>navigate('history')}>Ver histórico</button></div>
-  {latest.length===0?<p>Nenhuma operação física registrada nesta unidade.</p>:<div className="kitchen-history">{latest.map(x=><div key={x.id}><div><strong>{x.label}</strong><span>{x.productName}</span></div><span>{x.at?new Date(x.at).toLocaleString('pt-BR'):'—'}</span></div>)}</div>}
+  {latest.length===0?<p>Nenhuma operação física registrada nesta unidade.</p>:<div className="ti-history-summary" aria-label="Atividade recente">{latest.map(x=><button type="button" key={x.label+'-'+x.id} className="ti-history-summary-item" onClick={()=>navigate('history')}><span><strong>{x.label}</strong><small>{x.productName||x.recipeName||'Operação registrada'}</small></span><time>{x.at?new Date(x.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}</time></button>)}</div>}
   <p className="inventory-footnote">Os dados são carregados do Firebase. Contagem física e saldos legados permanecem separados até serem conciliados.</p>
  </section>;
 }
