@@ -15,3 +15,16 @@
 .ti-profile-v5-shortcuts{display:flex;gap:8px;flex-wrap:wrap}
 .ti-profile-v5-shortcuts button{flex:1;min-width:140px;border:1px solid #a71919;background:#fff7f7;border-radius:10px;color:#a71919;padding:11px;font-size:13px;font-weight:750}
 @media(max-width:550px){.ti-profile-v5 .ti-premium-hero{padding:14px}.ti-profile-v5-nav{scrollbar-width:thin}}
+
+/* Correção de fidelidade: perfil compacto, jornada ganha prioridade. */
+.ti-profile-v5 .ti-premium-hero{display:flex;align-items:center;gap:16px;min-height:0;position:relative}
+.ti-profile-v5 .ti-avatar-editor{flex:0 0 auto}
+.ti-profile-v5 .ti-premium-identity{min-width:0;flex:1}
+.ti-profile-v5 .ti-premium-unit{display:none}
+.ti-profile-v5 .ti-premium-identity p{font-size:12px}
+.ti-profile-v5 .ti-premium-identity h1{font-size:clamp(20px,5vw,27px);line-height:1.2;margin:5px 0}
+.ti-profile-v5 .ti-premium-identity>span{font-size:13px;line-height:1.4}
+.ti-profile-v5 .ti-avatar-change{font-size:11px}
+.ti-profile-v5 .ti-avatar-remove{font-size:11px}
+.ti-profile-v5 .ti-profile-v5-overview{display:none}
+@media(max-width:600px){.ti-profile-v5 .ti-premium-hero{padding:15px 12px;gap:12px}.ti-profile-v5 .ti-premium-avatar{width:68px;height:68px}.ti-profile-v5 .ti-premium-identity h1{font-size:21px}}
