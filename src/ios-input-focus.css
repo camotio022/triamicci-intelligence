@@ -1,9 +1,8 @@
-/* Safari iOS zooms focused form controls below 16px.
-   Preserve user pinch zoom and desktop typography. */
-@media screen and (max-width: 800px) {
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
-  textarea,
-  select {
-    font-size: 16px !important;
+/* iOS Safari may auto-zoom focused editable controls with text below 16px.
+   Apply across phone/tablet touch screens; never disable user pinch zoom.
+   Exclude non-text control types that have no editable text. */
+@media (hover: none) and (pointer: coarse), screen and (max-width: 800px) {
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]), textarea, select, [contenteditable="true"], [contenteditable="plaintext-only"]) {
+    font-size: max(16px, 1rem) !important;
   }
 }
