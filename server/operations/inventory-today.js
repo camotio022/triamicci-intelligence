@@ -3,6 +3,8 @@ import {todayCountPage} from './today-count-page.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
 const dayInUnit=at=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(at));
+// IncomingMessage expõe headers por getter herdado; espalhar req perde a autenticação.
+export function requestForReport(req,productId){return {method:req.method,headers:req.headers,body:{action:'dailyReport',productId}};}
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
@@ -20,7 +22,7 @@ export default async function handler(req,res){
   const products=[];
   for(let i=0;i<selected.length;i+=4){const batch=await Promise.all(selected.slice(i,i+4).map(async doc=>{
    const p=await root.collection('products').doc(doc.id).get();let data=null,status=200;
-   await dailyReport({...req,body:{action:'dailyReport',productId:doc.id}},{setHeader(){},status(c){status=c;return this},json(d){data=d;return this}});
+   await dailyReport(requestForReport(req,doc.id),{setHeader(){},status(c){status=c;return this},json(d){data=d;return this}});
    const report=data?.report;
    return {productId:doc.id,name:p.data()?.name||'Produto indisponível',at:iso(doc.data().at),countId:doc.data().countId||null,state:status!==200||!data?.complete||!report?'unavailable':report.status==='NO_PREVIOUS_COUNT'?'history':report.divergence?'investigate':'clear',report};
   }));products.push(...batch);}
