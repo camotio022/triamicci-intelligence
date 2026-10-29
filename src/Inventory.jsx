@@ -25,6 +25,7 @@ async function call(action, payload={}) {
   if (!res.ok) throw new Error(data.message || 'Erro ao consultar catálogo.');
   return data;
 }
+import {balancePresentation} from './operation-time.js';
 export default function Inventory({membership,mode='stock',onAction}) {
  const {notify}=useFeedback();
   const cachedProducts=useMemo(()=>readViewCache(auth.currentUser?.uid,membership.unitId,'inventory-products'),[membership.unitId]);
@@ -84,7 +85,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
     <p>{administration?'Revise cadastros, aprovações e configurações sem misturar essas tarefas com a rotina de estoque.':'Consulte a última contagem de reserva e giro. Sem contagem, mostramos o saldo legado identificado, não uma quantidade física confirmada.'}</p>
     {administration&&<div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>}
     {!administration&&<div className="ti-stock-overview" aria-label="Resumo do estoque"><button type="button" aria-pressed={countFilter==='all'} onClick={()=>setCountFilter('all')}><strong>{products.length}</strong><span>Insumos</span></button><button type="button" aria-pressed={countFilter==='today'} onClick={()=>setCountFilter('today')}><strong>{todays.length}</strong><span>Contados hoje</span></button><button type="button" aria-pressed={countFilter==='uncounted'} onClick={()=>setCountFilter('uncounted')}><strong>{products.filter(p=>!p.physicalBalance?.at).length}</strong><span>Sem contagem</span></button></div>}
-    {!administration&&<p className="ti-stock-day-label"><strong>Hoje · {new Date(today+"T12:00:00Z").toLocaleDateString("pt-BR",{timeZone:"UTC"})}</strong> · A data indica a última contagem, não o saldo após movimentações.</p>}
+    {!administration&&<p className="ti-stock-day-label"><strong>Hoje · {new Date(today+"T12:00:00Z").toLocaleDateString("pt-BR",{timeZone:"UTC"})}</strong> · O saldo inclui as movimentações registradas. A data indica a última contagem; confira antes de usar como quantidade física atual.</p>}
     {administration&&<nav className="ti-catalog-v41-nav" aria-label="Áreas do catálogo">{[{id:'products',title:'Produtos',desc:'Consultar e editar cadastros'},{id:'packages',title:'Embalagens',desc:'Como produtos são recebidos e contados'},{id:'attach',title:'Adicionar produtos',desc:'Vincular e aprovar itens'},{id:'review',title:'Revisão avançada',desc:'Conferir mudanças técnicas'}].filter(x=>x.id!=='review'||membership.role==='admin').map(area=><button key={area.id} type="button" aria-current={catalogArea===area.id?'page':undefined} onClick={()=>{setCatalogArea(area.id);cancel()}}><strong>{area.title}</strong><small>{area.desc}</small></button>)}</nav>}
     {administration&&catalogArea==='packages'&&canEdit&&<section className="ti-catalog-v41-pane"><h2>Embalagens e contagem</h2><MeasurementEditor products={products}/></section>}
     {administration && catalogArea==='review' && membership.role === 'admin' && <section className="ti-catalog-v41-pane"><h2>Revisão técnica do catálogo</h2><CatalogV2Review /></section>}
@@ -107,15 +108,16 @@ export default function Inventory({membership,mode='stock',onAction}) {
     {!administration&&<div className="ti-stock-filters" role="group" aria-label="Filtrar contagens">{[["all","Todos"],["today","Contados hoje"],["previous","Contados antes"],["uncounted","Sem contagem"]].map(([id,label])=><button key={id} type="button" className={countFilter===id?"active":""} aria-pressed={countFilter===id} onClick={()=>setCountFilter(id)}>{label}</button>)}</div>}
     {error && <p role="alert">{error}</p>}
     {!administration&&<div className="ti-stock-list" aria-label="Estoque por produto">
-     {visible.map(p=>{const u=p.physicalBalance?.unit||p.physicalUnit||p.unit;const counted=Boolean(p.physicalBalance);
+     {visible.map(p=>{const u=p.physicalBalance?.unit||p.physicalUnit||p.unit;const counted=Boolean(p.physicalBalance);const presentation=balancePresentation(p.physicalBalance);
       const mismatch=counted&&p.physicalUnit&&p.physicalBalance.unit&&p.physicalBalance.unit!==p.physicalUnit;
       const when=countDay(p);
       return <button className={"ti-stock-item"+(when===today?" ti-stock-item-today":"")} key={p.id} type="button" onClick={()=>setDetailId(p.id)} aria-label={"Ver detalhes de "+p.name}>
        <span className="ti-stock-item-main"><strong>{p.name}</strong><small>{p.category} · {when===today?"Contado hoje":when?"Última contagem: "+new Date(p.physicalBalance.at).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo"}):"Sem contagem física"}</small>
         {counted&&<span className="ti-stock-split"><span>Reserva <b>{p.physicalBalance.reserve} {u}</b></span><span>Giro <b>{p.physicalBalance.rotation} {u}</b></span></span>}
+        {when&&when!==today&&<small className="ti-focus-warning">Contagem anterior a hoje · conferir data</small>}
         {mismatch&&<small className="ti-stock-unit-warning">Unidade da contagem difere do cadastro · conferir</small>}
        </span>
-       <span className="ti-stock-item-total"><strong>{counted?p.physicalBalance.total:p.quantity??'—'} <small>{counted?u:p.unit}</small></strong><small className={when===today?"ti-stock-green":""}>{counted?"Total físico":"Saldo legado"}</small></span>
+       <span className="ti-stock-item-total"><strong>{counted?p.physicalBalance.total:p.quantity??'—'} <small>{counted?u:p.unit}</small></strong><small className={when===today?"ti-stock-green":""}>{counted?presentation.title:"Sem conferência física"}</small></span>
        <span className="ti-stock-item-chevron" aria-hidden="true">›</span>
       </button>;
      })}

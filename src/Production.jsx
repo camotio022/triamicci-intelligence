@@ -7,6 +7,9 @@ import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {executionQuantity} from '../server/production/daily-task.js';
 import {suggestedQuantity} from '../server/production/logic.js';
+import {recordDay,inPeriod} from './operation-time.js';
+import {useOperationDay} from './useOperationDay.js';
+import HistoryPeriod from './HistoryPeriod.jsx';
 const idFor=s=>s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,50);
 async function call(path,action,payload={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login.');
@@ -17,6 +20,9 @@ async function call(path,action,payload={}){
 }
 export default function Production({membership}){
  const {notify}=useFeedback();
+ const today=useOperationDay();
+ const [historyFrom,setHistoryFrom]=useState(''),[historyTo,setHistoryTo]=useState('');
+ const [showCompleted,setShowCompleted]=useState(false);
  const [recipes,setRecipes]=useState([]),[runs,setRuns]=useState([]),[products,setProducts]=useState([]);
  const [recipeId,setRecipeId]=useState(''),[name,setName]=useState(''),[yieldQuantity,setYield]=useState('1'),[outputProductId,setOutputProductId]=useState('');
  const [editRecipeId,setEditRecipeId]=useState(''),[recipeVersion,setRecipeVersion]=useState(null),[method,setMethod]=useState(''),[outputLot,setOutputLot]=useState(''),[expiryDate,setExpiryDate]=useState('');
@@ -28,7 +34,8 @@ export default function Production({membership}){
  const [dailyTasks,setDailyTasks]=useState([]),[plannedRecipe,setPlannedRecipe]=useState(''),[plannedQuantity,setPlannedQuantity]=useState(''),[activeTaskId,setActiveTaskId]=useState(null),[taskLoading,setTaskLoading]=useState(false);
  const admin=['admin','manager','submanager'].includes(membership.role);
  const canPlan=['admin','manager','submanager','cook'].includes(membership.role);
- const loadTasks=useCallback(async()=>{try{const r=await call('/api/production/manage','dayList');setDailyTasks(r.tasks||[]);return true;}catch(e){setStatus(e.message);return false}},[notify,membership?.unitId]);
+ const [tasksLoading,setTasksLoading]=useState(true),[tasksError,setTasksError]=useState('');
+ const loadTasks=useCallback(async()=>{try{setTasksError('');const r=await call('/api/production/manage','dayList');setDailyTasks(r.tasks||[]);return true;}catch(e){setTasksError(e.message);return false}finally{setTasksLoading(false)}},[membership?.unitId]);
  const addDailyTask=async e=>{e.preventDefault();if(taskLoading||!plannedRecipe)return;setTaskLoading(true);try{await call('/api/production/manage','dayAdd',{recipeId:plannedRecipe,plannedQuantity:plannedQuantity?Number(plannedQuantity):null});setPlannedRecipe('');setPlannedQuantity('');await loadTasks();notify('Preparação adicionada à lista.','success')}catch(e){notify(e.message,'error')}finally{setTaskLoading(false)}};
  const load=useCallback(async(silent=false)=>{
   if(!silent)setLoading(true);try{
@@ -40,6 +47,9 @@ export default function Production({membership}){
  useEffect(()=>{load();loadTasks()},[load,loadTasks]);
  const live=useUnitLive(membership?.unitId,()=>Promise.all([load(true),loadTasks()]));
  useEffect(()=>{const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
+ const todayRuns=runs.filter(r=>recordDay(r.at)===today);
+ const historyRuns=runs.filter(r=>inPeriod(r.at,historyFrom,historyTo));
+ const visibleTasks=dailyTasks.filter(t=>showCompleted||t.status!=='completed');
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=(id,task=null)=>{
   setRecipeId(id);setRequestId(null);setConfirmed(false);setActiveTaskId(null);
@@ -81,7 +91,8 @@ export default function Production({membership}){
   {status&&<p role="status" className="receiving-notice">{status}</p>}
   <section className="receiving-card ti-v4-daily-tasks"><h2>Lista de produção de hoje</h2><p>Planejamento compartilhado da cozinha. Só a confirmação da quantidade realmente produzida movimenta o estoque.</p>
    {canPlan&&<form className="ti-v4-daily-task-form" onSubmit={addDailyTask}><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional ({recipes.find(r=>r.id===plannedRecipe)?.outputUnit||'un'})<input type="number" min="0.001" max="10000" step="0.001" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading}>Adicionar à lista</button></form>}
-   {dailyTasks.length===0?<p className="ti-v4-production-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-daily-task-list">{dailyTasks.map(task=><li key={task.id}><div><strong>{task.recipeName}</strong><small>{task.status==="completed"?`Concluída: ${task.completedQuantity} ${task.unit||'un'}`:task.status==="partial"?`Parcial: ${task.completedQuantity} de ${task.plannedQuantity} ${task.unit||'un'}`:task.plannedQuantity?`Meta: ${task.plannedQuantity} ${task.unit||'un'}`:"Quantidade a definir"}</small></div>{task.status!=="completed"?<button type="button" onClick={()=>{choose(task.recipeId,task);setActiveTaskId(task.id);document.querySelector(".production-page .ti-v4-production-layout")?.scrollIntoView({behavior:"smooth",block:"start"})}}>Registrar execução</button>:<span className="ti-v4-task-done">Concluída</span>}</li>)}</ul>}
+   {dailyTasks.some(t=>t.status==='completed')&&<button type="button" aria-expanded={showCompleted} onClick={()=>setShowCompleted(v=>!v)}>{showCompleted?'Recolher concluídas':'Ver concluídas de hoje'} · {dailyTasks.filter(t=>t.status==='completed').length}</button>}
+   {tasksError&&<p role="alert">{tasksError}</p>}{tasksLoading?<p role="status">Carregando tarefas de hoje…</p>:tasksError?null:dailyTasks.length===0?<p className="ti-v4-production-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-daily-task-list">{visibleTasks.map(task=><li key={task.id}><div><strong>{task.recipeName}</strong><small>{task.status==="completed"?`Concluída: ${task.completedQuantity} ${task.unit||'un'}`:task.status==="partial"?`Parcial: ${task.completedQuantity} de ${task.plannedQuantity} ${task.unit||'un'}`:task.plannedQuantity?`Meta: ${task.plannedQuantity} ${task.unit||'un'}`:"Quantidade a definir"}</small></div>{task.status!=="completed"?<button type="button" onClick={()=>{choose(task.recipeId,task);setActiveTaskId(task.id);document.querySelector(".production-page .ti-v4-production-layout")?.scrollIntoView({behavior:"smooth",block:"start"})}}>Registrar execução</button>:<span className="ti-v4-task-done">Concluída</span>}</li>)}</ul>}
   </section>
   <div className="production-layout ti-v4-production-layout">
    <section className="receiving-card">
@@ -146,13 +157,16 @@ export default function Production({membership}){
     </form>
    </details>}
   </div>
-  <section className="receiving-card"><div className="inventory-list-header"><h2><History size={19} aria-hidden="true"/> Produções registradas</h2><button type="button" onClick={load} aria-label="Atualizar produções"><RefreshCw size={16} aria-hidden="true"/> Atualizar</button></div>
-   {loading?<p>Consultando Firebase...</p>:runs.length===0?<p className="ti-v4-production-empty">Nenhuma produção registrada nesta consulta. Adicionar uma preparação à lista não movimenta estoque.</p>:
-    <div className="production-history">{runs.map(r=><article key={r.id}><strong>{r.recipeName}</strong>
+  <section className="receiving-card"><div className="inventory-list-header"><h2><History size={19} aria-hidden="true"/> Produções registradas hoje</h2><button type="button" onClick={load} aria-label="Atualizar produções"><RefreshCw size={16} aria-hidden="true"/> Atualizar</button></div>
+   {loading?<p role="status">Carregando produções…</p>:todayRuns.length===0?<p className="ti-v4-production-empty">Nenhuma produção de hoje nesta consulta. Adicionar uma preparação à lista não movimenta estoque.</p>:
+    <div className="production-history">{todayRuns.map(r=><article key={r.id}><strong>{r.recipeName}</strong>
      <span>{r.portions} {r.outputUnit||'un'} · {r.at?new Date(r.at).toLocaleString('pt-BR'):'—'}</span>
      <small>{r.items?.map(i=>i.productName+' '+i.quantity+' '+i.unit).join(' · ')}</small>
      <small>Responsável: {r.actorName||r.actorUid}</small></article>)}</div>}
   </section>
-
+  <details className="receiving-card ti-history-disclosure"><summary>Consultar histórico de produção</summary>
+   <HistoryPeriod from={historyFrom} to={historyTo} onFrom={setHistoryFrom} onTo={setHistoryTo}/>
+   {loading?<p role="status">Carregando histórico…</p>:<div className="production-history">{historyRuns.map(r=><article key={r.id}><strong>{r.recipeName}</strong><span>{r.portions} {r.outputUnit||'un'} · {new Date(r.at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</span><small>Responsável: {r.actorName||r.actorUid}</small><small>{r.items?.map(i=>i.productName+' '+i.quantity+' '+i.unit).join(' · ')}</small></article>)}{!historyRuns.length&&<p>Nenhuma produção no período entre os registros carregados.</p>}</div>}
+  </details>
  </section>;
 }
