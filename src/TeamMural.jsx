@@ -1,11 +1,12 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck,ClipboardList} from 'lucide-react';
+import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck,ClipboardList,Sun,Moon,ChevronDown,UserRound} from 'lucide-react';
 import {auth} from './firebase.js';
 import {useUnitLive} from './useUnitLive.js';
 import LiveStatus from './LiveStatus.jsx';
 import PublishedRoster from './PublishedRoster.jsx';
 import {rosterToday,liveShiftState} from '../server/schedules/restaurant-today.js';
 import './operations-planning.css';
+import './mural-v5.css';
 
 async function read(module,action,payload={}){
  const token=await auth.currentUser?.getIdToken();
@@ -58,6 +59,7 @@ export default function TeamMural({membership}){
  const nextTeam=roster.filter(x=>!x.ongoing&&x.upcoming).sort((a,b)=>a.start.localeCompare(b.start));
  const withoutTime=roster.filter(x=>!x.start&&!x.ongoing);
  const [teamFilter,setTeamFilter]=useState('all');
+ const [openShifts,setOpenShifts]=useState({Manhã:true,Noite:false,Intermediário:false,Variável:false});
  const endedTeam=roster.filter(x=>x.start&&!x.ongoing&&!x.upcoming);
  const visibleTeam=teamFilter==='now'?nowTeam:teamFilter==='next'?nextTeam:teamFilter==='ended'?endedTeam:roster;
  const [noticeForm,setNoticeForm]=useState({title:'',body:'',priority:'normal'}),[publishing,setPublishing]=useState(false);
@@ -70,9 +72,24 @@ export default function TeamMural({membership}){
  const publishedCurrent=Boolean(current);
  const scheduleLabel=publishedCurrent?'Escala do mês publicada':'Sem escala oficial para este mês';
  return <section className="ti-planning ti-mural-home ti-mural-v4" aria-label="Mural da equipe">
-  <header className="ti-mural-header"><div><span className="eyebrow">INFORMAÇÕES DA UNIDADE</span><h1>Mural da equipe</h1><p>Comunicados, escala e informações do dia em um só lugar.</p></div><LiveStatus state={live}/><button type="button" className="ti-mural-refresh" aria-label="Atualizar informações do mural" title="Atualizar mural" onClick={()=>{refresh();refreshPresence()}}><RefreshCw size={17}/><span>Atualizar</span></button></header>
+  <header className="ti-mural-v5-hero"><div className="ti-mural-v5-overline"><Megaphone size={18}/> MURAL DA EQUIPE</div><h1>Tudo da sua unidade em um só lugar</h1><p>Comunicados, escala, folgas e informações do dia.</p><LiveStatus state={live}/></header>
+  <section className="ti-mural-v5-stats" aria-label="Resumo de hoje"><div><Users size={18}/><strong>{roster.length}</strong><small>Equipe de hoje</small></div><div><ShieldCheck size={18}/><strong>{roster.filter(p=>p.source==='employee').length}</strong><small>Confirmados</small></div><div><Clock3 size={18}/><strong>{roster.filter(p=>p.source!=='employee').length}</strong><small>Sem confirmação</small></div><div><Sun size={18}/><strong>{roster.filter(p=>p.shift==='Manhã').length}</strong><small>Manhã · {roster.filter(p=>p.shift==='Noite').length} noite</small></div></section>
   {error&&<p role="alert" className="team-error">{error}</p>}
   <div className="ti-mural-v4-sections">
+   <section className="ti-mural-card ti-mural-roster ti-v4-feature ti-mural-v5-roster" aria-labelledby="mural-roster-title">
+    <header className="ti-v4-section-title"><div className="ti-v4-title-left"><CalendarDays size={22} aria-hidden="true"/><div><h2 id="mural-roster-title">Escala da equipe</h2><p>{loading?'Carregando escala…':scheduleLabel}</p></div></div>{publishedCurrent&&<span className="ti-v4-official"><ShieldCheck size={14} aria-hidden="true"/> Oficial</span>}</header>
+    <div className="ti-v4-roster-summary">
+     <div className="ti-v4-roster-metric"><Users size={18} aria-hidden="true"/><div><strong>Equipe de hoje</strong><span>{!publishedCurrent?'Sem escala publicada':`${roster.length} escalado(s) para hoje`}</span></div></div>
+     <div className="ti-v4-roster-metric"><Clock3 size={18} aria-hidden="true"/><div><strong>Em andamento</strong><span>{!publishedCurrent?'Aguardando escala':nowTeam.length?`${nowTeam.length} com turno em andamento`:nextTeam.length?'Nenhum turno em andamento no momento':'Sem turno ativo ou próximo identificado'}</span></div></div>
+    </div>
+    {publishedCurrent&&<div className="ti-mural-v5-shifts">{['Manhã','Noite','Intermediário','Variável','Turno a definir'].filter(shift=>roster.some(p=>p.shift===shift)).map(shift=>{const members=roster.filter(p=>p.shift===shift);const isOpen=openShifts[shift]??false;return <section key={shift} className="ti-mural-v5-shift"><button type="button" className="ti-mural-v5-shift-toggle" aria-expanded={isOpen} onClick={()=>setOpenShifts(v=>({...v,[shift]:!isOpen}))}>{shift==='Noite'?<Moon size={17}/>:<Sun size={17}/>}<strong>{shift==='Turno a definir'?shift:'Turno '+shift.toLowerCase()}</strong><span>{members.length} colaboradores</span><ChevronDown size={17}/></button>{isOpen&&<ul className="ti-mural-v5-staff">{members.map(p=><li key={p.uid} className={p.source==='employee'?'confirmed':''}><div className="ti-mural-v5-avatar"><UserRound size={18}/></div><div className="ti-mural-v5-person"><strong>{p.name}</strong><small>{p.area} · {p.shift}</small></div><div className="ti-mural-v5-time"><strong>{p.start||'—'}</strong><small>{p.start?'Horário previsto':'A definir'}</small></div><span className={p.source==='employee'?'ti-mural-v5-status confirmed':'ti-mural-v5-status'}>{p.source==='employee'?'Confirmado':'Previsto'}</span></li>)}</ul>}</section>})}</div>}
+    <details className="ti-mural-roster-details ti-v4-roster-details"><summary><CalendarDays size={18} aria-hidden="true"/> Consultar escala mensal e folgas <ChevronRight size={17} aria-hidden="true"/></summary>
+    {loading?<p role="status">Carregando escalas…</p>:schedules.length===0?<p className="ti-mural-empty">Nenhuma escala publicada.</p>:<>
+     <div className="ti-mural-period-list">{schedules.slice(0,12).map(s=><button type="button" key={s.id} className={selected===s.id?'ti-mural-period active':'ti-mural-period'} aria-pressed={selected===s.id} onClick={()=>setExpanded(s.id)}>{monthLabel(s.period)}{s.id===current?.id&&<small>Mês atual</small>}</button>)}</div>
+     {active?<PublishedRoster key={active.id} schedule={active} presence={presence}/>:<p>Escolha uma escala para consultar.</p>}
+    </>}
+    </details>
+   </section>
    <section className="ti-mural-card ti-mural-notices ti-v4-feature" aria-labelledby="mural-notices-title">
     <header className="ti-v4-section-title"><div className="ti-v4-title-left"><Megaphone size={22} aria-hidden="true"/><div><h2 id="mural-notices-title">Comunicados</h2><p>Mensagens publicadas para a sua unidade.</p></div></div><span className="ti-v4-count" aria-label={notices.length+' comunicados'}>{notices.length}</span></header>
     {loading?<p role="status">Carregando comunicados…</p>:notices.length===0?<p className="ti-mural-empty">Nenhum comunicado publicado no momento.</p>:<>
@@ -83,20 +100,6 @@ export default function TeamMural({membership}){
     {['admin','manager','submanager'].includes(membership.role)&&<details className="ti-mural-roster-details"><summary>Publicar comunicado</summary><form className="stock-action-form" onSubmit={publishNotice}><label>Título<input required minLength={3} maxLength={100} value={noticeForm.title} onChange={e=>setNoticeForm(x=>({...x,title:e.target.value}))}/></label><label>Prioridade<select value={noticeForm.priority} onChange={e=>setNoticeForm(x=>({...x,priority:e.target.value}))}><option value="normal">Normal</option><option value="important">Importante</option><option value="urgent">Urgente</option></select></label><label>Mensagem<textarea required maxLength={3000} value={noticeForm.body} onChange={e=>setNoticeForm(x=>({...x,body:e.target.value}))}/></label><button type="submit" disabled={publishing}>{publishing?'Publicando…':'Revisar e publicar'}</button></form></details>}
    </section>
 
-   <section className="ti-mural-card ti-mural-roster ti-v4-feature" aria-labelledby="mural-roster-title">
-    <header className="ti-v4-section-title"><div className="ti-v4-title-left"><CalendarDays size={22} aria-hidden="true"/><div><h2 id="mural-roster-title">Escala da equipe</h2><p>{loading?'Carregando escala…':scheduleLabel}</p></div></div>{publishedCurrent&&<span className="ti-v4-official"><ShieldCheck size={14} aria-hidden="true"/> Oficial</span>}</header>
-    <div className="ti-v4-roster-summary">
-     <div className="ti-v4-roster-metric"><Users size={18} aria-hidden="true"/><div><strong>Equipe de hoje</strong><span>{!publishedCurrent?'Sem escala publicada':`${roster.length} escalado(s) para hoje`}</span></div></div>
-     <div className="ti-v4-roster-metric"><Clock3 size={18} aria-hidden="true"/><div><strong>Em andamento</strong><span>{!publishedCurrent?'Aguardando escala':nowTeam.length?`${nowTeam.length} com turno em andamento`:nextTeam.length?'Nenhum turno em andamento no momento':'Sem turno ativo ou próximo identificado'}</span></div></div>
-    </div>
-    {publishedCurrent&&<><div className="ti-stock-filters" role="group" aria-label="Momento da equipe">{[['all','Todos',roster.length],['now','Agora',nowTeam.length],['next','Próximos',nextTeam.length],['ended','Encerrados',endedTeam.length]].map(([id,label,total])=><button type="button" key={id} aria-pressed={teamFilter===id} onClick={()=>setTeamFilter(id)}>{label} · {total}</button>)}</div>{visibleTeam.length?<div className="ti-mural-now"><ul>{visibleTeam.map(p=><li key={p.uid} className={p.source==='employee'?'ti-live-confirmed':''}><strong>{p.name}</strong><span>{p.area} · {p.shift}{p.start?' · '+p.start:' · Horário a definir'}</span><small>{p.status}</small></li>)}</ul></div>:<p className="ti-mural-empty">Nenhuma pessoa neste filtro da escala publicada.</p>}</>}
-    <details className="ti-mural-roster-details ti-v4-roster-details"><summary><CalendarDays size={18} aria-hidden="true"/> Consultar escala mensal e folgas <ChevronRight size={17} aria-hidden="true"/></summary>
-    {loading?<p role="status">Carregando escalas…</p>:schedules.length===0?<p className="ti-mural-empty">Nenhuma escala publicada.</p>:<>
-     <div className="ti-mural-period-list">{schedules.slice(0,12).map(s=><button type="button" key={s.id} className={selected===s.id?'ti-mural-period active':'ti-mural-period'} aria-pressed={selected===s.id} onClick={()=>setExpanded(s.id)}>{monthLabel(s.period)}{s.id===current?.id&&<small>Mês atual</small>}</button>)}</div>
-     {active?<PublishedRoster key={active.id} schedule={active} presence={presence}/>:<p>Escolha uma escala para consultar.</p>}
-    </>}
-    </details>
-   </section>
    <section className="ti-mural-card ti-v4-feature ti-v4-production-mural" aria-labelledby="mural-production-title"><header className="ti-v4-section-title"><div className="ti-v4-title-left"><ClipboardList size={22} aria-hidden="true"/><div><h2 id="mural-production-title">Produção de hoje</h2><p>Planejamento compartilhado da cozinha.</p></div></div></header>{productionError?<p role="status" className="ti-mural-empty">{productionError}</p>:productionTasks.length===0?<p className="ti-mural-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-mural-tasks">{productionTasks.map(task=><li key={task.id}><span><strong>{task.recipeName}</strong><small>{task.plannedQuantity?task.plannedQuantity+" "+(task.unit||"un")+" planejadas":"Quantidade livre"}</small></span><em className={task.status==="completed"?"complete":""}>{task.status==="completed"?"Concluída":task.status==="partial"?"Parcial":"Pendente"}</em></li>)}</ul>}</section>
   </div>
  </section>;
