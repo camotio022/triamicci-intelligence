@@ -88,6 +88,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     if(screen==='Navegação'){
      if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible())await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
      await page.locator('#primary-sidebar').getByRole('button',{name:'Estoque e insumos',exact:true}).click();
+     await page.getByRole('button',{name:'Hoje',exact:true}).click();
      await page.getByPlaceholder('Nome do insumo').fill('Frango');
      if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible())await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
      await page.locator('#primary-sidebar').getByRole('button',{name:'Produção',exact:true}).click();
