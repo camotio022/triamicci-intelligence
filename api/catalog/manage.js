@@ -3,8 +3,11 @@ import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 
 const allowedUnits = new Set(['kg','L','un']);
-const catalogProposal=JSON.parse(readFileSync(new URL('../../data/triamicci-product-catalog-v2.proposal.json',import.meta.url),'utf8')).products;
+const approvedNames=new Set(JSON.parse(readFileSync(new URL('../../data/triamicci-catalogo-operacional-56.revisao.json',import.meta.url),'utf8')).products.map(p=>p.name));
 const genericIds = new Set(['queijos','massas','hortifruti','temperos']);
+const normalizedName=name=>String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('pt-BR');
+const approvedNormalized=new Set([...approvedNames].map(normalizedName));
+const inRevisedCatalog=p=>approvedNormalized.has(normalizedName(p.name));
 const eligible=p=>p.schemaVersion===2&&p.reviewRequired!==true&&p.ingredientsPending!==true&&
   ['supplier','internal'].includes(p.source)&&
   ['kg','L','un'].includes(p.operationalUnit)&&
@@ -27,8 +30,8 @@ export default async function handler(req,res){
         return {id:doc.id,name:p.name,category:p.category,stockUnit:p.stockUnit,
           type:p.type,trackExpiry:p.trackExpiry===true,relatedProducts:p.relatedProducts||[],
           producedFrom:p.producedFrom||[],notes:p.notes||'',active:p.active===true,
-          reviewRequired:p.active!==true || genericIds.has(doc.id),
-          approvalEligible:!genericIds.has(doc.id)&&eligible(p),schemaVersion:p.schemaVersion||1,
+          reviewRequired:p.active!==true || genericIds.has(doc.id) || !inRevisedCatalog(p),
+          approvalEligible:!genericIds.has(doc.id)&&inRevisedCatalog(p)&&eligible(p),schemaVersion:p.schemaVersion||1,
           receivingUnit:p.receivingUnit||null,operationalUnit:p.operationalUnit||null};
       }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
       return send(res,200,'Catálogo central carregado.',{catalog:items});
@@ -37,10 +40,13 @@ export default async function handler(req,res){
       if(m.role!=='admin')return send(res,403,'A ativação em lote exige administrador.');
       const docs=await catalog.limit(201).get();
       if(docs.size>200)return send(res,409,'Catálogo acima do limite de 200 itens; faça a ativação paginada.');
-      const centralIds=new Set(docs.docs.map(d=>d.id));
-      const missing=catalogProposal.filter(p=>!centralIds.has(p.id));
-      const catalogItems=[...docs.docs.map(d=>({ref:d.ref,id:d.id,data:d.data(),missing:false})),
-        ...missing.map(p=>({ref:catalog.doc(p.id),id:p.id,data:p,missing:true}))];
+      // Only products explicitly present in the approved operational list may be activated.
+      // Legacy experimental records are not automatically activated or reactivated.
+      const catalogItems=docs.docs.filter(d=>inRevisedCatalog(d.data()) && eligible(d.data()))
+        .map(d=>({ref:d.ref,id:d.id,data:d.data(),missing:false}));
+      if(catalogItems.length!==approvedNames.size)return send(res,409,
+        'Catálogo operacional incompleto: cadastre e valide os 56 itens antes de ativar. Nenhuma alteração realizada.',
+        {expected:approvedNames.size,eligible:catalogItems.length});
       if(catalogItems.length>200)return send(res,409,'Mais de 200 produtos no catálogo; ativação paginada necessária.');
       const unitProducts=db.collection('units').doc(m.unitId).collection('products');
       const refs=catalogItems.map(item=>unitProducts.doc(hashId(item.data.name||item.id)));
@@ -48,9 +54,8 @@ export default async function handler(req,res){
       const auditRef=db.collection('auditLogs').doc();
       let result;
       await db.runTransaction(async tx=>{
-        const [memberSnap,...allSnaps]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),...refs.map(ref=>tx.get(ref)),...missing.map(p=>tx.get(catalog.doc(p.id)))]);
-        const existingSnaps=allSnaps.slice(0,refs.length),missingSnaps=allSnaps.slice(refs.length);
-        if(missingSnaps.some(s=>s.exists))throw Error('CATALOG_CONFLICT');
+        const [memberSnap,...allSnaps]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),...refs.map(ref=>tx.get(ref))]);
+        const existingSnaps=allSnaps;
         const current=memberSnap.data();
         if(!current||current.status!=='active'||current.unitId!==m.unitId||current.role!=='admin')throw Error('FORBIDDEN');
         const invalid=[],created=[],preserved=[],conflicts=[];
@@ -77,9 +82,7 @@ export default async function handler(req,res){
         if(invalid.length)throw Error('INVALID_CATALOG');
         for(const item of created)tx.create(item.ref,item.data);
         for(const cat of catalogItems){
-          if(cat.missing)tx.create(cat.ref,{...cat.data,brandId:'triamicci',schemaVersion:2,
-            active:true,approvedBy:actor.uid,approvedAt:new Date(),createdAt:new Date()});
-          else if(cat.data.active!==true)tx.update(cat.ref,{active:true,approvedBy:actor.uid,approvedAt:new Date()});
+          if(cat.data.active!==true)tx.update(cat.ref,{active:true,approvedBy:actor.uid,approvedAt:new Date()});
         }
         tx.create(auditRef,{event:'catalog.unit_bootstrapped',unitId:m.unitId,actorUid:actor.uid,
           catalogCount:catalogItems.length,createdCount:created.length,preservedCount:preserved.length,
@@ -105,7 +108,7 @@ export default async function handler(req,res){
           const doc=snaps[i],id=ids[i];const product=doc.data();
           if(!doc.exists||typeof product.name!=='string'||!allowedUnits.has(product.stockUnit)||
            typeof product.category!=='string'||typeof product.trackExpiry!=='boolean'||
-           !eligible(product)){
+           !eligible(product)||!inRevisedCatalog(product)){
              outcome.rejected.push(id);continue;
           }
           if(product.active===true){outcome.alreadyActive.push(id);continue;}
@@ -132,7 +135,7 @@ export default async function handler(req,res){
         if(!catSnap.exists)throw new Error('NOT_FOUND');
         const p=catSnap.data();
         if(typeof p.name!=='string'||!allowedUnits.has(p.stockUnit)||typeof p.category!=='string'||
-          typeof p.trackExpiry!=='boolean'||!eligible(p))throw new Error('INVALID_CATALOG');
+          typeof p.trackExpiry!=='boolean'||!eligible(p)||!inRevisedCatalog(p))throw new Error('INVALID_CATALOG');
         if(p.active===true)return;
         tx.update(catalogRef,{active:true,approvedAt:now,approvedBy:actor.uid});
         tx.create(auditRef,{event:'catalog.approved',unitId:m.unitId,catalogId,actorUid:actor.uid,at:now});
@@ -157,7 +160,7 @@ export default async function handler(req,res){
          !['admin','manager','submanager'].includes(current.role))throw new Error('FORBIDDEN');
       if(!catSnap.exists)throw new Error('NOT_FOUND');
       const p=catSnap.data();
-      if(p.active!==true||genericIds.has(catalogId))throw new Error('NOT_APPROVED');
+      if(p.active!==true||genericIds.has(catalogId)||!inRevisedCatalog(p))throw new Error('NOT_APPROVED');
       if(typeof p.name!=='string'||!allowedUnits.has(p.stockUnit)||
          typeof p.category!=='string'||typeof p.trackExpiry!=='boolean')throw new Error('INVALID_CATALOG');
       id=hashId(p.name);
