@@ -33,6 +33,7 @@ export default async function handler(req,res){
    const [member,existing,central]=await Promise.all([tx.get(memberRef),tx.get(ref),tx.get(centralRef)]);
    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||
       !['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
+   if(existing.exists&&existing.data().catalogId===id&&existing.data().status==='active')throw Error('ALREADY_ACTIVE');
    if(existing.exists&&existing.data().catalogId!==id)throw Error('CATALOG_CONFLICT');
    if(central.exists&&central.data().name!==name)throw Error('CATALOG_CONFLICT');
    const record={id,name,category,type:source==='internal'?'prepared':'raw',source,stockUnit,
@@ -51,6 +52,7 @@ export default async function handler(req,res){
  }catch(e){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
+  if(e.message==='ALREADY_ACTIVE')return send(res,409,'Este insumo já está cadastrado e ativo; não é permitido duplicar.');
   if(e.message==='CATALOG_CONFLICT')return send(res,409,'Produto experimental conflitante; não foi alterado.');
   console.error('Operational catalog setup:',e.message);
   return send(res,500,'Falha ao ativar o produto.');
