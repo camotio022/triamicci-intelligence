@@ -1,3 +1,4 @@
+import TriamicciHistory from './TriamicciHistory.jsx';
 import React,{useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 export default function KitchenV3History({products}){
@@ -12,16 +13,13 @@ export default function KitchenV3History({products}){
  const date=stamp=>{if(!stamp)return'—';const epoch=stamp._seconds??stamp.seconds;const d=epoch!==undefined?new Date(epoch*1000):new Date(stamp);return Number.isNaN(d.getTime())?'—':d.toLocaleString('pt-BR')};
  const label={receipt:'Recebimento',production:'Produção',transfer:'Transferência interna',count:'Contagem física'};
  const product=id=>products.find(p=>p.id===id)?.profile?.displayName||products.find(p=>p.id===id)?.name||'Insumo não encontrado';
- return <section className="v3-card"><div className="v3-row"><h2>Histórico operacional V3</h2><button type="button" className="v3-secondary" onClick={load} disabled={loading}>Atualizar</button></div>
-  <p>Registro auditável de entradas, produção, transferências e contagens. A diferença física não é automaticamente venda nem consumo identificado.</p>
+ return <section className="v3-card"><p>Entradas, produção, transferências e contagens auditáveis. Diferenças físicas não equivalem automaticamente a vendas.</p>
   {error&&<p role="alert" className="v3-error">{error}</p>}
-  {loading?<p>Carregando registros…</p>:!items.length?<p>Nenhuma movimentação registrada no novo fluxo.</p>:
-   <div className="v3-tiles">{items.map(op=><article className="v3-tile" key={op.id}><strong>{label[op.kind]||op.kind}</strong>
-    <p>{product(op.productId)}</p><small>{date(op.at)} · {op.location||op.outputLocation||op.to||''}</small>
-    {op.kind==='receipt'&&<p>Recebido {op.commercialQuantity} {op.commercialUnit} · entrada {op.stockQuantity??'não medida'} {op.stockUnit||''}</p>}
-    {op.kind==='count'&&<p>Encontrado {op.quantity} {op.unit} · diferença não classificada: {op.difference}</p>}
-    {op.kind==='transfer'&&<p>{op.from} → {op.to} · {op.quantity} {op.unit}</p>}
-    {op.kind==='production'&&<p>Produzido {op.outputQuantity} {op.outputUnit} · origem registrada {op.inputs?.map(i=>product(i.productId)+' '+i.quantity+' '+i.unit).join(', ')}</p>}
-    </article>)}</div>}
+  <TriamicciHistory title="Histórico operacional" records={items} loading={loading}
+   getTitle={op=>product(op.productId)} getDate={op=>op.at?((op.at._seconds??op.at.seconds)!==undefined?new Date((op.at._seconds??op.at.seconds)*1000):op.at):null}
+   getQuantity={op=>label[op.kind]||op.kind}
+   getDescription={op=>op.kind==='receipt'?'Entrada: '+(op.stockQuantity??'não medida')+' '+(op.stockUnit||''):op.kind==='count'?'Encontrado: '+op.quantity+' '+op.unit:op.kind==='transfer'?op.from+' → '+op.to+' · '+op.quantity+' '+op.unit:op.kind==='production'?'Produzido: '+op.outputQuantity+' '+op.outputUnit:''}
+   renderDetails={op=><div>Registro: {op.id} · {op.location||op.outputLocation||op.to||'Local não informado'}</div>}
+   empty="Nenhuma movimentação registrada nesta consulta."/>
  </section>;
 }
