@@ -54,3 +54,64 @@
 .ti-profile-v5-statcards strong{font-size:21px;color:#1b293f}.ti-profile-v5-statcards small{font-size:10px;color:#657187}
 .ti-profile-v5-skill-link{width:100%;display:flex;justify-content:space-between;margin-top:10px;border:1px solid #a71919;background:white;border-radius:10px;padding:10px;color:#a71919;font-weight:750}
 @media(max-width:480px){.ti-profile-v5 .ti-profile-v5-hero{padding:12px}.ti-profile-v5-mainline{gap:9px}.ti-profile-v5-mainline .ti-premium-avatar{width:57px;height:57px}.ti-profile-v5-hero-actions button{font-size:10px}.ti-profile-v5-hero-actions{gap:5px}.ti-profile-v5-identity-meta{gap:4px}.ti-profile-v5-identity-meta strong{font-size:11px}}
+
+/* Avatar camera is an icon control, not an operational CTA.
+   Override global action-button geometry without changing other controls. */
+.ti-profile-v5 .ti-profile-v5-mainline .ti-avatar-editor {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  flex: 0 0 74px;
+}
+.ti-profile-v5 .ti-profile-v5-mainline .ti-premium-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.ti-profile-v5 .ti-profile-v5-mainline .ti-premium-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ti-profile-v5 .ti-profile-v5-mainline button.ti-profile-v5-camera {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  min-width: 31px;
+  min-height: 31px;
+  max-width: 31px;
+  padding: 0;
+  flex: 0 0 31px;
+  border-radius: 50%;
+  border: 2px solid white;
+  background: #1b2536;
+  color: white;
+  line-height: 1;
+  z-index: 2;
+}
+.ti-profile-v5 .ti-profile-v5-mainline button.ti-profile-v5-camera svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+@media (max-width: 600px) {
+  .ti-profile-v5 .ti-profile-v5-mainline .ti-avatar-editor {
+    width: 57px;
+    height: 57px;
+    flex-basis: 57px;
+  }
+  .ti-profile-v5 .ti-profile-v5-mainline button.ti-profile-v5-camera {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    max-width: 28px;
+    flex-basis: 28px;
+  }
+}
