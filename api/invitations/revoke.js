@@ -33,10 +33,12 @@ export default async function handler(req, res) {
     const ref = db.doc('units/' + unitId + '/invitations/' + invitationId);
     const auditRef = db.collection('auditLogs').doc();
     await db.runTransaction(async tx => {
-      const snap = await tx.get(ref);
+      const [snap,currentMemberSnap] = await Promise.all([tx.get(ref),tx.get(db.doc('memberships/'+actor.uid))]);
+      const currentMember=currentMemberSnap.data();
+      if(!currentMember||currentMember.status!=='active'||currentMember.unitId!==unitId||!['admin','manager','submanager'].includes(currentMember.role))throw new Error('FORBIDDEN');
       const invitation = snap.data();
       if (!invitation) throw new Error('NOT_FOUND');
-      if (member.role !== 'admin' && invitation.createdBy !== actor.uid)
+      if (currentMember.role !== 'admin' && invitation.createdBy !== actor.uid)
         throw new Error('FORBIDDEN');
       if (!['pending','delivery_failed'].includes(invitation.status))
         throw new Error('NOT_REVOCABLE');

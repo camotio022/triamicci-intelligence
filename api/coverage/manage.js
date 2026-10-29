@@ -1,3 +1,4 @@
+import {pastProposal} from '../../src/operation-time.js';
 import {coverageTimeline} from '../../server/schedules/coverage-timeline.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import {randomUUID} from 'node:crypto';
@@ -61,6 +62,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const [m,p]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(ref)]);
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!p.exists||p.data().status!=='pending_acceptance')throw Error('CONFLICT');
+    if(pastProposal(p.data()))throw Error('EXPIRED');
     const person=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
     if(!person.exists||person.data().status!=='active'||person.data().accountUid!==actor.uid)throw Error('FORBIDDEN');
     tx.update(ref,{status:decision==='accepted'?'pending_approval':'declined',...(decision==='accepted'?{acceptedAt:now}:{declinedAt:now}),updatedAt:now,respondedBy:actor.uid});
@@ -131,6 +133,7 @@ export default async function handler(req,res){
   if(action==='propose'){
    const {staffId,date,first,second,external=false,reason,rateRole}=req.body||{};
    if(!idOk(staffId)||!validDate(date)||typeof reason!=='string'||reason.trim().length<10||reason.length>500||typeof external!=='boolean'||!rateKeys.includes(rateRole)||!first||!second||![first.start,first.end,second.start,second.end].every(validTime))return send(res,400,'Proposta incompleta.');
+   if(pastProposal({date}))return send(res,400,'Não é possível propor cobertura para um dia passado.');
    const review=checkDoubleShift({first,second});
    if(review.state==='blocked')return send(res,409,'A proposta contém restrições impeditivas de jornada.',{issues:review.reasons});
    const ref=unit.collection('staffRegistry').doc(staffId),person=await ref.get();
@@ -161,6 +164,7 @@ export default async function handler(req,res){
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!roles.has(m.data().role))throw Error('FORBIDDEN');
     if(!p.exists||!['pending_approval','pending_acceptance'].includes(p.data().status)||decision==='approved'&&p.data().status!=='pending_approval')throw Error('CONFLICT');
     if(decision==='approved'){
+     if(pastProposal(p.data()))throw Error('EXPIRED');
      const currentPerson=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
      const gate=approvalGate({status:p.data().status,createdBy:p.data().createdBy,actorUid:actor.uid,
       consentPending:p.data().consentPending,acceptedAt:p.data().acceptedAt,staffActive:currentPerson.exists&&currentPerson.data().status==='active',
@@ -177,6 +181,7 @@ export default async function handler(req,res){
  }catch(e){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
   if(e.message==='FORBIDDEN')return send(res,403,'Operação não autorizada.');
+  if(e.message==='EXPIRED')return send(res,409,'O turno desta proposta já passou. Consulte a gestão.');
   if(e.message==='CONFLICT')return send(res,409,'A proposta foi alterada ou está indisponível.');
   if(e.message==='SELF_APPROVAL')return send(res,403,'Quem criou a proposta não pode aprová-la.');
   if(e.message==='INACTIVE_STAFF')return send(res,409,'Colaborador não está ativo.');

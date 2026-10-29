@@ -11,3 +11,6 @@ export function can(role,capability){
  return false; // fail closed: concessões por unidade são validadas separadamente
 }
 export const isManagement=role=>management.has(role);
+
+const managementPages=new Set(['catalog','people','master-registry','team','skills','shifts','schedule-planning','count']);
+export const canAccessPage=(role,page)=>team.has(role)&&(!managementPages.has(page)||management.has(role));

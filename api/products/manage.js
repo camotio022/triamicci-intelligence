@@ -39,7 +39,7 @@ export default async function handler(req,res) {
       return send(res,200,'Catálogo carregado.',{products:snap.docs.filter(doc=>belongsToOperationalCatalog(doc.data())).map(doc=>{
        const p=clean(doc),b=balances.get(doc.id);
        return {...p,physicalUnit:countUnit(p,definitions.get(p.catalogId)),physicalBalance:b?{reserve:b.reserve,rotation:b.rotation,total:b.total,
-        unit:b.unit,at:b.at?.toDate?.()?.toISOString?.()||null}:null};
+        unit:b.unit,quality:b.quality||null,countedTotal:b.countedTotal??null,entriesSinceCount:b.entriesSinceCount??null,exitsSinceCount:b.exitsSinceCount??null,lastMovementAt:b.lastMovementAt?.toDate?.()?.toISOString?.()||null,at:b.at?.toDate?.()?.toISOString?.()||null}:null};
       }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))});
     }
     if(action==='correctUnits'){
