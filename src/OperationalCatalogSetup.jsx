@@ -22,7 +22,7 @@ export default function OperationalCatalogSetup({onActivated}){
  const refresh=async()=>{try{const r=await request('status');setEntries(r.items||[])}catch(e){setError(e.message)}};
  useEffect(()=>{refresh()},[]);
  const product=useMemo(()=>draft.products.find(p=>p.id===selected),[selected]);
- const choose=p=>{setSelected(p.id);setError('');setNotice('');setForm({name:p.name,category:p.category,stockUnit:p.stockUnit,receivingUnit:p.receivingUnit||'',operationalUnit:p.operationalUnit||p.stockUnit,source:p.source,trackExpiry:p.trackExpiry,reviewConfirmed:false})};
+ const choose=p=>{setSelected(p.id);setError('');setNotice('');setForm({name:p.name,category:p.category,stockUnit:p.stockUnit,receivingUnit:p.receivingUnit||'',operationalUnit:p.operationalUnit||p.stockUnit,source:p.source,trackExpiry:p.trackExpiry,minStock:0,countFrequency:'weekly',critical:false,reviewConfirmed:false})};
  const status=new Map(entries.map(p=>[p.id,p]));
  const shown=draft.products.filter(p=>p.name.toLocaleLowerCase('pt-BR').includes(filter.toLocaleLowerCase('pt-BR')));
  const count=entries.filter(p=>p.active).length;
@@ -39,6 +39,9 @@ export default function OperationalCatalogSetup({onActivated}){
  <label>Origem<select value={form.source} onChange={e=>{const source=e.target.value;setForm(f=>({...f,source,receivingUnit:source==='internal'?'':f.receivingUnit,reviewConfirmed:false}))}}><option value="supplier">Recebido de fornecedor</option><option value="internal">Preparado na cozinha</option></select></label>
  {form.source==='supplier'&&<label>Unidade de recebimento<select value={form.receivingUnit} onChange={e=>set('receivingUnit',e.target.value)}><option value="">Selecione</option>{units.map(u=><option key={u}>{u}</option>)}</select></label>}
  <label>Unidade para contagem<select value={form.operationalUnit} onChange={e=>set('operationalUnit',e.target.value)}>{units.map(u=><option key={u}>{u}</option>)}</select></label>
+ <label>Estoque mínimo<input type="number" min="0" step="any" value={form.minStock} onChange={e=>set('minStock',Number(e.target.value))}/></label>
+ <label>Frequência de contagem<select value={form.countFrequency} onChange={e=>set('countFrequency',e.target.value)}><option value="daily">Diária</option><option value="weekly">Semanal</option><option value="on_demand">Sob demanda</option></select></label>
+ <label><input type="checkbox" checked={form.critical} onChange={e=>set('critical',e.target.checked)}/> Produto crítico</label>
  <label><input type="checkbox" checked={form.trackExpiry} onChange={e=>set('trackExpiry',e.target.checked)}/> Exigir controle de validade</label>
  <label><input type="checkbox" checked={form.reviewConfirmed} onChange={e=>setForm(f=>({...f,reviewConfirmed:e.target.checked}))}/> Conferi os campos deste produto na operação</label>
  <button type="submit" disabled={busy||!form.reviewConfirmed||status.get(selected)?.active}>{busy?'Salvando...':status.get(selected)?.active?'Já ativo':'Validar e ativar'}</button></form>}
