@@ -24,12 +24,12 @@ export default function TeamMural({membership}){
  const [noticeCursor,setNoticeCursor]=useState(null);
  const refresh=useCallback(async()=>{
   try{
-   const [roster,board,people]=await Promise.all([read('schedules','list'),read('mural','publicNotices'),read(undefined,'masterRegistryPreview')]);
-   setStaff((people.registry||[]).filter(x=>x.status==='active'));
+   const [roster,board,people]=await Promise.all([read('schedules','list'),read('mural','publicNotices'),read('attendanceV31','teamDirectory')]);
+   setStaff(people.registry||[]);
    setSchedules((roster.schedules||[]).filter(x=>x.status==='published').sort((a,b)=>String(b.period).localeCompare(String(a.period))));
    setNotices(board.items||[]);setNoticeCursor(board.nextCursor||null);setError('');return true;
   }catch(e){setError(e.message);return false}finally{setLoading(false)}
- },[membership?.unitId]);
+ },[membership?.unitId,membership?.role]);
  const refreshProduction=useCallback(async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const response=await fetch('/api/production/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'dayList'})});if(!response.ok)throw Error('Produção indisponível');const data=await response.json();setProductionTasks(data.tasks||[]);setProductionError('');return true}catch{setProductionError('Não foi possível consultar o planejamento de hoje.');return false}},[membership?.unitId]);
  const refreshPresence=useCallback(async()=>{
   try{const result=await read('attendanceV31','teamToday');setPresence(Object.fromEntries((result.presence||[]).map(x=>[x.uid,x])));return true;}

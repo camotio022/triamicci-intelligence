@@ -10,3 +10,10 @@ export function progressAfterProduction(task,actualQuantity){
  if(target!==null&&(!Number.isFinite(target)||target<=0))throw Error('INVALID_TASK_PROGRESS');
  return {status:target===null||total>=target?'completed':'partial',completedQuantity:total};
 }
+
+// Ao retomar uma tarefa, sugere apenas o restante da meta. Sem meta, usa o rendimento da ficha.
+export function executionQuantity(task, recipe){
+ const target=task?.plannedQuantity, completed=task?.completedQuantity??0;
+ if(Number.isFinite(target)&&target>completed)return Math.round((target-completed)*1000)/1000;
+ return recipe?.yieldQuantity||1;
+}

@@ -5,6 +5,7 @@ import {useUnitLive} from './useUnitLive.js';
 import LiveStatus from './LiveStatus.jsx';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
+import {executionQuantity} from '../server/production/daily-task.js';
 import {suggestedQuantity} from '../server/production/logic.js';
 const idFor=s=>s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,50);
 async function call(path,action,payload={}){
@@ -40,11 +41,13 @@ export default function Production({membership}){
  const live=useUnitLive(membership?.unitId,()=>Promise.all([load(true),loadTasks()]));
  useEffect(()=>{const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
  const selected=recipes.find(r=>r.id===recipeId);
- const choose=id=>{
+ const choose=(id,task=null)=>{
   setRecipeId(id);setRequestId(null);setConfirmed(false);setActiveTaskId(null);
   const r=recipes.find(x=>x.id===id);
-  setPortions(String(r?.yieldQuantity||1));
-  setItems((r?.lines||[]).map(l=>({productId:l.productId,quantity:String(l.quantity)})));
+  const quantity=executionQuantity(task,r);
+  setPortions(String(quantity));
+  setItems((r?.lines||[]).map(l=>({productId:l.productId,quantity:String(suggestedQuantity(l.quantity,quantity,r.yieldQuantity,{individual:false})??'')})));
+  setNotes('');
  };
  const selectProduct=(i,value)=>{setItems(a=>a.map((x,j)=>j===i?{...x,productId:value}:x));setRequestId(null);setConfirmed(false)};
  const recipeOutputConflict=Boolean(outputProductId&&lines.some(l=>l.productId===outputProductId||l.substitutes?.includes(outputProductId)));
@@ -78,7 +81,7 @@ export default function Production({membership}){
   {status&&<p role="status" className="receiving-notice">{status}</p>}
   <section className="receiving-card ti-v4-daily-tasks"><h2>Lista de produção de hoje</h2><p>Planejamento compartilhado da cozinha. Só a confirmação da quantidade realmente produzida movimenta o estoque.</p>
    {canPlan&&<form className="ti-v4-daily-task-form" onSubmit={addDailyTask}><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional ({recipes.find(r=>r.id===plannedRecipe)?.outputUnit||'un'})<input type="number" min="0.001" max="10000" step="0.001" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading}>Adicionar à lista</button></form>}
-   {dailyTasks.length===0?<p className="ti-v4-production-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-daily-task-list">{dailyTasks.map(task=><li key={task.id}><div><strong>{task.recipeName}</strong><small>{task.status==="completed"?`Concluída: ${task.completedQuantity} ${task.unit||'un'}`:task.status==="partial"?`Parcial: ${task.completedQuantity} de ${task.plannedQuantity} ${task.unit||'un'}`:task.plannedQuantity?`Meta: ${task.plannedQuantity} ${task.unit||'un'}`:"Quantidade a definir"}</small></div>{task.status!=="completed"?<button type="button" onClick={()=>{choose(task.recipeId);setActiveTaskId(task.id);document.querySelector(".production-page .ti-v4-production-layout")?.scrollIntoView({behavior:"smooth",block:"start"})}}>Registrar execução</button>:<span className="ti-v4-task-done">Concluída</span>}</li>)}</ul>}
+   {dailyTasks.length===0?<p className="ti-v4-production-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-daily-task-list">{dailyTasks.map(task=><li key={task.id}><div><strong>{task.recipeName}</strong><small>{task.status==="completed"?`Concluída: ${task.completedQuantity} ${task.unit||'un'}`:task.status==="partial"?`Parcial: ${task.completedQuantity} de ${task.plannedQuantity} ${task.unit||'un'}`:task.plannedQuantity?`Meta: ${task.plannedQuantity} ${task.unit||'un'}`:"Quantidade a definir"}</small></div>{task.status!=="completed"?<button type="button" onClick={()=>{choose(task.recipeId,task);setActiveTaskId(task.id);document.querySelector(".production-page .ti-v4-production-layout")?.scrollIntoView({behavior:"smooth",block:"start"})}}>Registrar execução</button>:<span className="ti-v4-task-done">Concluída</span>}</li>)}</ul>}
   </section>
   <div className="production-layout ti-v4-production-layout">
    <section className="receiving-card">

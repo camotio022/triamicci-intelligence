@@ -1,3 +1,4 @@
+import {muralDirectoryEntry} from '../team/mural-directory.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {restaurantDay} from '../schedules/restaurant-today.js';
@@ -20,6 +21,11 @@ export default async function attendanceWorkflow(req,res){
   const overnight=yesterday.exists&&['working','on_break'].includes(yesterday.data().status);
   if(overnight&&action!=='clock_in')workDay=previousDay;
   const ref=attendance.doc(workDay+'_'+user.uid);
+  if(action==='teamDirectory'){
+   const staff=await unit.collection('staffRegistry').limit(201).get();
+   if(staff.size>200)return send(res,409,'Equipe excede o limite desta consulta.');
+   return send(res,200,'Equipe para consulta do mural.',{registry:staff.docs.filter(doc=>doc.data().status==='active').map(doc=>muralDirectoryEntry(doc.id,doc.data()))});
+  }
   if(action==='teamToday'){
    const [records,previous]=await Promise.all([attendance.where('day','==',day).limit(201).get(),attendance.where('day','==',previousDay).limit(201).get()]);
    if(records.size>200||previous.size>200)return send(res,409,'Muitos registros. Filtragem por unidade necessária.');
