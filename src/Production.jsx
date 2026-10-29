@@ -61,6 +61,17 @@ export default function Production({membership}){
    setEditRecipeId('');setRecipeVersion(null);setStatus('Ficha técnica salva no Firebase.');notify('Ficha técnica salva com sucesso.','success');await load();
   }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
+ const archiveRecipe=async()=>{
+  if(!editRecipeId||!Number.isInteger(recipeVersion))return;
+  if(!window.confirm('Arquivar esta ficha? Ela não aparecerá mais para novas produções, mas o histórico será preservado.'))return;
+  setBusy(true);setStatus('');
+  try{
+   await call('/api/production/manage','archiveRecipe',{id:editRecipeId,expectedVersion:recipeVersion});
+   setEditRecipeId('');setRecipeVersion(null);setRecipeId('');setName('');setLines([{productId:'',quantity:'',substitutes:[]}]);
+   await Promise.all([load(),loadTasks()]);
+   notify('Ficha arquivada. O histórico foi preservado.','success');
+  }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
+ };
  const finish=async e=>{
   e.preventDefault();if(busy||!confirmed)return;
   if(!window.confirm(selected?.outputProductId?'Confirmar a transformação? Os ingredientes sairão dos locais definidos na ficha e o produto preparado entrará na reserva.':'Confirmar a produção e descontar agora os ingredientes realmente utilizados do giro?'))return;
@@ -143,6 +154,7 @@ export default function Production({membership}){
      </div>)}
      <button type="button" disabled={lines.length>=12} onClick={()=>setLines(a=>[...a,{productId:'',quantity:'',substitutes:[]}])}>Adicionar ingrediente</button>
      <button type="submit" className="stock-action-save" disabled={busy||!name.trim()||recipeOutputConflict||recipeDuplicateInputs}>{busy?'Salvando...':'Salvar ficha técnica'}</button>
+     {editRecipeId&&<button type="button" disabled={busy} onClick={archiveRecipe}>Arquivar ficha experimental</button>}
     </form>
    </details>}
   </div>
