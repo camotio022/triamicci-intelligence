@@ -13,11 +13,16 @@ async function api(path,action,extra={}){
   body:JSON.stringify({action,...extra})});
  const data=await response.json();if(!response.ok)throw Error(data.message||'Erro de comunicação.');return data;
 }
+import HistoryPeriod from './HistoryPeriod.jsx';
+import {recordDay,inPeriod} from './operation-time.js';
+import {useOperationDay} from './useOperationDay.js';
 const fmt=at=>at?new Date(at).toLocaleString('pt-BR'):'—';
 const qty=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const numeric=(s)=>s===''?null:Number(s);
 export default function PhysicalStock({membership,mode='receive',initialProductId=null}){
  const {notify}=useFeedback();
+ const today=useOperationDay();
+ const [historyFrom,setHistoryFrom]=useState(''),[historyTo,setHistoryTo]=useState(''),[historyProduct,setHistoryProduct]=useState(initialProductId||''),[loading,setLoading]=useState(true),[loadError,setLoadError]=useState('');
  const [products,setProducts]=useState([]),[catalog,setCatalog]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[],productions:[]});
  const [productId,setProductId]=useState(initialProductId||''),[supplier,setSupplier]=useState(''),[weight,setWeight]=useState('');
  const [amount,setAmount]=useState(''),[orderedQuantity,setOrderedQuantity]=useState(''),[pendingId,setPendingId]=useState(null),[reserve,setReserve]=useState(''),[rotation,setRotation]=useState('');
@@ -34,8 +39,8 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
    const [p,h,c]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list'),api('/api/catalog/manage','list')]);
    setProducts(p.products||[]);setCatalog(c.catalog||[]);setHistory({receipts:h.receipts||[],counts:h.counts||[],outflows:h.outflows||[],transfers:h.transfers||[],productions:h.productions||[]});
    if(mode==='receive'){const d=await api('/api/operations/stock','v3Dashboard');setOperational({products:d.products||[],orders:d.orders||[]});}
-   setMore({receipts:!!h.hasMore_receipts,counts:!!h.hasMore_counts,outflows:!!h.hasMore_outflows,transfers:!!h.hasMore_transfers,productions:!!h.hasMore_productions});
-  }catch(e){setStatus(e.message)}
+   setLoadError('');setMore({receipts:!!h.hasMore_receipts,counts:!!h.hasMore_counts,outflows:!!h.hasMore_outflows,transfers:!!h.hasMore_transfers,productions:!!h.hasMore_productions});
+  }catch(e){setLoadError(e.message)}finally{setLoading(false)}
  },[mode]);
  useUnitLive(membership?.unitId,()=>load(true));
  useEffect(()=>{load()},[load]);
@@ -102,8 +107,9 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   ...history.outflows.map(x=>({...x,kind:'dispatch'})),
   ...history.transfers.map(x=>({...x,kind:'transfer'})),...history.productions.map(x=>({...x,kind:'production'}))
  ].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)):mode==='receive'?history.receipts:history.counts)
- .filter(x=>!initialProductId||x.productId===initialProductId||x.kind==='production'&&x.items?.some(i=>i.productId===initialProductId));
- if(mode==='receive')return <section className="receiving-page"><p className="eyebrow">OPERAÇÃO · RECEBIMENTO</p><h1>Recebimento de mercadorias</h1><p>Confira o pedido e a entrega. A entrada no estoque depende da aprovação gerencial.</p>{status&&<p role="status">{status}</p>}<KitchenV3Workflows kind="receive" products={operational.products} orders={operational.orders} membership={membership} initialProductId={initialProductId} onChange={load} onConfigure={()=>window.dispatchEvent(new CustomEvent('ti-navigate',{detail:'kitchen-v3'}))}/><section className="receiving-card"><h2>Recebimentos recentes</h2>{history.receipts.length?history.receipts.map(r=><details key={r.id}><summary>{r.productName||'Produto'} · {qty(r.physicalQuantity)} {r.unit} · {fmt(r.at)}</summary><p>{r.supplier} · {r.orderId?'Vinculado a pedido':'Entrega não prevista'}</p>{r.lot&&<p>Lote {r.lot} · Validade {r.expiryDate}</p>}</details>):<p>Nenhum recebimento aprovado nesta consulta.</p>}</section></section>;
+ .filter(x=>(!historyProduct||x.productId===historyProduct||x.kind==='production'&&x.items?.some(i=>i.productId===historyProduct))&&inPeriod(x.at,historyFrom,historyTo));
+ const todayCounts=history.counts.filter(x=>recordDay(x.at)===today&&(!productId||x.productId===productId));
+ if(mode==='receive')return <section className="receiving-page"><p className="eyebrow">OPERAÇÃO · RECEBIMENTO</p><h1>Recebimento de mercadorias</h1><p>Confira o pedido e a entrega. A entrada no estoque depende da aprovação gerencial.</p>{status&&<p role="status">{status}</p>}<KitchenV3Workflows kind="receive" products={operational.products} orders={operational.orders} membership={membership} initialProductId={initialProductId} onChange={load} onConfigure={()=>window.dispatchEvent(new CustomEvent('ti-navigate',{detail:'kitchen-v3'}))}/><details className="receiving-card ti-history-disclosure"><summary>Consultar recebimentos aprovados</summary>{history.receipts.length?history.receipts.map(r=><details key={r.id}><summary>{r.productName||'Produto'} · {qty(r.physicalQuantity)} {r.unit} · {fmt(r.at)}</summary><p>{r.supplier} · {r.orderId?'Vinculado a pedido':'Entrega não prevista'}</p>{r.lot&&<p>Lote {r.lot} · Validade {r.expiryDate}</p>}</details>):<p>Nenhum recebimento aprovado nesta consulta.</p>}</details></section>;
  if(mode==='count'&&!canReceive)return <section className="ti-premium-card"><h2>Contagem oficial</h2><p>A contagem física que altera saldos é restrita à gestão. Comunique divergências pela Central de Insumos.</p></section>;
  return <section className="receiving-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId}</p>
@@ -169,8 +175,10 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
     {lots.map(x=><tr key={x.id}><td>{x.lot}</td><td>{x.expiryDate}</td><td>{qty(x.receivedQuantity)} {x.unit}</td><td>{Number.isFinite(x.availableQuantity)?qty(x.availableQuantity)+' '+x.unit:'A conferir'}</td></tr>)}
    </tbody></table></div>
   </section>}
-  <section className="receiving-card"><div className="inventory-list-header"><h2>Histórico real</h2><button type="button" onClick={load}>Atualizar</button></div>
-   {rows.length===0?<p>Nenhum registro salvo nesta unidade.</p>:<>
+  {loadError&&<p role="alert">{loadError}</p>}
+  {mode==='count'&&<section className="receiving-card"><h2>Contagens de hoje</h2>{loading?<p role="status">Carregando contagens…</p>:loadError?null:todayCounts.length?todayCounts.map(r=><p key={r.id}><strong>{r.productName}</strong> · {qty(r.reserve)} Reserva + {qty(r.rotation)} Giro = {qty(r.total??r.reserve+r.rotation)} {r.unit} · {fmt(r.at)}</p>):<p>Nenhuma contagem de hoje entre os registros carregados.</p>}</section>}
+  <details className="receiving-card ti-history-disclosure" open={mode==='history'}><summary>Consultar histórico de operações</summary><HistoryPeriod from={historyFrom} to={historyTo} onFrom={setHistoryFrom} onTo={setHistoryTo}/><label>Produto<select value={historyProduct} onChange={e=>setHistoryProduct(e.target.value)}><option value="">Todos os produtos</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><div className="inventory-list-header"><h2>Registros consultados</h2><button type="button" onClick={load}>Atualizar</button></div>
+   {loading?<p role="status">Carregando registros…</p>:loadError?null:rows.length===0?<p>Nenhum registro no período entre os dados carregados.</p>:<>
     <div className="ti-v43-history-cards" aria-label="Histórico de operações">{rows.map(r=><article key={r.id} className="ti-v43-history-card"><div className="ti-v43-history-head"><strong>{({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'}</strong><time>{fmt(r.at)}</time></div><h3>{r.productName||r.recipeName||'Produto não identificado'}</h3><p>{r.kind==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':r.kind==='count'?qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')':r.kind==='production'?r.portions+' porções · '+r.items?.map(i=>i.productName+' '+qty(i.quantity)+' '+i.unit).join(' + '):r.kind==='transfer'?qty(r.quantity)+' '+r.unit+' · '+r.from+' → '+r.to:qty(r.quantity)+' '+r.unit+' · '+r.location+' · '+r.reason}</p><small>Responsável: {r.actorName||'Não identificado'}</small></article>)}</div>
     <div className="receiving-scroll ti-v43-history-table"><table className="receiving-table"><thead><tr><th>QUANDO</th><th>TIPO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>RESPONSÁVEL</th></tr></thead><tbody>
      {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'}</td><td>{r.productName||r.recipeName}</td><td>{r.kind==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':
@@ -180,6 +188,6 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
       qty(r.quantity)+' '+r.unit+' · '+r.location+' · '+r.reason}</td><td>{r.actorName||'Responsável não identificado'}</td></tr>)}
     </tbody></table></div></>}
    {(more.receipts||more.counts||more.outflows||more.transfers||more.productions)&&<button type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore?'Carregando...':'Carregar registros anteriores'}</button>}
-  </section>
+  </details>
  </section>;
 }

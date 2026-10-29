@@ -17,7 +17,9 @@ const dateLabel=value=>{
  if(!/^\d{4}-\d{2}-\d{2}$/.test(value||''))return value||'Data indisponível';
  return new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z'));
 };
+import {useOperationDay} from './useOperationDay.js';
 export default function LeaveRequests({membership}){
+ const today=useOperationDay();
  const [requests,setRequests]=useState([]),[date,setDate]=useState(''),[reason,setReason]=useState(''),[notes,setNotes]=useState({}),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[notice,setNotice]=useState('');
  const [reviewId,setReviewId]=useState(null),[showForm,setShowForm]=useState(false),[filter,setFilter]=useState('pending');
  const [context,setContext]=useState(null);
@@ -81,6 +83,7 @@ export default function LeaveRequests({membership}){
    {loading?<p role="status">Carregando solicitações...</p>:filtered.length===0?<p className="ti-leave-v4-empty">Nenhuma solicitação neste filtro.</p>:<div className="ti-leave-v4-list">{filtered.map(x=><article className="ti-leave-v4-item" key={x.id}>
     <div className="ti-leave-v4-item-head"><div><strong>{dateLabel(x.date)}</strong><span className={'ti-leave-v4-status '+(x.status||'')}>{statuses[x.status]||x.status}</span></div>
     {manager&&x.status==='pending'&&<button type="button" disabled={busy} aria-expanded={reviewId===x.id} onClick={()=>setReviewId(v=>v===x.id?null:x.id)}>{reviewId===x.id?'Fechar revisão':'Revisar pedido'}</button>}</div>
+    {x.status==='pending'&&x.date<today&&<p className="ti-focus-warning">Data já passou · a gestão precisa encerrar este pedido. A escala não será alterada automaticamente.</p>}
     <p>{x.reason}</p>
     {x.note&&<small className="ti-leave-v4-note">Decisão: {x.note}</small>}
     {manager&&reviewId===x.id&&x.status==='pending'&&<div className="ti-leave-v4-review">
