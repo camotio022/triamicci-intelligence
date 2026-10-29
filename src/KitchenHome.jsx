@@ -28,7 +28,7 @@ export default function KitchenHome({membership,navigate}){
  return <section className="kitchen-home">
   <p className="eyebrow">TRIAMICCI INTELLIGENCE · UNIDADE {membership.unitId.toUpperCase()}</p>
   <div className="kitchen-header"><div><h1>Operação da cozinha</h1><p>Recebimentos, contagens e estoque físico da unidade em um só lugar.</p></div><button type="button" onClick={load} disabled={loading}><RefreshCw size={16}/> Atualizar</button></div>
-  <div className="kitchen-actions">{actions.map(({name,description,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong><span>{description}</span></button>)}</div>
+  <div className="kitchen-actions">{actions.filter(action=>action.page!=='count'||['admin','manager','submanager'].includes(membership.role)).map(({name,description,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong><span>{description}</span></button>)}</div>
   {error&&<p role="alert" className="receiving-notice"><AlertCircle size={16}/> {error}</p>}
   <div className="kitchen-summary">{[['all',products.length,'Produtos vinculados'],['counted',counted.length,'Com contagem física'],['uncounted',products.length-counted.length,'Aguardam contagem']].map(([key,n,label])=><button type="button" key={key} aria-pressed={filter===key} onClick={()=>setFilter(key)}><strong>{n}</strong><span>{label}</span></button>)}</div>
   <div className="inventory-list-header"><h2>Produção registrada</h2><button type="button" onClick={()=>navigate('production')}>Abrir produção</button></div>
