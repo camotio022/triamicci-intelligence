@@ -1,0 +1,349 @@
+{
+  "schemaVersion": "draft-1",
+  "status": "PROPOSTA_NAO_IMPORTAR",
+  "date": "2026-10-29",
+  "notes": [
+    "Esta lista substitui o catálogo experimental como referência pretendida, não exclui registros Firebase.",
+    "O arquivo não tem unidades homologadas; não alimentar seed-product-catalog.mjs automaticamente.",
+    "Frango em cubos para strogonoff excluído por decisão operacional. Bife de alcatra recebido fatiado, controlado por unidade.",
+    "Óleo de fritadeira e margarina têm embalagem quadrada similar, capacidades particulares ainda não homologadas."
+  ],
+  "products": [
+    {
+      "name": "Peito de frango",
+      "category": "Proteínas e carnes",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Filé de frango porcionado (120 g)",
+      "category": "Proteínas e carnes",
+      "kind": "produto (validar unidade)",
+      "validation": "revisão específica pendente"
+    },
+    {
+      "name": "Strogonoff de frango",
+      "category": "Proteínas e carnes",
+      "kind": "preparação (validar ficha)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Filé mignon",
+      "category": "Proteínas e carnes",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Contrafilé / chorizo",
+      "category": "Proteínas e carnes",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Bife de alcatra",
+      "category": "Proteínas e carnes",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Cubos de alcatra",
+      "category": "Proteínas e carnes",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Tilápia",
+      "category": "Proteínas e carnes",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Almôndegas",
+      "category": "Proteínas e carnes",
+      "kind": "preparação (validar ficha)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Bacon",
+      "category": "Proteínas e carnes",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Limão",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Alho",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Cebola",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Salsinha",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Tomate",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Tomate seco",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Rúcula",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Alface",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Brócolis",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Champignon",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Alho-poró",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Berinjela",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Couve",
+      "category": "Hortifrúti e temperos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Leite",
+      "category": "Laticínios e derivados",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Queijo minas",
+      "category": "Laticínios e derivados",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Provolone",
+      "category": "Laticínios e derivados",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Parmesão",
+      "category": "Laticínios e derivados",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Cheddar",
+      "category": "Laticínios e derivados",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Creme de leite",
+      "category": "Laticínios e derivados",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Manteiga",
+      "category": "Laticínios e derivados",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Margarina",
+      "category": "Laticínios e derivados",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Ovos",
+      "category": "Laticínios e derivados",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Arroz",
+      "category": "Massas e acompanhamentos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Arroz arbóreo",
+      "category": "Massas e acompanhamentos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Feijão",
+      "category": "Massas e acompanhamentos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Fettuccine",
+      "category": "Massas e acompanhamentos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Penne",
+      "category": "Massas e acompanhamentos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Espaguete",
+      "category": "Massas e acompanhamentos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Nhoque",
+      "category": "Massas e acompanhamentos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Batata frita",
+      "category": "Massas e acompanhamentos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Batata palha",
+      "category": "Massas e acompanhamentos",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Batata noisette",
+      "category": "Massas e acompanhamentos",
+      "kind": "produto (validar unidade)",
+      "validation": "revisão específica pendente"
+    },
+    {
+      "name": "Óleo de soja",
+      "category": "Mercearia",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Sal",
+      "category": "Mercearia",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Farinha para empanar / mistura para empanar",
+      "category": "Mercearia",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Vinho branco culinário",
+      "category": "Mercearia",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Farinha de mandioca",
+      "category": "Mercearia",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Caldo de galinha",
+      "category": "Mercearia",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Colorau",
+      "category": "Mercearia",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Mostarda",
+      "category": "Mercearia",
+      "kind": "produto (validar unidade)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Óleo para fritadeira",
+      "category": "Mercearia",
+      "kind": "produto (validar unidade)",
+      "validation": "revisão específica pendente"
+    },
+    {
+      "name": "Purê de batatas",
+      "category": "Preparações e outros",
+      "kind": "preparação (validar ficha)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Molho sugo",
+      "category": "Preparações e outros",
+      "kind": "preparação (validar ficha)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Molho branco",
+      "category": "Preparações e outros",
+      "kind": "preparação (validar ficha)",
+      "validation": "unidade e cadastro Firebase pendentes"
+    },
+    {
+      "name": "Suco",
+      "category": "Preparações e outros",
+      "kind": "produto (validar unidade)",
+      "validation": "revisão específica pendente"
+    },
+    {
+      "name": "Molho para porção",
+      "category": "Preparações e outros",
+      "kind": "preparação (validar ficha)",
+      "validation": "revisão específica pendente"
+    }
+  ]
+}
