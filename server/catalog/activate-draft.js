@@ -66,7 +66,7 @@ export default async function handler(req,res){
    if(central.exists)tx.update(centralRef,record);else tx.create(centralRef,{...record,createdAt:now});
    if(existing.exists){
      tx.update(ref,{catalogId:id,status:'active',reviewRequired:false,operationalCatalogVersion:OPERATIONAL_CATALOG_VERSION,operationalUnitOverride:operationalUnit,receivingUnitOverride:source==='supplier'?receivingUnit:null,minStock,countFrequency,critical,updatedAt:now,updatedBy:actor.uid});
-   }else tx.create(ref,{name,category,unit:stockUnit,minStock,countFrequency,critical,trackExpiry,quantity:0,status:'active',operationalCatalogVersion:OPERATIONAL_CATALOG_VERSION,
+   }else tx.create(ref,{name,category,unit:stockUnit,minStock,countFrequency,critical,trackExpiry,lotTrackingMode:trackExpiry?'per_lot':'aggregate',quantity:0,status:'active',operationalCatalogVersion:OPERATIONAL_CATALOG_VERSION,
      catalogId:id,productType:record.type,relatedCatalogIds:[],createdAt:now,createdBy:actor.uid,updatedAt:now});
    if(!profile.exists)tx.create(profileRef,operationalProfileFor({name,source,operationalUnit,receivingUnit},actor.uid,now));
    else if(profile.data().origin!==source)throw Error('RECONCILIATION_REQUIRED');

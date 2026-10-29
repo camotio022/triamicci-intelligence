@@ -1,4 +1,4 @@
-import {isOperationalProduct} from './catalog-identity.js';
+import {isOperationalProduct,usesPhysicalLots} from './catalog-identity.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {signalUnitChange} from '../live-signal.js';
@@ -58,14 +58,14 @@ export default async function shipments(req,res){
     if(orderRef&&(!expected||expected.unit!==line.commercialUnit))throw Error('ORDER');
     const commercial=(totals.get(line.productId)||0)+line.commercialQuantity;totals.set(line.productId,commercial);
     if(expected&&commercial>expected.quantity-(order.data().received?.[line.productId]||0)&&data.notes.trim().length<8)throw Error('DIVERGENCE');
-    if(p.data().lotTrackingMode==='per_lot'&&(!line.lot.trim()||!date(line.expiryDate)||line.expiryDate<day()))throw Error('LOT');
+    if(usesPhysicalLots(p.data())&&(!line.lot.trim()||!date(line.expiryDate)||line.expiryDate<day()))throw Error('LOT');
     const key=line.productId+'|'+line.location+'|'+line.lot+'|'+line.expiryDate;if(keys.has(key))throw Error('DUPLICATE_LINE');keys.add(key);
     const balance=balances.get(line.productId).data()||{unit:cfg.countUnit,reserva:0,giro:0,total:0};
     if(quantitative&&balance.unit!==cfg.countUnit)throw Error('UNIT');
     if(quantitative){
      const accumulated=stock.get(line.productId)||{...balance};
      accumulated[line.location]=Math.round(((accumulated[line.location]||0)+line.stockQuantity)*1000)/1000;accumulated.total=Math.round((accumulated.total+line.stockQuantity)*1000)/1000;stock.set(line.productId,accumulated);
-     if(p.data().lotTrackingMode==='per_lot'){
+     if(usesPhysicalLots(p.data())){
       const lotRef=unit.collection('physicalLots').doc(line.productId).collection('lots').doc(createHash('sha256').update(line.lot.trim()+'|'+line.expiryDate).digest('hex'));
       let change=lotUpdates.get(lotRef.path);
       if(!change){const old=await tx.get(lotRef);if(old.exists&&old.data().unit!==cfg.countUnit)throw Error('UNIT');change={ref:lotRef,data:{...(old.data()||{}),productId:line.productId,lot:line.lot.trim(),expiryDate:line.expiryDate,unit:cfg.countUnit,reserva:old.data()?.reserva||0,giro:old.data()?.giro||0}};}
