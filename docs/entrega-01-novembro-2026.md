@@ -10,6 +10,7 @@ Auditoria técnica de 29/10/2026. Base reconciliada: `875df93` (inclui históric
 - Histórico compartilhado mantém o visual aprovado e acrescenta intervalo De/Até, com atualização do dia sem recarregar dados.
 - Pendências de recebimento são consultadas separadamente do histórico paginado: uma conferência antiga não some quando há mais de vinte entregas recentes.
 - Proposta de cobertura passada não pode ser aceita/aprovada; registros anteriores são preservados.
+- Conflito de transação de escala é respondido como 409, sem afirmar sucesso nem duplicar pedidos.
 - Revogação de convite revalida o vínculo gerencial dentro da transação.
 
 ## Evidência automatizada local
@@ -38,7 +39,7 @@ Acesso Google, PWA instalado no iPhone, impressão e uso durante um turno real n
 
 ## Pendências de implantação operacional
 
-- Última auditoria publicada encontrou dois cadastros ativados para teste (Bacon e Molho sugo). Outros 54 não foram homologados individualmente no Firebase; 15 apresentavam candidatos antigos à conciliação. Reconsultar antes de qualquer migração.
+- Consulta visual atual ao Barigui confirmou 5 de 56 ativos e 15 candidatos à conciliação. Portanto, 51 posições ainda não estão ativadas; os cinco ativos também usam dados de teste e não representam aceite operacional. Reconsultar antes de qualquer migração.
 - Validar origem, unidade de recebimento/contagem, validade, matérias-primas e rendimento real de cada preparação. Manifesto de 56 posições é rascunho sujeito à revisão, não aprovação do restaurante.
 - Os dados fictícios criados nas auditorias continuam identificados. Não apagar histórico nem converter saldos em massa para “limpar” o sistema.
 - O gerente deve executar o roteiro de aceite: abrir sua conta, consultar equipe/avisos, receber entrega de teste, revisar/aprovar, conferir Reserva/Giro, produzir com ficha revisada e consultar histórico/inventário.

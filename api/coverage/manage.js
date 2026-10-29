@@ -133,6 +133,7 @@ export default async function handler(req,res){
   if(action==='propose'){
    const {staffId,date,first,second,external=false,reason,rateRole}=req.body||{};
    if(!idOk(staffId)||!validDate(date)||typeof reason!=='string'||reason.trim().length<10||reason.length>500||typeof external!=='boolean'||!rateKeys.includes(rateRole)||!first||!second||![first.start,first.end,second.start,second.end].every(validTime))return send(res,400,'Proposta incompleta.');
+   if(pastProposal({date}))return send(res,400,'Não é possível propor cobertura para um dia passado.');
    const review=checkDoubleShift({first,second});
    if(review.state==='blocked')return send(res,409,'A proposta contém restrições impeditivas de jornada.',{issues:review.reasons});
    const ref=unit.collection('staffRegistry').doc(staffId),person=await ref.get();

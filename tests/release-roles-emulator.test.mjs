@@ -97,6 +97,7 @@ test('entrega: rotina e fronteiras dos cinco perfis, folgas, cobertura e revoga√
  await expect(acceptInvite,revokedRecipient,'accept',{invite:revokeToken},400);
  assert.equal((await db.doc('memberships/'+revokedRecipient.uid).get()).exists,false);
  const proposal={staffId:people.auxiliar.uid,date:future,first:{start:'08:00',end:'12:00'},second:{start:'13:00',end:'17:00'},external:false,rateRole:'other',reason:'TESTE proposta de cobertura fict√≠cia'};
+ await expect(coverage,manager,'propose',{...proposal,date:'2020-01-01'},400);
  const proposed=await expect(coverage,manager,'propose',proposal,201);
  await expect(coverage,people.cook,'respond',{id:proposed.id,decision:'accepted'},403);
  await expect(coverage,people.auxiliar,'respond',{id:proposed.id,decision:'accepted'},200);

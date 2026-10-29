@@ -208,6 +208,7 @@ export default async function handler(req,res){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Permissão negada.');
   if(['CONFLICT','LOCKED'].includes(e.message))return send(res,409,'A escala mudou de estado. Atualize a página.');
+  if(e.code===10||e.code==='ABORTED'||e.code===3&&/Transaction is invalid or closed/i.test(e.message))return send(res,409,'Houve uma alteração simultânea. Consulte o estado atual antes de tentar novamente.');
   console.error('Schedules:',e.message);return send(res,500,'Não foi possível concluir a operação de escala.');
  }
 }

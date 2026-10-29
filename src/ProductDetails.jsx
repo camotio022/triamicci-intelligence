@@ -43,7 +43,7 @@ export default function ProductDetails({product,onBack,onAction,membership,onRef
    <div className="operational-uncounted"><strong>Sem contagem física registrada</strong><span>Saldo legado: {qty(product.quantity)} {product.unit}. Não representa quantidade física conferida.</span></div>}
   {unitMismatch&&<p className="ti-product-unit-warning" role="alert">A contagem foi registrada em {b.unit}, enquanto o cadastro usa {product.unit}. As unidades não foram convertidas automaticamente; confira a configuração antes de movimentar.</p>}
   <div className="product-detail-actions ti-product-v41-primary">
-   {['admin','manager'].includes(membership.role)&&<button type="button" onClick={()=>onAction('receiving',product.id)}><PackagePlus size={20}/> Registrar recebimento</button>}
+   {['admin','manager','submanager','cook','auxiliar'].includes(membership.role)&&<button type="button" onClick={()=>onAction('receiving',product.id)}><PackagePlus size={20}/> Registrar recebimento</button>}
    {['admin','manager','submanager'].includes(membership.role)&&<button type="button" onClick={()=>onAction('count',product.id)}><ClipboardCheck size={20}/> Fazer contagem</button>}
 
   </div>
