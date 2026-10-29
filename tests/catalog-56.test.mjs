@@ -45,3 +45,11 @@ test('API permanece no limite de 12 funções do plano atual',async()=>{
  const entries=readdirSync(new URL('../api',import.meta.url),{recursive:true});
  assert.ok(entries.filter(p=>p.endsWith('.js')).length<=12,'Handlers internos devem ficar em server, fora de api');
 });
+
+ test('catálogo com validade exige lotes inclusive em cadastros anteriores sem flag',async()=>{
+  const {usesPhysicalLots}=await import('../server/operations/catalog-identity.js');
+  assert.equal(usesPhysicalLots({operationalCatalogVersion:'56-v1',catalogId:'bacon',trackExpiry:true}),true);
+  assert.equal(usesPhysicalLots({lotTrackingMode:'per_lot'}),true);
+  assert.equal(usesPhysicalLots({trackExpiry:true}),false);
+  assert.equal(usesPhysicalLots({operationalCatalogVersion:'56-v1',catalogId:'bacon',trackExpiry:true,lotTrackingMode:'aggregate'}),false);
+ });

@@ -1,3 +1,4 @@
+import {usesPhysicalLots} from '../server/operations/catalog-identity.js';
 import ShipmentReceiving from './ShipmentReceiving.jsx';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import React,{useEffect,useMemo,useState} from 'react';
@@ -16,7 +17,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  [commercialUnit,setCommercialUnit]=useState('kg'),[commercialQuantity,setCommercialQuantity]=useState(''),
  [stockQuantity,setStockQuantity]=useState(''),[orderId,setOrderId]=useState(''),[lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),
  [notes,setNotes]=useState(''),[quantity,setQuantity]=useState(''),[sessionId,setSessionId]=useState(()=>crypto.randomUUID()),
- [lotCounts,setLotCounts]=useState({}),[initialLotName,setInitialLotName]=useState(''),[initialLotExpiry,setInitialLotExpiry]=useState(''),[lots,setLots]=useState([]),[loadingLots,setLoadingLots]=useState(false),
+ [lotCounts,setLotCounts]=useState({}),[initialLotName,setInitialLotName]=useState(''),[initialLotExpiry,setInitialLotExpiry]=useState(''),[lots,setLots]=useState([]),[loadingLots,setLoadingLots]=useState(false),[lotRevision,setLotRevision]=useState(0),
  [from,setFrom]=useState('reserva'),[to,setTo]=useState('giro'),
  [outputId,setOutputId]=useState(''),[outputQty,setOutputQty]=useState(''),[outputLocation,setOutputLocation]=useState('reserva'),
  [sources,setSources]=useState([{productId:'',location:'reserva',quantity:''}]),[alternativeReason,setAlternativeReason]=useState(''),
@@ -37,15 +38,15 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  useEffect(()=>{if(chosenLine){setCommercialUnit(chosenLine.unit);setSupplier(order.supplier);}else if(chosen?.profile?.receivingPresentation==='kg')setCommercialUnit('kg');},[productId,orderId,chosenLine?.unit]);
  useEffect(()=>{
   let alive=true;setLotCounts({});setLots([]);
-  if(kind!=='count'||!productId||!chosen?.trackExpiry)return;
+  if(kind!=='count'||!productId||!usesPhysicalLots(chosen))return;
   setLoadingLots(true);
   invoke('v3Lots',{productId}).then(d=>{if(alive){setLots(d.lots||[]);setLotCounts(Object.fromEntries((d.lots||[]).map(l=>[l.id,'' ])));}})
    .catch(e=>{if(alive)setError(e.message)}).finally(()=>{if(alive)setLoadingLots(false)});
   return()=>{alive=false};
- },[kind,productId,chosen?.trackExpiry]);
+ },[kind,productId,usesPhysicalLots(chosen),location,lotRevision]);
  const commit=async(action,payload,success)=>{
   if(busy)return;setBusy(true);setError('');
-  try{await invoke(action,{requestId:crypto.randomUUID(),...payload});notify(success,'success');await onChange?.();if(kind==='receive')await loadPending();setNotes('');setQuantity('');setCommercialQuantity('');setStockQuantity('');setOutputQty('');return true;}
+  try{await invoke(action,{requestId:crypto.randomUUID(),...payload});notify(success,'success');await onChange?.();if(kind==='receive')await loadPending();setNotes('');setQuantity('');setCommercialQuantity('');setStockQuantity('');setOutputQty('');if(kind==='count'){setInitialLotName('');setInitialLotExpiry('');setLotRevision(v=>v+1)}return true;}
   catch(e){setError(e.message);notify(e.message,'error');return false;}
   finally{setBusy(false);}
  };
@@ -66,9 +67,9 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    commercialQuantity:Number(commercialQuantity),commercialUnit,stockQuantity:Number(stockQuantity||0),location,lot,expiryDate:expiry,notes},'Conferência enviada. A entrada depende da aprovação gerencial.');
   if(kind==='count'){
    if(!/^[a-f0-9-]{36}$/i.test(sessionId)){setError('Identificador da rodada inválido. Gere um novo identificador.');return;}
-   if(chosen?.trackExpiry&&lots.some(l=>lotCounts[l.id]==='')){setError('Informe a contagem de cada lote, inclusive zero quando estiver vazio.');return;}
+   if(usesPhysicalLots(chosen)&&lots.some(l=>lotCounts[l.id]==='')){setError('Informe a contagem de cada lote, inclusive zero quando estiver vazio.');return;}
    const counts=lots.map(l=>({id:l.id,quantity:Number(lotCounts[l.id])}));
-   return commit('v3Count',{productId,location,sessionId,quantity:Number(quantity),lotCounts:counts,initialLot:chosen?.trackExpiry&&!lots.length&&Number(quantity)>0?{lot:initialLotName.trim(),expiryDate:initialLotExpiry}:null,notes},'Contagem física registrada.');
+   return commit('v3Count',{productId,location,sessionId,quantity:Number(quantity),lotCounts:counts,initialLot:usesPhysicalLots(chosen)&&!lots.length&&Number(quantity)>0?{lot:initialLotName.trim(),expiryDate:initialLotExpiry}:null,notes},'Contagem física registrada.');
   }
   if(kind==='transfer'&&from===to){setError('Escolha locais diferentes para a transferência.');return;}
   if(kind==='transfer'&&(!hasKnownBalance||!(Number(quantity)>0)||Number(quantity)>available)){setError('A quantidade precisa ser positiva e não pode exceder o saldo disponível no local de origem.');return;}
@@ -79,7 +80,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
  const prepared=kind==='produce';
  const relevantProduct=prepared?out:chosen;
  const locations=relevantProduct?.profile?.locations||['reserva','giro'];
- const showLot=(kind==='receive'&&chosen?.trackExpiry)||(prepared&&out?.trackExpiry);
+ const showLot=(kind==='receive'&&usesPhysicalLots(chosen))||(prepared&&out?.trackExpiry);
  return <section className="v3-page v3-card v3-workflow">
   {kind==='receive'&&<ShipmentReceiving products={products} orders={orders} membership={membership} onChange={onChange} onConfigure={onConfigure}/>}
   <details open={kind!=='receive'}><summary>{kind==='receive'?'Conferência individual e pendências anteriores':'Detalhes da operação'}</summary>
@@ -110,8 +111,8 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
    {kind==='count'&&<>
     <Field name="Onde está contando?"><select value={location} onChange={e=>setLocation(e.target.value)}>{locations.map(x=><option value={x} key={x}>{x==='reserva'?'Reserva · 2º piso':'Giro · 1º piso'}</option>)}</select></Field>
     <Field name={'Quantidade encontrada ('+(expected||'sem unidade de contagem')+')'}><input required type="number" min="0" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={quantity} onChange={e=>setQuantity(e.target.value)}/></Field>
-    <Field name="Identificador da rodada de contagem"><input required value={sessionId} onChange={e=>setSessionId(e.target.value)} aria-describedby="v3-session-help"/></Field><p id="v3-session-help" className="v3-info">Use o mesmo identificador para contar Reserva e Giro na mesma rodada. Uma nova rodada deve ter um identificador diferente.</p><button type="button" className="v3-secondary" onClick={()=>setSessionId(crypto.randomUUID())}>Iniciar nova rodada</button>
-    {chosen?.trackExpiry&&<fieldset><legend>Contagem de lotes no local</legend><p>Para preservar validade e rastreabilidade, informe cada lote; sem lotes cadastrados é necessário primeiro regularizar o recebimento.</p>
+    <Field name="Identificador da rodada de contagem"><input required value={sessionId} onChange={e=>setSessionId(e.target.value)} aria-describedby="v3-session-help"/></Field><p id="v3-session-help" className="v3-info">Use o mesmo identificador para contar Reserva e Giro na mesma rodada. Uma nova rodada deve ter um identificador diferente.</p><button type="button" className="v3-secondary" disabled={busy} onClick={()=>{setSessionId(crypto.randomUUID());setQuantity('');setNotes('');setLotRevision(v=>v+1)}}>Iniciar nova rodada</button>
+    {usesPhysicalLots(chosen)&&<fieldset><legend>Contagem de lotes no local</legend><p>Para preservar validade e rastreabilidade, informe cada lote; sem lotes cadastrados é necessário primeiro regularizar o recebimento.</p>
       {loadingLots?<p>Carregando lotes…</p>:lots.length?lots.map(l=><Field key={l.id} name={(l.lot||'Lote')+' · vence '+l.expiryDate}><input required type="number" min="0" step={['un','pacote','porcao','duzia'].includes(expected)?'1':'.001'} value={lotCounts[l.id]??''} onChange={e=>setLotCounts(old=>({...old,[l.id]:e.target.value}))}/></Field>):<div className="v3-form"><p role="status">Primeira contagem: gerente ou administrador deve identificar o lote existente antes de estabelecer o saldo.</p>{managers&&<><Field name="Lote físico inicial"><input required maxLength={80} value={initialLotName} onChange={e=>setInitialLotName(e.target.value)}/></Field><Field name="Validade do lote"><input required type="date" value={initialLotExpiry} onChange={e=>setInitialLotExpiry(e.target.value)}/></Field></>}</div>}
      </fieldset>}
    </>}
@@ -137,7 +138,7 @@ export default function KitchenV3Workflows({kind,products,orders,membership,onCh
     <div className="v3-line"><Field name="Lote de armazenamento"><input required maxLength={80} value={lot} onChange={e=>setLot(e.target.value)} placeholder="Identificação real"/></Field><Field name="Validade"><input required type="date" value={expiry} onChange={e=>setExpiry(e.target.value)}/></Field></div>
    </>}
    {kind!=='transfer'&&<Field name="Observações (opcional)"><textarea maxLength={240} value={notes} onChange={e=>setNotes(e.target.value)}/></Field>}
-   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='count'&&(!managers||chosen?.profile?.controlMode!=='quantitative')||kind==='count'&&chosen?.trackExpiry&&!lots.length&&!managers||kind==='transfer'&&(from===to||!hasKnownBalance||!(Number(quantity)>0)||Number(quantity)>available)||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
+   <button type="submit" disabled={busy||(!prepared&&!chosen)||prepared&&!out||kind==='count'&&(!managers||chosen?.profile?.controlMode!=='quantitative')||kind==='count'&&usesPhysicalLots(chosen)&&(loadingLots||!lots.length&&!managers)||kind==='transfer'&&(from===to||!hasKnownBalance||!(Number(quantity)>0)||Number(quantity)>available)||kind==='transfer'&&chosen?.profile?.controlMode!=='quantitative'}>
     {busy?'Registrando…':({receive:'Enviar conferência',count:'Salvar contagem',transfer:'Confirmar transferência',produce:'Concluir produção'})[kind]}
    </button>
   </form>

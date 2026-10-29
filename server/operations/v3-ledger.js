@@ -1,4 +1,4 @@
-import {isOperationalProduct} from './catalog-identity.js';
+import {isOperationalProduct,usesPhysicalLots} from './catalog-identity.js';
 import {intervalFromBalance} from './inventory-summary.js';
 import {operationalBalance,writeOperationalBalance} from './shared-balance.js';
 import {signalUnitChange} from '../live-signal.js';
@@ -106,7 +106,7 @@ export default async function v3Ledger(req,res){
     const [bal,profile,product]=await Promise.all([operationalBalance(tx,balRef),tx.get(profileRef),tx.get(productRef)]);
     if(!bal.exists||!profile.exists||!product.exists||!isOperationalProduct(product.data())||profile.data().controlMode!=='quantitative')throw Error('MISSING');
     if(profile.data().countUnit!==bal.data().unit||data.unit!==bal.data().unit||!number(data.quantity,data.unit)||!profile.data().locations.includes(data.location)||bal.data()[data.location]<data.quantity)throw Error('QUANTITY');
-    const lots=product.data().lotTrackingMode==='per_lot'?await tx.get(lotRoots.doc(data.productId).collection('lots').orderBy('expiryDate').limit(101)):null;
+    const lots=usesPhysicalLots(product.data())?await tx.get(lotRoots.doc(data.productId).collection('lots').orderBy('expiryDate').limit(101)):null;
     if(lots?.size>100)throw Error('LOT');
     let remaining=data.quantity,lotUpdates=[];
     if(lots){
@@ -158,7 +158,7 @@ export default async function v3Ledger(req,res){
      if(cfg.controlMode==='quantitative'&&!number(stockQuantity,cfg.countUnit))throw Error('QUANTITY');
      if(cfg.controlMode!=='quantitative'&&stockQuantity!==0)throw Error('QUANTITY');
      if(cfg.controlMode==='quantitative'&&!cfg.locations.includes(location))throw Error('LOCATION');
-     if(product.data().lotTrackingMode==='per_lot'&&(!lot.trim()||!isoDay(expiryDate)))throw Error('LOT');
+     if(usesPhysicalLots(product.data())&&(!lot.trim()||!isoDay(expiryDate)))throw Error('LOT');
      tx.create(inspection,{...payload,unitId:m.unitId,status:'pending',fingerprint,inspectedBy:actor.uid,inspectedAt:now()});
      audit(tx,db,'v3.receipt_inspected',m.unitId,actor.uid,{requestId,productId});
    });
@@ -229,13 +229,13 @@ export default async function v3Ledger(req,res){
     if(isCounted&&!number(stockQuantity,cfg.countUnit))throw Error('QUANTITY');
     if(!isCounted&&stockQuantity!==0)throw Error('QUANTITY');
     if(isCounted&&!cfg.locations.includes(location))throw Error('LOCATION');
-    if(product.data().lotTrackingMode==='per_lot'&&(!lot.trim()||lot.length>80||!isoDay(expiryDate)||expiryDate<new Date().toISOString().slice(0,10)))throw Error('LOT');
+    if(usesPhysicalLots(product.data())&&(!lot.trim()||lot.length>80||!isoDay(expiryDate)||expiryDate<new Date().toISOString().slice(0,10)))throw Error('LOT');
     if(orderRef&&(!order?.exists||!order.data().items.some(i=>i.productId===productId)))throw Error('ORDER');
     if(orderRef&&['cancelled','received'].includes(order.data().status))throw Error('ORDER');
     const old=balance.exists?balance.data():{unit:cfg.countUnit,reserva:0,giro:0,total:0};
     if(isCounted&&old.unit!==cfg.countUnit)throw Error('UNIT');
     // Aferição e contagem explícitas: nunca kg -> peças por peso nominal.
-    const lotRef=isCounted&&product.data().lotTrackingMode==='per_lot'?lotRoots.doc(productId).collection('lots').doc(hashed(lot.trim()+'|'+expiryDate)):null;
+    const lotRef=isCounted&&usesPhysicalLots(product.data())?lotRoots.doc(productId).collection('lots').doc(hashed(lot.trim()+'|'+expiryDate)):null;
     const batch=lotRef?await tx.get(lotRef):null;
     if(lotRef&&batch.exists&&batch.data().unit!==cfg.countUnit)throw Error('UNIT');
     if(isCounted){
@@ -283,7 +283,7 @@ export default async function v3Ledger(req,res){
     const prior=balance.data()||{reserva:0,giro:0,total:0,unit:u};
     if(prior.unit!==u)throw Error('UNIT');
     const today=new Date().toISOString().slice(0,10);
-    const lotQuery=p.data().lotTrackingMode==='per_lot'?await tx.get(lotRoots.doc(productId).collection('lots').limit(101)):null;
+    const lotQuery=usesPhysicalLots(p.data())?await tx.get(lotRoots.doc(productId).collection('lots').limit(101)):null;
     if(lotQuery?.size>100)throw Error('LOT');
     if(lotQuery){
      const lots=lotQuery.docs;
@@ -328,7 +328,7 @@ export default async function v3Ledger(req,res){
     const u=cfg.data().countUnit,prior=b.data();
     if(!number(quantity,u)||prior.unit!==u||prior[from]<quantity)throw Error('QUANTITY');
     let changes=[];
-    if(p.data().lotTrackingMode==='per_lot'){
+    if(usesPhysicalLots(p.data())){
      const list=await tx.get(lotRoots.doc(productId).collection('lots').orderBy('expiryDate').limit(101));
      if(list.size>100)throw Error('LOT');
      const chunks=debitLotDocs(list.docs,from,quantity,new Date().toISOString().slice(0,10));if(!chunks)throw Error('LOT');
@@ -366,7 +366,7 @@ export default async function v3Ledger(req,res){
       outProfile.data().controlMode!=='quantitative'||!outProfile.data().locations.includes(outputLocation))throw Error('MISSING');
     const ocfg=outProfile.data(),outUnit=ocfg.countUnit;
     if(!number(outputQuantity,outUnit))throw Error('QUANTITY');
-    if(outProduct.data().lotTrackingMode==='per_lot'&&(!lot.trim()||lot.length>80||!isoDay(expiryDate)||expiryDate<new Date().toISOString().slice(0,10)))throw Error('LOT');
+    if(usesPhysicalLots(outProduct.data())&&(!lot.trim()||lot.length>80||!isoDay(expiryDate)||expiryDate<new Date().toISOString().slice(0,10)))throw Error('LOT');
     const n=inputs.length,sP=snaps.slice(5,5+n),sCfg=snaps.slice(5+n,5+2*n),sBal=snaps.slice(5+2*n,5+3*n);
     if(sP.some(x=>!x.exists||!isOperationalProduct(x.data()))||sCfg.some(x=>!x.exists)||sBal.some(x=>!x.exists))throw Error('MISSING');
     let usesAlternative=false;
@@ -380,8 +380,8 @@ export default async function v3Ledger(req,res){
     }
     if(usesAlternative&&!MANAGEMENT_ROLES.includes(a.data().role))throw Error('ALTERNATIVE_APPROVAL');
      if(usesAlternative&&alternativeReason.trim().length<8)throw Error('ALTERNATIVE');
-    const outputLotRef=outProduct.data().lotTrackingMode==='per_lot'?lotRoots.doc(outputProductId).collection('lots').doc(hashed(lot.trim()+'|'+expiryDate)):null;
-    const inputLots=await Promise.all(inputs.map((i,index)=>sP[index].data().lotTrackingMode==='per_lot'?
+    const outputLotRef=usesPhysicalLots(outProduct.data())?lotRoots.doc(outputProductId).collection('lots').doc(hashed(lot.trim()+'|'+expiryDate)):null;
+    const inputLots=await Promise.all(inputs.map((i,index)=>usesPhysicalLots(sP[index].data())?
       tx.get(lotRoots.doc(i.productId).collection('lots').orderBy('expiryDate').limit(101)):Promise.resolve(null)));
     const destLot=outputLotRef?await tx.get(outputLotRef):null;
     const sourceLotUpdates=[];

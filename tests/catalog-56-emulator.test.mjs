@@ -43,8 +43,13 @@ test('56 produtos: ativação, conciliação, pedido, aprovação, giro, produç
  const bife=ids.get('bife-de-alcatra'),raw=ids.get('peito-de-frango'),out=ids.get('strogonoff-de-frango');
  const orderId=randomUUID();
  const order=await call(kitchen,manager,'v3OrderCreate',{requestId:orderId,etaDate:'2099-12-01',supplier:'Fornecedor fictício',items:[{productId:bife,quantity:10,unit:'un'},{productId:raw,quantity:3,unit:'kg'}],notes:'Teste isolado'});assert.equal(order.code,200,JSON.stringify(order));
- const shipment={requestId:randomUUID(),orderId,supplier:'Fornecedor fictício',notes:'Teste isolado',lines:[{productId:bife,commercialQuantity:10,commercialUnit:'un',stockQuantity:10,location:'reserva',lot:'',expiryDate:''},{productId:raw,commercialQuantity:3,commercialUnit:'kg',stockQuantity:3,location:'reserva',lot:'',expiryDate:''}]};
+ const shipment={requestId:randomUUID(),orderId,supplier:'Fornecedor fictício',notes:'Teste isolado',lines:[{productId:bife,commercialQuantity:10,commercialUnit:'un',stockQuantity:10,location:'reserva',lot:'TESTE-LOTE',expiryDate:'2099-12-31'},{productId:raw,commercialQuantity:3,commercialUnit:'kg',stockQuantity:3,location:'reserva',lot:'TESTE-LOTE',expiryDate:'2099-12-31'}]};
+ // Reproduz um cadastro já ativado antes da correção, sem a flag de lotes.
+ await root.collection('products').doc(raw).update({lotTrackingMode:(await import('firebase-admin/firestore')).FieldValue.delete()});
+ const invalidShipment={...shipment,requestId:randomUUID(),lines:shipment.lines.map(l=>({...l,lot:'',expiryDate:''}))};
+ assert.equal((await call(shipments,aux,'shipmentInspect',invalidShipment)).code,409,'Validade exige lote mesmo sem flag antiga');
  assert.equal((await call(shipments,aux,'shipmentInspect',shipment)).code,200);
+ assert.equal((await root.collection('physicalLots').doc(raw).collection('lots').get()).size,0,'Conferência não cria saldo nem lote');
  assert.equal((await root.collection('physicalBalances').doc(bife).get()).data().total,0);
  assert.equal((await call(shipments,aux,'shipmentApprove',{requestId:shipment.requestId})).code,403);
  assert.equal((await call(shipments,manager,'shipmentApprove',{requestId:shipment.requestId})).code,200);
@@ -52,9 +57,19 @@ test('56 produtos: ativação, conciliação, pedido, aprovação, giro, produç
  assert.equal((await root.collection('physicalBalances').doc(bife).get()).data().total,10);
  assert.equal((await call(kitchen,aux,'v3Transfer',{requestId:randomUUID(),productId:raw,from:'reserva',to:'giro',quantity:1.5,notes:'Teste'})).code,200);
  assert.equal((await root.collection('physicalBalances').doc(raw).get()).data().total,3);
+ const lots=await call(kitchen,aux,'v3Lots',{productId:raw});assert.equal(lots.code,200);assert.equal(lots.lots.length,1);
+ assert.equal(lots.lots[0].reserva,1.5);assert.equal(lots.lots[0].giro,1.5);assert.equal(lots.lots[0].availableQuantity,3);
+ const sessionId=randomUUID();
+ for(const location of ['reserva','giro']){
+  const counted=await call(kitchen,manager,'v3Count',{productId:raw,requestId:randomUUID(),sessionId,location,quantity:1.5,lotCounts:[{id:lots.lots[0].id,quantity:1.5}],notes:'TESTE mesma rodada'});
+  assert.equal(counted.code,200,JSON.stringify(counted));
+ }
+ const confirmed=(await root.collection('physicalBalances').doc(raw).get()).data();
+ assert.equal(confirmed.countSessions.reserva,sessionId);assert.equal(confirmed.countSessions.giro,sessionId);assert.equal(confirmed.quality,'PHYSICAL_COUNT');
+ assert.equal(confirmed.countedTotal,3);
  const recipe={id:'catalog-test-preparo',name:'Ficha fictícia de homologação',yieldQuantity:1,outputProductId:out,lines:[{productId:raw,quantity:1,location:'giro',substitutes:[]}]};
  assert.equal((await call(production,manager,'saveRecipe',recipe)).code,200);
- const run={recipeId:recipe.id,requestId:randomUUID(),portions:1,items:[{productId:raw,quantity:1}],notes:'TESTE ISOLADO'};
+ const run={recipeId:recipe.id,requestId:randomUUID(),portions:1,items:[{productId:raw,quantity:1}],notes:'TESTE ISOLADO',outputLot:'TESTE-PRODUCAO',expiryDate:'2099-12-31'};
  assert.equal((await call(production,aux,'finish',run)).code,200);
  assert.equal((await call(production,aux,'finish',run)).duplicate,true);
  const balance=(await root.collection('physicalBalances').doc(raw).get()).data();assert.equal(balance.reserve,1.5);assert.equal(balance.rotation,0.5);assert.equal(balance.total,2);
