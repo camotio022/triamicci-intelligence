@@ -53,3 +53,23 @@
     transition-duration: 0.01ms;
   }
 }
+
+/* Consistent treatment of operational controls while preserving compact toolbars. */
+:where(.v3-form,.receiving-actions,.inventory-actions,.ti-receive-navigation,.ti-attendance-actions,.ti-coverage-page,.ti-leave-v4,.production-page,.receiving-page,.inventory-page,.ti-master-editor,.ti-my-profile-page,.ti-stock-detail-dialog)
+:where(button,input[type="button"],input[type="submit"],input[type="reset"]) {
+  font-size: 14px;
+  letter-spacing: normal;
+  text-align: center;
+}
+:where(.v3-form,.receiving-actions,.inventory-actions,.ti-receive-navigation,.ti-attendance-actions,.ti-coverage-page,.ti-leave-v4,.production-page,.receiving-page,.inventory-page,.ti-master-editor,.ti-my-profile-page,.ti-stock-detail-dialog)
+:where(button,input[type="button"],input[type="submit"],input[type="reset"]):not(:disabled):active {
+  filter: brightness(.96);
+}
+:where(button,[role="button"],input[type="button"],input[type="submit"],input[type="reset"])[aria-busy="true"] {
+  cursor: progress;
+}
+@media (max-width: 600px) {
+  :where(.receiving-actions,.inventory-actions,.ti-receive-navigation) > button {
+    flex: 1 1 140px;
+  }
+}
