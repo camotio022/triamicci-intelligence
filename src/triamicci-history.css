@@ -33,3 +33,7 @@
 .ti-history-summary-item small{color:#a71919;font-size:12px}
 .ti-history-summary-item time{font-size:12px;color:#667085;flex:none;text-align:right;max-width:45%}
 @media(max-width:420px){.ti-history-summary-item{padding:11px}.ti-history-summary-item strong{font-size:13px}.ti-history-summary-item time{font-size:11px}}
+
+.ti-history-summary-product b{flex:none;color:#172338;font-size:14px;white-space:nowrap;font-weight:750}
+.ti-history-summary-product small{color:#687487}
+@media(max-width:420px){.ti-history-summary-product b{font-size:13px}}
