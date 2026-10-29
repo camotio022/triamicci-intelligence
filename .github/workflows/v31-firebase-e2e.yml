@@ -22,6 +22,8 @@ jobs:
         run: npm install --no-audit --no-fund && npm install --no-save playwright@1.56.0
       - name: Instalar navegador de homologação
         run: npx playwright install --with-deps chromium
+      - name: Preservar todas as regras de negócio
+        run: npm run test:rules
       - name: Testar Firebase Auth + Firestore isolados
         env:
           CI: true
