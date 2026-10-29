@@ -40,3 +40,27 @@
 .ti-attendance-v5-actions .ti-attendance-secondary{flex:0 0 auto;min-width:130px}
 .ti-attendance-v5-expand{width:auto;justify-self:start;border:none;background:transparent;font-size:12px;padding:6px;color:#a71919}
 @media(max-width:390px){.ti-attendance-v5-bottom{gap:7px}.ti-attendance-v5-bottom .ti-journey-upcoming,.ti-attendance-v5-bottom .ti-journey-month{padding:8px}.ti-v5-cal-day{font-size:9px}.ti-attendance-v5-milestone small{font-size:9px}}
+
+/* Correção mobile homologação: nunca comprimir calendário mensal em meia coluna. */
+.ti-attendance-v5-bottom{width:100%;min-width:0}
+.ti-attendance-v5-bottom .ti-journey-month,
+.ti-attendance-v5-bottom .ti-journey-upcoming{box-sizing:border-box;min-width:0;max-width:100%;overflow:hidden}
+.ti-attendance-v5-bottom .ti-journey-monthnav{display:grid;grid-template-columns:34px minmax(0,1fr) 34px;align-items:center;gap:6px;width:100%;min-width:0}
+.ti-attendance-v5-bottom .ti-journey-monthnav strong{min-width:0;text-align:center;white-space:nowrap;font-size:13px;overflow:hidden;text-overflow:ellipsis}
+.ti-attendance-v5-bottom .ti-journey-monthnav button{min-width:0;min-height:34px;width:34px;height:34px;padding:0;font-size:18px}
+.ti-attendance-v5-bottom .ti-journey-month-toggle{min-width:0;max-width:100%}
+.ti-attendance-v5-bottom .ti-journey-month-toggle span:first-child{min-width:0}
+.ti-attendance-v5-bottom .ti-v5-calendar{width:100%;min-width:0;grid-template-columns:repeat(7,minmax(0,1fr));box-sizing:border-box}
+.ti-attendance-v5-bottom .ti-v5-cal-day{min-width:0}
+@media(max-width:700px){
+ .ti-attendance-v5-bottom{grid-template-columns:minmax(0,1fr)!important}
+ .ti-attendance-v5-bottom .ti-journey-upcoming,
+ .ti-attendance-v5-bottom .ti-journey-month{width:100%;padding:13px;max-width:100%}
+ .ti-attendance-v5-bottom .ti-journey-nextgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+ .ti-attendance-v5-bottom .ti-v5-cal-day{font-size:12px;min-height:32px}
+ .ti-attendance-v5-bottom .ti-v5-cal-head{font-size:11px}
+}
+@media(max-width:380px){
+ .ti-attendance-v5-bottom .ti-journey-nextgrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+ .ti-attendance-v5-bottom .ti-journey-nextgrid article{padding:6px!important}
+}
