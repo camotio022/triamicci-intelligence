@@ -92,7 +92,7 @@ export default function LeaveRequests({membership}){
    </article>)}</div>}
   </section>
   <section className="ti-planning-card"><TriamicciHistory title="Histórico de solicitações" records={requests.filter(x=>x.status==='approved'||x.status==='rejected')}
-    getId={x=>x.id} getTitle={x=>dateLabel(x.date)} getDate={x=>x.decidedAt||x.updatedAt||x.createdAt||null}
+    getId={x=>x.id} getTitle={x=>dateLabel(x.date)} getDate={x=>x.decidedAt||x.updatedAt||x.createdAt||x.date||null}
     getQuantity={x=>statuses[x.status]||x.status} getDescription={x=>x.reason||'Solicitação de folga'}
     getPerson={x=>x.actorName||x.requesterName||x.employeeName}
     renderDetails={x=><div>{x.note?'Decisão: '+x.note:'Sem observações'} · ID: {x.id}</div>}
