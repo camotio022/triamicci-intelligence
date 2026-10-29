@@ -9,7 +9,7 @@ import {useFeedback} from './FeedbackProvider.jsx';
 import {receivingUnit, receivingLineError} from '../server/operations/receiving-input.js';
 const blank=()=>({productId:'',commercialQuantity:'',commercialUnit:'kg',stockQuantity:'',location:'reserva',lot:'',expiryDate:''});
 async function api(action,payload={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login.');const r=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
-export default function ShipmentReceiving({products,orders,membership,onChange,onConfigure}){
+export default function ShipmentReceiving({approvedReceipts=[],products,orders,membership,onChange,onConfigure}){
  const {notify}=useFeedback(),[step,setStep]=useState(1),[showWizard,setShowWizard]=useState(false),[orderId,setOrderId]=useState(''),[supplier,setSupplier]=useState(''),[notes,setNotes]=useState(''),[lines,setLines]=useState([blank()]),[requestId,setRequestId]=useState(()=>crypto.randomUUID()),[busy,setBusy]=useState(false),[error,setError]=useState(''),[shipments,setShipments]=useState([]),[cursor,setCursor]=useState(null),[reason,setReason]=useState('');
  const management=['admin','manager','submanager'].includes(membership.role);
  const load=async(more=false)=>{const d=await api('shipmentsList',more&&cursor?{before:cursor}:{});setShipments(a=>more?[...a,...d.shipments]:d.shipments||[]);setCursor(d.nextCursor||null);};
@@ -23,7 +23,13 @@ export default function ShipmentReceiving({products,orders,membership,onChange,o
  const submit=async()=>{if(busy||blocked)return;setBusy(true);try{const payload=lines.filter(l=>Number(l.commercialQuantity)>0).map(l=>({...l,commercialQuantity:Number(l.commercialQuantity),stockQuantity:Number(l.stockQuantity||0)}));if(!payload.length)throw Error('Informe ao menos um item entregue.');const d=await api('shipmentInspect',{requestId,orderId:orderId||null,supplier,notes,lines:payload});notify(d.message,'success');setRequestId(crypto.randomUUID());setStep(1);setShowWizard(false);setLines([blank()]);setOrderId('');setSupplier('');setNotes('');await load();await onChange?.()}catch(e){setError(e.message)}finally{setBusy(false)}};
  const decide=async(item,approved)=>{if(busy)return;if(!approved&&reason.trim().length<8){setError('Informe a justificativa da recusa.');return;}if(!window.confirm(approved?'Aprovar todos os itens desta conferência e registrar a entrada no estoque?':'Recusar esta conferência sem alterar estoque?'))return;setBusy(true);try{const d=await api(approved?'shipmentApprove':'shipmentReject',{requestId:item.id,reason});notify(d.message,'success');setReason('');await load();await onChange?.()}catch(e){setError(e.message)}finally{setBusy(false)}};
  const pending=shipments.filter(s=>s.status==='pending');
- const completed=shipments.filter(s=>s.status!=='pending');
+ const completed=[
+  ...shipments.filter(s=>s.status!=='pending'),
+  ...approvedReceipts.map(r=>({id:'legacy-'+r.id,createdAt:r.at,status:'approved',supplier:r.supplier,
+   lines:[{productName:r.productName,commercialQuantity:r.physicalQuantity,commercialUnit:r.unit,
+    stockQuantity:r.physicalQuantity,stockUnit:r.unit,location:r.location||'reserva',lot:r.lot,expiryDate:r.expiryDate}],
+   notes:r.notes,inspectedByName:r.actorName||r.recordedBy||'',legacy:true}))
+ ].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
  const todayKey=new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
  const todaysCount=shipments.filter(s=>new Date(s.createdAt).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'})===todayKey).length;
  return <section className="v3-page ti-shipment ti-shipment-v2">
