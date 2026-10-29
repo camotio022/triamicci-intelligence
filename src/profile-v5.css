@@ -28,3 +28,29 @@
 .ti-profile-v5 .ti-avatar-remove{font-size:11px}
 .ti-profile-v5 .ti-profile-v5-overview{display:none}
 @media(max-width:600px){.ti-profile-v5 .ti-premium-hero{padding:15px 12px;gap:12px}.ti-profile-v5 .ti-premium-avatar{width:68px;height:68px}.ti-profile-v5 .ti-premium-identity h1{font-size:21px}}
+
+.ti-profile-v5 .ti-profile-v5-hero{display:block;padding:16px;border-radius:16px;background:linear-gradient(115deg,#4b1d22,#ab1115);margin-bottom:12px}
+.ti-profile-v5-mainline{display:flex;align-items:center;gap:13px;min-width:0}
+.ti-profile-v5-mainline .ti-avatar-editor{position:relative;flex:none}
+.ti-profile-v5-mainline .ti-premium-avatar{width:74px;height:74px}
+.ti-profile-v5-camera{position:absolute;right:-3px;bottom:-3px;display:grid;place-items:center;width:27px;height:27px;border-radius:50%;border:2px solid #fff;background:#1b2536;color:white;cursor:pointer}
+.ti-profile-v5-photoactions{position:absolute;z-index:3;top:82px;left:0;min-width:130px;display:grid;gap:8px;padding:12px;background:white;color:#172338;border-radius:10px;box-shadow:0 8px 30px #0003}
+.ti-profile-v5-photoactions label,.ti-profile-v5-photoactions button{cursor:pointer;font-size:12px;background:white;color:#172338}
+.ti-profile-v5-photoactions input{position:absolute;opacity:0;width:1px;height:1px}
+.ti-profile-v5-hero-actions{display:grid;justify-items:end;gap:7px;margin-left:auto}
+.ti-profile-v5-hero-actions button{border:1px solid #ffffff77;border-radius:10px;color:white;background:#ffffff12;padding:8px;display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px}
+.ti-profile-v5-active{display:flex;gap:5px;align-items:center;color:#d7f6e4;background:#ffffff1a;padding:7px;border-radius:40px;font-size:11px}
+.ti-profile-v5-identity-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px;padding-top:12px;border-top:1px solid #ffffff44}
+.ti-profile-v5-identity-meta>span{display:grid;grid-template-columns:auto 1fr;column-gap:7px;align-items:center;color:white;min-width:0}
+.ti-profile-v5-identity-meta svg{grid-row:span 2}.ti-profile-v5-identity-meta small{font-size:10px;color:#ffe0e0}.ti-profile-v5-identity-meta strong{font-size:12px;overflow-wrap:anywhere}
+.ti-profile-v5 .ti-premium-content{display:block}
+.ti-profile-v5 .ti-profile-v5-overview{display:block;border-radius:16px;margin-top:12px}
+.ti-profile-v5-overview>div:first-child{display:flex;gap:10px;align-items:center;color:#a71919}
+.ti-profile-v5-overview>div:first-child strong{color:#1a293f;flex:1;font-size:17px}
+.ti-profile-v5-overview>div:first-child button{border:1px solid #e1e5ec;background:white;border-radius:10px;font-size:11px;padding:8px;color:#38475c}
+.ti-profile-v5-statcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.ti-profile-v5-statcards article{min-width:0;border:1px solid #e2e7ec;border-radius:11px;padding:10px;display:grid;gap:4px;background:#f9fcfa}
+.ti-profile-v5-statcards article:nth-child(2){background:#fff8f8}.ti-profile-v5-statcards article:nth-child(3){background:#fffaf3}
+.ti-profile-v5-statcards strong{font-size:21px;color:#1b293f}.ti-profile-v5-statcards small{font-size:10px;color:#657187}
+.ti-profile-v5-skill-link{width:100%;display:flex;justify-content:space-between;margin-top:10px;border:1px solid #a71919;background:white;border-radius:10px;padding:10px;color:#a71919;font-weight:750}
+@media(max-width:480px){.ti-profile-v5 .ti-profile-v5-hero{padding:12px}.ti-profile-v5-mainline{gap:9px}.ti-profile-v5-mainline .ti-premium-avatar{width:57px;height:57px}.ti-profile-v5-hero-actions button{font-size:10px}.ti-profile-v5-hero-actions{gap:5px}.ti-profile-v5-identity-meta{gap:4px}.ti-profile-v5-identity-meta strong{font-size:11px}}
