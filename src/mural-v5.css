@@ -27,3 +27,9 @@
 .ti-mural-v5-status.confirmed{background:#ddf4e7;color:#117343}
 @media(max-width:650px){.ti-mural-v5-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.ti-mural-v5-staff li{gap:7px}.ti-mural-v5-time{max-width:72px}.ti-mural-v5-status{font-size:10px;padding:5px 6px}}
 @media(max-width:360px){.ti-mural-v5-avatar{display:none}.ti-mural-v5-time small{display:none}}
+
+.ti-mural-v5-nav{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:thin}
+.ti-mural-v5-nav button{white-space:nowrap;flex:none;background:#fff;border:1px solid #e0e5ec;border-radius:10px;padding:10px 13px;font-size:12px;font-weight:700;color:#39465d;cursor:pointer}
+.ti-mural-v5-nav button:first-child{background:#a71919;color:#fff;border-color:#a71919}
+#mural-v5-team,#mural-v5-notices,#mural-v5-schedule,#mural-v5-production{scroll-margin-top:100px}
+.ti-mural-v5-roster .ti-v4-roster-summary{margin-bottom:12px}
