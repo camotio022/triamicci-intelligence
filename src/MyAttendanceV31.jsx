@@ -38,7 +38,7 @@ export default function MyAttendanceV31({unitId}){
  const baseMonthIndex=Math.max(0,months.indexOf(currentMonth));
  const selectedMonth=months[Math.min(Math.max(baseMonthIndex+monthOffset,0),Math.max(0,months.length-1))]||currentMonth;
  const monthEntries=publishedEntries.filter(e=>e.date.startsWith(selectedMonth));
- const upcoming=publishedEntries.filter(e=>e.date>=operationalDay).slice(0,3);
+ const upcoming=publishedEntries.filter(e=>e.date>operationalDay).slice(0,3);
  const dateLabel=date=>date?.split('-').reverse().join('/')||'—';
  const typeLabel={work:'Trabalho',off:'Folga',monthly_sunday:'Domingo de folga',leave:'Ausência'};
 
@@ -48,7 +48,7 @@ export default function MyAttendanceV31({unitId}){
  return <section className="ti-attendance-v31 ti-attendance-v5" aria-label="Minha jornada">
   <div className="ti-attendance-v5-heading"><div><span className="ti-attendance-eyebrow">JORNADA DE HOJE · {day||'HOJE'}</span><h2>Minha jornada</h2><p>{status==='not_started'?(off?'Folga ou ausência na escala oficial':!todayEntry?'Sem escala oficial para hoje':live.label):labels[status]}</p></div><span className="ti-attendance-v5-state">{status==='finished'?'Encerrada':status==='not_started'?'Não iniciada':'Em andamento'}</span></div>
   <div className="ti-attendance-v5-schedule"><span>Horário previsto: <strong>{live.start||'Não informado'}{live.end?'–'+live.end:''}</strong></span><span>{todayEntry?'Escala: '+(typeLabel[todayEntry.type]||'Publicada'):'Sem escala oficial para hoje'}</span></div>
-  <div className="ti-attendance-v5-progress" aria-label="Etapas da jornada">{stages.map(stage=><div key={stage.key} className={'ti-attendance-v5-milestone '+stage.kind}><span className="ti-attendance-v5-circle" aria-hidden="true"/><strong>{stage.title}</strong></div>)}</div>
+  <div className="ti-attendance-v5-progress" aria-label="Etapas da jornada">{stages.map((stage,i)=><div key={stage.key} className={'ti-attendance-v5-milestone '+stage.kind}><span className="ti-attendance-v5-circle" aria-hidden="true"/><strong>{stage.title}</strong><small>{i===0?(live.start||'—'):i===1?(record?.clockInAt?new Date(record.clockInAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}):'Declarada'):i===2?(profile?.availability?.find?.(x=>x.day===['dom','seg','ter','qua','qui','sex','sab'][new Date(operationalDay+'T12:00:00Z').getUTCDay()])?.breakStart||'—'):i===3?(profile?.availability?.find?.(x=>x.day===['dom','seg','ter','qua','qui','sex','sab'][new Date(operationalDay+'T12:00:00Z').getUTCDay()])?.breakEnd||'—'):(live.end||'—')}</small></div>)}</div>
   <div className="ti-attendance-actions ti-attendance-v5-actions">
    {next?.length>0&&<button className="ti-attendance-primary" type="button" onClick={()=>submit()} disabled={busy}>{busy?'Registrando…':next[1]}</button>}
    {status==='working'&&<button className="ti-attendance-secondary" type="button" onClick={()=>submit('clock_out')} disabled={busy}>Encerrar jornada</button>}
