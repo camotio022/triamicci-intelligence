@@ -73,3 +73,59 @@
     flex: 1 1 140px;
   }
 }
+
+/* Identidade Triamicci: tokens únicos, sem reclassificar botões de navegação. */
+:root {
+  --ti-action-primary: var(--ti-v4-brand, #a71916);
+  --ti-action-primary-hover: #8e1714;
+  --ti-action-primary-text: #fff;
+  --ti-action-secondary-bg: #fff;
+  --ti-action-secondary-text: #77211e;
+  --ti-action-secondary-border: #dcbfbb;
+  --ti-action-danger: var(--ti-v4-danger, #b42318);
+  --ti-action-danger-soft: var(--ti-v4-danger-soft, #fff0ee);
+  --ti-action-focus: var(--ti-v4-focus, rgba(167,25,22,.30));
+}
+/* Variantes explícitas: cor acompanha a intenção, não a posição do botão. */
+:where(.ti-btn-primary,.ti-attendance-primary,.ti-leave-v4-primary,.ti-receive-primary,.v3-form button[type="submit"],.receiving-actions button[type="submit"],.inventory-actions button[type="submit"]) {
+  background: var(--ti-action-primary);
+  border: 1px solid var(--ti-action-primary);
+  color: var(--ti-action-primary-text);
+  font-weight: 700;
+}
+:where(.ti-btn-secondary,.ti-attendance-secondary,.v3-secondary,.ti-receive-secondary) {
+  background: var(--ti-action-secondary-bg);
+  border: 1px solid var(--ti-action-secondary-border);
+  color: var(--ti-action-secondary-text);
+}
+:where(.ti-btn-danger,button[data-variant="danger"],button[data-tone="danger"]) {
+  background: var(--ti-action-danger-soft);
+  border: 1px solid var(--ti-action-danger);
+  color: var(--ti-action-danger);
+}
+:where(.ti-btn-primary,.ti-btn-secondary,.ti-btn-danger,.ti-attendance-primary,.ti-attendance-secondary,.v3-secondary,.ti-receive-primary,.ti-receive-secondary,.v3-form button[type="submit"]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ti-btn-gap);
+  min-height: var(--ti-btn-height);
+  padding: 10px 14px;
+  border-radius: var(--ti-btn-radius);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: center;
+}
+:where(.ti-btn-primary,.ti-attendance-primary,.ti-receive-primary,.v3-form button[type="submit"]):not(:disabled):hover {
+  background: var(--ti-action-primary-hover);
+}
+:where(.ti-btn-primary,.ti-btn-secondary,.ti-btn-danger,.ti-attendance-primary,.ti-attendance-secondary,.v3-secondary):focus-visible {
+  outline: 3px solid var(--ti-action-focus);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  :where(.ti-btn-primary,.ti-btn-secondary,.ti-btn-danger,.ti-attendance-primary,.ti-attendance-secondary,.v3-secondary,.ti-receive-primary,.ti-receive-secondary) {
+    min-height: 44px;
+    max-width: 100%;
+  }
+}
