@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../server/quota-error.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 
 export default async function handler(req,res) {
@@ -56,7 +57,7 @@ export default async function handler(req,res) {
     });
   }catch(e){
     if(e.message==='UNAUTHENTICATED')return send(res,401,'Entre com Google.');
-    console.error('Dashboard summary:',e.message);
+    if(sendQuotaError(res,e))return;console.error('Dashboard summary:',e.message);
     return send(res,500,'Não foi possível carregar o dashboard.');
   }
 }

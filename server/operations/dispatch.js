@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from './catalog-identity.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -90,7 +91,7 @@ export default async function handler(req,res){
      lotId:l.id,lot:l.lot,expiryDate:l.expiryDate,quantity:l.quantity
     }))};
    tx.create(movementRef,record);
-   signalUnitChange(tx,db,m.unitId);
+   signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
    tx.create(auditRef,{event:'physical.dispatched',unitId:m.unitId,productId,operationId:requestId,
     actorUid:actor.uid,details:record,at:now});
   });
@@ -105,6 +106,6 @@ export default async function handler(req,res){
    HISTORY_LIMIT:[409,'Há mais de 100 lotes: requer conferência administrativa antes de baixa.'],
    CONFLICT:[409,'Identificador já usado com dados diferentes.']};
   if(errors[e.message])return send(res,...errors[e.message]);
-  console.error('Dispatch:',e.message);return send(res,500,'Não foi possível registrar saída.');
+  if(sendQuotaError(res,e))return;console.error('Dispatch:',e.message);return send(res,500,'Não foi possível registrar saída.');
  }
 }

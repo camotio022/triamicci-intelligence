@@ -1,10 +1,11 @@
+import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 async function request(action,payload={}){
  const token=await auth.currentUser?.getIdToken();
  if(!token)throw new Error('Sessão expirada.');
- const res=await fetch('/api/catalog/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
+ const res=await apiFetch('/api/catalog/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
  const data=await res.json();
  if(!res.ok)throw new Error(data.message||'Falha ao consultar catálogo.');
  return data;

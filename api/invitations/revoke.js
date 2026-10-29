@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../server/quota-error.js';
 import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
 
 // Revogação definitiva de convite. Apenas administrador da unidade ou o emissor autorizado.
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
     if (error.message === 'NOT_FOUND') return send(res,404,'Convite não encontrado.');
     if (error.message === 'FORBIDDEN') return send(res,403,'Sem permissão para revogar este convite.');
     if (error.message === 'NOT_REVOCABLE') return send(res,409,'Este convite já foi usado ou revogado.');
-    console.error('Invitation revoke:',error.message);
+    if(sendQuotaError(res,error))return;console.error('Invitation revoke:',error.message);
     return send(res,500,'Não foi possível revogar o convite.');
   }
 }

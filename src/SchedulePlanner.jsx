@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {coverageTimeline} from '../server/schedules/coverage-timeline.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
@@ -7,12 +8,12 @@ import {restaurantDay} from '../server/schedules/restaurant-today.js';
 async function call(action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
  const token=await user.getIdToken();
- const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action,...extra})});
+ const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action,...extra})});
  const d=await r.json();if(!r.ok)throw Error([d.message,...(d.issues||[]).slice(0,5)].join(' · '));return d;
 }
-async function coverageApi(){const token=await auth.currentUser?.getIdToken();const r=await fetch('/api/coverage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'dashboard'})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
+async function coverageApi(){const token=await auth.currentUser?.getIdToken();const r=await apiFetch('/api/coverage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'dashboard'})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
 async function membersApi(){
- const token=await auth.currentUser?.getIdToken();const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'profiles'})});const d=await r.json();if(!r.ok)throw Error(d.message);const staff=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryPreview'})});const sd=await staff.json();if(!staff.ok)throw Error(sd.message||'Cadastro Mestre indisponível.');return {activated:!!sd.activated,registeredCount:(sd.registry||[]).filter(p=>p.status==='active').length,people:sd.activated?(sd.registry||[]).filter(p=>p.status==='active').map(p=>({uid:p.id,accountUid:p.accountUid||null,name:p.name,status:p.status,professional:{sector:p.sector,shift:p.shift,availability:p.availability||[],jobTitle:p.jobTitle,skills:p.skills||[],certifications:p.certifications||[]},fixedWeekday:p.fixedWeekday,registry:true})):d.members||[]};
+ const token=await auth.currentUser?.getIdToken();const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'profiles'})});const d=await r.json();if(!r.ok)throw Error(d.message);const staff=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryPreview'})});const sd=await staff.json();if(!staff.ok)throw Error(sd.message||'Cadastro Mestre indisponível.');return {activated:!!sd.activated,registeredCount:(sd.registry||[]).filter(p=>p.status==='active').length,people:sd.activated?(sd.registry||[]).filter(p=>p.status==='active').map(p=>({uid:p.id,accountUid:p.accountUid||null,name:p.name,status:p.status,professional:{sector:p.sector,shift:p.shift,availability:p.availability||[],jobTitle:p.jobTitle,skills:p.skills||[],certifications:p.certifications||[]},fixedWeekday:p.fixedWeekday,registry:true})):d.members||[]};
 }
 const labels={draft:'Rascunho',in_review:'Em análise',approved:'Aprovada',published:'Publicada',work:'Trabalho',off:'Folga',leave:'Ausência',monthly_sunday:'Domingo mensal adicional'};
 export default function SchedulePlanner({membership}){
@@ -26,8 +27,8 @@ export default function SchedulePlanner({membership}){
  const [uid,setUid]=useState(''),[date,setDate]=useState(''),[type,setType]=useState('work'),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const allowed=['admin','manager','submanager'].includes(membership.role);
  const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,f,l,c]=await Promise.all([call('list'),membersApi(),call('fixedOffList'),call('leaveList'),coverageApi()]);setCoverageRules(c.requirements||[]);setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})})}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
- useUnitLive(membership?.unitId,()=>refresh(true));
- useEffect(()=>{refresh()},[refresh]);
+ useUnitLive(membership?.unitId,initial=>refresh(!initial),{domains:['schedules','team','coverage'],refreshKey:membership.role});
+
  const chosen=plans.find(x=>x.id===selected);
  const legacyIds=useMemo(()=>registryState.activated?entries.filter(e=>!people.some(p=>p.uid===e.uid)).length:0,[entries,people,registryState.activated]);
  const dateSelected=date;
@@ -37,7 +38,7 @@ export default function SchedulePlanner({membership}){
  const filteredPeople=people.filter(p=>matrixSector==='todos'||p.professional?.sector===matrixSector);
  const saveFixed=async(person,value)=>{
   setSavingFixed(person.uid);try{
-   if(person.registry){const token=await auth.currentUser.getIdToken();const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryUpdate',id:person.uid,changes:{fixedWeekday:Number(value)}})});const d=await r.json();if(!r.ok)throw Error(d.message)}else await call('fixedOffSet',{uid:person.uid,weekday:Number(value)});
+   if(person.registry){const token=await auth.currentUser.getIdToken();const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryUpdate',id:person.uid,changes:{fixedWeekday:Number(value)}})});const d=await r.json();if(!r.ok)throw Error(d.message)}else await call('fixedOffSet',{uid:person.uid,weekday:Number(value)});
    setFixedOff(old=>({...old,[person.uid]:Number(value)}));
    notify('Folga habitual de '+(person.name||person.email)+' atualizada.','success');
   }catch(e){setError(e.message);notify(e.message,'error')}finally{setSavingFixed('')}

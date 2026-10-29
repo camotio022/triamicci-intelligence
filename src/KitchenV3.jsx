@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useViewState} from './useViewState.js';
 import {useUnitLive} from './useUnitLive.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
@@ -13,7 +14,7 @@ import './v4-stock-overview.css';
 async function api(action,payload={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
  const token=await user.getIdToken();
- const response=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
+ const response=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
  const data=await response.json();if(!response.ok)throw Error(data.message||'Falha na operação.');return data;
 }
 const kinds=[['availability','Disponibilidade'],['quantitative','Contagem quantitativa'],['on_demand','Conferir quando necessário']];
@@ -24,6 +25,7 @@ const date=iso=>iso?new Date(iso+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const longDate=x=>x?new Date(x).toLocaleString('pt-BR'):'—';
 export default function KitchenV3({membership}){
  const {notify}=useFeedback();
+ const [hasData,setHasData]=useState(false);
  const canManage=isManagement(membership.role);
  const [tab,setTab]=useViewState('KitchenV3.jsx:tab',membership.unitId,'overview'),[products,setProducts]=useState([]),[signals,setSignals]=useState([]),[orders,setOrders]=useState([]);
  const [selected,setSelected]=useState(''),[search,setSearch]=useViewState('KitchenV3.jsx:search',membership.unitId,''),[location,setLocation]=useState('reserva'),[showArchived,setShowArchived]=useState(false),[newName,setNewName]=useState(''),[newCategory,setNewCategory]=useState('Proteínas'),[newUnit,setNewUnit]=useState('kg'),[newExpiry,setNewExpiry]=useState(false),[resolutionById,setResolutionById]=useState({});
@@ -35,12 +37,12 @@ export default function KitchenV3({membership}){
  const [supplier,setSupplier]=useState(''),[eta,setEta]=useState(''),[orderLines,setOrderLines]=useState([{productId:'',quantity:'',unit:'kg'}]),[orderNote,setOrderNote]=useState('');
  const load=useCallback(async(silent=false)=>{
   if(!silent)setLoading(true);setError('');
-  try{const d=await api('v3Dashboard');setProducts(d.products||[]);setSignals(d.signals||[]);setOrders(d.orders||[]);}
-  catch(e){setError(e.message);}
+  try{const d=await api('v3Dashboard');setProducts(d.products||[]);setSignals(d.signals||[]);setOrders(d.orders||[]);setHasData(true);}
+  catch(e){setError(e.message);return false;}
   finally{setLoading(false);}
  },[]);
- useUnitLive(membership?.unitId,()=>load(true));
- useEffect(()=>{load();},[load]);
+ useUnitLive(membership?.unitId,initial=>load(!initial),{domains:['stock','catalog']});
+
  const active=useMemo(()=>products.filter(p=>(showArchived||p.status==='active')&&(p.name+' '+(p.profile?.displayName||'')+' '+(p.profile?.aliases||[]).join(' ')).toLowerCase().includes(search.trim().toLowerCase())),[products,search,showArchived]);
  const openOrders=orders.filter(o=>!['received','cancelled'].includes(o.status));
  const chosen=products.find(p=>p.id===selected);
@@ -54,7 +56,7 @@ export default function KitchenV3({membership}){
  const addProduct=async e=>{
   e.preventDefault();setBusy(true);setError('');
   try{const user=auth.currentUser;const token=await user?.getIdToken();if(!token)throw Error('Faça login.');
-   const response=await fetch('/api/products/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+   const response=await apiFetch('/api/products/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({action:'create',name:newName.trim(),category:newCategory,unit:newUnit,minStock:0,trackExpiry:newExpiry})});
    const d=await response.json();if(!response.ok)throw Error(d.message||'Não foi possível cadastrar.');
    notify('Insumo cadastrado. Configure seu fluxo antes de usar.','success');setNewName('');await load();
@@ -76,6 +78,7 @@ export default function KitchenV3({membership}){
   const ok=await update('v3OrderCreate',{requestId:crypto.randomUUID(),supplier,etaDate:eta,items,notes:orderNote},'Pedido incluído na agenda.');
   if(ok){setSupplier('');setEta('');setOrderLines([{productId:'',quantity:'',unit:'kg'}]);setOrderNote('');}
  };
+ if(!hasData)return <section className="inventory-page"><h1>Estoque e insumos</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>load()}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
  return <section className="v3-page">
   <header className="v3-head"><div><p className="eyebrow">OPERAÇÃO · ESTOQUE E INSUMOS</p><h1>Estoque e insumos</h1><p>O que temos, o que falta e o que está previsto para chegar.</p></div><button type="button" className="v3-secondary" onClick={load} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></header>
   <nav className="ti-v4-stock-nav" aria-label="Seções de estoque e insumos">

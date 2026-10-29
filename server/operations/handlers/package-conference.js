@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../quota-error.js';
 import {signalUnitChange} from '../../live-signal.js';
 // Registro auditável de conferência por apresentação. Não modifica saldos físicos.
 import {getDb,authenticate,membership,checkRequest,send} from '../../_lib.js';
@@ -38,7 +39,7 @@ export default async function handler(req,res){
     profileVersion:config.data().version,area,presentation:result.presentation,closed:result.closed,opened:result.opened,
     remainderStatus:result.opened>0?'UNKNOWN':'NONE',stockEffect:'NONE',at:now};
    tx.create(count,record);
-   signalUnitChange(tx,db,m.unitId);
+   signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
    tx.create(db.collection('auditLogs').doc(),{event:'physical.package_conference_recorded',unitId:m.unitId,
      productId,operationId:rid,actorUid:actor.uid,details:record,at:now});
   });
@@ -50,6 +51,6 @@ export default async function handler(req,res){
   if(e.message==='PROFILE_MISSING'||e.message==='COUNTING_NOT_CONFIGURED')return send(res,409,'Configure o método de contagem do produto antes de registrar.');
   if(e.message==='VERSION_CONFLICT'||e.message==='CONFLICT')return send(res,409,'Conferência desatualizada ou já registrada com outros dados.');
   if(e.message==='INVALID')return send(res,400,'Dados de conferência incompatíveis com o cadastro.');
-  console.error('Package conference:',e.message);return send(res,500,'Falha ao registrar conferência.');
+  if(sendQuotaError(res,e))return;console.error('Package conference:',e.message);return send(res,500,'Falha ao registrar conferência.');
  }
 }

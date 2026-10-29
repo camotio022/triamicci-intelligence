@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {coverageTimeline} from '../schedules/coverage-timeline.js';
 import {unitDay,publicationWindow} from '../schedules/temporal-policy.js';
 import {signalUnitChange} from '../live-signal.js';
@@ -31,7 +32,7 @@ export default async function handler(req,res){
     if(!actorSnap.exists||actorSnap.data().status!=='active'||actorSnap.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(actorSnap.data().role))throw Error('FORBIDDEN');
     if(!target.exists||target.data().unitId!==m.unitId||target.data().status!=='active')throw Error('FORBIDDEN');
     tx.set(ref,{weekday,unitId:m.unitId,updatedAt:now,updatedBy:actor.uid});
-    signalUnitChange(tx,db,m.unitId);
+    signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'schedule.fixed_off_changed',unitId:m.unitId,actorUid:actor.uid,targetUid:uid,previousWeekday:prior.exists?prior.data().weekday:null,weekday,at:now});
    });
    return send(res,200,'Folga habitual atualizada. Escalas publicadas não foram alteradas.');
@@ -89,7 +90,7 @@ export default async function handler(req,res){
     if(!current.exists||current.data().status!=='active'||current.data().unitId!==m.unitId)throw Error('FORBIDDEN');
     tx.set(ref,{uid:actor.uid,date,reason:reason.trim(),status:'pending',createdAt:now,unitId:m.unitId});
     tx.set(lockRef,{requestsUpdatedAt:now},{merge:true});
-    signalUnitChange(tx,db,m.unitId);
+    signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'leave.requested',actorUid:actor.uid,unitId:m.unitId,requestId:ref.id,at:now});
    });
    return send(res,201,'Solicitação enviada. A folga depende de aprovação.',{id:ref.id});
@@ -109,7 +110,7 @@ export default async function handler(req,res){
     if(!old.exists||old.data().status!=='pending'||old.data().uid===actor.uid)throw Error('CONFLICT');
     tx.update(ref,{status:decision,note:note.trim(),decidedAt:now,decidedBy:actor.uid});
     tx.create(unit.collection('memberNotifications').doc(old.data().uid).collection('items').doc(),{title:'Solicitação de folga analisada',message:old.data().date+' · '+(decision==='approved'?'Aprovada':'Recusada')+'. Consulte a escala oficial para confirmar a programação.',recipientUid:old.data().uid,unitId:m.unitId,actorUid:actor.uid,at:now,read:false});
-    signalUnitChange(tx,db,m.unitId);
+    signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'leave.'+decision,actorUid:actor.uid,targetUid:old.data().uid,requestId:id,unitId:m.unitId,at:now,note:note.trim()});
    });
    return send(res,200,'Decisão registrada. A escala oficial precisa ser atualizada e publicada separadamente.');
@@ -135,7 +136,7 @@ export default async function handler(req,res){
     if(old.exists&&old.data().revision!==expectedRevision)throw Error('CONFLICT');
     revision=(old.data()?.revision||0)+1;
     tx.set(ref,{title:title.trim(),period,entries:entries.map(e=>({date:e.date,uid:e.uid,type:e.type})),status:'draft',revision:(old.data()?.revision||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
-    signalUnitChange(tx,db,m.unitId);
+    signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'schedule.draft_saved',unitId:m.unitId,actorUid:actor.uid,scheduleId:ref.id,at:now});
    });
    return send(res,200,'Rascunho salvo. Ainda não está visível no Mural.',{id:ref.id,revision});
@@ -196,7 +197,7 @@ export default async function handler(req,res){
      }
     }
     tx.update(ref,{status:states[action],updatedAt:now,updatedBy:actor.uid,...(action==='publish'?{publishedAt:now,publishedBy:actor.uid}:{})});
-    signalUnitChange(tx,db,m.unitId);
+    signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'schedule.'+action,unitId:m.unitId,actorUid:actor.uid,scheduleId:id,at:now,revision:current.data().revision});
    });
    return send(res,200,action==='publish'?'Escala publicada no Mural.':'Escala encaminhada para próxima etapa.');
@@ -209,6 +210,6 @@ export default async function handler(req,res){
   if(e.message==='FORBIDDEN')return send(res,403,'Permissão negada.');
   if(['CONFLICT','LOCKED'].includes(e.message))return send(res,409,'A escala mudou de estado. Atualize a página.');
   if(e.code===10||e.code==='ABORTED'||e.code===3&&/Transaction is invalid or closed/i.test(e.message))return send(res,409,'Houve uma alteração simultânea. Consulte o estado atual antes de tentar novamente.');
-  console.error('Schedules:',e.message);return send(res,500,'Não foi possível concluir a operação de escala.');
+  if(sendQuotaError(res,e))return;console.error('Schedules:',e.message);return send(res,500,'Não foi possível concluir a operação de escala.');
  }
 }

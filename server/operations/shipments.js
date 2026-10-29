@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from './catalog-identity.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -41,7 +42,7 @@ export default async function shipments(req,res){
     if(previous.data().status===(action==='shipmentApprove'?'approved':'rejected')){duplicate=true;return;}
     throw Error('CONFLICT');
    }
-   if(action==='shipmentReject'){const at=new Date();tx.update(ref,{status:'rejected',reason:reason.trim(),decidedBy:actor.uid,decidedAt:at});signalUnitChange(tx,db,m.unitId);tx.create(db.collection('auditLogs').doc(),{event:action,shipmentId:requestId,unitId:m.unitId,actorUid:actor.uid,at});return;}
+   if(action==='shipmentReject'){const at=new Date();tx.update(ref,{status:'rejected',reason:reason.trim(),decidedBy:actor.uid,decidedAt:at});signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);tx.create(db.collection('auditLogs').doc(),{event:action,shipmentId:requestId,unitId:m.unitId,actorUid:actor.uid,at});return;}
    const data=action==='shipmentInspect'?{orderId,lines,supplier:supplier.trim(),notes:notes.trim()}:previous.data();
    const ids=[...new Set(data.lines.map(l=>l.productId))];
    const orderRef=data.orderId?unit.collection('purchaseOrdersV3').doc(data.orderId):null;
@@ -85,8 +86,8 @@ export default async function shipments(req,res){
     if(orderRef){const received={...(order.data().received||{})};for(const [p,q] of totals)received[p]=Math.round(((received[p]||0)+q)*1000)/1000;tx.update(orderRef,{received,status:order.data().items.every(i=>(received[i.productId]||0)>=i.quantity)?'received':'partially_received',updatedAt:now});}
     tx.update(ref,{status:'approved',decidedBy:actor.uid,decidedAt:now});
    }
-   signalUnitChange(tx,db,m.unitId);tx.create(db.collection('auditLogs').doc(),{event:action,shipmentId:requestId,unitId:m.unitId,actorUid:actor.uid,at:now});
+   signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);tx.create(db.collection('auditLogs').doc(),{event:action,shipmentId:requestId,unitId:m.unitId,actorUid:actor.uid,at:now});
   });
   return send(res,200,duplicate?'Conferência já processada.':action==='shipmentInspect'?'Conferência enviada para aprovação.':action==='shipmentApprove'?'Entrega aprovada e estoque atualizado.':'Entrega recusada sem alterar o estoque.',{duplicate});
- }catch(e){const messages={UNAUTHENTICATED:'Faça login.',FORBIDDEN:'Sem permissão.',NOT_FOUND:'Conferência indisponível.',CONFLICT:'A conferência mudou. Atualize antes de decidir.',ORDER:'Pedido encerrado, item ou unidade incompatível.',PRODUCT:'Produto ou perfil indisponível.',QUANTITY:'Quantidade ou local incompatível.',DIVERGENCE:'Justifique quantidades acima do pedido.',LOT:'Informe lote e validade reais.',UNIT:'Unidades de saldo e configuração divergem.',DUPLICATE_LINE:'Não repita o mesmo produto/local/lote.'};if(messages[e.message])return send(res,e.message==='UNAUTHENTICATED'?401:e.message==='FORBIDDEN'?403:409,messages[e.message]);console.error('Shipments:',e.message);return send(res,500,'Não foi possível processar a entrega.');}
+ }catch(e){const messages={UNAUTHENTICATED:'Faça login.',FORBIDDEN:'Sem permissão.',NOT_FOUND:'Conferência indisponível.',CONFLICT:'A conferência mudou. Atualize antes de decidir.',ORDER:'Pedido encerrado, item ou unidade incompatível.',PRODUCT:'Produto ou perfil indisponível.',QUANTITY:'Quantidade ou local incompatível.',DIVERGENCE:'Justifique quantidades acima do pedido.',LOT:'Informe lote e validade reais.',UNIT:'Unidades de saldo e configuração divergem.',DUPLICATE_LINE:'Não repita o mesmo produto/local/lote.'};if(messages[e.message])return send(res,e.message==='UNAUTHENTICATED'?401:e.message==='FORBIDDEN'?403:409,messages[e.message]);if(sendQuotaError(res,e))return;console.error('Shipments:',e.message);return send(res,500,'Não foi possível processar a entrega.');}
 }

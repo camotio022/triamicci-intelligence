@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import {investigationReasons} from '../server/operations/investigation-rules.js';
 import React,{useEffect,useState} from 'react';
@@ -10,7 +11,7 @@ const date=x=>x?new Date(x).toLocaleString('pt-BR'):'—';
 async function request(path,action,extra={}){
  if(!auth.currentUser)throw Error('Faça login novamente.');
  const token=await auth.currentUser.getIdToken();
- const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',
+ const res=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',
   Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
  const data=await res.json();
  if(!res.ok)throw Error(data.message||'Erro ao carregar inventário.');
@@ -25,18 +26,18 @@ export default function DailyInventory({membership}){
  const [todayCounts,setTodayCounts]=useState([]),[todayLoading,setTodayLoading]=useState(true),[todayCountComplete,setTodayCountComplete]=useState(false),[todayCountError,setTodayCountError]=useState('');
  const [closures,setClosures]=useState([]),[moreClosures,setMoreClosures]=useState(false),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const [investigations,setInvestigations]=useState([]),[allocations,setAllocations]=useState([{reason:'unidentified',quantity:'',notes:''}]),[decisionNote,setDecisionNote]=useState('');
- const [revision,setRevision]=useState(0);
- useUnitLive(membership.unitId,()=>setRevision(x=>x+1));
+ const [revision,setRevision]=useState(null);
+ useUnitLive(membership.unitId,()=>setRevision(x=>(x??-1)+1),{domains:['stock','production','catalog']});
  const isManager=['admin','manager','submanager'].includes(membership.role);
- useEffect(()=>{let active=true;setTodayLoading(true);setTodayCountError('');setTodayCountComplete(false);request('/api/operations/stock','todayCounts').then(data=>{if(active){setTodayCounts(data.products||[]);setTodayCountComplete(!!data.complete);setTodayCursor(data.nextCursor||null)}}).catch(e=>{if(active){setTodayCountError(e.message);setTodayCountComplete(false)}}).finally(()=>{if(active)setTodayLoading(false)});return()=>{active=false}},[membership.unitId,revision]);
+ useEffect(()=>{if(revision===null)return;let active=true;setTodayLoading(true);setTodayCountError('');setTodayCountComplete(false);request('/api/operations/stock','todayCounts').then(data=>{if(active){setTodayCounts(data.products||[]);setTodayCountComplete(!!data.complete);setTodayCursor(data.nextCursor||null)}}).catch(e=>{if(active){setTodayCountError(e.message);setTodayCountComplete(false)}}).finally(()=>{if(active)setTodayLoading(false)});return()=>{active=false}},[membership.unitId,revision]);
  const loadTodayMore=async()=>{if(busy||!todayCursor)return;setBusy(true);try{const d=await request('/api/operations/stock','todayCounts',{before:todayCursor});setTodayCounts(a=>[...a,...(d.products||[])]);setTodayCursor(d.nextCursor||null);setTodayCountError('')}catch(e){setTodayCountError(e.message)}finally{setBusy(false)}};
  const [closureFilter,setClosureFilter]=useState('pending');
  const refreshClosures=async()=>{if(!isManager)return;const d=await request('/api/operations/stock','closeList');setClosures(d.closures||[]);setMoreClosures(!!d.hasMore)};
  const loadMoreClosures=async()=>{if(busy||!moreClosures||!closures.length)return;setBusy(true);try{const d=await request('/api/operations/stock','closeList',{before:closures.at(-1).submittedAt});setClosures(old=>[...old,...(d.closures||[])]);setMoreClosures(!!d.hasMore)}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
- useEffect(()=>{if(isManager)refreshClosures().catch(e=>setError(e.message))},[membership.role,revision]);
+ useEffect(()=>{if(revision===null)return;if(isManager)refreshClosures().catch(e=>setError(e.message))},[membership.role,revision]);
  const decide=async(action,id,pid,reason='')=>{setBusy(true);setNotice('');try{const d=await request('/api/operations/stock',action,{productId:pid,requestId:id,reason});setNotice(d.message);notify(d.message,'success');await refreshClosures()}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
  useEffect(()=>{
-  let active=true;
+  if(revision===null)return;let active=true;
   request('/api/products/manage','list').then(d=>{if(active)setProducts((d.products||[]).filter(p=>p.status==='active'))})
    .catch(e=>{if(active)setError(e.message)});
   return()=>{active=false};

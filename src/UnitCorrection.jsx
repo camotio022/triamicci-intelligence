@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import React,{useState} from 'react';
 import {auth} from './firebase.js';
 const units=['un','kg','g','L','ml'];
@@ -15,7 +16,7 @@ export default function UnitCorrection({product,membership,onUpdated}){
   try{
    const token=await auth.currentUser?.getIdToken();
    if(!token)throw Error('Sessão expirada.');
-   const r=await fetch('/api/products/manage',{method:'POST',headers:{
+   const r=await apiFetch('/api/products/manage',{method:'POST',headers:{
     'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({action:'correctUnits',productId:product.id,
      operationalUnit:operational,receivingUnit:receiving,reason,confirm:'RECONTAR_UNIDADE'})});

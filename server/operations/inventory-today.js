@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from './catalog-identity.js';
 import dailyReport from './daily-report.js';
 import {todayCountPage} from './today-count-page.js';
@@ -23,13 +24,13 @@ export default async function handler(req,res){
   const products=[];
   for(let i=0;i<selected.length;i+=4){const batch=await Promise.all(selected.slice(i,i+4).map(async doc=>{
    const p=await root.collection('products').doc(doc.id).get();if(!p.exists||!isOperationalProduct(p.data()))return null;let data=null,status=200;
-   await dailyReport(requestForReport(req,doc.id),{setHeader(){},status(c){status=c;return this},json(d){data=d;return this}});
+   await dailyReport(requestForReport(req,doc.id),{setHeader(){},status(c){status=c;return this},json(d){data=d;return this}},{actor,member:m,product:p,balance:doc});
    const report=data?.report;
    return {productId:doc.id,name:p.data()?.name||'Produto indisponível',at:iso(doc.data().at),countId:doc.data().countId||null,state:status!==200||!data?.complete||!report?'unavailable':report.status==='NO_PREVIOUS_COUNT'?'history':report.divergence?'investigate':'clear',report};
   }));products.push(...batch.filter(Boolean));}
   return send(res,200,'Produtos contados hoje com apuração.',{day:today,products,complete:true,hasMore:!!nextCursor,nextCursor});
  }catch(e){
-  console.error('Inventory today:',e.message);
+  if(sendQuotaError(res,e))return;console.error('Inventory today:',e.message);
   return send(res,500,'Não foi possível listar as contagens de hoje.');
  }
 }

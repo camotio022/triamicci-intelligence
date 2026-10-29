@@ -3,6 +3,7 @@ import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import {clearViewCache} from './fastCache.js';
+import {setApiScope} from './api-fetch.js';
 import TriamicciLogo from './TriamicciLogo.jsx';
 import { ShieldCheck, Package, CookingPot, Users, ArrowRight, AlertCircle } from 'lucide-react';
 import './auth-v41.css';
@@ -28,6 +29,7 @@ export default function AuthGate({ children }) {
   useEffect(() => onAuthStateChanged(auth, setUser), []);
   useEffect(() => {
     if (!user) {
+      setApiScope(null);
       setMembership(null);
       setMembershipUid(null);
       setAccessError('');
@@ -76,6 +78,7 @@ export default function AuthGate({ children }) {
       setAccessError('');
       setAccessReason('');
       setAccessStatus('active');
+      setApiScope(user.uid+':'+value.unitId+':'+value.role+':'+value.status);
       setMembership(value);
     }, e => {
       if (cancelled) return;

@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {AreaChart,Area,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell} from 'recharts';
@@ -16,7 +17,7 @@ export default function Dashboard({membership,onInventory}){
     setLoading(true);setError('');
     try{
       const token=await auth.currentUser.getIdToken();
-      const res=await fetch('/api/dashboard/summary',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:'{}'});
+      const res=await apiFetch('/api/dashboard/summary',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:'{}'});
       const json=await res.json();
       if(!res.ok)throw new Error(json.message||'Erro ao carregar indicadores.');
       setData(json);

@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {useUnitLive} from './useUnitLive.js';
 import {auth} from './firebase.js';
@@ -11,7 +12,7 @@ const date=x=>x?new Date(x).toLocaleString('pt-BR'):'Não registrada';
 async function request(action,productId){
  const token=await auth.currentUser?.getIdToken();
  if(!token)throw Error('Sessão expirada');
- const response=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,productId})});
+ const response=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,productId})});
  const body=await response.json();if(!response.ok)throw Error(body.message||'Não foi possível consultar o produto.');return body;
 }
 export default function ProductDetails({product,onBack,onAction,membership,onRefresh}){
@@ -28,8 +29,8 @@ export default function ProductDetails({product,onBack,onAction,membership,onRef
   }catch(e){if(current===generation.current)setError(e.message)}
   finally{if(current===generation.current)setLoading(false)}
  },[product.id]);
- const live=useUnitLive(membership.unitId,()=>load(true));
- useEffect(()=>{load();return()=>{generation.current++}},[load]);
+ const live=useUnitLive(membership.unitId,initial=>load(!initial),{domains:['stock','catalog','production'],refreshKey:product.id});
+ useEffect(()=>()=>{generation.current++},[load]);
  const b=product.physicalBalance,minimum=Number(product.minStock);
  const presentation=balancePresentation(b);
  const operationUnit=product.physicalUnit||product.operationalUnitOverride||product.unit;

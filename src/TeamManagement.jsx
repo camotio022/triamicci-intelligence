@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { auth } from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -40,7 +41,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
     setSubmitting(true); setFeedback(''); setShareInvite(null);
     try {
       const token = await auth.currentUser.getIdToken();
-      const response = await fetch('/api/invitations/create', {
+      const response = await apiFetch('/api/invitations/create', {
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
         body:JSON.stringify({email:email.trim(),role,unitId:membership.unitId,deliveryMethod})
@@ -82,7 +83,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
     setRevokingId(invitationId); setFeedback('');
     try {
       const token = await auth.currentUser.getIdToken();
-      const response = await fetch('/api/invitations/revoke', {
+      const response = await apiFetch('/api/invitations/revoke', {
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
         body:JSON.stringify({unitId:membership.unitId,invitationId})
@@ -101,7 +102,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
     setReadState('loading');
     try {
       const token = await auth.currentUser.getIdToken();
-      const response = await fetch('/api/invitations/revoke', {
+      const response = await apiFetch('/api/invitations/revoke', {
         method:'POST',
         headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
         body:JSON.stringify({action:'list',unitId:membership.unitId})

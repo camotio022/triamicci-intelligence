@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useState} from 'react';
 import {BookOpen,ClipboardList} from 'lucide-react';
 import TriamicciHistory from './TriamicciHistory.jsx';
@@ -12,7 +13,7 @@ const idFor=s=>s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/
 async function call(path,action,payload={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login.');
  const token=await user.getIdToken();
- const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+ const res=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
   body:JSON.stringify({action,...payload})});
  const data=await res.json();if(!res.ok)throw Error(data.message||'Erro na operação.');return data;
 }
@@ -38,8 +39,8 @@ export default function Production({membership}){
   }catch(e){setStatus(e.message);return false}finally{setLoading(false)}
  },[membership?.unitId]);
  useEffect(()=>{setProducts([]);setRecipes([]);setRuns([]);setDailyTasks([]);setRecipeId('');setActiveTaskId(null);},[membership?.unitId]);
- useEffect(()=>{load();loadTasks()},[load,loadTasks]);
- const live=useUnitLive(membership?.unitId,()=>Promise.all([load(true),loadTasks()]));
+
+ const live=useUnitLive(membership?.unitId,initial=>Promise.all([load(!initial),loadTasks()]),{domains:['stock','catalog','production']});
  useEffect(()=>{const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=(id,task=null)=>{

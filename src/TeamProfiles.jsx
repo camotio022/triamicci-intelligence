@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useViewState} from './useViewState.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState,useRef} from 'react';
@@ -13,7 +14,7 @@ const blank=()=>({sector:'cozinha',jobTitle:'Auxiliar de cozinha',skills:[],cert
 async function api(action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Sessão expirada.');
  const token=await user.getIdToken();
- const res=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
+ const res=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
  const data=await res.json();if(!res.ok)throw Error(data.message||'Não foi possível carregar equipe.');return data;
 }
 export default function TeamProfiles({membership,initialTab='profiles'}){
@@ -25,8 +26,8 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');
   try{const [reg,q]=await Promise.all([api('masterRegistryPreview'),api('skillReviewList')]);const registered=(reg.registry||[]).map(p=>({uid:p.id,name:p.name,status:p.status,registry:true,role:p.jobTitle==='Cozinheiro'?'cook':p.jobTitle==='Auxiliar de cozinha'?'auxiliar':'staff',professional:{sector:p.sector,jobTitle:p.jobTitle,shift:p.shift,availability:p.availability||[],skills:p.skills||[],certifications:p.certifications||[],notes:p.notes||'',sectorExceptions:[]}}));setMembers(registered);setRequests(q.requests||[])}
   catch(e){setError(e.message)}finally{setLoading(false)}},[]);
- useUnitLive(membership?.unitId,()=>load(true));
- useEffect(()=>{load()},[load]);
+ useUnitLive(membership?.unitId,initial=>load(!initial),{domains:['team','profile'],refreshKey:membership.role});
+
  useEffect(()=>{setTab(initialTab);setSelected('');setError('')},[initialTab]);
  const filtered=useMemo(()=>members.filter(m=>(m.name+' '+m.email+' '+(m.professional?.jobTitle||'')).toLowerCase().includes(search.toLowerCase())),[members,search]);
  const current=members.find(x=>x.uid===selected);

@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {matchesCatalogProduct,operationalProfileFor,OPERATIONAL_CATALOG_VERSION} from '../operations/catalog-identity.js';
@@ -70,7 +71,7 @@ export default async function handler(req,res){
    if(!profile.exists)tx.create(profileRef,operationalProfileFor({name,source,operationalUnit,receivingUnit},actor.uid,now));
    else if(profile.data().origin!==source)throw Error('RECONCILIATION_REQUIRED');
    if(!balance.exists)tx.create(balanceRef,{productId:ref.id,unit:operationalUnit,reserve:0,rotation:0,total:0,quality:'NOT_COUNTED',updatedAt:now});
-   signalUnitChange(tx,db,m.unitId);
+   signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
    tx.create(db.collection('auditLogs').doc(),{event:'catalog.manual_activation',unitId:m.unitId,
      productId:ref.id,catalogId:id,reconciled:existing.exists,previousCatalogId:existing.data()?.catalogId||null,actorUid:actor.uid,at:now});
   });
@@ -82,7 +83,7 @@ export default async function handler(req,res){
   if(e.message==='ALREADY_ACTIVE')return send(res,409,'Este insumo já está cadastrado e ativo; não é permitido duplicar.');
   if(e.message==='CATALOG_LIMIT')return send(res,409,'Catálogo acima de 200 registros: concilie antes de ativar.');
   if(e.message==='CATALOG_CONFLICT')return send(res,409,'Produto experimental conflitante; não foi alterado.');
-  console.error('Operational catalog setup:',e.message);
+  if(sendQuotaError(res,e))return;console.error('Operational catalog setup:',e.message);
   return send(res,500,'Falha ao ativar o produto.');
  }
 }

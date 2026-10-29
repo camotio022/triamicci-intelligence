@@ -5,8 +5,8 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
   for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:4179/qa/v4-mobile.html')).ok)break}catch{}await new Promise(r=>setTimeout(r,100));}
   browser=await chromium.launch({headless:true});
   for(const width of [320,390,768,1280]){
-   const page=await browser.newPage({viewport:{width,height:900}}),errors=[],counts=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.route('**/api/**',route=>{const b=route.request().postDataJSON()||{};const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());const a='c'.repeat(40),out='d'.repeat(40);const product={id:a,name:'Frango grelhado',status:'active',unit:'un',physicalUnit:'un',physicalBalance:{reserve:50,rotation:0,total:50,unit:'un',at:new Date().toISOString()}};
+   const page=await browser.newPage({viewport:{width,height:900}}),errors=[],counts=[],reads=[];page.on('pageerror',e=>errors.push(e.message));
+   await page.route('**/api/**',route=>{const b=route.request().postDataJSON()||{};reads.push({path:new URL(route.request().url()).pathname,action:b.action});const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());const a='c'.repeat(40),out='d'.repeat(40);const product={id:a,name:'Frango grelhado',status:'active',unit:'un',physicalUnit:'un',physicalBalance:{reserve:50,rotation:0,total:50,unit:'un',at:new Date().toISOString()}};
     const base={message:'Consulta de teste',shipments:[],people:[],accounts:[],claims:[],notifications:[],members:[],orders:[],signals:[],products:[product,{...product,id:out,name:'Parmegiana',physicalBalance:{reserve:0,rotation:0,total:0,unit:'un'}}],catalog:[],registry:[{id:'qa-user',accountUid:'qa-user',name:'Pessoa de teste',status:'active',sector:'cozinha',shift:'manha'}],schedules:[{id:'official',period:today.slice(0,7),status:'published',entries:[{uid:'qa-user',date:today,type:'work',name:'Pessoa de teste'}]}],presence:[],tasks:[{id:'abcdefghijklmnopqrst',recipeId:'parmegiana',recipeName:'Parmegiana de frango',plannedQuantity:30,status:'pending'}],recipes:[{id:'parmegiana',name:'Parmegiana de frango',yieldQuantity:1,outputProductId:out,version:1,lines:[{productId:a,quantity:1,substitutes:[]}]}],runs:[{id:'qa-today',recipeName:'Produção de hoje',portions:1,at:new Date().toISOString(),items:[]},{id:'qa-old',recipeName:'Produção da semana passada',portions:1,at:new Date(Date.now()-7*86400000).toISOString(),items:[]}],items:[{id:'notice',title:'Conferência das entregas',body:'Conferir itens e validade antes de encaminhar para aprovação.',priority:'important',publishedByName:'Gestão da unidade',publishedAt:new Date().toISOString()}],requests:[],closures:[],investigations:[],professional:{name:'Pessoa de teste',skills:[],certifications:[],availability:[]},personal:{},recognition:{},proposals:[],record:null,day:today,complete:true,entry:null,nextOff:null,pending:false,official:false,report:null};
     if(b.action==='shipmentsList'){base.shipments=[{id:'closed',status:'approved',supplier:'Entrega recente',createdAt:new Date().toISOString(),lines:[]}];base.pendingShipments=[{id:'pending-old',status:'pending',supplier:'Pendência antiga de teste',createdAt:'2020-01-01T12:00:00Z',lines:[]}];base.pendingComplete=true;}
     if(b.action==='list'&&route.request().url().includes('/api/operations/stock'))base.productions=base.runs;
@@ -17,13 +17,28 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     return route.fulfill({contentType:'application/json',body:JSON.stringify(base)});
    });
    await page.goto('http://127.0.0.1:4179/qa/v4-mobile.html');await page.waitForTimeout(500);assert.deepEqual(errors,[],errors.join('\n'));
+   const signal=async(stock,attendance)=>{const response=await fetch('http://127.0.0.1:8080/v1/projects/demo-triamicci-v31/databases/(default)/documents/units/qa-unit/live/attendance',{method:'PATCH',headers:{Authorization:'Bearer owner','Content-Type':'application/json'},body:JSON.stringify({fields:{protocolVersion:{integerValue:'2'},revision:{stringValue:stock+attendance},domains:{mapValue:{fields:{stock:{stringValue:stock},attendance:{stringValue:attendance}}}}}})});assert.equal(response.ok,true)};
+   await signal('stock-initial','attendance-initial');
    for(const screen of ['Mural','Produção','Inventário','Folgas','Minha ficha','Cozinha','Recebimento','Recebimento pendente','Recebimento com lote','Contagem','Acessos','Cadastro','Navegação']){
+    const beforeReads=reads.length;
     await page.getByRole('navigation',{name:'Telas de teste'}).getByRole('button',{name:screen,exact:true}).click();
     await page.waitForTimeout(120);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${screen} overflows at ${width}`);
     if(screen==='Mural'){await page.getByText('Publicar comunicado',{exact:true}).click();await page.getByLabel('Título',{exact:true}).fill('Comunicado de teste');}
     if(screen==='Produção'){assert.equal(await page.getByText('Produção da semana passada',{exact:true}).isVisible(),false);await page.getByRole('region',{name:'Histórico de produção',exact:true}).getByRole('button',{name:'Todos',exact:true}).click();assert.equal(await page.getByText('Produção da semana passada',{exact:true}).isVisible(),true);const history=page.getByRole('region',{name:'Histórico de produção',exact:true});await history.getByRole('button',{name:'Personalizado',exact:true}).click();const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());await history.getByLabel('De',{exact:true}).fill(today);await history.getByLabel('Até',{exact:true}).fill(today);assert.equal(await page.getByText('Produção da semana passada',{exact:true}).count(),0);await page.getByRole('button',{name:'Registrar execução'}).click();await page.getByLabel('Quantidade produzida (un)',{exact:true}).fill('10');}
-    if(screen==='Cozinha'){assert.equal(await page.getByRole('heading',{name:'Operação da cozinha',exact:true}).count(),1);await page.getByText('Produção de hoje',{exact:true}).first().waitFor();assert.equal(await page.getByText('Produção da semana passada',{exact:true}).count(),0);assert.deepEqual(errors,[],errors.join('\n'));}
+    if(screen==='Cozinha'){
+     await page.getByRole('button',{name:/Produção de hoje/}).first().waitFor();
+     assert.equal(await page.getByRole('heading',{name:'Operação da cozinha',exact:true}).count(),1);
+     assert.equal(await page.getByText('Produção da semana passada',{exact:true}).count(),0);
+     const ownReads=()=>reads.slice(beforeReads).filter(r=>r.action==='list'&&['/api/products/manage','/api/operations/stock'].includes(r.path)).length;
+     assert.equal(ownReads(),2,'Uma carga de catálogo e uma do resumo, sem duplicação inicial');
+     await signal('stock-initial','attendance-changed');await page.waitForTimeout(150);
+     assert.equal(ownReads(),2,'Presença não recarrega estoque nem produção da cozinha');
+     await signal('stock-changed','attendance-changed');
+     for(let n=0;n<30&&ownReads()<4;n++)await page.waitForTimeout(100);
+     assert.equal(ownReads(),4,'Mudança de estoque atualiza a cozinha uma única vez');
+     assert.deepEqual(errors,[],errors.join('\n'));
+    }
     if(['Recebimento','Recebimento pendente','Recebimento com lote'].includes(screen))await page.getByRole('button',{name:'＋ Nova conferência',exact:true}).click();
     if(screen==='Recebimento'){
      assert.equal(await page.getByText('Pendência antiga de teste',{exact:true}).count(),1,'Pendência antiga não desaparece com a paginação do histórico');

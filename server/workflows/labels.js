@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {getDb,getAuth,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {dateOk,cappedExpiry,canReplaceLabel} from '../labels/rules.js';
 const idOk=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
@@ -130,6 +131,6 @@ export default async function handler(req,res){
   if(e.message==='FORBIDDEN')return send(res,403,'Essa operação exige permissão ou habilidade de etiquetagem confirmada.');
   if(e.message==='NOT_FOUND')return send(res,404,'Produto não encontrado.');
   if(e.message==='POLICY_STATE')return send(res,409,'Regra ou etiqueta alterada; recarregue antes de prosseguir.');
-  console.error('Labels:',e.message);return send(res,500,'Não foi possível registrar etiqueta.');
+  if(sendQuotaError(res,e))return;console.error('Labels:',e.message);return send(res,500,'Não foi possível registrar etiqueta.');
  }
 }

@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {usesPhysicalLots} from '../server/operations/catalog-identity.js';
 import ShipmentReceiving from './ShipmentReceiving.jsx';
 import {isManagement} from '../server/permissions/v31-policy.js';
@@ -7,7 +8,7 @@ import {useFeedback} from './FeedbackProvider.jsx';
 const listUnits=['kg','g','L','mL','un','porcao','pacote','duzia'];
 async function invoke(action,payload={}){
  const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');
- const r=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
+ const r=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
  const d=await r.json();if(!r.ok)throw Error(d.message||'Operação não realizada.');return d;
 }
 function Field({name,children}){return <label>{name}{children}</label>}

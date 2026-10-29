@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useDialogFocus} from './useDialogFocus.js';
 import {useUnitLive} from './useUnitLive.js';
 import {useViewState} from './useViewState.js';
@@ -13,7 +14,7 @@ async function request(action, payload = {}) {
   const user = auth.currentUser;
   if (!user) throw new Error('Sessão expirada. Entre novamente.');
   const token = await user.getIdToken();
-  const response = await fetch('/api/members/manage', {
+  const response = await apiFetch('/api/members/manage', {
     method:'POST',
     headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({action,...payload})
@@ -45,8 +46,8 @@ export default function MemberDirectory({user,membership}) {
     } catch (err) {setError(err.message);}
     finally {setLoading(false);}
   },[]);
-  useEffect(() => {load();},[load]);
- useUnitLive(membership.unitId,()=>load(true));
+
+ useUnitLive(membership.unitId,initial=>load(!initial),{domains:['team'],refreshKey:membership.role});
 
   const filtered = useMemo(() => members.filter(item =>
     ((item.name || '') + ' ' + (item.email || '') + ' ' + (roleLabels[item.role] || '')).toLocaleLowerCase('pt-BR')

@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useOperationDay} from './useOperationDay.js';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import './shipment-receiving-v2.css';
@@ -9,12 +10,13 @@ import {useUnitLive} from './useUnitLive.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {receivingUnit, receivingLineError} from '../server/operations/receiving-input.js';
 const blank=()=>({productId:'',commercialQuantity:'',commercialUnit:'kg',stockQuantity:'',location:'reserva',lot:'',expiryDate:''});
-async function api(action,payload={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login.');const r=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
+async function api(action,payload={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login.');const r=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
 export default function ShipmentReceiving({approvedReceipts=[],products,orders,membership,onChange,onConfigure}){
  const {notify}=useFeedback(),[step,setStep]=useState(1),[showWizard,setShowWizard]=useState(false),[orderId,setOrderId]=useState(''),[supplier,setSupplier]=useState(''),[notes,setNotes]=useState(''),[lines,setLines]=useState([blank()]),[requestId,setRequestId]=useState(()=>crypto.randomUUID()),[busy,setBusy]=useState(false),[error,setError]=useState(''),[shipments,setShipments]=useState([]),[cursor,setCursor]=useState(null),[reason,setReason]=useState(''),[pendingShipments,setPendingShipments]=useState([]),[pendingComplete,setPendingComplete]=useState(null);
+ const [hasData,setHasData]=useState(false);
  const management=['admin','manager','submanager'].includes(membership.role);
- const load=async(more=false)=>{const d=await api('shipmentsList',more&&cursor?{before:cursor}:{});setShipments(a=>more?[...a,...d.shipments]:d.shipments||[]);setPendingShipments(d.pendingShipments||(d.shipments||[]).filter(s=>s.status==='pending'));setPendingComplete(d.pendingComplete??null);setCursor(d.nextCursor||null);};
- useEffect(()=>{load().catch(e=>setError(e.message))},[membership.unitId]);useUnitLive(membership.unitId,()=>load());
+ const load=async(more=false)=>{const d=await api('shipmentsList',more&&cursor?{before:cursor}:{});setError('');setShipments(a=>more?[...a,...d.shipments]:d.shipments||[]);setPendingShipments(d.pendingShipments||(d.shipments||[]).filter(s=>s.status==='pending'));setPendingComplete(d.pendingComplete??null);setCursor(d.nextCursor||null);setHasData(true);};
+ useUnitLive(membership.unitId,()=>load().catch(e=>{setError(e.message);return false}),{domains:['stock'],refreshKey:membership.role});
  const selected=orders.find(o=>o.id===orderId);
  const setLine=(index,values)=>{setError('');setLines(a=>a.map((x,i)=>i===index?{...x,...values}:x));};
  const chooseOrder=id=>{setOrderId(id);const order=orders.find(o=>o.id===id);setSupplier(order?.supplier||'');setLines(order?order.items.filter(l=>l.quantity>(order.received?.[l.productId]||0)).map(l=>({...blank(),productId:l.productId,commercialUnit:l.unit})): [blank()]);};
@@ -33,6 +35,7 @@ export default function ShipmentReceiving({approvedReceipts=[],products,orders,m
  ].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
  const todayKey=useOperationDay();
  const todaysCount=shipments.filter(s=>new Date(s.createdAt).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'})===todayKey).length;
+ if(!hasData)return <section className="inventory-page"><h1>Recebimento</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>load().catch(e=>setError(e.message))}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
  return <section className="v3-page ti-shipment ti-shipment-v2">
   <header className="ti-shipment-heading"><span className="ti-shipment-eyebrow">OPERAÇÃO · RECEBIMENTO</span><h2>Recebimento</h2><p>Confira entregas e acompanhe as aprovações.</p></header>
   {pendingComplete===false&&<p role="alert">Há mais de 200 conferências pendentes. Resolva as primeiras e consulte novamente.</p>}

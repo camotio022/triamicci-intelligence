@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
@@ -31,7 +32,7 @@ export default async function handler(req,res){
   }
   if(action==='noticeRead'){
    const id=req.body?.id;if(!idOk(id))return send(res,400,'Comunicado inválido.');
-   await db.runTransaction(async tx=>{const [account,item]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(items.doc(id))]);if(!account.exists||account.data().status!=='active'||account.data().unitId!==m.unitId)throw Error('FORBIDDEN');if(!item.exists||item.data().kind!=='notice'||item.data().status!=='published')throw Error('LOCKED');tx.set(unit.collection('muralReads').doc(actor.uid).collection('items').doc(id),{version:item.data().version,readAt:new Date(),uid:actor.uid});signalUnitChange(tx,db,m.unitId);});
+   await db.runTransaction(async tx=>{const [account,item]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(items.doc(id))]);if(!account.exists||account.data().status!=='active'||account.data().unitId!==m.unitId)throw Error('FORBIDDEN');if(!item.exists||item.data().kind!=='notice'||item.data().status!=='published')throw Error('LOCKED');tx.set(unit.collection('muralReads').doc(actor.uid).collection('items').doc(id),{version:item.data().version,readAt:new Date(),uid:actor.uid});signalUnitChange(tx,db,m.unitId,['mural']);});
    return send(res,200,'Leitura registrada.');
   }
   if(action==='list'){
@@ -51,7 +52,7 @@ export default async function handler(req,res){
     if(old.exists&&old.data().status!=='draft')throw Error('LOCKED');
     if(supersedesId&&(!prior?.exists||prior.data().status!=='published'||prior.data().kind!==normalized.kind))throw Error('LOCKED');
     tx.set(ref,{...normalized,supersedesId:supersedesId||old.data()?.supersedesId||null,status:'draft',version:(old.data()?.version||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
-    signalUnitChange(tx,db,m.unitId);
+    signalUnitChange(tx,db,m.unitId,['mural']);
     tx.create(db.collection('auditLogs').doc(),{event:'mural.draft_saved',actorUid:actor.uid,unitId:m.unitId,at:now,itemId:ref.id});
    });
    return send(res,200,'Rascunho salvo sem publicação.',{id:ref.id});
@@ -70,7 +71,7 @@ export default async function handler(req,res){
     if(old.data().kind==='preparation'&&old.data().createdBy===actor.uid)throw Error('SELF_APPROVAL');
     if(priorRef)tx.update(priorRef,{status:'superseded',supersededAt:now,supersededBy:id});
     tx.update(ref,{status:'published',publishedAt:now,publishedBy:actor.uid,publishedByName:actor.name||'Gestão da unidade',version:prior?prior.data().version+1:old.data().version});
-    signalUnitChange(tx,db,m.unitId);
+    signalUnitChange(tx,db,m.unitId,['mural']);
     tx.create(db.collection('auditLogs').doc(),{event:'mural.published',unitId:m.unitId,actorUid:actor.uid,itemId:id,version:old.data().version,at:now});
    });
    return send(res,200,'Conteúdo aprovado e publicado no Mural.');
@@ -81,6 +82,6 @@ export default async function handler(req,res){
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='SELF_APPROVAL')return send(res,409,'A publicação precisa ser aprovada por outro administrador.');
   if(e.message==='LOCKED')return send(res,409,'Item não encontrado ou não editável. Faça nova versão.');
-  console.error('Mural:',e.message);return send(res,500,'Falha na operação do Mural.');
+  if(sendQuotaError(res,e))return;console.error('Mural:',e.message);return send(res,500,'Falha na operação do Mural.');
  }
 }

@@ -1,5 +1,7 @@
+import {sendQuotaError} from '../../server/quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
 import {intervalFromBalance} from '../../server/operations/inventory-summary.js';
+import {restaurantDay} from '../../server/schedules/restaurant-today.js';
 import shipments from '../../server/operations/shipments.js';
 import investigation from '../../server/operations/investigation.js';
 import {signalUnitChange} from '../../server/live-signal.js';
@@ -32,7 +34,7 @@ function error(res,e){
  CONFLICT:[409,'Esta operação já foi registrada com outros dados.'],
  INVALID:[400,'Dados inválidos. Confira unidades, quantidades e campos obrigatórios.']};
  if(errors[e.message])return send(res,...errors[e.message]);
- console.error('Physical operations:',e.message);return send(res,500,'Não foi possível completar a operação.');
+ if(sendQuotaError(res,e))return;console.error('Physical operations:',e.message);return send(res,500,'Não foi possível completar a operação.');
 }
 export default async function handler(req,res){
  if(typeof req.body?.action==='string'&&req.body.action.startsWith('v3'))return kitchenV3(req,res);
@@ -137,7 +139,7 @@ export default async function handler(req,res){
    }});
   }
   if(action==='list'){
-   const size=30;
+   const size=req.body?.preview===true?5:30;
    const types=[['receipts','physicalReceipts'],['counts','physicalCounts'],
     ['outflows','physicalOutflows'],['transfers','physicalTransfers'],['productions','productionRuns']];
    const result={};
@@ -146,6 +148,7 @@ export default async function handler(req,res){
     const before=req.body?.['before_'+key];
     if(before!==undefined&&(typeof before!=='string'||!Number.isFinite(Date.parse(before))))throw Error('INVALID');
     let q=unit.collection(col).orderBy('at','desc');
+    if(req.body?.todayOnly===true){const start=new Date(restaurantDay()+'T03:00:00Z');q=q.where('at','>=',start).where('at','<',new Date(start.getTime()+86400000));}
     if(before)q=q.where('at','<',new Date(before));
     const snap=await q.limit(size+1).get();
     result[key]=snap.docs.slice(0,size).map(clean);
@@ -237,7 +240,7 @@ export default async function handler(req,res){
       lastReceiptId:requestId,updatedAt:now},{merge:true});
    }
    tx.create(ref,record);
-   signalUnitChange(tx,db,m.unitId);
+   signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
    tx.create(auditRef,{event:action==='receive'?'physical.received':'physical.counted',unitId:m.unitId,
     productId,actorUid:actor.uid,operationId:requestId,details:payload,at:now});
    result={id:requestId,duplicate:false,record};

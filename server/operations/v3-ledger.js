@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from './catalog-identity.js';
 import {intervalFromBalance} from './inventory-summary.js';
 import {operationalBalance,writeOperationalBalance} from './shared-balance.js';
@@ -16,7 +17,7 @@ const active=(d,u,roles)=>d.exists&&d.data().status==='active'&&d.data().unitId=
 const hashed=s=>createHash('sha256').update(s).digest('hex');
 const snapMap=s=>({id:s.id,...s.data()});
 const now=()=>new Date();
-const audit=(tx,db,event,unitId,uid,details)=>{signalUnitChange(tx,db,unitId);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid:uid,at:now(),details});};
+const audit=(tx,db,event,unitId,uid,details)=>{signalUnitChange(tx,db,unitId,['stock', 'catalog']);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid:uid,at:now(),details});};
 function debitLotDocs(docs,location,amount,today){
  let remaining=amount,updates=[];
  for(const d of docs){
@@ -431,6 +432,6 @@ export default async function v3Ledger(req,res){
    LOCATION:[409,'Local não permitido para este item.'],ORDER:[409,'Pedido não corresponde ao item recebido.'],
    ORDER_UNIT:[409,'Unidade do pedido não corresponde à conferência.'],SOURCE:[409,'Matéria-prima não autorizada nesta preparação.'],ALTERNATIVE:[409,'Explique a substituição antes de produzir.'],ALTERNATIVE_APPROVAL:[403,'Uma substituição de matéria-prima exige autorização gerencial. Solicite à gestão que registre a produção.']};
   if(errors[e.message])return send(res,...errors[e.message]);
-  console.error('V3 ledger:',e.message);return send(res,500,'Erro ao registrar operação V3.');
+  if(sendQuotaError(res,e))return;console.error('V3 ledger:',e.message);return send(res,500,'Erro ao registrar operação V3.');
  }
 }

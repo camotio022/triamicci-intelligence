@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useDialogFocus} from './useDialogFocus.js';
 import {useUnitLive} from './useUnitLive.js';
 import {useViewState} from './useViewState.js';
@@ -9,7 +10,7 @@ const days=['Domingo','Segunda','Terça','Quarta','Quinta'];
 const states={existing:'Ficha existente',needs_review:'Possível conta existente',ambiguous:'Duplicidade',new:'Sem correspondência'};
 async function api(action,extra={}){
  const token=await auth.currentUser?.getIdToken();
- const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
+ const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
  const data=await r.json();if(!r.ok)throw Error(data.message||'Erro ao consultar cadastro.');return data;
 }
 export default function MasterRegistry({membership={}}){
@@ -17,8 +18,8 @@ export default function MasterRegistry({membership={}}){
  const dialog=useRef(null);
  const [claims,setClaims]=useState([]),[editing,setEditing]=useState(null),[form,setForm]=useState({}),[data,setData]=useState(null),[selected,setSelected]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const refresh=useCallback(async(silent=false)=>{if(!silent)setBusy(true);setError('');try{const v=await api('masterRegistryPreview');setData(v);const claimsData=await api('masterRegistryClaims');setClaims(claimsData.claims||[]);if(!silent)setSelected([])}catch(e){setError(e.message)}finally{setBusy(false)}},[]);
- useEffect(()=>{refresh()},[refresh]);
- useUnitLive(membership.unitId,()=>refresh(true));
+
+ useUnitLive(membership.unitId,initial=>refresh(!initial),{domains:['team','profile'],refreshKey:membership.role});
  useDialogFocus(dialog,!!editing,()=>{if(!busy)setEditing(null)});
  const selectable=(data?.people||[]).filter(p=>p.state==='new');
  const filteredRegistry=(data?.registry||[]).filter(p=>(statusFilter==='all'||p.status===statusFilter)&&[p.name,p.jobTitle,p.sector,p.shift].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'))));

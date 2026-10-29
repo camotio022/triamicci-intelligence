@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../server/quota-error.js';
 import {readFileSync} from 'node:fs';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 
@@ -31,6 +32,6 @@ export default async function handler(req,res){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='CONFLICT')return send(res,409,'O catálogo mudou durante a revisão. Gere uma nova prévia.');
-  console.error('Catalog migration:',e.message);return send(res,500,'Falha na prévia do catálogo experimental.');
+  if(sendQuotaError(res,e))return;console.error('Catalog migration:',e.message);return send(res,500,'Falha na prévia do catálogo experimental.');
  }
 }

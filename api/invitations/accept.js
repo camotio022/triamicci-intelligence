@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../server/quota-error.js';
 import { getDb, authenticate, membership, normalizeEmail, hashToken, checkRequest, send } from '../../server/_lib.js';
 export default async function handler(req,res) {
   if (!checkRequest(req,res)) return;
@@ -37,7 +38,7 @@ export default async function handler(req,res) {
     if (error.message === 'UNAUTHENTICATED') return send(res,401,'Entre com Google para aceitar.');
     if (error.message === 'INVALID_INVITATION') return send(res,400,'Convite inválido, expirado ou já utilizado.');
     if (error.message === 'MEMBERSHIP_EXISTS') return send(res,409,'Esta conta já possui vínculo.');
-    console.error('Invitation accept:',error.message);
+    if(sendQuotaError(res,error))return;console.error('Invitation accept:',error.message);
     return send(res,500,'Não foi possível aceitar o convite.');
   }
 }

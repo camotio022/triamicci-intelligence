@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../server/quota-error.js';
 import operationalCatalog from '../../server/catalog/activate-draft.js';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -101,7 +102,7 @@ export default async function handler(req,res){
     if(e.message==='INVALID_CATALOG')return send(res,409,'Produto central precisa de revisão técnica.');
     if(e.message==='CATALOG_CONFLICT')return send(res,409,'Existe conflito entre IDs e produtos existentes; nenhum dado foi modificado.');
     if(e.message==='DUPLICATE')return send(res,409,'Este produto já está cadastrado na unidade.');
-    console.error('Catalog attach:',e.message);
+    if(sendQuotaError(res,e))return;console.error('Catalog attach:',e.message);
     return send(res,500,'Falha ao consultar ou vincular catálogo.');
   }
 }

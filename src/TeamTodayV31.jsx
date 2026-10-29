@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
@@ -5,7 +6,7 @@ import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import {rosterToday,liveShiftState} from '../server/schedules/restaurant-today.js';
 async function request(module,action,extra={}){
  const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');
- const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...extra})});
+ const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...extra})});
  const d=await r.json();if(!r.ok)throw Error(d.message||'Dados indisponíveis.');return d;
 }
 export default function TeamTodayV31({unitId}){
@@ -19,8 +20,8 @@ export default function TeamTodayV31({unitId}){
   setStaff((c.registry||[]).filter(x=>x.status==='active'));
   setError('');
  }catch(e){setError(e.message)}finally{if(!silent)setBusy(false)}},[]);
- useUnitLive(unitId,()=>refresh({silent:true}));
- useEffect(()=>{refresh();const timer=setInterval(()=>{setClock(new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));setToday(restaurantDay())},30000);return()=>clearInterval(timer)},[refresh]);
+ useUnitLive(unitId,initial=>refresh({silent:!initial}),{domains:['attendance','team','schedules']});
+ useEffect(()=>{const timer=setInterval(()=>{setClock(new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));setToday(restaurantDay())},30000);return()=>clearInterval(timer)},[refresh]);
  const submitCorrection=async e=>{e.preventDefault();if(correctionBusy)return;setCorrectionBusy(true);setCorrectionNotice('');setError('');try{
   const result=await request('attendanceV31','correct',{...correction,requestId:crypto.randomUUID()});setCorrectionNotice(result.message);setCorrection(p=>({...p,reason:''}));await refresh()
  }catch(e){setError(e.message)}finally{setCorrectionBusy(false)}};

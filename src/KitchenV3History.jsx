@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import React,{useEffect,useState} from 'react';
 import {auth} from './firebase.js';
@@ -5,7 +6,7 @@ export default function KitchenV3History({products}){
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const load=async()=>{setLoading(true);setError('');
   try{const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');
-   const r=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'v3LedgerHistory'})});
+   const r=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'v3LedgerHistory'})});
    const d=await r.json();if(!r.ok)throw Error(d.message||'Não foi possível consultar histórico.');setItems(d.operations||[]);
   }catch(e){setError(e.message)}finally{setLoading(false)}
  };

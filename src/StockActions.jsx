@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import React,{useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 
@@ -5,7 +6,7 @@ async function api(path,action,payload){
  const user=auth.currentUser;
  if(!user)throw Error('Sessão expirada.');
  const token=await user.getIdToken();
- const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+ const res=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
   body:JSON.stringify({action,...payload})});
  const data=await res.json();
  if(!res.ok)throw Error(data.message||'Falha na operação.');

@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../quota-error.js';
 import {signalUnitChange} from '../../live-signal.js';
 // Cadastro de apresentações por unidade. Não altera saldo, lote ou histórico.
 import {getDb,authenticate,membership,checkRequest,send} from '../../_lib.js';
@@ -62,7 +63,7 @@ export default async function handler(req,res){
    const record={version,packages:validated.packages,countingMethod:countValidation.method,note,updatedAt:now,updatedBy:actor.uid,
     stockUnitAtReview:product.data().operationalUnitOverride||product.data().operationalUnit||product.data().unit};
    tx.set(profileRef,record);
-   signalUnitChange(tx,db,member.unitId);
+   signalUnitChange(tx,db,member.unitId,['stock', 'catalog']);
    tx.create(db.collection('auditLogs').doc(),{event:'product.measurement_profile_saved',unitId:member.unitId,productId,actorUid:actor.uid,at:now,
      before:old.exists?{version:oldVersion,packages:old.data().packages||[]}:null,after:{version,packages:validated.packages,countingMethod:countValidation.method},note});
   });
@@ -72,6 +73,6 @@ export default async function handler(req,res){
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='PRODUCT_NOT_FOUND')return send(res,404,'Produto não encontrado ou inativo.');
   if(e.message==='CONFLICT')return send(res,409,'Outra pessoa atualizou as apresentações. Recarregue antes de salvar.');
-  console.error('measurementProfiles:',e.message);return send(res,500,'Não foi possível salvar as apresentações.');
+  if(sendQuotaError(res,e))return;console.error('measurementProfiles:',e.message);return send(res,500,'Não foi possível salvar as apresentações.');
  }
 }
