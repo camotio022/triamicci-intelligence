@@ -89,7 +89,7 @@ export default async function handler(req,res) {
         if (!current || current.status !== 'active' || current.unitId !== m.unitId || !['admin','manager','submanager'].includes(current.role))
           throw new Error('FORBIDDEN');
         if (existing.exists) throw new Error('DUPLICATE');
-        tx.create(ref,{...payload,quantity:0,status:'active',createdAt:now,createdBy:actor.uid,updatedAt:now});
+        tx.create(ref,{...payload,quantity:0,status:'active',operationalCatalogVersion:'56-v1',countFrequency:'weekly',critical:false,createdAt:now,createdBy:actor.uid,updatedAt:now});
         signalUnitChange(tx,db,m.unitId);
         tx.create(auditRef,{event:'product.created',unitId:m.unitId,productId:id,actorUid:actor.uid,at:now,details:payload});
       });
