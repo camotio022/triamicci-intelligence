@@ -42,8 +42,8 @@ export default async function handler(req,res){
     brandId:'triamicci',approvedBy:actor.uid,approvedAt:now,updatedAt:now};
    if(central.exists)tx.update(centralRef,record);else tx.create(centralRef,{...record,createdAt:now});
    if(existing.exists){
-     tx.update(ref,{status:'active',minStock,countFrequency,critical,updatedAt:now,updatedBy:actor.uid});
-   }else tx.create(ref,{name,category,unit:stockUnit,minStock,countFrequency,critical,trackExpiry,quantity:0,status:'active',
+     tx.update(ref,{status:'active',operationalCatalogVersion:'56-v1',minStock,countFrequency,critical,updatedAt:now,updatedBy:actor.uid});
+   }else tx.create(ref,{name,category,unit:stockUnit,minStock,countFrequency,critical,trackExpiry,quantity:0,status:'active',operationalCatalogVersion:'56-v1',
      catalogId:id,productType:record.type,relatedCatalogIds:[],createdAt:now,createdBy:actor.uid,updatedAt:now});
    tx.create(db.collection('auditLogs').doc(),{event:'catalog.manual_activation',unitId:m.unitId,
      productId:ref.id,catalogId:id,actorUid:actor.uid,at:now});
