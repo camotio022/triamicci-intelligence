@@ -6,7 +6,7 @@ async function request(action,payload={}){
  const user=auth.currentUser;
  if(!user)throw Error('Faça login novamente.');
  const token=await user.getIdToken();
- const response=await fetch('/api/catalog/activate-draft',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
+ const response=await fetch('/api/catalog/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'operationalCatalog',action,...payload})});
  const data=await response.json();
  if(!response.ok)throw Error(data.message||'Não foi possível consultar o catálogo.');
  return data;

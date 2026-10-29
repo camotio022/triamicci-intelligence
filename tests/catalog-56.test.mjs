@@ -39,3 +39,9 @@ test('conciliação detecta aliases, acentos e nomes antigos sem confundir corte
  assert.equal(matchesCatalogProduct({name:'Alcatra'},{id:'bife-de-alcatra',name:'Bife de alcatra'}),false);
  assert.equal(matchesCatalogProduct({name:'Cubos de alcatra'},{id:'bife-de-alcatra',name:'Bife de alcatra'}),false);
 });
+
+test('API permanece no limite de 12 funções do plano atual',async()=>{
+ const {readdirSync}=await import('node:fs');
+ const entries=readdirSync(new URL('../api',import.meta.url),{recursive:true});
+ assert.ok(entries.filter(p=>p.endsWith('.js')).length<=12,'Handlers internos devem ficar em server, fora de api');
+});

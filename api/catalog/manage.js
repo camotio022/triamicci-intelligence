@@ -1,3 +1,4 @@
+import operationalCatalog from '../../server/catalog/activate-draft.js';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
@@ -15,6 +16,7 @@ const eligible=p=>p.schemaVersion===2&&p.reviewRequired!==true&&p.ingredientsPen
 const hashId = name => createHash('sha256').update(name.trim().toLocaleLowerCase('pt-BR')).digest('hex').slice(0,40);
 
 export default async function handler(req,res){
+ if(req.body?.module==='operationalCatalog')return operationalCatalog(req,res);
   if(!checkRequest(req,res))return;
   res.setHeader('Cache-Control','no-store');
   try{

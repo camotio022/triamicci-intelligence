@@ -6,7 +6,7 @@ test('56 produtos: ativação, conciliação, pedido, aprovação, giro, produç
  const project='demo-triamicci-v31',unitId='catalog-56-'+randomUUID();
  const {privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});
  Object.assign(process.env,{APP_ENV:'staging',PUBLIC_APP_URL:'https://triamicci-e2e.test',FIREBASE_EXPECTED_PROJECT_ID:project,FIRESTORE_EMULATOR_HOST:'127.0.0.1:8080',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099',FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({project_id:project,client_email:'catalog@'+project+'.iam.gserviceaccount.com',private_key:privateKey.export({type:'pkcs8',format:'pem'}).toString()})});
- const [{getDb},{default:activate},{default:products},{default:kitchen},{default:shipments},{default:production},{default:stock}]=await Promise.all([import('../server/_lib.js'),import('../api/catalog/activate-draft.js'),import('../api/products/manage.js'),import('../server/operations/v3-service.js'),import('../server/operations/shipments.js'),import('../api/production/manage.js'),import('../api/operations/stock.js')]);
+ const [{getDb},{default:activate},{default:products},{default:kitchen},{default:shipments},{default:production},{default:stock}]=await Promise.all([import('../server/_lib.js'),import('../api/catalog/manage.js'),import('../api/products/manage.js'),import('../server/operations/v3-service.js'),import('../server/operations/shipments.js'),import('../api/production/manage.js'),import('../api/operations/stock.js')]);
  const db=getDb(),root=db.collection('units').doc(unitId),manifest=JSON.parse(readFileSync(new URL('../data/triamicci-product-catalog-56.staging.json',import.meta.url))).products;
  const signup=async(role,tenant=unitId)=>{
   const r=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=local',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:randomUUID()+'@catalog.test',password:'test-password-56',returnSecureToken:true})});const u=await r.json();assert.equal(r.status,200);
@@ -15,7 +15,7 @@ test('56 produtos: ativação, conciliação, pedido, aprovação, giro, produç
  const manager=await signup('manager'),aux=await signup('auxiliar'),foreign=await signup('manager','other-unit-'+randomUUID());
  const call=async(handler,actor,action,extra={})=>{
   const res={code:200,setHeader(){},status(c){this.code=c;return this},json(data){this.data=data;return this}};
-  await handler({method:'POST',headers:{origin:'https://triamicci-e2e.test','content-type':'application/json',authorization:'Bearer '+actor.token},body:{action,...extra}},res);return {code:res.code,...res.data};
+  await handler({method:'POST',headers:{origin:'https://triamicci-e2e.test','content-type':'application/json',authorization:'Bearer '+actor.token},body:{...(handler===activate?{module:'operationalCatalog'}:{}),action,...extra}},res);return {code:res.code,...res.data};
  };
  const approved=p=>({...p,minStock:0,countFrequency:'daily',critical:false,reviewConfirmed:true});
  assert.equal((await call(activate,aux,'activate',approved(manifest[0]))).code,403);
