@@ -22,3 +22,14 @@
 .ti-history-expanded{border-top:1px solid #edf0f4;margin-top:9px;padding-top:9px;font-size:12px;color:#536176;display:grid;gap:5px;overflow-wrap:anywhere}
 .ti-history-empty{padding:15px;border:1px dashed #dce2e9;border-radius:10px;color:#687487}
 @media(max-width:600px){.ti-history-toolbar{align-items:stretch;flex-direction:column}.ti-history-search{flex:auto;min-width:0}.ti-history-cards{grid-template-columns:minmax(0,1fr)}}
+
+/* Resumo operacional: um card compartilhado, linhas econômicas e leitura rápida. */
+.ti-history-summary{display:flex;flex-direction:column;overflow:hidden;border:1px solid #e1e6ed;border-left:4px solid #a71919;border-radius:13px;background:#fff;margin:9px 0 18px;box-shadow:0 2px 7px #17233808}
+.ti-history-summary-item{display:flex;align-items:center;justify-content:space-between;text-align:left;gap:12px;padding:12px 14px;border:0;border-bottom:1px solid #e9ecf1;background:#fff;color:#172338;cursor:pointer;font:inherit;width:100%;min-width:0}
+.ti-history-summary-item:last-child{border-bottom:0}
+.ti-history-summary-item:hover,.ti-history-summary-item:focus-visible{background:#fff8f8}
+.ti-history-summary-item span{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.ti-history-summary-item strong{font-size:14px;line-height:1.4;overflow-wrap:anywhere;font-weight:700}
+.ti-history-summary-item small{color:#a71919;font-size:12px}
+.ti-history-summary-item time{font-size:12px;color:#667085;flex:none;text-align:right;max-width:45%}
+@media(max-width:420px){.ti-history-summary-item{padding:11px}.ti-history-summary-item strong{font-size:13px}.ti-history-summary-item time{font-size:11px}}
