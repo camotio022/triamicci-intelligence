@@ -31,7 +31,26 @@ export default async function handler(req,res){
   const action=req.body?.action;
   if(action==='list'){
    const [r,p]=await Promise.all([recipes.orderBy('name').limit(100).get(),runs.orderBy('at','desc').limit(30).get()]);
-   return send(res,200,'Produção carregada.',{recipes:r.docs.map(clean),runs:p.docs.map(clean)});
+   return send(res,200,'Produção carregada.',{recipes:r.docs.filter(d=>d.data().active===true).map(clean),runs:p.docs.map(clean)});
+  }
+  if(action==='archiveRecipe'){
+   if(!['admin','manager','submanager'].includes(member.role))return send(res,403,'Somente gestão pode arquivar fichas.');
+   const {id,expectedVersion}=req.body||{};
+   if(!idPattern.test(id||'')||!Number.isInteger(expectedVersion)||expectedVersion<1)return send(res,400,'Ficha ou versão inválida.');
+   const ref=recipes.doc(id),actorRef=db.doc('memberships/'+actor.uid);
+   await db.runTransaction(async tx=>{
+    const [a,old]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
+    if(!a.exists||a.data().status!=='active'||a.data().unitId!==member.unitId||
+       !['admin','manager','submanager'].includes(a.data().role))throw Error('FORBIDDEN');
+    if(!old.exists)throw Error('RECIPE_NOT_FOUND');
+    if(old.data().version!==expectedVersion)throw Error('CONFLICT');
+    if(old.data().active===false)throw Error('RECIPE_ARCHIVED');
+    const now=new Date();
+    tx.update(ref,{active:false,archivedAt:now,archivedBy:actor.uid,updatedAt:now});
+    tx.create(db.collection('auditLogs').doc(),{event:'production.recipe_archived',unitId:member.unitId,recipeId:id,actorUid:actor.uid,at:now});
+    signalUnitChange(tx,db,member.unitId);
+   });
+   return send(res,200,'Ficha arquivada, histórico preservado.');
   }
   if(action==='saveRecipe'){
    if(!['admin','manager','submanager'].includes(member.role))return send(res,403,'Somente administração pode definir preparações.');
