@@ -1,0 +1,55 @@
+/* Triamicci Intelligence — button foundation, mobile-first.
+   Keeps existing semantic colors, icon actions, tab patterns and navigation. */
+:root {
+  --ti-btn-height: 44px;
+  --ti-btn-radius: 12px;
+  --ti-btn-gap: 8px;
+  --ti-btn-focus: #a71920;
+}
+:where(button,[role="button"],input[type="button"],input[type="submit"],input[type="reset"]) {
+  box-sizing: border-box;
+  max-width: 100%;
+  font-family: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+:where(button,[role="button"],input[type="button"],input[type="submit"],input[type="reset"]):focus-visible {
+  outline: 3px solid var(--ti-btn-focus);
+  outline-offset: 3px;
+}
+:where(button,[role="button"],input[type="button"],input[type="submit"],input[type="reset"]):disabled,
+:where([role="button"][aria-disabled="true"]) {
+  cursor: not-allowed;
+  opacity: .55;
+}
+:where(.v3-form,.receiving-actions,.inventory-actions,.ti-receive-navigation,.ti-attendance-actions,.ti-coverage-page,.ti-leave-v4,.production-page,.receiving-page,.inventory-page,.ti-master-editor,.ti-my-profile-page,.ti-stock-detail-dialog)
+:where(button:not(.ti-nav-item):not(.ti-v5-cal-day):not(.ti-journey-monthnav button):not(.ti-history-detail-btn):not(.ti-history-description button),input[type="button"],input[type="submit"],input[type="reset"]) {
+  min-height: var(--ti-btn-height);
+  border-radius: var(--ti-btn-radius);
+  padding: 10px 14px;
+  line-height: 1.35;
+  font-weight: 650;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+:where(.receiving-actions,.inventory-actions,.ti-receive-navigation,.ti-attendance-actions) {
+  min-width: 0;
+}
+:where(.receiving-actions,.inventory-actions,.ti-receive-navigation,.ti-attendance-actions)>button {
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  :where(.v3-form,.receiving-actions,.inventory-actions,.ti-receive-navigation,.ti-attendance-actions,.ti-coverage-page,.ti-leave-v4,.production-page,.receiving-page,.inventory-page,.ti-master-editor,.ti-my-profile-page,.ti-stock-detail-dialog)
+  :where(button:not(.ti-nav-item):not(.ti-v5-cal-day):not(.ti-journey-monthnav button):not(.ti-history-detail-btn):not(.ti-history-description button),input[type="button"],input[type="submit"],input[type="reset"]) {
+    min-height: 44px;
+  }
+  :where(.receiving-actions,.inventory-actions,.ti-receive-navigation) {
+    flex-wrap: wrap;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(button,[role="button"],input[type="button"],input[type="submit"],input[type="reset"]) {
+    transition-duration: 0.01ms;
+  }
+}
