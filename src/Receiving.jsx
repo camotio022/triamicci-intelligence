@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import TriamicciHistory from './TriamicciHistory.jsx';
 
 const initial = [
   { id: 'PED-001', product: 'Peito de frango', unit: 'kg', ordered: 12, received: '', note: '' },
@@ -41,6 +42,10 @@ export default function Receiving() {
       </tbody></table></div>
       <div className="receiving-actions"><button type="submit">Registrar conferência</button><span role="status">{message}</span></div>
     </form>
-    <section className="receiving-card"><h2>Histórico desta sessão</h2>{records.length === 0 ? <p>Nenhuma conferência registrada nesta sessão.</p> : <div className="receiving-scroll"><table className="receiving-table"><thead><tr><th>DATA/HORA</th><th>PRODUTO</th><th>PEDIDO</th><th>RECEBIDO</th><th>STATUS</th><th>OBSERVAÇÃO</th></tr></thead><tbody>{records.map((r,i)=><tr key={r.recordedAt+r.id+i}><td>{new Date(r.recordedAt).toLocaleString('pt-BR')}</td><td>{r.product}</td><td>{number(r.ordered)} {r.unit}</td><td>{number(r.received)} {r.unit}</td><td><span className={r.difference === 0 ? 'receiving-ok' : 'receiving-warning'}>{r.status}</span></td><td>{r.note || '—'}</td></tr>)}</tbody></table></div>}</section>
+    <section className="receiving-card"><TriamicciHistory title="Histórico de conferências (demonstração)" records={records}
+     getId={(r)=>r.recordedAt+'-'+r.id} getDate={r=>r.recordedAt} getTitle={r=>r.product}
+     getQuantity={r=>number(r.received)+' '+r.unit} getDescription={r=>r.status+' · Pedido: '+number(r.ordered)+' '+r.unit}
+     getPerson={r=>r.recordedBy} renderDetails={r=><div>{r.note||'Sem observação'} · Diferença: {number(r.difference)} {r.unit}</div>}
+     empty="Nenhuma conferência registrada nesta sessão."/></section>
   </section>;
 }

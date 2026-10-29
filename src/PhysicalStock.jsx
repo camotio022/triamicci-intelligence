@@ -1,4 +1,5 @@
 import {useUnitLive} from './useUnitLive.js';
+import TriamicciHistory from './TriamicciHistory.jsx';
 import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -169,16 +170,12 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
     {lots.map(x=><tr key={x.id}><td>{x.lot}</td><td>{x.expiryDate}</td><td>{qty(x.receivedQuantity)} {x.unit}</td><td>{Number.isFinite(x.availableQuantity)?qty(x.availableQuantity)+' '+x.unit:'A conferir'}</td></tr>)}
    </tbody></table></div>
   </section>}
-  <section className="receiving-card"><div className="inventory-list-header"><h2>Histórico real</h2><button type="button" onClick={load}>Atualizar</button></div>
-   {rows.length===0?<p>Nenhum registro salvo nesta unidade.</p>:<>
-    <div className="ti-v43-history-cards" aria-label="Histórico de operações">{rows.map(r=><article key={r.id} className="ti-v43-history-card"><div className="ti-v43-history-head"><strong>{({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'}</strong><time>{fmt(r.at)}</time></div><h3>{r.productName||r.recipeName||'Produto não identificado'}</h3><p>{r.kind==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':r.kind==='count'?qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')':r.kind==='production'?r.portions+' porções · '+r.items?.map(i=>i.productName+' '+qty(i.quantity)+' '+i.unit).join(' + '):r.kind==='transfer'?qty(r.quantity)+' '+r.unit+' · '+r.from+' → '+r.to:qty(r.quantity)+' '+r.unit+' · '+r.location+' · '+r.reason}</p><small>Responsável: {r.actorName||'Não identificado'}</small></article>)}</div>
-    <div className="receiving-scroll ti-v43-history-table"><table className="receiving-table"><thead><tr><th>QUANDO</th><th>TIPO</th><th>PRODUTO</th><th>QUANTIDADE</th><th>RESPONSÁVEL</th></tr></thead><tbody>
-     {rows.map(r=><tr key={r.id}><td>{fmt(r.at)}</td><td>{({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'}</td><td>{r.productName||r.recipeName}</td><td>{r.kind==='receive'?qty(r.physicalQuantity)+' '+r.unit+' (pedido: '+qty(r.orderedQuantity||0)+' '+(r.receivingUnit||r.unit)+')':
-      r.kind==='count'?qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro ('+r.unit+')':
-      r.kind==='production'?r.portions+' porções · '+r.items?.map(i=>i.productName+' '+qty(i.quantity)+' '+i.unit).join(' + '):
-      r.kind==='transfer'?qty(r.quantity)+' '+r.unit+' · '+r.from+' → '+r.to:
-      qty(r.quantity)+' '+r.unit+' · '+r.location+' · '+r.reason}</td><td>{r.actorName||'Responsável não identificado'}</td></tr>)}
-    </tbody></table></div></>}
+  <section className="receiving-card"><TriamicciHistory title="Histórico de operações" records={rows}
+    getTitle={r=>r.productName||r.recipeName||'Produto não identificado'} getDate={r=>r.at}
+    getQuantity={r=>({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'}
+    getDescription={r=>r.kind==='receive'?qty(r.physicalQuantity)+' '+r.unit:r.kind==='count'?qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro':r.kind==='production'?r.portions+' porções':r.kind==='transfer'?qty(r.quantity)+' '+r.unit+' · '+r.from+' → '+r.to:qty(r.quantity)+' '+r.unit}
+    getPerson={r=>r.actorName} renderDetails={r=><div>Tipo: {({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'} · ID: {r.id}</div>}
+    empty="Nenhum registro encontrado para o período."/>
    {(more.receipts||more.counts||more.outflows||more.transfers||more.productions)&&<button type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore?'Carregando...':'Carregar registros anteriores'}</button>}
   </section>
  </section>;
