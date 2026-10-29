@@ -33,3 +33,14 @@ test('limite de leitura preserva cursor em página vazia para alcançar registro
  const first=await todayCountPage(collection(docs),{...range,scanLimit:1});assert.equal(first.nextCursor,'a');assert.equal(first.selected.length,0);
  const next=await todayCountPage(collection(docs),{...range,before:first.nextCursor});assert.equal(next.selected[0].id,'b');
 });
+
+// Reproduz a forma do IncomingMessage usada pela Vercel, diferente dos mocks literais.
+test('relatório interno preserva cabeçalhos herdados de IncomingMessage',async()=>{
+ const {requestForReport}=await import('../server/operations/inventory-today.js');
+ const headers={'content-type':'application/json',origin:'https://example.test',authorization:'Bearer test-token'};
+ const req=Object.create({get headers(){return headers}});req.method='POST';
+ assert.equal({...req}.headers,undefined);
+ const forwarded=requestForReport(req,'a'.repeat(40));
+ assert.equal(forwarded.headers,headers);assert.equal(forwarded.method,'POST');
+ assert.deepEqual(forwarded.body,{action:'dailyReport',productId:'a'.repeat(40)});
+});
