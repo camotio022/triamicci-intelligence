@@ -5,7 +5,7 @@ export async function todayCountPage(collection,{before,start,end,pageSize=12,sc
  while(scanned<scanLimit){
   let query=collection.orderBy('__name__');
   if(cursor)query=query.startAfter(cursor);
-  const limit=Math.min(200,scanLimit-scanned),snap=await query.limit(limit).get();
+  const limit=Math.min(pageSize-selected.length,scanLimit-scanned),snap=await query.limit(limit).get();
   for(const doc of snap.docs){
    cursor=doc.id;scanned++;
    const value=doc.data().at,at=value?.toDate?.()||value;

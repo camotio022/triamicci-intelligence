@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../server/quota-error.js';
 import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
 
 const idPattern = /^[a-f0-9]{40}$/;
@@ -100,7 +101,7 @@ export default async function handler(req,res) {
     if (e.message === 'INSUFFICIENT') return send(res,409,'Saldo insuficiente para esta saída.');
     if (e.message === 'LIMIT') return send(res,409,'Saldo excede o limite permitido.');
     if (e.message === 'IDEMPOTENCY_CONFLICT') return send(res,409,'Identificador de operação já utilizado com outros dados.');
-    console.error('Stock movement:',e.message);
+    if(sendQuotaError(res,e))return;console.error('Stock movement:',e.message);
     return send(res,500,'Não foi possível registrar a movimentação.');
   }
 }

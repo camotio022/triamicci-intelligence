@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useViewState} from './useViewState.js';
 import {readViewCache,writeViewCache} from './fastCache.js';
 import {useUnitLive} from './useUnitLive.js';
@@ -19,7 +20,7 @@ const blank = {name:'',category:'Proteínas',unit:'kg',minStock:'0',trackExpiry:
 async function call(action, payload={}) {
   if (!auth.currentUser) throw new Error('Sessão expirada.');
   const token = await auth.currentUser.getIdToken();
-  const res = await fetch('/api/products/manage',{method:'POST',
+  const res = await apiFetch('/api/products/manage',{method:'POST',
     headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({action,...payload})});
   const data = await res.json();
@@ -29,6 +30,7 @@ async function call(action, payload={}) {
 import {balancePresentation} from './operation-time.js';
 export default function Inventory({membership,mode='stock',onAction}) {
  const {notify}=useFeedback();
+ const [hasData,setHasData]=useState(false);
   const cachedProducts=useMemo(()=>readViewCache(auth.currentUser?.uid,membership.unitId,'inventory-products'),[membership.unitId]);
   const [products,setProducts] = useState(()=>Array.isArray(cachedProducts)?cachedProducts:[]);
   const [loading,setLoading] = useState(()=>!Array.isArray(cachedProducts));
@@ -47,12 +49,12 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const administration = mode === 'catalog';
   const load = useCallback(async (silent=false) => {
     if(!silent)setLoading(true);setError('');
-    try { const data = await call('list');const fresh=data.products||[];setProducts(fresh);writeViewCache(auth.currentUser?.uid,membership.unitId,'inventory-products',fresh); }
-    catch(e) {setError(e.message);}
+    try { const data = await call('list');const fresh=data.products||[];setProducts(fresh);writeViewCache(auth.currentUser?.uid,membership.unitId,'inventory-products',fresh);setHasData(true); }
+    catch(e) {setError(e.message);return false;}
     finally {setLoading(false);}
   },[membership.unitId]);
- useUnitLive(membership?.unitId,()=>load(true));
-  useEffect(()=>{load(Array.isArray(cachedProducts));},[load]);
+ useUnitLive(membership?.unitId,initial=>load(!initial),{domains:['stock','catalog']});
+
   const countDay=p=>{const at=p.physicalBalance?.at;if(!at)return null;const date=new Date(at);return Number.isNaN(date.getTime())?null:restaurantDay(date)};
   const todays=products.filter(p=>countDay(p)===today);
   const visible=useMemo(()=>products.filter(p=>{
@@ -80,7 +82,8 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const set = (field,value) => setForm(old=>({...old,[field]:value}));
   const detail=products.find(p=>p.id===detailId);
   useEffect(()=>{if(!detailId)return;const previous=document.activeElement;const handle=e=>{if(e.key==='Escape')setDetailId(null)};document.addEventListener('keydown',handle);return()=>{document.removeEventListener('keydown',handle);previous?.focus?.()}},[detailId]);
-  return <section className="inventory-page">
+  if(!hasData)return <section className="inventory-page"><h1>Catálogo e estoque</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>load()}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
+ return <section className="inventory-page">
     <p className="eyebrow">OPERAÇÃO · UNIDADE {membership.unitId.toUpperCase()}</p>
     <h1>{administration?'Administração · Catálogo':'Estoque físico da cozinha'}</h1>
     <p>{administration?'Revise cadastros, aprovações e configurações sem misturar essas tarefas com a rotina de estoque.':'Consulte a última contagem de reserva e giro. Sem contagem, mostramos o saldo legado identificado, não uma quantidade física confirmada.'}</p>

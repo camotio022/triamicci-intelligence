@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from '../operations/catalog-identity.js';
 import {validQuantity} from '../operations/logic.js';
 import {signalUnitChange} from '../live-signal.js';
@@ -38,7 +39,7 @@ export default async function handler(req,res){
     const outputUnit=recipeDoc.data().outputUnit||'un';if(plannedQuantity!==null&&!validQuantity(plannedQuantity,{unit:outputUnit}))throw Error('INVALID_QUANTITY');
     const now=new Date();
     tx.create(taskRef,{recipeId,recipeName:recipeDoc.data().name,unit:outputUnit,plannedQuantity,status:'pending',day,unitId:m.unitId,createdBy:actor.uid,createdAt:now});
-    signalUnitChange(tx,db,m.unitId);
+    signalUnitChange(tx,db,m.unitId,['production', 'stock']);
     tx.create(db.collection('auditLogs').doc(),{event:'production.task_added',unitId:m.unitId,day,taskId:taskRef.id,recipeId,actorUid:actor.uid,at:now});
    });
    return send(res,200,'Preparação adicionada à lista do dia.',{taskId:taskRef.id});
@@ -49,6 +50,6 @@ export default async function handler(req,res){
   if(e.message==='INVALID_QUANTITY')return send(res,400,'Meta incompatível com a unidade da preparação.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='RECIPE_NOT_FOUND')return send(res,404,'Ficha técnica não disponível.');
-  console.error('Production day list:',e.message);return send(res,500,'Não foi possível consultar ou atualizar a lista de produção.');
+  if(sendQuotaError(res,e))return;console.error('Production day list:',e.message);return send(res,500,'Não foi possível consultar ou atualizar a lista de produção.');
  }
 }

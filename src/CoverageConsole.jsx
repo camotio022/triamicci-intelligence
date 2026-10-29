@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
@@ -6,7 +7,7 @@ import './coverage.css';
 const sectors={cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'};
 const roleNames={manager:'Gerente',submanager:'Subgerente',head_cook:'Cozinheiro-chefe',cook:'Cozinheiro',other:'Outros funcionários',external:'Convocado de fora'};
 const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-async function request(action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');const r=await fetch('/api/coverage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});const d=await r.json();if(!r.ok)throw Error([d.message,...(d.issues||[])].join(' · '));return d;}
+async function request(action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');const r=await apiFetch('/api/coverage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});const d=await r.json();if(!r.ok)throw Error([d.message,...(d.issues||[])].join(' · '));return d;}
 export default function CoverageConsole({membership}){
  const [data,setData]=useState(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const [planId,setPlanId]=useState(''),[date,setDate]=useState(''),[windowStart,setWindowStart]=useState('12:00'),[windowEnd,setWindowEnd]=useState('14:00'),[sector,setSector]=useState('cozinha'),[requiredSkill,setRequiredSkill]=useState(''),[required,setRequired]=useState(4),[simulation,setSimulation]=useState(null);
@@ -15,8 +16,8 @@ export default function CoverageConsole({membership}){
  const [note,setNote]=useState(''),[consentEvidence,setConsentEvidence]=useState(''),[legalChecked,setLegalChecked]=useState(false),[consentVerified,setConsentVerified]=useState(false);
  const [ratesEdit,setRatesEdit]=useState(null),[requirements,setRequirements]=useState([]),[newRequirement,setNewRequirement]=useState({sector:'cozinha',weekday:6,start:'12:00',end:'14:00',minimum:4,skill:''});
  const load=useCallback(async(silent=false)=>{try{const result=await request('dashboard');setData(result);if(!silent){setRatesEdit(result.rates);setRequirements(result.requirements||[]);}setRateRole(old=>old==='other'?rateRoleFor(result.people.find(p=>p.status==='active')):old);setPlanId(id=>id||result.plans[0]?.id||'');setStaffId(id=>id||result.people.find(p=>p.status==='active')?.uid||'');setError('')}catch(e){setError(e.message)}},[]);
- useUnitLive(membership?.unitId,()=>load(true));
- useEffect(()=>{load()},[load]);
+ useUnitLive(membership?.unitId,initial=>load(!initial),{domains:['coverage','team','schedules'],refreshKey:membership.role});
+
  const plan=useMemo(()=>data?.plans.find(p=>p.id===planId),[data,planId]);
  const run=async(fn)=>{setBusy(true);setError('');setNotice('');try{const d=await fn();setNotice(d.message);await load();return d}catch(e){setError(e.message)}finally{setBusy(false)}};
  const simulate=async()=>{setBusy(true);setError('');try{const d=await request('simulate',{planId,date,sector,requiredSkill,required:Number(required),windowStart,windowEnd});setSimulation(d.simulation)}catch(e){setError(e.message)}finally{setBusy(false)}};

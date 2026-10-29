@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {readViewCache,writeViewCache} from './fastCache.js';
 import React, { useState, useEffect, useRef } from 'react';
 import {FeedbackProvider} from './FeedbackProvider.jsx';
@@ -54,7 +55,7 @@ function Metric({icon:Icon,label,value,change,positive=true,detail}) {
 }
 
 export default function App() {
- return <FeedbackProvider><AuthGate>{({ user, membership, logout }) => <Workspace user={user} membership={membership} logout={logout} />}</AuthGate></FeedbackProvider>;
+ return <FeedbackProvider><AuthGate>{({ user, membership, logout }) => <Workspace key={user.uid+":"+membership.unitId+":"+membership.role} user={user} membership={membership} logout={logout} />}</AuthGate></FeedbackProvider>;
 }
 
 export function Workspace({ user, membership, logout }) {
@@ -79,7 +80,7 @@ export function Workspace({ user, membership, logout }) {
   setAvatar(cached??user.photoURL??null);
   const refresh=async()=>{try{
    const token=await auth.currentUser?.getIdToken();if(!token)return;
-   const response=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'myProfile'})});
+   const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'myProfile'})});
    if(response.ok){const data=await response.json();if(active){
     const next=data.avatar||null;setAvatar(next);
     if(!next||next.length<160000)writeViewCache(user.uid,membership.unitId,'avatar',next,600000);

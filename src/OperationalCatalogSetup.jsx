@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import React,{useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import draft from '../data/triamicci-product-catalog-56.staging.json';
@@ -6,7 +7,7 @@ async function request(action,payload={}){
  const user=auth.currentUser;
  if(!user)throw Error('Faça login novamente.');
  const token=await user.getIdToken();
- const response=await fetch('/api/catalog/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'operationalCatalog',action,...payload})});
+ const response=await apiFetch('/api/catalog/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'operationalCatalog',action,...payload})});
  const data=await response.json();
  if(!response.ok)throw Error(data.message||'Não foi possível consultar o catálogo.');
  return data;

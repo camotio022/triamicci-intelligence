@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {canApproveClosure,closureDay} from './inventory-closure-rules.js';
@@ -8,7 +9,7 @@ const toIso=v=>v?.toDate?.()?.toISOString?.()||null;
 const fail=(res,e)=>{
  const m={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Acesso gerencial necessário.'],INVALID:[400,'Dados inválidos.'],NOT_FOUND:[404,'Registro não encontrado.'],CONFLICT:[409,'Contagem ou saldo mudou; atualize e solicite novamente.'],ALREADY_CLOSED:[409,'Fechamento deste dia já aprovado.']};
  if(m[e.message])return send(res,...m[e.message]);
- console.error('Inventory closure:',e.message);return send(res,500,'Não foi possível processar o fechamento.');
+ if(sendQuotaError(res,e))return;console.error('Inventory closure:',e.message);return send(res,500,'Não foi possível processar o fechamento.');
 };
 export default async function inventoryClosure(req,res) {
  if(!checkRequest(req,res))return;
@@ -69,7 +70,7 @@ export default async function inventoryClosure(req,res) {
       balanceMovementAt:toIso(b.data().lastMovementAt)||toIso(b.data().at),
       status:'pending',submittedBy:actor.uid,submittedAt:now};
     tx.create(ref,data);
-    signalUnitChange(tx,db,membershipData.unitId);
+    signalUnitChange(tx,db,membershipData.unitId,['stock', 'catalog']);
     tx.create(db.collection('auditLogs').doc(),{event:'inventory.close_requested',unitId:membershipData.unitId,
       productId,countId:requestId,actorUid:actor.uid,at:now,details:{day}});
     result={id:ref.id,status:'pending',duplicate:false};
@@ -99,7 +100,7 @@ export default async function inventoryClosure(req,res) {
        throw Error('CONFLICT');
     }
     tx.update(ref,{status:next,decidedBy:actor.uid,decidedAt:now,reason:reason.trim()});
-    signalUnitChange(tx,db,membershipData.unitId);
+    signalUnitChange(tx,db,membershipData.unitId,['stock', 'catalog']);
     tx.create(db.collection('auditLogs').doc(),{event:next==='approved'?'inventory.close_approved':'inventory.close_rejected',
       unitId:membershipData.unitId,productId,countId:requestId,actorUid:actor.uid,at:now,
       details:{day:current.day,reason:reason.trim()}});

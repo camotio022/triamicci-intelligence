@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from './catalog-identity.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -68,7 +69,7 @@ export default async function handler(req,res){
     actorUid:actor.uid,unitId:m.unitId,at:now,
     lots:allocations.map(({lot,expiryDate,quantity})=>({lot,expiryDate,quantity}))};
    tx.create(opRef,entry);
-   signalUnitChange(tx,db,m.unitId);
+   signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
    tx.create(db.collection('auditLogs').doc(),{event:'physical.transferred',productId,
     unitId:m.unitId,actorUid:actor.uid,operationId:requestId,details:entry,at:now});
   });
@@ -83,6 +84,6 @@ export default async function handler(req,res){
    LIMIT:[409,'Há muitos lotes para transferência automática.'],
    CONFLICT:[409,'Identificador repetido com dados diferentes.']};
   if(err[e.message])return send(res,...err[e.message]);
-  console.error('Transfer:',e.message);return send(res,500,'Não foi possível transferir.');
+  if(sendQuotaError(res,e))return;console.error('Transfer:',e.message);return send(res,500,'Não foi possível transferir.');
  }
 }

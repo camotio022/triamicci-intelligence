@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import React, {useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -6,7 +7,7 @@ async function api(action,payload={}) {
   const user=auth.currentUser;
   if (!user) throw new Error('Sessão expirada. Entre novamente.');
   const token=await user.getIdToken();
-  const response=await fetch('/api/stock/movements',{
+  const response=await apiFetch('/api/stock/movements',{
     method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({action,...payload})
   });

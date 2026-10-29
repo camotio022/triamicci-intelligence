@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../quota-error.js';
 // Prévia de homologação: leitura e cálculo apenas. Nunca altera physicalBalances ou physicalLots.
 import {getDb,authenticate,membership,checkRequest,send} from '../../_lib.js';
 import {reconcilePackageCount} from '../package-reconciliation.js';
@@ -57,7 +58,7 @@ export default async function handler(req,res){
   return send(res,200,computed.ok?'Prévia calculada para avaliação gerencial.':'Prévia não conciliável.',{review:result});
  }catch(e){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
-  console.error('Package reconciliation review:',e.message);
+  if(sendQuotaError(res,e))return;console.error('Package reconciliation review:',e.message);
   return send(res,500,'Não foi possível revisar a conferência.');
  }
 }

@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../server/quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
 import {hasRecipeCycle} from '../../server/production/recipe-graph.js';
 import {signalUnitChange} from '../../server/live-signal.js';
@@ -51,7 +52,7 @@ export default async function handler(req,res){
     const now=new Date();
     tx.update(ref,{active:false,archivedAt:now,archivedBy:actor.uid,updatedAt:now});
     tx.create(db.collection('auditLogs').doc(),{event:'production.recipe_archived',unitId:member.unitId,recipeId:id,actorUid:actor.uid,at:now});
-    signalUnitChange(tx,db,member.unitId);
+    signalUnitChange(tx,db,member.unitId,['production', 'stock']);
    });
    return send(res,200,'Ficha arquivada, histórico preservado.');
   }
@@ -86,7 +87,7 @@ export default async function handler(req,res){
     tx.set(ref,{name:name.trim(),method:method.trim(),outputUnit,outputProductId,yieldQuantity,lines:lines.map(x=>({productId:x.productId,
       location:x.location||(outputProductId?'reserva':'giro'),quantity:x.quantity,substitutes:x.substitutes||[]})),version:(prev.data()?.version||0)+1,
       updatedAt:now,updatedBy:actor.uid,active:true});
-    signalUnitChange(tx,db,member.unitId);
+    signalUnitChange(tx,db,member.unitId,['production', 'stock']);
     tx.create(db.collection('auditLogs').doc(),{event:'production.recipe_saved',unitId:member.unitId,
       recipeId:id,actorUid:actor.uid,at:now});
    });
@@ -193,7 +194,7 @@ export default async function handler(req,res){
    tx.create(ref,record);
    if(taskRef){const progress=progressAfterProduction(task.data(),portions);
     tx.update(taskRef,{...progress,...(progress.status==='completed'?{completedAt:now}:{}),completedBy:actor.uid,productionRunId:requestId});}
-   signalUnitChange(tx,db,member.unitId);
+   signalUnitChange(tx,db,member.unitId,['production', 'stock']);
    tx.create(db.collection('auditLogs').doc(),{event:'production.finished',unitId:member.unitId,
     operationId:requestId,actorUid:actor.uid,at:now,details:record});
   });
@@ -213,6 +214,6 @@ export default async function handler(req,res){
    INVALID_TRANSFORMATION:[409,'Revise as quantidades e unidades de transformação da ficha técnica.'],
    TASK_NOT_PENDING:[409,'Tarefa inexistente, já concluída ou incompatível com a preparação.']};
   if(errors[e.message])return send(res,...errors[e.message]);
-  console.error('Production:',e.message);return send(res,500,'Não foi possível registrar a produção.');
+  if(sendQuotaError(res,e))return;console.error('Production:',e.message);return send(res,500,'Não foi possível registrar a produção.');
  }
 }

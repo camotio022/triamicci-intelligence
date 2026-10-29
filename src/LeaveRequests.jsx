@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import TriamicciHistory from './TriamicciHistory.jsx';
@@ -7,7 +8,7 @@ import './leave-v4.css';
 async function api(action,extra={}){
  const token=await auth.currentUser?.getIdToken();
  if(!token)throw Error('Sessão expirada.');
- const res=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action,...extra})});
+ const res=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action,...extra})});
  const body=await res.json();
  if(!res.ok)throw Error(body.message||'Falha na solicitação.');
  return body;
@@ -30,8 +31,8 @@ export default function LeaveRequests({membership}){
   catch(e){setError(e.message);}
   finally{setLoading(false);}
  },[membership.unitId]);
- useUnitLive(membership?.unitId,()=>load(true));
- useEffect(()=>{setRequests([]);setReviewId(null);setNotes({});setError('');setNotice('');load();},[load]);
+ useUnitLive(membership?.unitId,initial=>load(!initial),{domains:['schedules','team'],refreshKey:membership.role});
+ useEffect(()=>{setRequests([]);setReviewId(null);setNotes({});setError('');setNotice('');},[load]);
  const filtered=useMemo(()=>manager&&filter!=='all'?requests.filter(x=>x.status===filter):requests,[requests,manager,filter]);
  const pendingCount=requests.filter(x=>x.status==='pending').length;
  const submit=async e=>{

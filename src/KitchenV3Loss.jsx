@@ -1,10 +1,11 @@
+import {apiFetch} from './api-fetch.js';
 import React,{useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {isManagement} from '../server/permissions/v31-policy.js';
 async function api(action,extra={}){
  const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');
- const res=await fetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
+ const res=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
  const data=await res.json();if(!res.ok)throw Error(data.message||'Operação indisponível.');return data;
 }
 export default function KitchenV3Loss({membership,products,onChange}){

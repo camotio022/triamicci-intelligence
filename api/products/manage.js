@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../server/quota-error.js';
 import {isOperationalProduct,belongsToOperationalCatalog,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import measurementsHandler from '../../server/operations/handlers/measurements.js';
@@ -32,11 +33,14 @@ export default async function handler(req,res) {
     const db = getDb();
     const products = db.collection('units').doc(m.unitId).collection('products');
     if (action === 'list') {
-      const [snap,balanceSnap,catalogSnap] = await Promise.all([products.limit(201).get(),db.collection('units').doc(m.unitId).collection('physicalBalances').limit(201).get(),db.collection('productCatalog').limit(201).get()]);
+      const [snap,balanceSnap] = await Promise.all([products.limit(201).get(),db.collection('units').doc(m.unitId).collection('physicalBalances').limit(201).get()]);
       if (snap.size > 200) return send(res,409,'Catálogo acima do limite inicial de 200 itens. Paginação necessária.');
       const balances=new Map(balanceSnap.docs.map(doc=>[doc.id,doc.data()]));
-      const definitions=new Map(catalogSnap.docs.map(doc=>[doc.id,doc.data()]));
-      return send(res,200,'Catálogo carregado.',{products:snap.docs.filter(doc=>belongsToOperationalCatalog(doc.data())).map(doc=>{
+      const visible=snap.docs.filter(doc=>belongsToOperationalCatalog(doc.data()));
+      const catalogIds=[...new Set(visible.map(doc=>doc.data().catalogId).filter(Boolean))];
+      const catalogDocs=catalogIds.length?await db.getAll(...catalogIds.map(id=>db.collection('productCatalog').doc(id))):[];
+      const definitions=new Map(catalogDocs.map(doc=>[doc.id,doc.data()]));
+      return send(res,200,'Catálogo carregado.',{products:visible.map(doc=>{
        const p=clean(doc),b=balances.get(doc.id);
        return {...p,physicalUnit:countUnit(p,definitions.get(p.catalogId)),physicalBalance:b?{reserve:b.reserve,rotation:b.rotation,total:b.total,
         unit:b.unit,quality:b.quality||null,countedTotal:b.countedTotal??null,entriesSinceCount:b.entriesSinceCount??null,exitsSinceCount:b.exitsSinceCount??null,lastMovementAt:b.lastMovementAt?.toDate?.()?.toISOString?.()||null,at:b.at?.toDate?.()?.toISOString?.()||null}:null};
@@ -59,7 +63,7 @@ export default async function handler(req,res) {
        const old=product.data();
        tx.update(productRef,{operationalUnitOverride:operationalUnit,receivingUnitOverride:receivingUnit,
         unitCorrectionAt:now,unitCorrectionBy:actor.uid,updatedAt:now});
-       signalUnitChange(tx,db,m.unitId);
+       signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
        tx.create(db.collection('auditLogs').doc(),{event:'product.units_corrected',
         unitId:m.unitId,productId,actorUid:actor.uid,at:now,
         before:{stockUnit:old.unit,operationalUnitOverride:old.operationalUnitOverride||null,
@@ -91,7 +95,7 @@ export default async function handler(req,res) {
           throw new Error('FORBIDDEN');
         if (existing.exists) throw new Error('DUPLICATE');
         tx.create(ref,{...payload,quantity:0,status:'inactive',countFrequency:'weekly',critical:false,reviewRequired:true,createdAt:now,createdBy:actor.uid,updatedAt:now});
-        signalUnitChange(tx,db,m.unitId);
+        signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
         tx.create(auditRef,{event:'product.created',unitId:m.unitId,productId:id,actorUid:actor.uid,at:now,details:payload});
       });
       return send(res,201,'Cadastro criado como pendente de revisão; não integra o catálogo operacional de 56 até conciliação.',{id});
@@ -119,7 +123,7 @@ export default async function handler(req,res) {
       if (createHash('sha256').update(safeName.toLocaleLowerCase('pt-BR')).digest('hex').slice(0,40) !== productId)
         throw new Error('RENAME_NOT_SUPPORTED');
       tx.update(ref,{...payload,status,updatedAt:now,updatedBy:actor.uid});
-      signalUnitChange(tx,db,m.unitId);
+      signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
       tx.create(auditRef,{event:'product.updated',unitId:m.unitId,productId,actorUid:actor.uid,at:now,
         before:{name:previous.name,category:previous.category,unit:previous.unit,minStock:previous.minStock,trackExpiry:previous.trackExpiry,status:previous.status},
         after:{...payload,status}});
@@ -135,7 +139,7 @@ export default async function handler(req,res) {
     if (e.message === 'CATALOG_LOCKED') return send(res,409,'Nome, categoria, unidade e validade pertencem ao catálogo central e não podem ser alterados na unidade.');
     if (e.message === 'UNIT_LOCKED') return send(res,409,'Não altere a unidade de medida de um insumo com saldo.');
     if (e.message === 'RENAME_NOT_SUPPORTED') return send(res,409,'Renomeação ainda não disponível nesta versão; mantenha o nome original.');
-    console.error('Catalog:',e.message);
+    if(sendQuotaError(res,e))return;console.error('Catalog:',e.message);
     return send(res,500,'Não foi possível concluir a operação.');
   }
 }

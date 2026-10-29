@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../quota-error.js';
 import {signalUnitChange} from '../../live-signal.js';
 // Aplicação transacional restrita. Revalida estado dentro da transação.
 // Por segurança, somente produtos sem controle de lotes e sem embalagens abertas
@@ -60,7 +61,7 @@ export default async function handler(req,res){
     entriesSinceCount:null,exitsSinceCount:null});
    tx.create(recordRef,{productId,conferenceId,unitId:m.unitId,actorUid:user.uid,payloadHash,at:now,
     area:conf.area,unit:unitName,profileVersion:cfg.version,change:plan.change,before:plan.before,after:plan.after});
-   signalUnitChange(tx,db,m.unitId);
+   signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
    tx.create(db.collection('auditLogs').doc(),{event:'physical.package_adjusted',productId,unitId:m.unitId,
     actorUid:user.uid,operationId:requestId,at:now,details:{conferenceId,area:conf.area,profileVersion:cfg.version,before:plan.before,after:plan.after}});
    after=plan.after;
@@ -72,6 +73,6 @@ export default async function handler(req,res){
    UNVERIFIED:[409,'Embalagem não homologada.'],STALE:[409,'Saldo ou configuração mudou. Refaça a prévia.'],
    CONFLICT:[409,'Identificador já utilizado com outros dados.'],INVALID_PLAN:[409,'Plano de ajuste inválido.']};
   if(errors[e.message])return send(res,...errors[e.message]);
-  console.error('Package adjustment:',e.message);return send(res,500,'Não foi possível aplicar o ajuste.');
+  if(sendQuotaError(res,e))return;console.error('Package adjustment:',e.message);return send(res,500,'Não foi possível aplicar o ajuste.');
  }
 }

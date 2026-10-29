@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct,belongsToOperationalCatalog} from './catalog-identity.js';
 import {operationalView} from './shared-balance.js';
 import {signalUnitChange} from '../live-signal.js';
@@ -18,7 +19,7 @@ const obj=s=>({id:s.id,...s.data()});
 const now=()=>new Date();
 const dateOk=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(x+'T12:00:00Z'))&&new Date(x+'T12:00:00Z').toISOString().slice(0,10)===x;
 const quantity=(v,unit,zero=false)=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&(zero||v>0)&&v<=100000&&(!['un','porcao','pacote','duzia'].includes(unit)||Number.isInteger(v))&&Math.abs(Math.round(v*1000)-v*1000)<1e-7;
-const newAudit=(tx,db,event,unitId,actorUid,details)=>{signalUnitChange(tx,db,unitId);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid,details,at:now()});};
+const newAudit=(tx,db,event,unitId,actorUid,details)=>{signalUnitChange(tx,db,unitId,['stock', 'catalog']);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid,details,at:now()});};
 const verify=(a,unitId,allowed)=>a.exists&&a.data().status==='active'&&a.data().unitId===unitId&&allowed.includes(a.data().role);
 const productPath=(unit,id)=>unit.collection('products').doc(id);
 const limitText=(x,max=240)=>typeof x==='string'&&x.length<=max;
@@ -180,7 +181,7 @@ export default async function kitchenV3(req,res){
    ALREADY_REPORTED:[409,'Sua sinalização já está aberta para este produto e local.'],CONFLICT:[409,'Identificador do pedido já utilizado.'],
    INVALID_TRANSITION:[409,'Transição de pedido incompatível com a situação atual.']};
   if(errors[e.message])return send(res,...errors[e.message]);
-  console.error('V3 operation:',e.message);
+  if(sendQuotaError(res,e))return;console.error('V3 operation:',e.message);
   return send(res,500,'Não foi possível completar a operação.');
  }
 }

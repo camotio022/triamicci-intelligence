@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {muralDirectoryEntry} from '../team/mural-directory.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -17,10 +18,6 @@ export default async function attendanceWorkflow(req,res){
   const previousDay=new Date(Date.parse(day+'T12:00:00Z')-86400000).toISOString().slice(0,10);
   const priorRef=attendance.doc(previousDay+'_'+user.uid);
   const refToday=attendance.doc(day+'_'+user.uid);
-  const yesterday=await priorRef.get();
-  const overnight=yesterday.exists&&['working','on_break'].includes(yesterday.data().status);
-  if(overnight&&action!=='clock_in')workDay=previousDay;
-  const ref=attendance.doc(workDay+'_'+user.uid);
   if(action==='teamDirectory'){
    const staff=await unit.collection('staffRegistry').limit(201).get();
    if(staff.size>200)return send(res,409,'Equipe excede o limite desta consulta.');
@@ -49,12 +46,15 @@ export default async function attendanceWorkflow(req,res){
     if(seen){if(seen.action!=='correct'||seen.status!==status)throw Error('CONFLICT');duplicate=true;return;}
     const at=new Date(),event={action:'correct',status,requestId,at,by:user.uid};
     tx.set(target,{uid:targetUid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at,lastCorrection:{by:user.uid,at,reason:reason.trim()}},{merge:true});
-    tx.set(unit.collection('live').doc('attendance'),{updatedAt:at},{merge:true});
-    signalUnitChange(tx,db,m.unitId);
+    signalUnitChange(tx,db,m.unitId,['attendance']);
     tx.create(db.collection('auditLogs').doc(),{event:'attendance.correct',unitId:m.unitId,actorUid:user.uid,at,details:{targetUid,workDay,from:old.status,to:status,requestId,reason:reason.trim()}});
    });
    return send(res,200,duplicate?'Correção já registrada.':'Correção auditada e registrada.',{duplicate});
   }
+  const yesterday=await priorRef.get();
+  const overnight=yesterday.exists&&['working','on_break'].includes(yesterday.data().status);
+  if(overnight&&action!=='clock_in')workDay=previousDay;
+  const ref=attendance.doc(workDay+'_'+user.uid);
   if(action==='today'){
    const selected=overnight?priorRef:refToday;
    const snap=await selected.get(),record=snap.data()||null;
@@ -80,8 +80,7 @@ export default async function attendanceWorkflow(req,res){
    if(!status)throw Error('INVALID_TRANSITION');
    const at=new Date(),event={action,requestId,at,by:user.uid};
    tx.set(ref,{uid:user.uid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at},{merge:true});
-   tx.set(unit.collection('live').doc('attendance'),{updatedAt:at},{merge:true});
-   signalUnitChange(tx,db,m.unitId);
+   signalUnitChange(tx,db,m.unitId,['attendance']);
    tx.create(db.collection('auditLogs').doc(),{event:'attendance.'+action,unitId:m.unitId,actorUid:user.uid,at,details:{day:workDay,requestId}});
    result=status;
   });
@@ -93,6 +92,6 @@ export default async function attendanceWorkflow(req,res){
   if(e.message==='INVALID_TRANSITION')return send(res,409,'Esta ação não corresponde à sua situação atual.');
   if(e.message==='CONFLICT')return send(res,409,'Registro com identificador diferente.');
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
-  console.error('attendance V3.1',e.message);return send(res,500,'Não foi possível registrar a presença.');
+  if(sendQuotaError(res,e))return;console.error('attendance V3.1',e.message);return send(res,500,'Não foi possível registrar a presença.');
  }
 }

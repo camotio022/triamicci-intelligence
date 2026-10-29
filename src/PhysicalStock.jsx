@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import React,{useCallback,useEffect,useState} from 'react';
@@ -10,7 +11,7 @@ import PackageConference from './PackageConference.jsx';
 async function api(path,action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Sessão expirada.');
  const token=await user.getIdToken();
- const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+ const response=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
   body:JSON.stringify({action,...extra})});
  const data=await response.json();if(!response.ok)throw Error(data.message||'Erro de comunicação.');return data;
 }
@@ -38,8 +39,8 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
    setMore({receipts:!!h.hasMore_receipts,counts:!!h.hasMore_counts,outflows:!!h.hasMore_outflows,transfers:!!h.hasMore_transfers,productions:!!h.hasMore_productions});
   }catch(e){setStatus(e.message)}
  },[mode]);
- useUnitLive(membership?.unitId,()=>load(true));
- useEffect(()=>{load()},[load]);
+ useUnitLive(membership?.unitId,()=>load(),{domains:['stock','catalog','production'],refreshKey:mode});
+
  useEffect(()=>{if(initialProductId)setProductId(initialProductId)},[initialProductId]);
  useEffect(()=>{
   let active=true;setSummary(null);setLots([]);

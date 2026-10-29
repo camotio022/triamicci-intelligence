@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import React,{useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -16,7 +17,7 @@ export default function CatalogV2Review(){
   setBusy(true);setNotice('');
   try{
    const token=await auth.currentUser.getIdToken();
-   const res=await fetch('/api/catalog/sync-v2',{method:'POST',
+   const res=await apiFetch('/api/catalog/sync-v2',{method:'POST',
     headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({action:'preview'})});
    const data=await res.json();if(!res.ok)throw Error(data.message);

@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {signalUnitChange} from '../live-signal.js';
@@ -42,7 +43,7 @@ export default async function investigation(req,res){
     if(!old.exists||old.data().status!=='pending'||old.data().actorUid===actor.uid||old.data().reportHash!==hash||old.data().version!==expectedVersion)throw Error('CONFLICT');
     tx.update(ref,{status:action==='investigationApprove'?'approved':'rejected',decidedBy:actor.uid,decidedAt:now,note:note.trim()});
    }
-   signalUnitChange(tx,db,m.unitId);
+   signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
    tx.create(db.collection('auditLogs').doc(),{event:action,unitId:m.unitId,actorUid:actor.uid,investigationId:ref.id,version:action==='investigationSave'?expectedVersion+1:expectedVersion,note:action==='investigationSave'?null:note.trim(),at:now,informationalOnly:true});
   });
   return send(res,200,'Investigação registrada. Nenhum saldo foi alterado.');
@@ -50,6 +51,6 @@ export default async function investigation(req,res){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='CONFLICT')return send(res,409,'Os dados mudaram ou esta investigação exige revisão por outro gestor. Atualize e revise.');
-  console.error('Inventory investigation:',e.message);return send(res,500,'Não foi possível registrar a investigação.');
+  if(sendQuotaError(res,e))return;console.error('Inventory investigation:',e.message);return send(res,500,'Não foi possível registrar a investigação.');
  }
 }

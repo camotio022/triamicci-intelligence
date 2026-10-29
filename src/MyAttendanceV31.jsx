@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import {liveShiftState} from '../server/schedules/restaurant-today.js';
 import React,{useCallback,useEffect,useState} from 'react';
@@ -7,7 +8,7 @@ import './my-journey-v5.css';
 const actions={not_started:['clock_in','Registrar entrada'],working:['break_start','Iniciar intervalo'],on_break:['break_end','Retornar do intervalo'],finished:[]};
 async function call(action,extra={}){
  const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');
- const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'attendanceV31',action,...extra})});
+ const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'attendanceV31',action,...extra})});
  const data=await r.json();if(!r.ok)throw Error(data.message||'Não foi possível registrar.');return data;
 }
 export default function MyAttendanceV31({unitId}){
@@ -15,11 +16,11 @@ export default function MyAttendanceV31({unitId}){
  const [expandedSchedule,setExpandedSchedule]=useState(true),[expandedTimeline,setExpandedTimeline]=useState(false),[monthOffset,setMonthOffset]=useState(0);
  const [profile,setProfile]=useState(null),[clock,setClock]=useState('00:00'),[record,setRecord]=useState(null),[day,setDay]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const reload=useCallback(async()=>{try{const d=await call('today');setRecord(d.record);setDay(d.day)}catch(e){setError(e.message)}},[]);
- useEffect(()=>{let active=true;const token=async()=>auth.currentUser?.getIdToken();token().then(t=>t&&fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify({module:'attendanceV31',action:'teamDirectory'})})).then(r=>r?.ok?r.json():null).then(d=>{if(active)setProfile((d?.registry||[]).find(p=>p.accountUid===auth.currentUser?.uid)||null)}).catch(()=>{});return()=>{active=false}},[unitId]);
+ const refreshProfile=async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return false;const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'myProfile'})});const d=await r.json();if(!r.ok)throw Error(d.message);setProfile(d.professional||null);return true}catch(e){setError(e.message);return false}};
  useEffect(()=>{let lastDate=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());const update=()=>{const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());if(date!==lastDate){lastDate=date;reload();refreshSchedule().catch(e=>setError(e.message));}setClock(new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));};update();const timer=setInterval(update,30000);return()=>clearInterval(timer)},[]);
- const refreshSchedule=async()=>{const token=await auth.currentUser?.getIdToken();if(!token)return;const r=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action:'mine'})});const d=await r.json();if(!r.ok)throw Error(d.message);setMySchedules(d.schedules||[])};
- useUnitLive(unitId,()=>Promise.all([reload(),refreshSchedule()]));
- useEffect(()=>{reload();refreshSchedule().catch(e=>setError(e.message))},[unitId,reload]);
+ const refreshSchedule=async()=>{const token=await auth.currentUser?.getIdToken();if(!token)return;const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action:'mine'})});const d=await r.json();if(!r.ok)throw Error(d.message);setMySchedules(d.schedules||[])};
+ useUnitLive(unitId,(_initial,changes)=>Promise.all([!changes||changes.includes('attendance')?reload():true,!changes||changes.some(x=>['schedules','team'].includes(x))?refreshSchedule():true,!changes||changes.some(x=>['profile','team'].includes(x))?refreshProfile():true]),{domains:['attendance','schedules','team','profile']});
+
  const status=record?.status||'not_started';
  const events=record?.events||[];
  const hasEvent=action=>events.some(event=>event.action===action);

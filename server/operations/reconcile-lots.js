@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {signalUnitChange} from '../live-signal.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -73,7 +74,7 @@ export default async function handler(req,res){
    tx.create(ref,{productId,actorUid:actor.uid,unitId:m.unitId,payloadHash,at:now,
      before:existingLots.docs.map(d=>({id:d.id,reserva:d.data().reserva??null,giro:d.data().giro??null})),
      after:items,reason:'physical_lot_reconciliation'});
-   signalUnitChange(tx,db,m.unitId);
+   signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);
    tx.create(db.collection('auditLogs').doc(),{event:'physical.lots_reconciled',
     productId,actorUid:actor.uid,unitId:m.unitId,operationId:requestId,at:now});
   });
@@ -86,6 +87,6 @@ export default async function handler(req,res){
    TOTAL_MISMATCH:[409,'A soma dos lotes deve coincidir com reserva e giro da última contagem.'],
    UNIT_CONFLICT:[409,'Unidade de contagem diverge do catálogo.']};
   if(errors[e.message])return send(res,...errors[e.message]);
-  console.error('Lot reconciliation:',e.message);return send(res,500,'Não foi possível conciliar lotes.');
+  if(sendQuotaError(res,e))return;console.error('Lot reconciliation:',e.message);return send(res,500,'Não foi possível conciliar lotes.');
  }
 }

@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../quota-error.js';
 import {reportFromSnapshot} from './inventory-summary.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {countUnit} from './logic.js';
@@ -10,21 +11,22 @@ async function scan(query,visit){
  let cursor=null;
  for(;;){const page=await (cursor?query.orderBy('__name__').startAfter(cursor):query.orderBy('__name__')).limit(200).get();for(const doc of page.docs)visit(doc);if(page.size<200)return;cursor=page.docs.at(-1);}
 }
-export default async function dailyReport(req,res) {
+export default async function dailyReport(req,res,context=null) {
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
  try {
-  const actor=await authenticate(req), member=await membership(actor.uid);
+  // Context is supplied only by the server-side todayCounts handler, never req.body.
+  const actor=context?.actor||await authenticate(req), member=context?.member||await membership(actor.uid);
   if(!member?.unitId)return send(res,403,'Vínculo ativo necessário.');
   const {productId}=req.body||{};
   if(!idPattern.test(productId||''))return send(res,400,'Produto inválido.');
   const db=getDb(),root=db.collection('units').doc(member.unitId);
-  const product=await root.collection('products').doc(productId).get();
+  const product=context?.product||await root.collection('products').doc(productId).get();
   if(!product.exists)return send(res,404,'Produto não encontrado nesta unidade.');
   const catalog=product.data().catalogId?
     await db.collection('productCatalog').doc(product.data().catalogId).get():null;
   const unit=countUnit(product.data(),catalog?.data());
-  const balance=await root.collection('physicalBalances').doc(productId).get();
+  const balance=context?.balance||await root.collection('physicalBalances').doc(productId).get();
   if(balance.data()?.countId){const count=await root.collection('physicalCounts').doc(balance.data().countId).get();if(count.exists&&count.data().productId===productId&&count.data().unit===unit&&count.data().inventorySummary){try{const report=reportFromSnapshot(count,productId,product.data().name);return send(res,200,'Apuração pelos acumulados transacionais.',{report,complete:true});}catch{return send(res,200,'Resumo incompatível. Revise contagens e unidades.',{report:null,complete:false,reason:'INCOMPATIBLE_SUMMARY'});}}}
   // Compatibility for experimental records predating transactional summaries: scan in bounded pages.
   const ordered=[];
@@ -65,7 +67,7 @@ export default async function dailyReport(req,res) {
   }
  }catch(e){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
-  console.error('Daily inventory report:',e.message);
+  if(sendQuotaError(res,e))return;console.error('Daily inventory report:',e.message);
   return send(res,500,'Não foi possível apurar o inventário.');
  }
 }

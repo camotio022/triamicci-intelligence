@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {auth} from './firebase.js';
@@ -14,7 +15,7 @@ const blank={displayName:'',bio:'',developmentGoal:'',preferredShift:''};
 async function api(action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
  const token=await user.getIdToken();
- const response=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
+ const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
  const data=await response.json();if(!response.ok)throw Error(data.message||'Não foi possível concluir.');
  return data;
 }
@@ -30,8 +31,8 @@ export default function MyProfessionalProfile({membership,attendance=null}){
  const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const data=await api('myProfile');
  setProfile(data.professional);setAvatar(data.avatar||null);if(!editingRef.current)setPersonal({...blank,...(data.personal||{})});setRecognition(data.recognition);setSyncedAt(new Date());
  }catch(e){if(!silent)setError(e.message)}finally{if(!silent)setLoading(false)}},[]);
- useUnitLive(membership?.unitId,()=>load(true));
- useEffect(()=>{load()},[load]);
+ useUnitLive(membership?.unitId,initial=>load(!initial),{domains:['profile','team']});
+
  const uploadAvatar=event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;
   if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>15_000_000){notify('Escolha uma foto JPG, PNG ou WebP de até 15 MB.','error');return;}
   setPhotoFile(file);

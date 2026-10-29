@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useEffect,useState} from 'react';
 import {auth} from './firebase.js';
@@ -6,10 +7,10 @@ import {useOperationDay} from './useOperationDay.js';
 export default function MyCoverageProposals({unitId}){
  const today=useOperationDay();
  const [items,setItems]=useState([]),[requests,setRequests]=useState([]),[requestKind,setRequestKind]=useState('coverage'),[requestDate,setRequestDate]=useState(''),[requestReason,setRequestReason]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState('');
- async function api(action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada');const r=await fetch('/api/coverage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
+ async function api(action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada');const r=await apiFetch('/api/coverage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
  async function load(){try{const d=await api('myProposals');setItems(d.proposals||[]);setRequests(d.requests||[]);setError('')}catch(e){setError(e.message)}}
- useUnitLive(unitId,load);
- useEffect(()=>{load()},[]);
+ useUnitLive(unitId,()=>load(),{domains:['coverage']});
+
  async function sendRequest(e){e.preventDefault();if(busy)return;setBusy('request');setError('');setNotice('');try{const d=await api('requestChange',{kind:requestKind,date:requestDate,reason:requestReason.trim()});setNotice(d.message);setRequestReason('');setRequestDate('');await load()}catch(e){setError(e.message)}finally{setBusy('')}}
  async function respond(id,decision){if(!window.confirm(decision==='accepted'?'Confirmar aceite desta proposta?':'Recusar esta proposta?'))return;setBusy(id);try{await api('respond',{id,decision});await load()}catch(e){setError(e.message)}finally{setBusy('')}}
  const active=p=>!pastProposal(p,today)&&['pending_acceptance','pending_approval','accepted','approved'].includes(p.status);

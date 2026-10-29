@@ -1,3 +1,4 @@
+import {sendQuotaError} from '../../server/quota-error.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import {staffSeed,reconcileStaff,normalizeStaffName,defaultStaffAvailability} from '../../server/team/master-registry.js';
 import schedulesWorkflow from '../../server/workflows/schedules.js';
@@ -39,7 +40,7 @@ export default async function handler(req,res) {
 
     const { action } = req.body || {};
     const db = getDb();
-    const writePersonal=async(ref,data)=>db.runTransaction(async tx=>{const current=await tx.get(db.doc('memberships/'+actor.uid));if(!current.exists||current.data().status!=='active'||current.data().unitId!==actingMember.unitId)throw Error('FORBIDDEN');tx.set(ref,data,{merge:true});signalUnitChange(tx,db,actingMember.unitId)});
+    const writePersonal=async(ref,data)=>db.runTransaction(async tx=>{const current=await tx.get(db.doc('memberships/'+actor.uid));if(!current.exists||current.data().status!=='active'||current.data().unitId!==actingMember.unitId)throw Error('FORBIDDEN');tx.set(ref,data,{merge:true});signalUnitChange(tx,db,actingMember.unitId,['team', 'profile', 'schedules', 'notifications'])});
     if(action==='masterRegistryActivate'){
       if(!['admin','manager','submanager'].includes(actingMember.role))return send(res,403,'Apenas gerência ativa o Cadastro Mestre.');
       if(req.body?.confirm!==true)return send(res,400,'Confirmação obrigatória.');
@@ -54,7 +55,7 @@ export default async function handler(req,res) {
         const a=await tx.get(db.collection('memberships').doc(actor.uid));
         if(!a.exists||a.data().status!=='active'||a.data().unitId!==actingMember.unitId||!['admin','manager','submanager'].includes(a.data().role))throw Error('FORBIDDEN');
         tx.set(ref,{active:true,activatedAt:now,activatedBy:actor.uid,updatedAt:now});
-        signalUnitChange(tx,db,actingMember.unitId);
+        signalUnitChange(tx,db,actingMember.unitId,['team', 'profile', 'schedules', 'notifications']);
         tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_activated',unitId:actingMember.unitId,actorUid:actor.uid,at:now,activeCount:active.length});
       });
       return send(res,200,'Cadastro Mestre ativado para novas escalas. Históricos preservados.');
@@ -87,7 +88,7 @@ export default async function handler(req,res) {
         else tx.create(ref,{...seed,availability:defaultStaffAvailability(seed.shift,seed.fixedWeekday),normalizedName:normalizeStaffName(seed.name),status:'active',skills:[],certifications:[],accountUid:uid,linkedAt:now,linkedBy:actor.uid,createdAt:now,createdBy:actor.uid,updatedAt:now,source:'levantamento_escala_2026'});
         if(!lock.exists)tx.create(linkLock,{registryId:id,accountUid:uid,linkedAt:now,linkedBy:actor.uid});
         tx.update(claim,{status:'approved',reviewedAt:now,reviewedBy:actor.uid});
-        signalUnitChange(tx,db,actingMember.unitId);
+        signalUnitChange(tx,db,actingMember.unitId,['team', 'profile', 'schedules', 'notifications']);
         tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_account_linked',unitId:actingMember.unitId,actorUid:actor.uid,targetUid:uid,registryId:id,at:now});
       });
       return send(res,200,'Vínculo confirmado sem alterar permissões de acesso.');
@@ -123,7 +124,7 @@ export default async function handler(req,res) {
         if(!skills.every(s=>eligibleSkills(sector).includes(s))||!certifications.every(s=>skills.includes(s)))throw Error('Habilidades incompatíveis com setor ou certificações.');
         if(changes.availability!==undefined&&!validateProfessionalProfile({sector,jobTitle:changes.jobTitle||before.jobTitle,skills,certifications,sectorExceptions:[],shift:changes.shift||before.shift,availability:changes.availability,notes:changes.notes||before.notes||''}))throw Error('Horários ou intervalos inválidos.');
         tx.update(ref,{...changes,...(changes.availability!==undefined?{}:changes.shift!==undefined||changes.fixedWeekday!==undefined?{availability:defaultStaffAvailability(changes.shift||before.shift,changes.fixedWeekday||before.fixedWeekday)}:{}),updatedBy:actor.uid,updatedAt:now});
-        signalUnitChange(tx,db,actingMember.unitId);
+        signalUnitChange(tx,db,actingMember.unitId,['team', 'profile', 'schedules', 'notifications']);
         tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_updated',unitId:actingMember.unitId,actorUid:actor.uid,registryId:id,before:Object.fromEntries(Object.keys(changes).map(k=>[k,before[k]??null])),changes,at:now});
       });
       return found?send(res,200,'Ficha atualizada sem modificar conta de acesso.'):send(res,404,'Ficha não encontrada.');
@@ -214,7 +215,7 @@ export default async function handler(req,res) {
        const [active,existing]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
        if(!active.exists||active.data().status!=='active'||active.data().unitId!==actingMember.unitId)throw Error('FORBIDDEN');
        tx.set(ref,{uid:actor.uid,unitId:actingMember.unitId,fields,updatedAt:now},{merge:true});
-       signalUnitChange(tx,db,actingMember.unitId);
+       signalUnitChange(tx,db,actingMember.unitId,['team', 'profile', 'schedules', 'notifications']);
        tx.create(db.collection('auditLogs').doc(),{event:'team.personal_updated',unitId:actingMember.unitId,
          actorUid:actor.uid,targetUid:actor.uid,at:now,changedFields:Object.keys(fields).filter(k=>fields[k]!==existing.data()?.fields?.[k])});
       });
@@ -296,7 +297,7 @@ export default async function handler(req,res) {
          unitId:actingMember.unitId,recipientUid:uid,actorUid:actor.uid,at:now,read:false});
        tx.set(profileRef,{uid,unitId:actingMember.unitId,profile:normalized,updatedAt:now,
          updatedBy:actor.uid,revision:(existing.data()?.revision||0)+1},{merge:true});
-       signalUnitChange(tx,db,actingMember.unitId);
+       signalUnitChange(tx,db,actingMember.unitId,['team', 'profile', 'schedules', 'notifications']);
        tx.create(db.collection('auditLogs').doc(),{event:'team.professional_updated',unitId:actingMember.unitId,
          actorUid:actor.uid,targetUid:uid,at:now,before:existing.data()?.profile||null,after:normalized});
       });
@@ -371,7 +372,7 @@ export default async function handler(req,res) {
       const noteRef=db.collection('units').doc(currentActor.unitId).collection('memberNotifications').doc(uid).collection('items').doc();
       tx.create(noteRef,{title:'Acesso atualizado',message:parts.join(' · '),changes:parts,read:false,
        recipientUid:uid,actorUid:actor.uid,unitId:currentActor.unitId,at:now});
-      signalUnitChange(tx,db,actingMember.unitId);
+      signalUnitChange(tx,db,actingMember.unitId,['team', 'profile', 'schedules', 'notifications']);
       tx.create(auditRef,{
         event:'member.updated',unitId:currentActor.unitId,actorUid:actor.uid,
         targetUid:uid,fromRole:target.role,toRole:role,fromStatus:target.status,toStatus:status,at:now
@@ -387,7 +388,7 @@ export default async function handler(req,res) {
     if (error.message === 'SKILL_SECTOR') return send(res,400,'Novas habilidades devem corresponder ao setor selecionado.');
     if (error.message === 'NO_CHANGES') return send(res,409,'Nenhuma alteração foi feita.');
     if (error.message === 'INVALID_STATE') return send(res,409,'O vínculo atual está inconsistente.');
-    console.error('Member management:',error.message);
+    if(sendQuotaError(res,error))return;console.error('Member management:',error.message);
     return send(res,500,'Não foi possível concluir a operação.');
   }
 }

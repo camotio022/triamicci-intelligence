@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import {recordDay,hasPhysicalCount} from './operation-time.js';
 import {useOperationDay} from './useOperationDay.js';
 import {useUnitLive} from './useUnitLive.js';
@@ -8,18 +9,19 @@ import './triamicci-history.css';
 
 export default function KitchenHome({membership,navigate}){
  const today=useOperationDay();
+ const [hasData,setHasData]=useState(false);
  const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[],productions:[]}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const load=useCallback(async(silent=false)=>{
   if(!silent)setLoading(true);setError('');
   try{
    const token=await auth.currentUser.getIdToken();
-   const call=async(url,action)=>{const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action})});const data=await res.json();if(!res.ok)throw Error(data.message||'Falha ao carregar a operação');return data};
+   const call=async(url,action)=>{const res=await apiFetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...(url==='/api/operations/stock'?{todayOnly:true,preview:true}:{})})});const data=await res.json();if(!res.ok)throw Error(data.message||'Falha ao carregar a operação');return data};
    const [stock,ops]=await Promise.all([call('/api/products/manage','list'),call('/api/operations/stock','list')]);
-   setProducts(stock.products||[]);setHistory({receipts:ops.receipts||[],counts:ops.counts||[],outflows:ops.outflows||[],transfers:ops.transfers||[],productions:ops.productions||[]});
-  }catch(e){setError(e.message)}finally{setLoading(false)}
+   setProducts(stock.products||[]);setHistory({receipts:ops.receipts||[],counts:ops.counts||[],outflows:ops.outflows||[],transfers:ops.transfers||[],productions:ops.productions||[]});setHasData(true);
+  }catch(e){setError(e.message);return false}finally{setLoading(false)}
  },[]);
- useUnitLive(membership?.unitId,()=>load(true));
- useEffect(()=>{load()},[load]);
+ useUnitLive(membership?.unitId,initial=>load(!initial),{domains:['stock','catalog','production']});
+
  const [filter,setFilter]=useState('counted');
  const todayProductions=history.productions.filter(r=>recordDay(r.at)===today);
  const counted=products.filter(p=>hasPhysicalCount(p.physicalBalance));
@@ -30,11 +32,12 @@ export default function KitchenHome({membership,navigate}){
   {name:'Contagem diária',description:'Registrar reserva e giro',page:'count',Icon:ClipboardCheck},
   {name:'Estoque físico',description:'Consultar produtos da cozinha',page:'inventory',Icon:Boxes},
   {name:'Histórico',description:'Consultar operações registradas',page:'history',Icon:History}];
+ if(!hasData)return <section className="inventory-page"><h1>Operação da cozinha</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>load()}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
  return <section className="kitchen-home">
   <p className="eyebrow">TRIAMICCI INTELLIGENCE · UNIDADE {membership.unitId.toUpperCase()}</p>
   <div className="kitchen-header"><div><h1>Operação da cozinha</h1><p>Recebimentos, contagens e estoque físico da unidade em um só lugar.</p></div><button type="button" onClick={load} disabled={loading}><RefreshCw size={16}/> Atualizar</button></div>
   <div className="kitchen-actions">{actions.filter(action=>action.page!=='count'||['admin','manager','submanager'].includes(membership.role)).map(({name,description,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong><span>{description}</span></button>)}</div>
-  {error&&<p role="alert" className="receiving-notice"><AlertCircle size={16}/> {error}</p>}
+  {error&&<p role="alert" className="receiving-notice"><AlertCircle size={16}/> Falha na atualização. Os dados da última consulta podem estar desatualizados. {error}</p>}
   <section className="ti-operations-overview" aria-label="Resumo operacional">
    <h2>Resumo operacional</h2>
    <div className="ti-operations-primary" role="status">

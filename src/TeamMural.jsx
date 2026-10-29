@@ -1,3 +1,4 @@
+import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck,ClipboardList,Sun,Moon,ChevronDown,UserRound} from 'lucide-react';
 import {auth} from './firebase.js';
@@ -11,7 +12,7 @@ import './mural-v5.css';
 async function read(module,action,payload={}){
  const token=await auth.currentUser?.getIdToken();
  if(!token)throw Error('Faça login novamente.');
- const response=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...payload})});
+ const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...payload})});
  const data=await response.json();
  if(!response.ok)throw Error(data.message||'Não foi possível atualizar o mural.');
  return data;
@@ -31,14 +32,18 @@ export default function TeamMural({membership}){
    setNotices(board.items||[]);setNoticeCursor(board.nextCursor||null);setError('');return true;
   }catch(e){setError(e.message);return false}finally{setLoading(false)}
  },[membership?.unitId,membership?.role]);
- const refreshProduction=useCallback(async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const response=await fetch('/api/production/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'dayList'})});if(!response.ok)throw Error('Produção indisponível');const data=await response.json();setProductionTasks(data.tasks||[]);setProductionError('');return true}catch{setProductionError('Não foi possível consultar o planejamento de hoje.');return false}},[membership?.unitId]);
+ const refreshProduction=useCallback(async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return;const response=await apiFetch('/api/production/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'dayList'})});if(!response.ok)throw Error('Produção indisponível');const data=await response.json();setProductionTasks(data.tasks||[]);setProductionError('');return true}catch{setProductionError('Não foi possível consultar o planejamento de hoje.');return false}},[membership?.unitId]);
  const refreshPresence=useCallback(async()=>{
   try{const result=await read('attendanceV31','teamToday');setPresence(Object.fromEntries((result.presence||[]).map(x=>[x.uid,x])));return true;}
   catch{return false;}
  },[membership?.unitId]);
  useEffect(()=>{setSchedules([]);setNotices([]);setStaff([]);setPresence({});setProductionTasks([]);setLoading(true);},[membership?.unitId]);
- useEffect(()=>{refresh();refreshPresence();refreshProduction()},[refresh,refreshPresence,refreshProduction]);
- const live=useUnitLive(membership?.unitId,()=>Promise.all([refresh(),refreshPresence(),refreshProduction()]));
+
+ const live=useUnitLive(membership?.unitId,(_initial,changes)=>Promise.all([
+  !changes||changes.some(x=>['team','schedules','mural'].includes(x))?refresh():true,
+  !changes||changes.some(x=>['attendance','team'].includes(x))?refreshPresence():true,
+  !changes||changes.includes('production')?refreshProduction():true
+ ]),{domains:['attendance','team','schedules','mural','production'],refreshKey:membership.role});
  useEffect(()=>{let lastDate=todayInSaoPaulo();const tick=()=>{const date=todayInSaoPaulo();if(date!==lastDate){lastDate=date;refresh();refreshPresence();refreshProduction();}setToday(date);setClock(new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));};tick();const timer=setInterval(tick,30000);return()=>clearInterval(timer)},[refresh,refreshPresence,refreshProduction]);
  const current=useMemo(()=>schedules.find(x=>x.period===today.slice(0,7)),[schedules,today]);
  const selected=expanded===null?current?.id:expanded;
@@ -63,7 +68,7 @@ export default function TeamMural({membership}){
  const endedTeam=roster.filter(x=>x.start&&!x.ongoing&&!x.upcoming);
  const visibleTeam=teamFilter==='now'?nowTeam:teamFilter==='next'?nextTeam:teamFilter==='ended'?endedTeam:roster;
  const [noticeForm,setNoticeForm]=useState({title:'',body:'',priority:'normal'}),[publishing,setPublishing]=useState(false);
- const publishNotice=async e=>{e.preventDefault();if(publishing||!window.confirm('Publicar este comunicado para a unidade?'))return;setPublishing(true);try{const token=await auth.currentUser.getIdToken();const write=async(action,payload)=>{const response=await fetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'mural',action,...payload})});const d=await response.json();if(!response.ok)throw Error(d.message);return d};const draft=await write('saveDraft',{item:{kind:'notice',...noticeForm}});await write('publish',{id:draft.id});setNoticeForm({title:'',body:'',priority:'normal'});await refresh()}catch(e){setError(e.message)}finally{setPublishing(false)}};
+ const publishNotice=async e=>{e.preventDefault();if(publishing||!window.confirm('Publicar este comunicado para a unidade?'))return;setPublishing(true);try{const token=await auth.currentUser.getIdToken();const write=async(action,payload)=>{const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'mural',action,...payload})});const d=await response.json();if(!response.ok)throw Error(d.message);return d};const draft=await write('saveDraft',{item:{kind:'notice',...noticeForm}});await write('publish',{id:draft.id});setNoticeForm({title:'',body:'',priority:'normal'});await refresh()}catch(e){setError(e.message)}finally{setPublishing(false)}};
  const [showAllNotices,setShowAllNotices]=useState(false);
  const prioritized=[...notices].sort((a,b)=>({urgent:2,important:1,normal:0}[b.priority||'normal']-({urgent:2,important:1,normal:0}[a.priority||'normal']))||String(b.publishedAt||'').localeCompare(String(a.publishedAt||'')));
  const visibleNotices=showAllNotices?prioritized:prioritized.slice(0,2);
