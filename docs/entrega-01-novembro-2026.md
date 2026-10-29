@@ -11,6 +11,7 @@ Auditoria técnica de 29/10/2026. Base reconciliada: `875df93` (inclui históric
 - Pendências de recebimento são consultadas separadamente do histórico paginado: uma conferência antiga não some quando há mais de vinte entregas recentes.
 - Proposta de cobertura passada não pode ser aceita/aprovada; registros anteriores são preservados.
 - Conflito de transação de escala é respondido como 409, sem afirmar sucesso nem duplicar pedidos.
+- Cadastro aceita unidade comercial diferente da contagem, sem fator presumido. A conferência exige a quantidade física medida; conciliação continua bloqueando mudança incompatível de saldos existentes.
 - Revogação de convite revalida o vínculo gerencial dentro da transação.
 
 ## Evidência automatizada local

@@ -35,9 +35,8 @@ export default async function handler(req,res){
      !units.has(operationalUnit)||!['supplier','internal'].includes(source)||
      (source==='supplier'&&!units.has(receivingUnit))||typeof trackExpiry!=='boolean'||typeof minStock!=='number'||!Number.isFinite(minStock)||minStock<0||minStock>100000000||!['daily','weekly','on_demand'].includes(countFrequency)||typeof critical!=='boolean'||reviewConfirmed!==true)
    return send(res,400,'Confirme as informações do produto antes de ativar.');
-  // Avoid automatic conversions between unlike units: configured receipt and count must match the stock unit.
-  if(operationalUnit!==stockUnit||(source==='supplier'&&receivingUnit!==stockUnit))
-   return send(res,409,'Unidades diferentes exigem regra de conversão homologada. Use a mesma unidade para ativar.');
+  // Ativação não movimenta estoque. Unidades comerciais e físicas podem diferir:
+  // o recebimento exige ambas as quantidades medidas, sem calcular kg -> peças.
   const ref=unitProducts.doc(existingProductId||hash(name)),centralRef=catalog.doc(id),memberRef=db.collection('memberships').doc(actor.uid);
   const now=new Date();
   await db.runTransaction(async tx=>{

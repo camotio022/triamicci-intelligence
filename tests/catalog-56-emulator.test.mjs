@@ -17,7 +17,7 @@ test('56 produtos: ativação, conciliação, pedido, aprovação, giro, produç
   const res={code:200,setHeader(){},status(c){this.code=c;return this},json(data){this.data=data;return this}};
   await handler({method:'POST',headers:{origin:'https://triamicci-e2e.test','content-type':'application/json',authorization:'Bearer '+actor.token},body:{...(handler===activate?{module:'operationalCatalog'}:{}),action,...extra}},res);return {code:res.code,...res.data};
  };
- const approved=p=>({...p,minStock:0,countFrequency:'daily',critical:false,reviewConfirmed:true});
+ const approved=p=>({...p,...(p.id==='bacon'?{stockUnit:'kg',receivingUnit:'kg',operationalUnit:'un'}:{}),minStock:0,countFrequency:'daily',critical:false,reviewConfirmed:true});
  assert.equal((await call(activate,aux,'activate',approved(manifest[0]))).code,403);
  const oldId='a'.repeat(40),old={name:' FEIJAO ',unit:'kg',status:'active',trackExpiry:true,quantity:12};
  await root.collection('products').doc(oldId).set(old);
@@ -33,13 +33,21 @@ test('56 produtos: ativação, conciliação, pedido, aprovação, giro, produç
  const ids=new Map([['feijao',oldId]]);
  for(const p of manifest.filter(p=>p.id!=='feijao')){
   const result=await call(activate,manager,'activate',approved(p));assert.equal(result.code,200,JSON.stringify({product:p.id,result}));ids.set(p.id,result.productId);
-  const profile=(await root.collection('operationalProfiles').doc(result.productId).get()).data();assert.equal(profile.countUnit,p.operationalUnit);assert.equal(profile.origin,p.source);
+  const profile=(await root.collection('operationalProfiles').doc(result.productId).get()).data();assert.equal(profile.countUnit,approved(p).operationalUnit);assert.equal(profile.origin,p.source);
  }
  assert.equal((await call(products,aux,'list')).products.length,56);
  assert.equal((await call(kitchen,aux,'v3Dashboard')).products.length,56);
  assert.equal((await call(activate,foreign,'status')).items.some(p=>p.active),false);
  assert.equal((await call(activate,manager,'activate',approved(manifest[0]))).code,409);
  assert.equal((await root.collection('products').get()).size,56);
+ // Peso comercial e contagem em peças são medições distintas, nunca conversão automática.
+ const bacon=ids.get('bacon'),measuredShipment={requestId:randomUUID(),supplier:'Fornecedor fictício',notes:'TESTE peso comercial e peças aferidas',lines:[{productId:bacon,commercialQuantity:2.5,commercialUnit:'kg',stockQuantity:10,location:'reserva',lot:'TESTE-PECAS',expiryDate:'2099-12-31'}]};
+ assert.equal((await call(shipments,aux,'shipmentInspect',{...measuredShipment,requestId:randomUUID(),lines:measuredShipment.lines.map(l=>({...l,stockQuantity:0}))})).code,409,'Peso não substitui contagem de peças');
+ assert.equal((await call(shipments,aux,'shipmentInspect',measuredShipment)).code,200);
+ assert.equal((await root.collection('physicalBalances').doc(bacon).get()).data().total,0);
+ assert.equal((await call(shipments,manager,'shipmentApprove',{requestId:measuredShipment.requestId})).code,200);
+ const measuredBalance=(await root.collection('physicalBalances').doc(bacon).get()).data();assert.equal(measuredBalance.unit,'un');assert.equal(measuredBalance.total,10);
+ assert.equal((await call(products,aux,'list')).products.find(p=>p.id===bacon).physicalUnit,'un');
  const bife=ids.get('bife-de-alcatra'),raw=ids.get('peito-de-frango'),out=ids.get('strogonoff-de-frango');
  const orderId=randomUUID();
  const order=await call(kitchen,manager,'v3OrderCreate',{requestId:orderId,etaDate:'2099-12-01',supplier:'Fornecedor fictício',items:[{productId:bife,quantity:10,unit:'un'},{productId:raw,quantity:3,unit:'kg'}],notes:'Teste isolado'});assert.equal(order.code,200,JSON.stringify(order));
