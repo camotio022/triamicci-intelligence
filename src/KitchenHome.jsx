@@ -7,6 +7,7 @@ import {PackageCheck,ClipboardCheck,Boxes,History,RefreshCw,AlertCircle,CookingP
 import './triamicci-history.css';
 
 export default function KitchenHome({membership,navigate}){
+ const today=useOperationDay();
  const [products,setProducts]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[],productions:[]}),[error,setError]=useState(''),[loading,setLoading]=useState(true);
  const load=useCallback(async(silent=false)=>{
   if(!silent)setLoading(true);setError('');
