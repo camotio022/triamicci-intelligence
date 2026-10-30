@@ -45,6 +45,33 @@
  .page-heading{padding:16px 0}
  .ti-mentor-context{max-width:100%}
 }
+/* Active unit indicator: strong glow and one slow outward pulse. */
+.sidebar .workspace-unit-icon .workspace-dot{
+ position:relative;
+ flex-shrink:0;
+ animation:ti-unit-glow 1.7s ease-in-out infinite;
+}
+.sidebar .workspace-unit-icon .workspace-dot::after{
+ content:"";
+ position:absolute;
+ inset:-4px;
+ border:2px solid #49d791;
+ border-radius:50%;
+ pointer-events:none;
+ animation:ti-unit-wave 1.7s ease-out infinite;
+}
+@keyframes ti-unit-glow{
+ 0%,100%{transform:scale(1);box-shadow:0 0 0 3px #49d79135,0 0 7px 2px #49d79155}
+ 50%{transform:scale(1.18);box-shadow:0 0 0 5px #49d79155,0 0 16px 5px #49d791aa}
+}
+@keyframes ti-unit-wave{
+ 0%{transform:scale(.8);opacity:.9}
+ 85%,100%{transform:scale(1.9);opacity:0}
+}
+@media(prefers-reduced-motion:reduce){
+ .sidebar .workspace-unit-icon .workspace-dot{animation:none;box-shadow:0 0 0 3px #49d79135,0 0 10px 3px #49d79180}
+ .sidebar .workspace-unit-icon .workspace-dot::after{animation:none;opacity:0}
+}
 @media(max-width:380px){
  .main-content{padding-left:10px;padding-right:10px}
  .topbar{gap:5px}
