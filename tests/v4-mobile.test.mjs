@@ -8,6 +8,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
    const page=await browser.newPage({viewport:{width,height:900}}),errors=[],counts=[],reads=[];page.on('pageerror',e=>errors.push(e.message));
    await page.route('**/api/**',route=>{const b=route.request().postDataJSON()||{};reads.push({path:new URL(route.request().url()).pathname,action:b.action});const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());const a='c'.repeat(40),out='d'.repeat(40);const product={id:a,name:'Frango grelhado',status:'active',unit:'un',physicalUnit:'un',physicalBalance:{reserve:50,rotation:0,total:50,unit:'un',at:new Date().toISOString()}};
     const base={message:'Consulta de teste',shipments:[],people:[],accounts:[],claims:[],notifications:[],members:[],orders:[],signals:[],products:[product,{...product,id:out,name:'Parmegiana',physicalBalance:{reserve:0,rotation:0,total:0,unit:'un'}}],catalog:[],registry:[{id:'qa-user',accountUid:'qa-user',name:'Pessoa de teste',status:'active',sector:'cozinha',shift:'manha'}],schedules:[{id:'official',period:today.slice(0,7),status:'published',entries:[{uid:'qa-user',date:today,type:'work',name:'Pessoa de teste'}]}],presence:[],tasks:[{id:'abcdefghijklmnopqrst',recipeId:'parmegiana',recipeName:'Parmegiana de frango',plannedQuantity:30,status:'pending'}],recipes:[{id:'parmegiana',name:'Parmegiana de frango',yieldQuantity:1,outputProductId:out,version:1,lines:[{productId:a,quantity:1,substitutes:[]}]}],runs:[{id:'qa-today',recipeName:'Produção de hoje',portions:1,at:new Date().toISOString(),items:[]},{id:'qa-old',recipeName:'Produção da semana passada',portions:1,at:new Date(Date.now()-7*86400000).toISOString(),items:[]}],items:[{id:'notice',title:'Conferência das entregas',body:'Conferir itens e validade antes de encaminhar para aprovação.',priority:'important',publishedByName:'Gestão da unidade',publishedAt:new Date().toISOString()}],requests:[],closures:[],investigations:[],professional:{name:'Pessoa de teste',skills:[],certifications:[],availability:[]},personal:{},recognition:{},proposals:[],record:null,day:today,complete:true,entry:null,nextOff:null,pending:false,official:false,report:null};
+    if(b.module==='operationalCatalog'&&b.action==='status')base.items=[{id:'bacon',active:false,reason:'missing_profile',needsReconciliation:true,matches:[{id:'e'.repeat(40),name:'Bacon',configuration:{stockUnit:'un',operationalUnit:'un',receivingUnit:'kg',source:'supplier',trackExpiry:false,minStock:5,countFrequency:'daily',critical:true}}]}];
     if(b.action==='shipmentsList'){base.shipments=[{id:'closed',status:'approved',supplier:'Entrega recente',createdAt:new Date().toISOString(),lines:[]}];base.pendingShipments=[{id:'pending-old',status:'pending',supplier:'Pendência antiga de teste',createdAt:'2020-01-01T12:00:00Z',lines:[]}];base.pendingComplete=true;}
     if(b.action==='list'&&route.request().url().includes('/api/operations/stock'))base.productions=base.runs;
     if(b.action==='v3Count')counts.push(b);
@@ -109,6 +110,14 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
        if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible())await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
        await adminNav.click();
        await page.getByRole('heading',{name:'Administração · Catálogo',exact:true}).waitFor();
+       await page.getByRole('button',{name:'Configurar 56 produtos Validar e ativar insumos da nova lista',exact:true}).click();
+       await page.getByRole('button',{name:'Bacon Configuração pendente · Proteínas e carnes',exact:true}).click();
+       await page.getByRole('heading',{name:'Configuração da cozinha preservada',exact:true}).waitFor();
+       assert.equal(await page.getByRole('combobox',{name:'Unidade de estoque',exact:true}).inputValue(),'un');
+       assert.equal(await page.getByRole('combobox',{name:'Unidade de recebimento',exact:true}).inputValue(),'kg');
+       assert.equal(await page.getByLabel('Exigir controle de validade',{exact:true}).isChecked(),false);
+       assert.equal(await page.getByLabel('Estoque mínimo',{exact:true}).inputValue(),'5');
+
       }
       if(!management)assert.equal(await page.getByRole('heading',{name:'Administração · Catálogo',exact:true}).count(),0,'Revogar papel fecha área administrativa');
      }

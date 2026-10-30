@@ -40,6 +40,26 @@ test('56 produtos: ativação, conciliação, pedido, aprovação, giro, produç
  assert.equal((await call(activate,foreign,'status')).items.some(p=>p.active),false);
  assert.equal((await call(activate,manager,'activate',approved(manifest[0]))).code,409);
  assert.equal((await root.collection('products').get()).size,56);
+ // A configuração revisada da unidade prevalece sobre as sugestões do catálogo.
+ const customUnit='custom-'+randomUUID(),custom=await signup('manager',customUnit),customRoot=db.collection('units').doc(customUnit),customId='e'.repeat(40);
+ const meat=manifest.find(p=>p.id==='file-mignon');assert.ok(meat);
+ const centralBefore=(await db.collection('productCatalog').doc(meat.id).get()).data();
+ await customRoot.collection('products').doc(customId).set({name:meat.name,unit:'un',operationalUnitOverride:'un',receivingUnitOverride:'kg',trackExpiry:false,minStock:5,countFrequency:'daily',critical:true,quantity:7,status:'active',productType:'raw'});
+ await customRoot.collection('physicalBalances').doc(customId).set({unit:'un',reserve:5,rotation:2,total:7});
+ const customStatus=await call(activate,custom,'status');const comparison=customStatus.items.find(p=>p.id===meat.id).matches[0];
+ assert.deepEqual(comparison.configuration,{stockUnit:'un',operationalUnit:'un',receivingUnit:'kg',source:'supplier',trackExpiry:false,minStock:5,countFrequency:'daily',critical:true});
+ const preserve={...approved(meat),...comparison.configuration,existingProductId:customId};
+ const wrongUnit=await call(activate,custom,'activate',{...preserve,stockUnit:'kg'});assert.equal(wrongUnit.code,409);assert.equal(wrongUnit.code===409&&wrongUnit.message.includes('unidade de estoque'),true);
+ const customActivation=await call(activate,custom,'activate',preserve);assert.equal(customActivation.code,200,JSON.stringify(customActivation));
+ assert.deepEqual((await customRoot.collection('physicalBalances').doc(customId).get()).data(),{unit:'un',reserve:5,rotation:2,total:7});
+ const kept=(await customRoot.collection('products').doc(customId).get()).data();assert.equal(kept.unit,'un');assert.equal(kept.receivingUnitOverride,'kg');assert.equal(kept.trackExpiry,false);assert.equal(kept.minStock,5);assert.equal(kept.quantity,7);
+ assert.deepEqual((await db.collection('productCatalog').doc(meat.id).get()).data(),centralBefore,'Conciliação local não altera outras unidades');
+ const rice=manifest.find(p=>p.id==='arroz'),legacyId='f'.repeat(40);
+ await customRoot.collection('products').doc(legacyId).set({name:rice.name,unit:'kg',trackExpiry:true,quantity:12,status:'active'});
+ await customRoot.collection('v3PhysicalBalances').doc(legacyId).set({unit:'kg',reserva:8,giro:4,total:12});
+ const legacyAttempt=await call(activate,custom,'activate',{...approved(rice),existingProductId:legacyId});assert.equal(legacyAttempt.code,409);assert.equal(legacyAttempt.message.includes('saldo no controle anterior'),true);
+ assert.equal((await customRoot.collection('physicalBalances').doc(legacyId).get()).exists,false,'Não fabricar saldo físico zero sobre saldo anterior');
+
  // Peso comercial e contagem em peças são medições distintas, nunca conversão automática.
  const bacon=ids.get('bacon'),measuredShipment={requestId:randomUUID(),supplier:'Fornecedor fictício',notes:'TESTE peso comercial e peças aferidas',lines:[{productId:bacon,commercialQuantity:2.5,commercialUnit:'kg',stockQuantity:10,location:'reserva',lot:'TESTE-PECAS',expiryDate:'2099-12-31'}]};
  assert.equal((await call(shipments,aux,'shipmentInspect',{...measuredShipment,requestId:randomUUID(),lines:measuredShipment.lines.map(l=>({...l,stockQuantity:0}))})).code,409,'Peso não substitui contagem de peças');

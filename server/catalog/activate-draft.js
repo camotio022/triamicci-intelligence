@@ -25,7 +25,11 @@ export default async function handler(req,res){
     const active=matches.some(row=>row.catalogId===p.id&&row.status==='active'&&row.operationalCatalogVersion==='56-v1'&&row.profile);
     const reason=active?'active':matches.length>1?'duplicate':!matches.length?'not_registered':matches.some(row=>row.status!=='active')?'inactive':matches.some(row=>!row.profile)?'missing_profile':'review_required';
     return {id:p.id,active,reason,needsReconciliation:matches.length>0&&!active||matches.length>1,
-      matches:matches.map(row=>({id:row.id,name:row.name,catalogId:row.catalogId||null,status:row.status||null,version:row.operationalCatalogVersion||null}))};
+      matches:matches.map(row=>({id:row.id,name:row.name,catalogId:row.catalogId||null,status:row.status||null,version:row.operationalCatalogVersion||null,
+       configuration:{stockUnit:row.unit,operationalUnit:row.operationalUnitOverride||row.profile?.countUnit||row.operationalUnit||row.unit,
+        receivingUnit:row.receivingUnitOverride||row.profile?.receivingPresentation||row.unit,
+        source:row.profile?.origin||(['raw','prepared'].includes(row.productType)?row.productType==='prepared'?'internal':'supplier':p.source),
+        trackExpiry:Boolean(row.trackExpiry),minStock:row.minStock??0,countFrequency:row.countFrequency||'weekly',critical:Boolean(row.critical)}}))};
    })});
   }
   if(req.body?.action!=='activate')return send(res,400,'Ação inválida.');
@@ -56,15 +60,20 @@ export default async function handler(req,res){
    if(existing.exists){
     const old=existing.data();
     // Não converter unidades nem habilitar/desabilitar rastreamento sobre histórico existente.
-    if(old.unit!==stockUnit||Boolean(old.trackExpiry)!==trackExpiry||profile.exists&&profile.data().countUnit!==operationalUnit||balance.exists&&balance.data().unit!==operationalUnit||legacy.exists&&!balance.exists)throw Error('RECONCILIATION_REQUIRED');
+    if(old.unit!==stockUnit)throw Error('STOCK_UNIT_MISMATCH');
+    if(Boolean(old.trackExpiry)!==trackExpiry)throw Error('EXPIRY_MISMATCH');
+    if(old.operationalUnitOverride&&old.operationalUnitOverride!==operationalUnit||profile.exists&&profile.data().countUnit!==operationalUnit||balance.exists&&balance.data().unit!==operationalUnit)throw Error('COUNT_UNIT_MISMATCH');
+    if(old.receivingUnitOverride&&old.receivingUnitOverride!==receivingUnit)throw Error('RECEIVING_UNIT_MISMATCH');
+    if(legacy.exists&&!balance.exists)throw Error('LEGACY_BALANCE_REVIEW');
    }
-   if(central.exists&&central.data().active===true&&['stockUnit','operationalUnit','source','trackExpiry'].some(key=>central.data()[key]!==({stockUnit,operationalUnit,source,trackExpiry})[key]))throw Error('RECONCILIATION_REQUIRED');
+   if(!existingProductId&&central.exists&&central.data().active===true&&['stockUnit','operationalUnit','source','trackExpiry'].some(key=>central.data()[key]!==({stockUnit,operationalUnit,source,trackExpiry})[key]))throw Error('RECONCILIATION_REQUIRED');
    if(central.exists&&central.data().name!==name)throw Error('CATALOG_CONFLICT');
    const record={id,name,category,type:source==='internal'?'prepared':'raw',source,stockUnit,
     operationalUnit,receivingUnit:source==='supplier'?receivingUnit:null,trackExpiry,
     schemaVersion:2,reviewRequired:false,ingredientsPending:source==='internal',active:true,
     brandId:'triamicci',approvedBy:actor.uid,approvedAt:now,updatedAt:now};
-   if(central.exists)tx.update(centralRef,record);else tx.create(centralRef,{...record,createdAt:now});
+   // A conciliação preserva a configuração local e não reescreve a definição compartilhada.
+   if(central.exists){if(!existingProductId||central.data().active!==true)tx.update(centralRef,record)}else tx.create(centralRef,{...record,createdAt:now});
    if(existing.exists){
      tx.update(ref,{catalogId:id,status:'active',reviewRequired:false,operationalCatalogVersion:OPERATIONAL_CATALOG_VERSION,operationalUnitOverride:operationalUnit,receivingUnitOverride:source==='supplier'?receivingUnit:null,minStock,countFrequency,critical,updatedAt:now,updatedBy:actor.uid});
    }else tx.create(ref,{name,category,unit:stockUnit,minStock,countFrequency,critical,trackExpiry,lotTrackingMode:trackExpiry?'per_lot':'aggregate',quantity:0,status:'active',operationalCatalogVersion:OPERATIONAL_CATALOG_VERSION,
@@ -81,6 +90,8 @@ export default async function handler(req,res){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='RECONCILIATION_REQUIRED')return send(res,409,'Unidade, validade, origem ou saldo legado exige migração revisada; nenhum saldo foi alterado.');
+  const conflicts={STOCK_UNIT_MISMATCH:'A unidade de estoque difere do cadastro existente. Use a configuração já revisada.',EXPIRY_MISMATCH:'O controle de validade difere do cadastro existente. Preserve a configuração já revisada.',COUNT_UNIT_MISMATCH:'A unidade de contagem difere da configuração ou do saldo existente. Não há conversão automática.',RECEIVING_UNIT_MISMATCH:'A unidade de recebimento difere da configuração existente.',LEGACY_BALANCE_REVIEW:'Existe saldo no controle anterior sem saldo físico conciliado. É preciso revisar esse saldo antes de ativar; nenhum valor foi alterado.'};
+  if(conflicts[e.message])return send(res,409,conflicts[e.message],{conflictCode:e.message});
   if(e.message==='ALREADY_ACTIVE')return send(res,409,'Este insumo já está cadastrado e ativo; não é permitido duplicar.');
   if(e.message==='CATALOG_LIMIT')return send(res,409,'Catálogo acima de 200 registros: concilie antes de ativar.');
   if(e.message==='CATALOG_CONFLICT')return send(res,409,'Produto experimental conflitante; não foi alterado.');
