@@ -1,3 +1,4 @@
+import PreparationSetup from './PreparationSetup.jsx';
 import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useState} from 'react';
 import {BookOpen,ClipboardList} from 'lucide-react';
@@ -60,7 +61,7 @@ export default function Production({membership}){
    await call('/api/production/manage','saveRecipe',{
     id:editRecipeId||idFor(name),expectedVersion:recipeVersion,method,name,yieldQuantity:Number(yieldQuantity),outputProductId:outputProductId||null,
     lines:lines.map(l=>({productId:l.productId,quantity:Number(l.quantity),location:l.location||(outputProductId?'reserva':'giro'),substitutes:l.substitutes}))});
-   setEditRecipeId('');setRecipeVersion(null);setStatus('Ficha técnica salva no Firebase.');notify('Ficha técnica salva com sucesso.','success');await load();
+   setEditRecipeId('');setRecipeVersion(null);setName('');setMethod('');setYield('1');setOutputProductId('');setLines([{productId:'',quantity:'',substitutes:[]}]);setStatus('Ficha técnica salva no Firebase.');notify('Ficha técnica salva com sucesso.','success');await load();
   }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const archiveRecipe=async()=>{
@@ -69,7 +70,7 @@ export default function Production({membership}){
   setBusy(true);setStatus('');
   try{
    await call('/api/production/manage','archiveRecipe',{id:editRecipeId,expectedVersion:recipeVersion});
-   setEditRecipeId('');setRecipeVersion(null);setRecipeId('');setName('');setLines([{productId:'',quantity:'',substitutes:[]}]);
+   setEditRecipeId('');setRecipeVersion(null);setRecipeId('');setName('');setMethod('');setYield('1');setOutputProductId('');setLines([{productId:'',quantity:'',substitutes:[]}]);
    await Promise.all([load(),loadTasks()]);
    notify('Ficha arquivada. O histórico foi preservado.','success');
   }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
@@ -127,8 +128,9 @@ export default function Production({membership}){
      </>}
     </form>
    </section>
+   {admin&&<PreparationSetup key={membership.unitId} unitId={membership.unitId} products={products} call={call} onSaved={()=>load(true)}/>}
    {admin&&<details className="receiving-card ti-v4-recipe-details">
-    <summary><BookOpen size={20} aria-hidden="true"/><span>Gerenciar fichas técnicas <small>Cadastro e ingredientes das preparações</small></span></summary>
+    <summary><BookOpen size={20} aria-hidden="true"/><span>Fichas anteriores <small>Revisar ou arquivar preparações já cadastradas</small></span></summary>
     <h2>{editRecipeId?'Revisar ficha técnica':'Nova ficha técnica'}</h2><label>Ficha para revisar<select value={editRecipeId} onChange={e=>{const r=recipes.find(x=>x.id===e.target.value);setEditRecipeId(r?.id||'');setRecipeVersion(r?.version??null);setName(r?.name||'');setMethod(r?.method||'');setYield(String(r?.yieldQuantity||1));setOutputProductId(r?.outputProductId||'');setLines(r?.lines?.map(l=>({...l,substitutes:l.substitutes||[]}))||[{productId:'',quantity:'',substitutes:[]}])}}><option value="">Criar nova ficha</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name} · v{r.version}</option>)}</select></label>
     <p>Defina uma preparação validada, com quantidades por rendimento. Não invente pesos nem conversões entre kg e peças.</p>
     <form className="stock-action-form" onSubmit={saveRecipe}>

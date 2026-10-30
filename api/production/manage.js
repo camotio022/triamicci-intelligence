@@ -1,3 +1,4 @@
+import preparationHandler from '../../server/production/preparation-handler.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
 import {hasRecipeCycle} from '../../server/production/recipe-graph.js';
@@ -22,6 +23,7 @@ function validLine(x){
   (x?.substitutes===undefined||Array.isArray(x.substitutes)&&x.substitutes.length<=4&&x.substitutes.every(id=>productIdPattern.test(id)));
 }
 export default async function handler(req,res){
+ if(['preparationList','savePreparation'].includes(req.body?.action))return preparationHandler(req,res);
  if(['dayList','dayAdd'].includes(req.body?.action))return dayListHandler(req,res);
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
