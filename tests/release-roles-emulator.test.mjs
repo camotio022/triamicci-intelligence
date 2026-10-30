@@ -56,6 +56,26 @@ test('entrega: rotina e fronteiras dos cinco perfis, folgas, cobertura e revoga�
   const notifications=await expect(members,person,'notifications',{},200);assert.ok(notifications.notifications?.length||notifications.items?.length,'Decisão gera notificação pessoal');
   await expect(coverage,person,'requestChange',{kind:'coverage',date:future,reason:'TESTE necessidade fictícia de cobertura.'},201);
  }
+
+ // Arquivamento é gerencial, idempotente, isolado por unidade e preserva o aviso.
+ await expect(mural,people.auxiliar,'archive',{id:draft.id},403);
+ await expect(mural,foreign,'archive',{id:draft.id},409);
+ await expect(mural,sub,'archive',{id:draft.id},200);
+ await expect(mural,manager,'archive',{id:draft.id},200);
+ const archived=await expect(mural,people.cook,'publicNotices',{},200);
+ assert.equal(archived.items.find(n=>n.id===draft.id).status,'archived');
+ assert.equal((await unit.collection('muralItems').doc(draft.id).get()).data().body,'Comunicado fictício de homologação');
+ assert.equal((await db.collection('auditLogs').where('unitId','==',unitId).where('event','==','mural.archived').get()).size,1);
+ const yesterday=new Date(Date.parse(day+'T12:00:00Z')-86400000).toISOString().slice(0,10);
+ await expect(mural,manager,'saveDraft',{item:{kind:'notice',title:'Validade inválida',body:'Não pode publicar vencido',expiresOn:yesterday}},400);
+ const untilToday=await expect(mural,manager,'saveDraft',{item:{kind:'notice',title:'Aviso temporário',body:'Válido até o fim de hoje',expiresOn:day}},200);
+ await expect(mural,manager,'publish',{id:untilToday.id},200);
+ assert.equal((await expect(mural,people.auxiliar,'publicNotices',{},200)).items.find(n=>n.id===untilToday.id).expiresOn,day);
+ await unit.collection('leaveRequests').doc('past-request').set({uid:people.cook.uid,date:yesterday,status:'pending',reason:'TESTE pedido passado',createdAt:new Date()});
+ await expect(schedules,manager,'leaveDecision',{id:'past-request',decision:'approved',note:'TESTE aprovação retroativa bloqueada'},409);
+ assert.equal((await unit.collection('leaveRequests').doc('past-request').get()).data().status,'pending');
+ await expect(schedules,sub,'leaveDecision',{id:'past-request',decision:'rejected',note:'TESTE encerramento com histórico preservado'},200);
+ assert.equal((await unit.collection('leaveRequests').doc('past-request').get()).data().status,'rejected');
  assert.equal((await expect(mural,foreign,'publicNotices',{},200)).items.length,0);
  await expect(mural,foreign,'noticeRead',{id:draft.id},409);
  assert.equal((await expect(schedules,foreign,'leaveList',{},200)).requests.length,0);

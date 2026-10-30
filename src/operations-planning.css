@@ -133,3 +133,12 @@
 
 /* Ordem intencional: comunicados e escala primeiro; produção compartilhada abaixo. */
 .ti-mural-v4 .ti-mural-notices{order:1}.ti-mural-v4 .ti-mural-roster{order:2}.ti-mural-v4 .ti-v4-production-mural{order:3;grid-column:1/-1}
+
+/* Fechamento mobile: Safari dá largura intrínseca aos campos de mês/data. */
+.ti-planning-card label{min-width:0;max-width:100%}
+.ti-planning-card input[type="month"],.ti-planning-card input[type="date"]{display:block;inline-size:100%;min-inline-size:0;max-inline-size:100%;box-sizing:border-box;appearance:none;-webkit-appearance:none}
+.ti-planning-card input::-webkit-date-and-time-value{min-width:0;text-align:left}
+.ti-planning-card details>summary{cursor:pointer;min-height:44px;align-content:center;color:#78201d;font-weight:700}
+.ti-planning-card details[open]>summary{margin-bottom:12px}
+.ti-v4-roster-metric small{display:block;color:#667085;font-size:12px;line-height:1.5;margin-top:5px}
+.ti-mural-v5-status{white-space:normal!important;overflow-wrap:anywhere;text-align:center}

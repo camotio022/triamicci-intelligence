@@ -29,7 +29,8 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  useUnitLive(membership?.unitId,initial=>load(!initial),{domains:['team','profile'],refreshKey:membership.role});
 
  useEffect(()=>{setTab(initialTab);setSelected('');setError('')},[initialTab]);
- const filtered=useMemo(()=>members.filter(m=>(m.name+' '+m.email+' '+(m.professional?.jobTitle||'')).toLowerCase().includes(search.toLowerCase())),[members,search]);
+ const [sectorFilter,setSectorFilter]=useState('all');
+ const filtered=useMemo(()=>members.filter(m=>m.status==='active'&&(sectorFilter==='all'||m.professional?.sector===sectorFilter)&&[m.name,m.email,m.professional?.jobTitle,m.professional?.sector].join(' ').toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR'))),[members,search,sectorFilter]);
  const current=members.find(x=>x.uid===selected);
  const editable=current&&(current.registry||membership.role==='admin'||['cook','auxiliar'].includes(current.role));
  const select=m=>{setSelected(m.uid);setForm(m.professional?{...blank(),...structuredClone(m.professional)}:blank());setNotice('');setError('');setTab('profiles')};
@@ -54,7 +55,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
   </div>
   <div className="team-directory-heading team-profiles-search"><label>Buscar colaborador
    <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome, cargo ou e-mail"/>
-  </label><button type="button" onClick={load} disabled={loading}>Atualizar</button></div>
+  </label><label>Setor<select value={sectorFilter} onChange={e=>setSectorFilter(e.target.value)}><option value="all">Todos os setores</option>{Object.entries(sectors).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label><button type="button" onClick={load} disabled={loading}>Atualizar</button></div>
   {requests.some(r=>r.status==='pending')&&<section className="team-review-requests" aria-label="Solicitações de revisão de habilidades">
    <h3>Solicitações de habilidades pendentes</h3><p>Analise os pedidos dos colaboradores e faça as alterações pela ficha profissional após confirmar a competência.</p>
    {requests.filter(r=>r.status==='pending').map(r=><article key={r.id}><strong>{members.find(m=>m.uid===r.uid)?.name||'Colaborador da unidade'}</strong>

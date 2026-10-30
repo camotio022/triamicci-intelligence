@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {liveShiftState} from '../server/schedules/restaurant-today.js';
+import {noticeExpired,noticeHistorical,validNoticeDate} from '../server/workflows/notice-policy.js';
+const employee={availability:[{day:'sex',start:'08:00',end:'16:20'}]};
+const state=attendance=>liveShiftState({day:'2026-10-30',clock:'11:42',employee,attendance});
+test('horário em curso não declara entrada nem presença',()=>{const x=state(null);assert.equal(x.due,true);assert.equal(x.active,false);assert.equal(x.declared,false);assert.equal(x.badge,'Previsto')});
+test('entrada antecipada não muda horário previsto e conta apenas como jornada declarada',()=>{const x=liveShiftState({day:'2026-10-30',clock:'11:42',employee:{availability:[{day:'sex',start:'14:00',end:'22:20'}]},attendance:{status:'working'}});assert.equal(x.due,false);assert.equal(x.active,true);assert.equal(x.badge,'Entrada declarada');assert.equal(x.start,'14:00')});
+test('saída e ausência não permanecem em andamento dentro do horário previsto',()=>{for(const status of ['finished','absent'])assert.equal(state({status}).active,false);assert.equal(state({status:'finished'}).badge,'Saída registrada');assert.equal(state({status:'absent'}).declared,false)});
+test('intervalo declarado e presença validada têm rótulos distintos',()=>{assert.equal(state({status:'on_break'}).badge,'Intervalo declarado');assert.equal(state({status:'on_break'}).active,true);assert.equal(state({status:'working',lastAction:'correct'}).badge,'Presença validada');assert.equal(state({status:'working',lastAction:'correct'}).verified,true)});
+test('aviso antigo sem validade explícita não é expirado por inferência',()=>{const n={publishedAt:'2026-10-01T12:00:00Z',status:'published'};assert.equal(noticeHistorical(n,'2026-10-30'),false)});
+test('aviso vale até o final da data da unidade e depois fica no histórico',()=>{const n={expiresOn:'2026-10-30',status:'published'};assert.equal(noticeExpired(n,'2026-10-30'),false);assert.equal(noticeHistorical(n,'2026-10-31'),true);assert.equal(noticeHistorical({status:'archived'},'2026-10-30'),true)});
+test('validade rejeita dias inexistentes e formatos ambíguos',()=>{for(const d of ['2026-02-30','30/10/2026','2026-13-01',''])assert.equal(validNoticeDate(d),false);assert.equal(validNoticeDate('2028-02-29'),true)});

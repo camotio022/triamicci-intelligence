@@ -1,6 +1,7 @@
 import {sendQuotaError} from '../quota-error.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {noticeExpired,validNoticeDate} from './notice-policy.js';
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 const txt=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.trim().length<=max;
 const serialize=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,updatedAt:d.data().updatedAt?.toDate?.()?.toISOString?.()||null,publishedAt:d.data().publishedAt?.toDate?.()?.toISOString?.()||null});
@@ -12,7 +13,8 @@ function normalize(v){
    !ingredients.every(x=>x&&txt(x.name,90)&&typeof x.amount==='number'&&x.amount>0&&x.amount<=100000&&['g','kg','ml','L','un'].includes(x.unit))))return null;
  if(v.kind==='preparation'&&(!txt(v.yieldText,100)||!Array.isArray(v.allergens)||v.allergens.length>15||!v.allergens.every(x=>txt(x,80))))return null;
  if(v.priority!==undefined&&!['normal','important','urgent'].includes(v.priority))return null;
- return {priority:v.priority||'normal',kind:v.kind,title:v.title.trim(),body:v.body.trim(),ingredients:ingredients?.map(x=>({name:x.name.trim(),amount:x.amount,unit:x.unit}))||[],yieldText:v.kind==='preparation'?v.yieldText.trim():'',allergens:v.kind==='preparation'?v.allergens.map(x=>x.trim()):[]};
+ if(v.expiresOn&&(!validNoticeDate(v.expiresOn)||noticeExpired(v)))return null;
+ return {expiresOn:v.expiresOn||null,priority:v.priority||'normal',kind:v.kind,title:v.title.trim(),body:v.body.trim(),ingredients:ingredients?.map(x=>({name:x.name.trim(),amount:x.amount,unit:x.unit}))||[],yieldText:v.kind==='preparation'?v.yieldText.trim():'',allergens:v.kind==='preparation'?v.allergens.map(x=>x.trim()):[]};
 }
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;res.setHeader('Cache-Control','no-store');
@@ -25,7 +27,7 @@ export default async function handler(req,res){
    let query=items.orderBy('publishedAt','desc').orderBy('__name__','desc');
    if(before){const cursor=await items.doc(before).get();if(!cursor.exists)return send(res,400,'Comunicado indisponível.');query=query.startAfter(cursor);}
    const eligible=[];let cursor=null;
-   while(eligible.length<21){const page=await (cursor?query.startAfter(cursor):query).limit(100).get();for(const d of page.docs)if(d.data().kind==='notice'&&d.data().status==='published'){eligible.push(d);if(eligible.length===21)break;}if(page.size<100||eligible.length===21)break;cursor=page.docs.at(-1);}
+   while(eligible.length<21){const page=await (cursor?query.startAfter(cursor):query).limit(100).get();for(const d of page.docs)if(d.data().kind==='notice'&&['published','archived'].includes(d.data().status)){eligible.push(d);if(eligible.length===21)break;}if(page.size<100||eligible.length===21)break;cursor=page.docs.at(-1);}
    const published=eligible.slice(0,20).map(serialize);
    const reads=published.length?await db.getAll(...published.map(p=>unit.collection('muralReads').doc(actor.uid).collection('items').doc(p.id))):[];
    return send(res,200,'Comunicados da unidade.',{items:published.map((p,i)=>({...p,read:reads[i]?.data()?.version===p.version})),hasMore:eligible.length>20,nextCursor:eligible.length>20?eligible[19].id:null});
@@ -41,6 +43,20 @@ export default async function handler(req,res){
    return send(res,200,'Mural consultado.',{items:docs.docs.filter(d=>manager||d.data().status==='published').map(serialize).sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'))});
   }
   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Sem permissão para administrar publicações.');
+  if(action==='archive'){
+   const id=req.body?.id;if(!idOk(id))return send(res,400,'Comunicado inválido.');
+   await db.runTransaction(async tx=>{
+    const ref=items.doc(id),now=new Date();
+    const [member,item]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
+    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
+    if(!item.exists||item.data().kind!=='notice'||!['published','archived'].includes(item.data().status))throw Error('LOCKED');
+    if(item.data().status==='archived')return;
+    tx.update(ref,{status:'archived',archivedAt:now,archivedBy:actor.uid});
+    signalUnitChange(tx,db,m.unitId,['mural']);
+    tx.create(db.collection('auditLogs').doc(),{event:'mural.archived',actorUid:actor.uid,unitId:m.unitId,itemId:id,at:now});
+   });
+   return send(res,200,'Comunicado arquivado. Histórico preservado.');
+  }
   if(action==='saveDraft'){
    const normalized=normalize(req.body?.item),id=req.body?.id,supersedesId=req.body?.supersedesId||null;
    if(!normalized||id&&!idOk(id)||supersedesId&&!idOk(supersedesId))return send(res,400,'Confira título, conteúdo, ingredientes, rendimento e alergênicos.');
@@ -64,6 +80,7 @@ export default async function handler(req,res){
     const [member,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
     if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
     if(!old.exists||old.data().status!=='draft')throw Error('LOCKED');
+    if(noticeExpired(old.data()))throw Error('EXPIRED_NOTICE');
     const priorRef=old.data().supersedesId?items.doc(old.data().supersedesId):null;
     const prior=priorRef?await tx.get(priorRef):null;
     if(priorRef&&(!prior?.exists||prior.data().status!=='published'))throw Error('LOCKED');
@@ -81,6 +98,7 @@ export default async function handler(req,res){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
   if(e.message==='SELF_APPROVAL')return send(res,409,'A publicação precisa ser aprovada por outro administrador.');
+  if(e.message==='EXPIRED_NOTICE')return send(res,409,'A validade do comunicado já passou. Revise o rascunho antes de publicar.');
   if(e.message==='LOCKED')return send(res,409,'Item não encontrado ou não editável. Faça nova versão.');
   if(sendQuotaError(res,e))return;console.error('Mural:',e.message);return send(res,500,'Falha na operação do Mural.');
  }

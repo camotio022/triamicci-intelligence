@@ -23,7 +23,8 @@ export default async function handler(req,res){
    return send(res,200,'Situação e possíveis conflitos de cadastro.',{items:draft.map(p=>{
     const matches=rows.filter(row=>matchesCatalogProduct(row,p));
     const active=matches.some(row=>row.catalogId===p.id&&row.status==='active'&&row.operationalCatalogVersion==='56-v1'&&row.profile);
-    return {id:p.id,active,needsReconciliation:matches.length>0&&!active||matches.length>1,
+    const reason=active?'active':matches.length>1?'duplicate':!matches.length?'not_registered':matches.some(row=>row.status!=='active')?'inactive':matches.some(row=>!row.profile)?'missing_profile':'review_required';
+    return {id:p.id,active,reason,needsReconciliation:matches.length>0&&!active||matches.length>1,
       matches:matches.map(row=>({id:row.id,name:row.name,catalogId:row.catalogId||null,status:row.status||null,version:row.operationalCatalogVersion||null}))};
    })});
   }

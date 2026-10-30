@@ -16,7 +16,7 @@ Auditoria técnica de 29/10/2026. Base reconciliada: `875df93` (inclui históric
 
 ## Evidência automatizada local
 
-- 167 testes puros aprovados, preservando as regras anteriores.
+- 185 testes puros aprovados (atualização de 30/10), preservando as regras anteriores.
 - Build Vite aprovado.
 - Firebase Auth/Firestore isolados (`demo-triamicci-v31`): V3.1, V4, integração dos 56 e suíte dos cinco perfis aprovadas.
 - Nenhum teste automatizado usa credenciais ou Firebase de produção. Nenhum e-mail é enviado nos testes de convites.
@@ -40,7 +40,7 @@ Acesso Google, PWA instalado no iPhone, impressão e uso durante um turno real n
 
 ## Pendências de implantação operacional
 
-- Consulta visual atual ao Barigui confirmou 5 de 56 ativos e 15 candidatos à conciliação. Portanto, 51 posições ainda não estão ativadas; os cinco ativos também usam dados de teste e não representam aceite operacional. Reconsultar antes de qualquer migração.
+- A consulta de 29/10 registrou 5 de 56 ativos e 15 candidatos à conciliação; esse retrato ficou desatualizado. Os 56 prints de 30/10 mostram 23 produtos operacionais, 4 com primeira contagem e 19 sem primeira contagem. Esse total não comprova a preparação das 56 posições. Reconsultar o painel de configuração, agora com motivo por produto, antes de qualquer ativação.
 - Validar origem, unidade de recebimento/contagem, validade, matérias-primas e rendimento real de cada preparação. Manifesto de 56 posições é rascunho sujeito à revisão, não aprovação do restaurante.
 - Os dados fictícios criados nas auditorias continuam identificados. Não apagar histórico nem converter saldos em massa para “limpar” o sistema.
 - O gerente deve executar o roteiro de aceite: abrir sua conta, consultar equipe/avisos, receber entrega de teste, revisar/aprovar, conferir Reserva/Giro, produzir com ficha revisada e consultar histórico/inventário.
