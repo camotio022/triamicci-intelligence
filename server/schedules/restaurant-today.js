@@ -33,5 +33,7 @@ export function liveShiftState({day,clock,employee={},attendance=null}){
  const label=actual==='finished'?'Saída registrada':actual==='absent'?'Ausência confirmada pela gestão':
   actual==='on_break'?'Intervalo declarado':actual==='working'?'Confirmado pelo funcionário':
   ended?'Jornada prevista encerrada':due?'Início previsto pelo sistema':start?'Entrada prevista às '+start:'Turno previsto · horário não informado';
- return {start,end,source,label,declared:Boolean(actual&&actual!=='absent'),verified,due,ended,upcoming:!actual&&from!==null&&current!==null&&!due&&!ended};
+ const active=actual==='working'||actual==='on_break';
+ const badge=actual==='finished'?'Saída registrada':actual==='absent'?'Ausência confirmada':actual==='on_break'?'Intervalo declarado':verified?'Presença validada':actual==='working'?'Entrada declarada':'Previsto';
+ return {start,end,source,label,badge,active,attendanceStatus:actual,declared:Boolean(actual&&actual!=='absent'),verified,due,ended,upcoming:!actual&&from!==null&&current!==null&&!due&&!ended};
 }

@@ -112,7 +112,7 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
   <h1>{mode==='history'?'Histórico da operação':mode==='receive'?'Recebimento de mercadorias':'Contagem diária — reserva e giro'}</h1>
   <p>{mode==='history'?'Registros físicos de recebimento e contagem, com data e responsável.':mode==='receive'?'Registre a mercadoria conferida com a quantidade física efetivamente recebida.':
     'Informe o estoque físico encontrado em cada área; confira o histórico antes de salvar.'}</p>
-  <div className="receiving-notice">Operações auditadas no Firebase. Após a primeira contagem, entregas e saídas atualizam o saldo físico; o saldo legado permanece separado. Para lotes antigos, a conciliação é necessária antes da baixa.</div>
+  <div className="receiving-notice">Cada operação mantém data e responsável. Após a primeira contagem, as movimentações atualizam o saldo. Quantidades antigas sem conferência ficam separadas; lotes com pendência precisam de revisão da gestão.</div>
   {mode==='history'?null:mode==='receive'&&!canReceive?<p>Somente administrador ou gerente pode registrar recebimentos.</p>:
   <form className={mode==='receive'?'ti-receive-form':'receiving-card'} onSubmit={submit}>
    {mode==='receive'?<>

@@ -3,7 +3,8 @@ import {isOperationalProduct,usesPhysicalLots} from './catalog-identity.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {signalUnitChange} from '../live-signal.js';
-import {operationalBalance,writeOperationalBalance} from './shared-balance.js';
+import {operationalBalances,writeOperationalBalance} from './shared-balance.js';
+import {shipmentTransaction} from './shipment-transaction.js';
 import {validQuantity} from './logic.js';
 const manager=r=>['admin','manager','submanager'].includes(r);
 const id=x=>typeof x==='string'&&/^[a-f0-9-]{36}$/i.test(x);
@@ -33,8 +34,9 @@ export default async function shipments(req,res){
   if(action==='shipmentReject'&&(typeof reason!=='string'||reason.trim().length<8||reason.length>400))return send(res,400,'Informe a justificativa da recusa.');
   if(action==='shipmentInspect'&&lines.some(l=>!l||!product(l.productId)||!['reserva','giro'].includes(l.location)||!validQuantity(l.commercialQuantity,{unit:l.commercialUnit})||typeof l.stockQuantity!=='number'||!Number.isFinite(l.stockQuantity)||l.stockQuantity<0||typeof l.lot!=='string'||l.lot.length>80||typeof l.expiryDate!=='string'))return send(res,400,'Revise as quantidades, os locais e os campos informados.');
   let duplicate=false;
-  await db.runTransaction(async tx=>{
-   const ref=collection.doc(requestId),[account,previous]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
+  await shipmentTransaction(db,async tx=>{
+   duplicate=false;
+   const ref=collection.doc(requestId),[account,previous]=await tx.getAll(db.doc('memberships/'+actor.uid),ref);
    if(!account.exists||account.data().status!=='active'||account.data().unitId!==m.unitId||action!=='shipmentInspect'&&!manager(account.data().role))throw Error('FORBIDDEN');
    if(action==='shipmentInspect'&&previous.exists){if(previous.data().fingerprint!==hash({orderId,lines,supplier:supplier.trim(),notes:notes.trim()})||previous.data().createdBy!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
    if(action!=='shipmentInspect'&&!previous.exists)throw Error('NOT_FOUND');
@@ -46,7 +48,9 @@ export default async function shipments(req,res){
    const data=action==='shipmentInspect'?{orderId,lines,supplier:supplier.trim(),notes:notes.trim()}:previous.data();
    const ids=[...new Set(data.lines.map(l=>l.productId))];
    const orderRef=data.orderId?unit.collection('purchaseOrdersV3').doc(data.orderId):null;
-   const [order,...snapshots]=await Promise.all([orderRef?tx.get(orderRef):Promise.resolve(null),...ids.map(p=>tx.get(unit.collection('products').doc(p))),...ids.map(p=>tx.get(unit.collection('operationalProfiles').doc(p))),...ids.map(p=>operationalBalance(tx,unit.collection('physicalBalances').doc(p)))]);
+   const order=orderRef?await tx.get(orderRef):null;
+   const snapshots=await tx.getAll(...ids.map(p=>unit.collection('products').doc(p)),...ids.map(p=>unit.collection('operationalProfiles').doc(p)));
+   snapshots.push(...await operationalBalances(tx,ids.map(p=>unit.collection('physicalBalances').doc(p))));
    if(orderRef&&(!order.exists||['cancelled','received'].includes(order.data().status)))throw Error('ORDER');
    const products=new Map(ids.map((p,i)=>[p,snapshots[i]])),profiles=new Map(ids.map((p,i)=>[p,snapshots[ids.length+i]])),balances=new Map(ids.map((p,i)=>[p,snapshots[2*ids.length+i]]));
    const totals=new Map(),stock=new Map(),lotUpdates=new Map(),normalized=[];

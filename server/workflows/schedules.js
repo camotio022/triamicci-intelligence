@@ -108,6 +108,7 @@ export default async function handler(req,res){
     const [current,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
     if(!current.exists||current.data().status!=='active'||current.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(current.data().role))throw Error('FORBIDDEN');
     if(!old.exists||old.data().status!=='pending'||old.data().uid===actor.uid)throw Error('CONFLICT');
+    if(decision==='approved'&&old.data().date<unitDay())throw Error('PAST_LEAVE');
     tx.update(ref,{status:decision,note:note.trim(),decidedAt:now,decidedBy:actor.uid});
     tx.create(unit.collection('memberNotifications').doc(old.data().uid).collection('items').doc(),{title:'Solicitação de folga analisada',message:old.data().date+' · '+(decision==='approved'?'Aprovada':'Recusada')+'. Consulte a escala oficial para confirmar a programação.',recipientUid:old.data().uid,unitId:m.unitId,actorUid:actor.uid,at:now,read:false});
     signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
@@ -204,7 +205,7 @@ export default async function handler(req,res){
   }
   return send(res,400,'Ação inválida.');
  }catch(e){
-  const policyErrors={APPROVED_LEAVE_CONFLICT:'A proposta deve respeitar as folgas aprovadas antes de publicar.',MONTH_PUBLISHED:'A escala deste mês já é oficial. Use troca, cobertura ou solicite revisão gerencial.',DUPLICATE_LEAVE:'Já existe um pedido em análise nesta data.',PUBLICATION_WINDOW:'A publicação abre vinte dias antes do início do mês. Meses encerrados não podem ser publicados.',PENDING_LEAVE:'Analise os pedidos de folga pendentes antes de publicar.',HISTORY_LIMIT:'Histórico acima do limite seguro. Refine a consulta.'};
+  const policyErrors={PAST_LEAVE:'A data solicitada já passou. Encerre o pedido sem aprovação e registre a justificativa.',APPROVED_LEAVE_CONFLICT:'A proposta deve respeitar as folgas aprovadas antes de publicar.',MONTH_PUBLISHED:'A escala deste mês já é oficial. Use troca, cobertura ou solicite revisão gerencial.',DUPLICATE_LEAVE:'Já existe um pedido em análise nesta data.',PUBLICATION_WINDOW:'A publicação abre vinte dias antes do início do mês. Meses encerrados não podem ser publicados.',PENDING_LEAVE:'Analise os pedidos de folga pendentes antes de publicar.',HISTORY_LIMIT:'Histórico acima do limite seguro. Refine a consulta.'};
   if(policyErrors[e.message])return send(res,409,policyErrors[e.message]);
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Permissão negada.');
