@@ -113,8 +113,8 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
        await page.getByRole('button',{name:'Configurar 56 produtos Validar e ativar insumos da nova lista',exact:true}).click();
        await page.getByRole('button',{name:'Bacon Configuração pendente · Proteínas e carnes',exact:true}).click();
        await page.getByRole('heading',{name:'Configuração da cozinha preservada',exact:true}).waitFor();
-       assert.equal(await page.getByLabel('Unidade de estoque',{exact:true}).inputValue(),'un');
-       assert.equal(await page.getByLabel('Unidade de recebimento',{exact:true}).inputValue(),'kg');
+       assert.equal(await page.getByRole('combobox',{name:'Unidade de estoque',exact:true}).inputValue(),'un');
+       assert.equal(await page.getByRole('combobox',{name:'Unidade de recebimento',exact:true}).inputValue(),'kg');
        assert.equal(await page.getByLabel('Exigir controle de validade',{exact:true}).isChecked(),false);
        assert.equal(await page.getByLabel('Estoque mínimo',{exact:true}).inputValue(),'5');
 
