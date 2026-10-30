@@ -51,7 +51,10 @@ export function checkRequest(req, res) {
 export async function authenticate(req) {
   const match = /^Bearer (.+)$/.exec(req.headers.authorization || '');
   if (!match) throw new Error('UNAUTHENTICATED');
-  return getAuth().verifyIdToken(match[1], true);
+  try{return await getAuth().verifyIdToken(match[1], true)}catch(error){
+    if(['auth/argument-error','auth/invalid-id-token','auth/id-token-expired','auth/id-token-revoked','auth/user-disabled','auth/user-not-found'].includes(error.code))throw new Error('UNAUTHENTICATED');
+    throw error;
+  }
 }
 export async function membership(uid) {
   const snap = await getDb().doc('memberships/' + uid).get();

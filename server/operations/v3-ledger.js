@@ -3,6 +3,7 @@ import {isOperationalProduct,usesPhysicalLots} from './catalog-identity.js';
 import {intervalFromBalance} from './inventory-summary.js';
 import {operationalBalance,writeOperationalBalance} from './shared-balance.js';
 import {signalUnitChange} from '../live-signal.js';
+import {receivingConflict} from './receiving-policy.js';
 // Novo ledger isolado: não mistura os saldos legados nem converte kg em porções.
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -148,6 +149,7 @@ export default async function v3Ledger(req,res){
      if(!product.exists||!isOperationalProduct(product.data())||!profile.exists)throw Error('MISSING');
      const cfg=profile.data();
      if(!['supplier','both'].includes(cfg.origin))throw Error('RECEIPT_ORIGIN');
+    const receivingError=receivingConflict(product.data(),cfg,{commercialUnit,commercialQuantity,stockQuantity});if(receivingError)throw Error(receivingError);
      if(!orderId&&notes.trim().length<8)throw Error('RECEIPT_REASON');
      if(orderId){
       if(!linkedOrder?.exists||['cancelled','received'].includes(linkedOrder.data().status))throw Error('ORDER');
@@ -226,6 +228,7 @@ export default async function v3Ledger(req,res){
     if(!product.exists||!isOperationalProduct(product.data())||!profile.exists)throw Error('MISSING');
     const cfg=profile.data(),isCounted=cfg.controlMode==='quantitative';
     if(!['supplier','both'].includes(cfg.origin))throw Error('RECEIPT_ORIGIN');
+    const receivingError=receivingConflict(product.data(),cfg,{commercialUnit,commercialQuantity,stockQuantity});if(receivingError)throw Error(receivingError);
     if(!orderRef&&notes.trim().length<8)throw Error('RECEIPT_REASON');
     if(isCounted&&!number(stockQuantity,cfg.countUnit))throw Error('QUANTITY');
     if(!isCounted&&stockQuantity!==0)throw Error('QUANTITY');
@@ -425,7 +428,7 @@ export default async function v3Ledger(req,res){
   }
   return send(res,400,'Ação não suportada.');
  }catch(e){
-  const errors={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem permissão.'],MISSING:[409,'Produto não configurado ou saldo indisponível.'],
+  const errors={RECEIVING_UNIT:[409,'A unidade recebida difere da configuração do produto.'],RECEIVING_QUANTITY:[409,'Na mesma unidade, as quantidades recebida e física devem coincidir.'],UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem permissão.'],MISSING:[409,'Produto não configurado ou saldo indisponível.'],
    CONFLICT:[409,'Operação já registrada ou identificador repetido.'],UNIT:[409,'Unidades incompatíveis; revisão necessária.'],
    QUANTITY:[409,'Quantidade inválida ou saldo insuficiente.'],LOT:[409,'Lotes e validade precisam ser reconciliados.'],
    RECEIPT_ORIGIN:[409,'Este produto é de produção interna e não pode entrar como entrega de fornecedor.'],RECEIPT_REASON:[409,'Explique a entrega não prevista ou o excedente com pelo menos oito caracteres.'],
