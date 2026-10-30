@@ -13,6 +13,7 @@ import OperationalCatalogSetup from './OperationalCatalogSetup.jsx';
 import ProductDetails from './ProductDetails.jsx';
 import MeasurementEditor from './MeasurementEditor.jsx';
 import './catalog-admin-v41.css';
+import {isManagement} from '../server/permissions/v31-policy.js';
 
 const categories = ['Preparações','Proteínas','Hortifruti','Laticínios','Mercearia','Congelados','Bebidas','Limpeza','Descartáveis','Outros'];
 const units = ['kg','g','L','ml','un'];
@@ -45,7 +46,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const [saving,setSaving] = useState(false);
   const [detailId,setDetailId] = useState(null);
  const [catalogArea,setCatalogArea]=useState('products');
-  const canEdit = ['admin','manager'].includes(membership.role);
+  const canEdit = isManagement(membership.role);
   const administration = mode === 'catalog';
   const load = useCallback(async (silent=false) => {
     if(!silent)setLoading(true);setError('');

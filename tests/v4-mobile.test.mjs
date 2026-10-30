@@ -106,7 +106,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       const management=['admin','manager','submanager'].includes(role);
       const adminNav=page.locator('#primary-sidebar').getByRole('button',{name:'Administração · Catálogo',exact:true});
       assert.equal(await adminNav.count(),management?1:0,'Menu respeita perfil '+role);
-      if(role==='admin'){
+      if(management){
        if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible())await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
        await adminNav.click();
        await page.getByRole('heading',{name:'Administração · Catálogo',exact:true}).waitFor();

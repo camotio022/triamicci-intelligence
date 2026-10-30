@@ -1,9 +1,0 @@
-/* V4 — estoque: três contextos claros no lugar de dez abas horizontais. */
-.ti-v4-stock-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:18px 0 12px;padding:5px;background:#f5f6f8;border:1px solid #e8eaef;border-radius:14px}
-.ti-v4-stock-group{display:flex;align-items:center;justify-content:center;min-height:44px;padding:9px 11px;border:1px solid transparent;border-radius:10px;background:transparent;color:#485268;font-size:13px;font-weight:750;cursor:pointer;min-width:0;text-align:center}
-.ti-v4-stock-group.selected{background:#a71916;color:white;box-shadow:0 2px 8px rgba(113,23,23,.18)}
-.ti-v4-stock-group:focus-visible,.ti-v4-stock-subnav button:focus-visible{outline:3px solid #b94c45;outline-offset:2px}
-.ti-v4-stock-subnav{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 19px}
-.ti-v4-stock-subnav button{padding:9px 12px;border-radius:10px;min-height:42px;border:1px solid #e1e4eb;background:#fff;color:#3f4b5e;font-size:12px;font-weight:700;cursor:pointer}
-.ti-v4-stock-subnav button.selected{background:#fff3f1;border-color:#a71916;color:#a71916}
-@media(max-width:520px){.ti-v4-stock-nav{gap:4px;padding:4px}.ti-v4-stock-group{padding:8px 4px;font-size:12px}.ti-v4-stock-subnav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.ti-v4-stock-subnav button{text-align:left;font-size:12px;min-width:0}}
