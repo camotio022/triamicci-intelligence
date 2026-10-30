@@ -27,4 +27,4 @@ jobs:
       - name: Testar Firebase Auth + Firestore isolados
         env:
           CI: true
-        run: npx --yes firebase-tools@14.2.0 emulators:exec --project demo-triamicci-v31 --only auth,firestore "node --test --test-concurrency=1 tests/v31-emulator.test.mjs tests/v4-emulator.test.mjs tests/catalog-56-emulator.test.mjs tests/release-roles-emulator.test.mjs tests/v4-mobile.test.mjs"
+        run: npx --yes firebase-tools@14.2.0 emulators:exec --project demo-triamicci-v31 --only auth,firestore "node --test --test-concurrency=1 tests/adversarial-emulator.test.mjs tests/v31-emulator.test.mjs tests/v4-emulator.test.mjs tests/catalog-56-emulator.test.mjs tests/release-roles-emulator.test.mjs tests/v4-mobile.test.mjs"
