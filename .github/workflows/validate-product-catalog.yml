@@ -1,0 +1,25 @@
+name: Validar catalogo Triamicci
+on:
+  push:
+    paths:
+      - 'data/triamicci-product-catalog.json'
+      - 'scripts/seed-product-catalog.mjs'
+      - '.github/workflows/validate-product-catalog.yml'
+  pull_request:
+    paths:
+      - 'data/triamicci-product-catalog.json'
+      - 'scripts/seed-product-catalog.mjs'
+      - '.github/workflows/validate-product-catalog.yml'
+permissions:
+  contents: read
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Validar catálogo sem gravar no Firebase
+        run: node scripts/seed-product-catalog.mjs

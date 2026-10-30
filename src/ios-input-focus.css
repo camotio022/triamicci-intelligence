@@ -1,0 +1,11 @@
+/* Safari iOS can zoom focused editable controls when the rendered type is below 16px.
+   Keep pinch-to-zoom enabled and override legacy !important select styles. */
+@media (hover: none) and (pointer: coarse), screen and (max-width: 800px) {
+  html body #root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
+  html body #root select,
+  html body #root textarea,
+  html body #root [contenteditable="true"],
+  html body #root [contenteditable="plaintext-only"] {
+    font-size: max(16px, 1rem) !important;
+  }
+}

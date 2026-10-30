@@ -1,0 +1,37 @@
+name: Pacote 05 - validação sem deploy
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Dependências
+        run: |
+          if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
+      - name: Regras de equipe
+        run: node --test tests/team-profile.test.js tests/ux-team.test.js tests/personal-profile.test.js tests/roster-entry.test.js tests/sector-skills.test.js tests/schedules-rules.test.js tests/monthly-roster-generator.test.js tests/master-registry.test.js tests/mural-view.test.js tests/labels-rules.test.js
+      - name: Verificar API
+        run: |
+          node --check api/members/manage.js
+          node --check server/team/profile-rules.js
+          node --check server/team/ux-rules.js
+          node --check server/team/personal-rules.js
+          node --check server/team/roster-rules.js
+          node --check server/schedules/rules.js
+          node --check server/schedules/generator.js
+          node --check server/schedules/mural-view.js
+          node --check server/team/master-registry.js
+          node --check server/labels/rules.js
+          node --check server/workflows/schedules.js
+          node --check server/workflows/mural.js
+          node --check server/workflows/labels.js
+      - name: Build
+        run: npm run build

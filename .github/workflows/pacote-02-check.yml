@@ -1,0 +1,39 @@
+name: Pacote 02 — validação sem Vercel
+on:
+  push:
+    branches: [feat/pacote-02-operacao-real]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validar sintaxe das APIs
+        run: |
+          node --check api/operations/stock.js
+          node --check server/operations/dispatch.js
+          node --check server/operations/transfer.js
+          node --check server/operations/reconcile-lots.js
+          node --check server/operations/lot-logic.js
+          node --check api/production/manage.js
+          node --check server/production/logic.js
+          node --check api/catalog/sync-v2.js
+          node --check api/catalog/manage.js
+      - name: Validar catálogo
+        run: node scripts/validate-product-catalog-v2.mjs
+      - name: Testar regras do estoque físico
+        run: node --test tests/physical-operations.test.mjs tests/catalog-v2-regressions.test.mjs tests/lot-fefo.test.mjs tests/production-logic.test.mjs
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund
+      - name: Compilar interface
+        run: npm run build

@@ -1,0 +1,97 @@
+import {sendQuotaError} from '../quota-error.js';
+import {muralDirectoryEntry} from '../team/mural-directory.js';
+import {signalUnitChange} from '../live-signal.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {restaurantDay} from '../schedules/restaurant-today.js';
+import {TEAM_ROLES,MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
+const next={not_started:['clock_in'],working:['break_start','clock_out'],on_break:['break_end'],finished:[]};
+export function attendanceTransition(current,action){return (next[current]||[]).includes(action)?({clock_in:'working',break_start:'on_break',break_end:'working',clock_out:'finished'})[action]:null;}
+export default async function attendanceWorkflow(req,res){
+ if(!checkRequest(req,res))return;
+ res.setHeader('Cache-Control','no-store');
+ try{
+  const user=await authenticate(req),m=await membership(user.uid);
+  if(!m?.unitId||!TEAM_ROLES.includes(m.role))return send(res,403,'Vínculo ativo necessário.');
+  const db=getDb(),unit=db.collection('units').doc(m.unitId),actorRef=db.doc('memberships/'+user.uid),day=restaurantDay(),action=req.body?.action;
+  const attendance=unit.collection('attendanceV31');
+  let workDay=day;
+  const previousDay=new Date(Date.parse(day+'T12:00:00Z')-86400000).toISOString().slice(0,10);
+  const priorRef=attendance.doc(previousDay+'_'+user.uid);
+  const refToday=attendance.doc(day+'_'+user.uid);
+  if(action==='teamDirectory'){
+   const staff=await unit.collection('staffRegistry').limit(201).get();
+   if(staff.size>200)return send(res,409,'Equipe excede o limite desta consulta.');
+   return send(res,200,'Equipe para consulta do mural.',{registry:staff.docs.filter(doc=>doc.data().status==='active').map(doc=>muralDirectoryEntry(doc.id,doc.data()))});
+  }
+  if(action==='teamToday'){
+   const [records,previous]=await Promise.all([attendance.where('day','==',day).limit(201).get(),attendance.where('day','==',previousDay).limit(201).get()]);
+   if(records.size>200||previous.size>200)return send(res,409,'Muitos registros. Filtragem por unidade necessária.');
+   const current=records.docs.map(doc=>({uid:doc.data().uid,status:doc.data().status,lastAction:doc.data().events?.at(-1)?.action||null,updatedAt:doc.data().updatedAt?.toDate?.()?.toISOString?.()||null}));
+   const found=new Set(current.map(x=>x.uid));
+   const overnightTeam=previous.docs.filter(doc=>!found.has(doc.data().uid)&&['working','on_break'].includes(doc.data().status)).map(doc=>({uid:doc.data().uid,status:doc.data().status,lastAction:doc.data().events?.at(-1)?.action||null,overnight:true}));
+   return send(res,200,'Situação operacional registrada hoje.',{day,presence:[...current,...overnightTeam]});
+  }
+  if(action==='correct'){
+   if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerência pode corrigir registros.');
+   const {targetUid,workDay,status,reason,requestId}=req.body||{};
+   if(typeof targetUid!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(targetUid)||typeof workDay!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(workDay)||!Number.isFinite(Date.parse(workDay+'T12:00:00Z'))||new Date(workDay+'T12:00:00Z').toISOString().slice(0,10)!==workDay||workDay>day||!['working','on_break','finished','absent'].includes(status)||typeof reason!=='string'||reason.trim().length<8||reason.length>240||typeof requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(requestId))return send(res,400,'Informe colaborador, data, situação e justificativa válida.');
+   const target=attendance.doc(workDay+'_'+targetUid),account=db.doc('memberships/'+targetUid);
+   let duplicate=false;
+   await db.runTransaction(async tx=>{
+    const [manager,employee,prior]=await Promise.all([tx.get(actorRef),tx.get(account),tx.get(target)]);
+    if(!manager.exists||manager.data().status!=='active'||manager.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(manager.data().role))throw Error('FORBIDDEN');
+    if(!employee.exists||employee.data().status!=='active'||employee.data().unitId!==m.unitId)throw Error('FORBIDDEN');
+    const old=prior.data()||{events:[],status:'not_started'};
+    const seen=(old.events||[]).find(e=>e.requestId===requestId);
+    if(seen){if(seen.action!=='correct'||seen.status!==status)throw Error('CONFLICT');duplicate=true;return;}
+    const at=new Date(),event={action:'correct',status,requestId,at,by:user.uid};
+    tx.set(target,{uid:targetUid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at,lastCorrection:{by:user.uid,at,reason:reason.trim()}},{merge:true});
+    signalUnitChange(tx,db,m.unitId,['attendance']);
+    tx.create(db.collection('auditLogs').doc(),{event:'attendance.correct',unitId:m.unitId,actorUid:user.uid,at,details:{targetUid,workDay,from:old.status,to:status,requestId,reason:reason.trim()}});
+   });
+   return send(res,200,duplicate?'Correção já registrada.':'Correção auditada e registrada.',{duplicate});
+  }
+  const yesterday=await priorRef.get();
+  const overnight=yesterday.exists&&['working','on_break'].includes(yesterday.data().status);
+  if(overnight&&action!=='clock_in')workDay=previousDay;
+  const ref=attendance.doc(workDay+'_'+user.uid);
+  if(action==='today'){
+   const selected=overnight?priorRef:refToday;
+   const snap=await selected.get(),record=snap.data()||null;
+   return send(res,200,'Sua presença de hoje.',{day,workDay:overnight?previousDay:day,record:record?{status:record.status,events:record.events||[],day:record.day}:null});
+  }
+  if(!['clock_in','break_start','break_end','clock_out'].includes(action))return send(res,400,'Ação de presença desconhecida.');
+  const requestId=req.body?.requestId;
+  if(typeof requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(requestId))return send(res,400,'Identificador inválido.');
+  if(action==='clock_in'&&overnight)return send(res,409,'Há uma jornada anterior em aberto. Registre a saída antes de iniciar outra.');
+  let result,duplicate=false;
+  await db.runTransaction(async tx=>{
+   const [actor,prior]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
+   if(!actor.exists||actor.data().status!=='active'||actor.data().unitId!==m.unitId||!TEAM_ROLES.includes(actor.data().role))throw Error('FORBIDDEN');
+   const old=prior.data()||{status:'not_started',events:[]};
+   if((old.events||[]).some(e=>e.requestId===requestId)){
+    if((old.events||[]).find(e=>e.requestId===requestId).action!==action)throw Error('CONFLICT');
+    result=old.status;duplicate=true;return;
+   }
+   // Uma jornada comporta um único intervalo. Depois do retorno, o próximo passo é a saída.
+   if(action==='break_start'&&(old.events||[]).some(e=>e.action==='break_start'))throw Error('BREAK_ALREADY_RECORDED');
+   if(action==='break_end'&&!(old.events||[]).some(e=>e.action==='break_start'))throw Error('INVALID_TRANSITION');
+   const status=attendanceTransition(old.status,action);
+   if(!status)throw Error('INVALID_TRANSITION');
+   const at=new Date(),event={action,requestId,at,by:user.uid};
+   tx.set(ref,{uid:user.uid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at},{merge:true});
+   signalUnitChange(tx,db,m.unitId,['attendance']);
+   tx.create(db.collection('auditLogs').doc(),{event:'attendance.'+action,unitId:m.unitId,actorUid:user.uid,at,details:{day:workDay,requestId}});
+   result=status;
+  });
+  return send(res,200,duplicate?'Registro já confirmado.':'Registro de presença confirmado.',{day:workDay,status:result,duplicate});
+ }catch(e){
+  if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
+  if(e.message==='UNFINISHED_SHIFT')return send(res,409,'Encerre primeiro sua jornada anterior.');
+  if(e.message==='BREAK_ALREADY_RECORDED')return send(res,409,'O intervalo já foi registrado nesta jornada. Registre a saída ao concluir.');
+  if(e.message==='INVALID_TRANSITION')return send(res,409,'Esta ação não corresponde à sua situação atual.');
+  if(e.message==='CONFLICT')return send(res,409,'Registro com identificador diferente.');
+  if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
+  if(sendQuotaError(res,e))return;console.error('attendance V3.1',e.message);return send(res,500,'Não foi possível registrar a presença.');
+ }
+}

@@ -1,0 +1,50 @@
+/* Detalhes de produto V4.1: alterações apenas na apresentação. */
+.ti-product-v41{display:flex;flex-direction:column;gap:14px;min-width:0}
+.ti-product-v41 .product-detail-heading{margin-bottom:0}
+.ti-product-v41 .product-detail-heading h1{margin:4px 0}
+.ti-product-v41 .ti-product-v41-metrics{border:1px solid #e3e8ef;border-radius:16px;padding:16px;background:#f8f9fb}
+.ti-product-v41-metrichead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ti-product-v41-metrichead h2{font-size:16px;margin:0}
+.ti-product-v41-metrichead small{font-size:12px;color:#64748b}
+.ti-product-v41 .product-detail-counts{margin:12px 0 8px}
+.ti-product-v41 .product-detail-counts strong small{font-size:11px;color:#64748b;font-weight:500}
+.ti-product-v41-metrics>p{font-size:12px;margin:0;color:#64748b}
+.ti-product-v41 .ti-product-v41-section,.ti-product-v41 .ti-product-v41-history,.ti-product-v41 .ti-product-v41-details{border:1px solid #e1e7ee;background:#fff;border-radius:16px;padding:14px 16px;margin:0}
+.ti-product-v41-disclosure{display:flex;width:100%;justify-content:space-between;align-items:center;gap:14px;min-height:44px;text-align:left;border:0;background:transparent;padding:0;color:#1e293b;cursor:pointer}
+.ti-product-v41-disclosure strong,.ti-product-v41-disclosure small{display:block}
+.ti-product-v41-disclosure strong{font-size:15px}.ti-product-v41-disclosure small{font-size:12px;color:#66758a;margin-top:5px}
+.ti-product-v41-expand{margin-top:12px}
+.ti-product-v41-details summary{font-size:15px;font-weight:700;cursor:pointer;min-height:44px;display:flex;align-items:center}
+.ti-product-v41-details dl{margin-top:10px}
+.ti-product-v41 .ti-product-v41-history h2{font-size:16px;margin:0 0 12px}
+.ti-product-v41-history .product-detail-list{border-left:2px solid #e1e5eb;padding-left:15px}
+.ti-product-v41-history .product-detail-list>div{position:relative;padding:10px 0;border-bottom:1px solid #edf0f3}
+.ti-product-v41-history .product-detail-list>div:before{content:"";position:absolute;left:-21px;top:16px;width:10px;height:10px;border:2px solid #fff;border-radius:50%;background:#a71916}
+.ti-product-v41 .product-detail-actions{margin:0}
+@media(max-width:600px){.ti-product-v41 .ti-product-v41-metrics{padding:12px}.ti-product-v41 .ti-product-v41-section,.ti-product-v41 .ti-product-v41-history,.ti-product-v41 .ti-product-v41-details{padding:12px}.ti-product-v41 .product-detail-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.ti-product-v41 .product-detail-actions button{min-width:0;min-height:48px}.ti-product-v41 .product-detail-actions button:last-child{grid-column:1/-1}}
+
+/* Fidelidade V4.1: prioridade visual, layout compacto e fonte de verdade explícita */
+.ti-product-v41{gap:10px}
+.ti-product-v41 .product-detail-heading{align-items:center;gap:8px}
+.ti-product-v41 .product-detail-heading h1{font-size:clamp(19px,3vw,23px);line-height:1.25}
+.ti-product-v41 .product-detail-heading p{margin:3px 0}
+.ti-product-v41-state{font-size:11px;color:#607080;white-space:nowrap}
+.ti-product-retry{align-self:flex-start;border:1px solid #cbd5e1;border-radius:9px;padding:9px;color:#9d1917;background:#fff}
+.ti-product-v41 .ti-product-v41-metrics{padding:12px 14px;background:#fff}
+.ti-product-v41 .product-detail-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0}
+.ti-product-v41 .product-detail-counts>div{padding:6px 2px!important;background:transparent!important;border:0!important;text-align:left!important;min-width:0}
+.ti-product-v41 .product-detail-counts strong{font-size:19px;white-space:nowrap}
+.ti-product-v41 .product-detail-counts span{font-size:12px}
+.ti-product-v41 .product-detail-actions.ti-product-v41-primary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.ti-product-v41 .ti-product-v41-primary button{width:100%;min-height:62px;border-radius:12px;padding:10px;display:flex;flex-direction:column;justify-content:center;gap:7px;font-size:13px}
+.ti-product-v41 .ti-product-v41-primary button:last-child{grid-column:auto}
+.ti-product-v41 .ti-product-v41-lots{order:10}
+.ti-product-v41 .ti-product-v41-history{order:11}
+.ti-product-v41 .ti-product-v41-admin{order:13}
+.ti-product-v41 .ti-product-v41-details{order:14}
+.ti-product-v41 .ti-product-v41-lotpreview{display:flex;flex-direction:column;gap:3px;margin-top:10px;font-size:13px}
+.ti-product-v41-lotpreview small{font-size:12px;color:#64748b}
+.ti-product-v41 .ti-product-v41-historyhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.ti-product-v41-historyhead button{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:#9e211e;font-size:12px;cursor:pointer;min-height:36px}
+.ti-product-unit-warning{border:1px solid #f0c6a0;background:#fff8ed;border-radius:9px;padding:10px;font-size:12px}
+@media(max-width:420px){.ti-product-v41 .product-detail-counts strong{font-size:16px}.ti-product-v41 .ti-product-v41-primary button{font-size:12px}}

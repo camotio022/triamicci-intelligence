@@ -1,0 +1,128 @@
+.kitchen-home,.operational-products{max-width:1120px}.kitchen-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}.kitchen-header h1{margin:0 0 12px}.kitchen-header p{color:#677085}.kitchen-header button,.inventory-list-header button{cursor:pointer}.kitchen-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:24px 0}.kitchen-action{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:10px;padding:22px 18px;min-height:155px;border:1px solid #e1e5ee;background:#fff;border-radius:18px;text-align:left;cursor:pointer;color:#21293d}.kitchen-action:hover,.kitchen-action:focus-visible{border-color:#ad302b;box-shadow:0 3px 16px #71231c12}.kitchen-action svg{color:#a32420}.kitchen-action strong{font-size:1.05rem}.kitchen-action span,.operational-product-head span,.operational-note,.operational-meta,.operational-uncounted span{font-size:.87rem;color:#687184}.kitchen-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0 28px}.kitchen-summary>div{border:1px solid #e4e7ef;background:#fafbfe;padding:18px;border-radius:14px;display:flex;flex-direction:column;gap:5px}.kitchen-summary strong{font-size:1.65rem}.kitchen-summary span{font-size:.88rem;color:#616d7e}.operational-products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0 30px}.operational-product{min-width:0;background:#fff;border:1px solid #e0e5ed;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:16px}.operational-product-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.operational-product-head>div{display:flex;flex-direction:column;gap:4px}.operational-product-head strong{font-size:1.08rem}.operational-product-state{white-space:nowrap}.operational-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.operational-counts>div{padding:12px 6px;background:#f5f6f9;border-radius:10px;text-align:center;display:flex;flex-direction:column;gap:6px;min-width:0}.operational-counts span{font-size:.78rem;color:#626b7c}.operational-counts strong{font-size:1.5rem;color:#202739;font-variant-numeric:tabular-nums}.operational-counts>div:last-child{background:#f9eae8}.operational-uncounted{padding:14px;background:#f7f7f9;border-radius:10px;display:flex;flex-direction:column;gap:6px}.operational-note{margin:0}.operational-meta{display:flex;gap:12px;flex-wrap:wrap}.kitchen-history{border:1px solid #e1e5ed;border-radius:14px;background:#fff;overflow:hidden;margin-bottom:25px}.kitchen-history>div{padding:15px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #eef0f4}.kitchen-history>div:last-child{border-bottom:0}.kitchen-history>div>div{display:flex;flex-direction:column;gap:3px}.kitchen-history span{font-size:.88rem;color:#687184}.kitchen-home .eyebrow{margin-bottom:16px}details.inventory-form summary{cursor:pointer;font-weight:650;padding:8px 0}@media(max-width:800px){.kitchen-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.operational-products{grid-template-columns:1fr}.kitchen-header{flex-direction:column}.kitchen-action{min-height:130px;padding:16px}.kitchen-summary{gap:8px}.kitchen-summary>div{padding:12px}.kitchen-summary strong{font-size:1.35rem}.kitchen-summary span{font-size:.75rem}}@media(max-width:390px){.kitchen-actions{gap:9px}.kitchen-action strong{font-size:.92rem}.kitchen-action span{font-size:.78rem}.operational-counts strong{font-size:1.2rem}}
+.operational-product-clickable{cursor:pointer;transition:border-color .15s,box-shadow .15s}.operational-product-clickable:hover,.operational-product-clickable:focus-visible{outline:2px solid #ab2924;outline-offset:2px;box-shadow:0 7px 20px #9e211912}
+.product-detail-page{max-width:1040px;margin:0 auto;padding-bottom:24px;display:flex;flex-direction:column;gap:18px}
+.product-detail-back{display:inline-flex;align-self:flex-start;gap:8px;align-items:center;background:none;border:0;cursor:pointer;padding:10px 0;color:#912520;font-weight:650}
+.product-detail-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.product-detail-heading h1{margin:5px 0 10px}.product-detail-heading>button{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.product-detail-counts{max-width:720px}.product-detail-counts>div{padding:22px 10px}.product-detail-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.product-detail-actions button{display:flex;gap:8px;align-items:center;justify-content:center;text-align:center;min-height:70px;border:1px solid #d9dfe8;background:#fff;color:#9b2721;border-radius:12px;padding:12px;cursor:pointer;font-weight:650}.product-detail-actions button:hover{background:#fff4f3}.product-detail-panel{background:#fff;border:1px solid #e2e6ed;border-radius:16px;padding:22px;min-width:0}.product-detail-panel h2{margin-top:0}.product-detail-panel dl{margin:0}.product-detail-panel dl>div{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid #eff0f4}.product-detail-panel dt{color:#657085}.product-detail-panel dd{margin:0;font-weight:600;text-align:right}.product-detail-list>div{display:flex;flex-direction:column;gap:5px;padding:12px 0;border-bottom:1px solid #eceff4}.product-detail-list>div:last-child{border:0}.product-detail-list span,.product-detail-list small{color:#657085}
+@media(max-width:640px){.product-detail-heading{flex-direction:column}.product-detail-actions{grid-template-columns:1fr}.product-detail-actions button{justify-content:flex-start;min-height:56px}.product-detail-panel{padding:16px}.product-detail-counts>div{padding:15px 4px}}
+
+
+/* Pacote 05: formulários e cartões móveis, sem herdar checkbox de largura total */
+.team-profiles{min-width:0;max-width:100%;overflow:hidden}
+.team-profiles-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.team-profiles-tabs button{min-width:0;min-height:46px;white-space:normal;line-height:1.3}
+.team-profiles-search{display:flex;align-items:end;gap:12px;margin-top:18px}
+.team-profiles-search label{width:min(100%,460px);display:flex;flex-direction:column;gap:7px}
+.team-profiles-search>button{min-height:44px}
+.team-profiles-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.team-profile-form{max-width:100%;padding:22px;margin:20px 0 0;border:1px solid #e5e9f0;border-radius:14px;background:#fafbfc;gap:14px}
+.team-profile-form>label{display:block;margin-top:4px}
+.team-profile-form>input,.team-profile-form>select,.team-profile-form>textarea{display:block;width:100%;max-width:100%;min-width:0}
+.team-profile-form>textarea{min-height:90px;border:1px solid #dce2eb;border-radius:9px;padding:12px;font:inherit}
+.team-profile-form h4{margin:14px 0 0;font-size:15px}
+.team-skills-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px}
+.team-skills-grid label,.team-checkbox{display:flex!important;align-items:center;gap:10px;min-width:0;padding:12px;border:1px solid #e1e5ed;border-radius:10px;background:white;font-weight:600}
+.team-profiles input[type="checkbox"]{appearance:auto!important;flex:0 0 20px!important;width:20px!important;height:20px!important;min-height:20px!important;margin:0!important;padding:0!important;accent-color:#a71916}
+.team-availability-day{padding:14px;border:1px solid #e1e5ed;background:white;border-radius:12px;display:flex;flex-direction:column;gap:12px}
+.team-availability-day>.team-checkbox{border:0;padding:0}
+.team-times-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.team-times-grid label{display:flex;flex-direction:column;gap:6px;min-width:0}
+.team-times-grid input{width:100%;min-width:0;max-width:100%}
+.team-matrix-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.team-matrix-scroll table{min-width:1100px}
+.team-profiles .team-member{align-items:center}
+@media(max-width:760px){
+ .team-profiles{padding:16px}
+ .team-profiles-tabs{grid-template-columns:1fr}
+ .team-profiles-tabs button{width:100%;min-height:44px}
+ .team-profiles-search{flex-direction:column;align-items:stretch}
+ .team-profiles-search label,.team-profiles-search>button{width:100%}
+ .team-profiles-list{grid-template-columns:1fr}
+ .team-profile-form{padding:15px}
+ .team-skills-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .team-times-grid{grid-template-columns:1fr}
+ .team-profile-form .team-edit-actions{flex-direction:column}
+ .team-profile-form .team-edit-actions button{width:100%}
+}
+@media(max-width:390px){.team-skills-grid{grid-template-columns:1fr}}
+
+/* Consistência P05 — escolhas densas sem controles desproporcionais */
+.team-profiles input[type="checkbox"]{width:17px!important;height:17px!important;min-width:17px!important;min-height:17px!important;max-width:17px!important;max-height:17px!important;flex:0 0 17px!important}
+.team-skills-grid label,.team-checkbox{padding:9px 11px;gap:8px;font-size:12px;line-height:1.4;border-radius:9px}
+.team-skills-grid label:has(input:checked),.team-checkbox:has(input:checked){background:#fff3f1;border-color:#ddaaa5}
+.team-profiles-tabs button{font-size:13px}
+@media(max-width:760px){.team-profiles-tabs{display:flex;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;gap:7px}.team-profiles-tabs button{width:auto;min-width:max-content;min-height:41px;flex:0 0 auto;scroll-snap-align:start;padding:9px 12px}.team-skills-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.team-skills-grid label{padding:9px 8px;font-size:11px}.team-profile-form{border-radius:13px;padding:13px}}
+@media(max-width:360px){.team-skills-grid{grid-template-columns:1fr}}
+
+/* Matriz de habilidades: leitura de alta densidade e legenda acessível */
+.team-matrix-scroll .inventory-table td:not(:first-child):not(:nth-child(2)){text-align:center;min-width:74px}
+.team-matrix-scroll .inventory-table th:not(:first-child):not(:nth-child(2)){font-size:11px;text-align:center}
+.ti-skill-status{display:inline-flex;justify-content:center;align-items:center;min-width:25px;height:25px;border-radius:7px;font-weight:800;font-size:13px}
+.ti-skill-status.confirmed{background:#e8f5ee;color:#186b43}
+.ti-skill-status.declared{background:#fff2e3;color:#995513}
+.ti-skill-status.missing{color:#9ba3b0}
+.ti-skill-legend{display:flex;gap:16px;flex-wrap:wrap;position:sticky;left:0;margin:10px 0 2px;font-size:11px;color:#667085}
+@media(max-width:640px){.team-matrix-scroll .inventory-table td:first-child,.team-matrix-scroll .inventory-table th:first-child{position:sticky;left:0;z-index:2;background:#fff;min-width:142px;max-width:142px;box-shadow:1px 0 0 #e9e5e8}.team-matrix-scroll .inventory-table td{padding:9px 7px}}
+
+/* Auditoria mobile: densidade correta na equipe, sem cartões intermináveis. */
+@media(max-width:640px){
+ .team-profiles .team-profiles-list{display:grid;gap:6px}
+ .team-profiles .team-profiles-list .team-member{display:flex;flex-direction:row;align-items:center;gap:10px;padding:11px 12px;min-height:70px}
+ .team-profiles .team-profiles-list .team-member-info{flex:1;min-width:0;gap:3px}
+ .team-profiles .team-profiles-list .team-member-info strong{font-size:13px;line-height:1.35}
+ .team-profiles .team-profiles-list .team-member-info>span{font-size:11px}
+ .team-profiles .team-profiles-list .team-member-tags{gap:4px}
+ .team-profiles .team-profiles-list .team-member-tags span{padding:3px 7px;font-size:10px}
+ .team-profiles .team-profiles-list .team-member-edit{flex:0 0 auto;width:auto;min-height:40px;padding:8px 10px;font-size:11px}
+ .team-profiles .team-profiles-search{gap:8px}
+ .team-profiles .team-profiles-search label{flex:1;min-width:0}
+ .team-profiles .team-profiles-search button{min-height:40px}
+}
+
+/* Jornadas por pessoa: leitura progressiva e espaçamento mobile-first. */
+.team-shift-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.team-shift-card{display:flex;flex-direction:column;gap:12px;min-width:0;background:white;border:1px solid #e3e5eb;border-radius:14px;padding:15px}
+.team-shift-card-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px}
+.team-shift-card-head>div{display:grid;gap:4px;min-width:0;flex:1}
+.team-shift-card-head strong{font-size:14px;color:#252c40;overflow-wrap:anywhere}
+.team-shift-card-head span:not(.team-shift-pill){font-size:12px;color:#667085}
+.team-shift-pill{background:#fff1ee;color:#87211d;font-size:11px;font-weight:700;border-radius:20px;padding:5px 9px}
+.team-shift-details summary{cursor:pointer;font-size:12px;font-weight:700;color:#87211d;padding:8px 0;min-height:38px}
+.team-shift-hours{display:grid;gap:0;border:1px solid #e7e7ed;border-radius:10px;overflow:hidden}
+.team-shift-hour{display:grid;grid-template-columns:minmax(75px,.8fr) minmax(0,1.4fr);gap:5px 9px;padding:9px;background:#fff;border-bottom:1px solid #eef0f4;align-items:center}
+.team-shift-hour:last-child{border-bottom:0}.team-shift-hour>span{font-size:11px;color:#667085}.team-shift-hour strong{font-size:12px;font-variant-numeric:tabular-nums}.team-shift-hour small{grid-column:2;color:#667085;font-size:11px}
+.team-shift-empty{font-size:12px;color:#667085;margin:0}.team-shift-card .team-member-edit{align-self:flex-start;margin-top:auto}
+@media(max-width:640px){.team-shift-list{grid-template-columns:1fr;gap:9px}.team-shift-card{padding:12px}.team-shift-hour{padding:8px 10px}}
+
+/* Matriz: cartões por pessoa em telas compactas, mantendo tabela no desktop. */
+.ti-skill-mobile{display:none}
+@media(max-width:700px){.team-profiles .team-matrix-scroll{display:none}.ti-skill-mobile{display:grid;gap:9px}.ti-skill-person{padding:13px;border:1px solid #e4e6ec;border-radius:13px;background:#fff;min-width:0}.ti-skill-person-head{display:grid;gap:3px}.ti-skill-person-head strong{font-size:14px;color:#23191b}.ti-skill-person-head small{font-size:11px;color:#677083}.ti-skill-person-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.ti-skill-person-tags>span{display:flex;align-items:center;gap:5px;padding:6px 8px;border-radius:9px;font-size:11px}.ti-skill-person-tags>span.confirmed{color:#176340;background:#e6f5ee}.ti-skill-person-tags>span.declared{color:#83521e;background:#fff2e0}.ti-skill-person-tags>span small{font-size:9px;opacity:.85}.ti-skill-person p{font-size:12px;color:#677083;margin:9px 0 0}}
+
+/* V3.1: indicação temporal visível sem confundir data e seleção. */
+.ti-current-day{display:inline-flex;align-items:center;white-space:nowrap;padding:6px 10px;border-radius:999px;border:1px solid #3278b6;color:#26699e;background:rgba(50,120,182,.09);font-weight:750;font-size:.78rem}
+@media(max-width:700px){.ti-current-day{font-size:.69rem;padding:5px 7px;white-space:normal;text-align:center}}
+
+/* V3.1 — cartão de presença acompanha tokens e responsividade do aplicativo. */
+.ti-attendance-v31{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px;border-radius:14px;margin-bottom:16px;border:1px solid var(--border-color,#d7dce2);background:var(--surface,#fff)}
+.ti-attendance-v31>div{flex:1 1 240px;min-width:0}
+.ti-attendance-v31 strong{font-weight:750}
+.ti-attendance-v31 p{margin:5px 0}
+.ti-attendance-v31 small{opacity:.75;line-height:1.45;display:block}
+.ti-attendance-v31 button{min-height:44px;min-width:130px;border-radius:10px;padding:10px 14px}
+.ti-attendance-v31 [role="alert"]{color:#b53434;width:100%}
+@media(max-width:480px){.ti-attendance-v31{padding:12px;gap:10px}.ti-attendance-v31 button{width:100%}}
+
+/* Jornada: controles consistentes com a identidade visual e leitura mobile. */
+.ti-attendance-v31{box-shadow:0 8px 28px rgba(30,30,40,.045);border-radius:18px;padding:20px;gap:14px}
+.ti-attendance-v31-content{flex:1 1 290px;min-width:0}
+.ti-attendance-v31 .ti-attendance-eyebrow{font-size:10px;letter-spacing:.065em;font-weight:800;color:#932c25}
+.ti-attendance-v31 h2{margin:6px 0;color:#273044;font-size:clamp(17px,2.5vw,22px);letter-spacing:-.025em}
+.ti-attendance-v31 p{font-size:13px;line-height:1.5;color:#627085}
+.ti-attendance-actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.ti-attendance-v31 button{font:inherit;font-weight:750;cursor:pointer;border:1px solid #a71916;border-radius:11px;transition:background .15s,box-shadow .15s}
+.ti-attendance-v31 button.ti-attendance-primary{background:#a71916;color:white}
+.ti-attendance-v31 button.ti-attendance-secondary{background:#fff;color:#8c2823}
+.ti-attendance-v31 button:focus-visible{outline:3px solid #bd7772;outline-offset:2px}
+.ti-attendance-v31 button:disabled{opacity:.55;cursor:wait}
+.ti-attendance-notice{flex-basis:100%;color:#176b4b!important}
+@media(max-width:480px){.ti-attendance-actions{width:100%;flex-direction:column}.ti-attendance-actions button{width:100%}}
