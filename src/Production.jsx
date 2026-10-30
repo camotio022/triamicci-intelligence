@@ -1,3 +1,4 @@
+import SameProductPortioning from './SameProductPortioning.jsx';
 import PreparationSetup from './PreparationSetup.jsx';
 import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useState} from 'react';
@@ -100,7 +101,7 @@ export default function Production({membership}){
   <div className="production-layout ti-v4-production-layout">
    <section className="receiving-card">
     <h2><ClipboardList size={19} aria-hidden="true"/> Registrar produção</h2>
-    <form className="stock-action-form" onSubmit={finish}>
+    {selected?.stockEffect==='portion_same_product'?<><label>Preparação<select value={recipeId} onChange={e=>choose(e.target.value)}><option value="">Selecione a preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><SameProductPortioning key={membership.unitId+recipeId+(activeTaskId||'')} taskId={activeTaskId} recipe={selected} call={call} management={admin} onSaved={async message=>{setStatus(message);notify(message,'success');await Promise.all([load(true),loadTasks()])}}/></>:<form className="stock-action-form" onSubmit={finish}>
      <label>Preparação<select required value={recipeId} onChange={e=>choose(e.target.value)}>
       <option value="">Selecione a preparação</option>
       {recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
@@ -126,12 +127,12 @@ export default function Production({membership}){
       <label className="production-confirm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> {selected.outputProductId?'Confirmo a quantidade produzida e os locais de origem conforme ficha técnica validada.':'Conferi os ingredientes e as quantidades reais utilizadas, não apenas as sugestões da ficha.'}</label>
       <button type="submit" className="stock-action-save" disabled={busy||!items.length||!confirmed}>{busy?'Registrando...':selected?.outputProductId?'Confirmar transformação na reserva':'Finalizar e descontar os ingredientes'}</button>
      </>}
-    </form>
+    </form>}
    </section>
    {admin&&<PreparationSetup key={membership.unitId} unitId={membership.unitId} products={products} call={call} onSaved={()=>load(true)}/>}
    {admin&&<details className="receiving-card ti-v4-recipe-details">
     <summary><BookOpen size={20} aria-hidden="true"/><span>Fichas anteriores <small>Revisar ou arquivar preparações já cadastradas</small></span></summary>
-    <h2>{editRecipeId?'Revisar ficha técnica':'Nova ficha técnica'}</h2><label>Ficha para revisar<select value={editRecipeId} onChange={e=>{const r=recipes.find(x=>x.id===e.target.value);setEditRecipeId(r?.id||'');setRecipeVersion(r?.version??null);setName(r?.name||'');setMethod(r?.method||'');setYield(String(r?.yieldQuantity||1));setOutputProductId(r?.outputProductId||'');setLines(r?.lines?.map(l=>({...l,substitutes:l.substitutes||[]}))||[{productId:'',quantity:'',substitutes:[]}])}}><option value="">Criar nova ficha</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name} · v{r.version}</option>)}</select></label>
+    <h2>{editRecipeId?'Revisar ficha técnica':'Nova ficha técnica'}</h2><label>Ficha para revisar<select value={editRecipeId} onChange={e=>{const r=recipes.find(x=>x.id===e.target.value);setEditRecipeId(r?.id||'');setRecipeVersion(r?.version??null);setName(r?.name||'');setMethod(r?.method||'');setYield(String(r?.yieldQuantity||1));setOutputProductId(r?.outputProductId||'');setLines(r?.lines?.map(l=>({...l,substitutes:l.substitutes||[]}))||[{productId:'',quantity:'',substitutes:[]}])}}><option value="">Criar nova ficha</option>{recipes.filter(r=>!r.preparationConfig).map(r=><option key={r.id} value={r.id}>{r.name} · v{r.version}</option>)}</select></label>
     <p>Defina uma preparação validada, com quantidades por rendimento. Não invente pesos nem conversões entre kg e peças.</p>
     <form className="stock-action-form" onSubmit={saveRecipe}>
      <label>Nome da preparação<input required minLength={3} maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label>
@@ -164,7 +165,7 @@ export default function Production({membership}){
   </div>
   <section className="receiving-card"><TriamicciHistory title="Histórico de produção" records={runs} loading={loading}
    getTitle={r=>r.recipeName||'Produção'} getDate={r=>r.at} getQuantity={r=>r.portions+' '+(r.outputUnit||'un')}
-   getDescription={r=>(r.items||[]).map(i=>i.productName+' · '+i.quantity+' '+i.unit).join(' · ')}
+   getDescription={r=>r.stockEffect==='portion_same_product'?`Porcionado: ${r.portionedWeight} ${r.stockUnit} · saldo total preservado`:(r.items||[]).map(i=>i.productName+' · '+i.quantity+' '+i.unit).join(' · ')}
    getPerson={r=>r.actorName||r.actorUid}
    renderDetails={r=><>{r.notes&&<div>Observação: {r.notes}</div>}<div>Registro: {r.id}</div></>}
    empty="Nenhuma produção registrada para o período. A lista planejada não movimenta estoque."/></section>

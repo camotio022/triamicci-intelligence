@@ -17,5 +17,21 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  const transformed={...configuration,type:'transform',name:'Iscas de tilápia',portionWeight:330},tid='iscas-'+randomUUID();assert.equal((await call(manager,'savePreparation',{id:tid,configuration:transformed,activate:true})).http,409);assert.equal((await call(manager,'savePreparation',{id:tid,configuration:transformed})).http,200);
  assert.equal((await call(manager,'savePreparation',{id:'invalid-recipe',configuration:{...configuration,ingredients:[null]}})).http,400);
  const finished=await call(aux,'finish',{recipeId:id,requestId:randomUUID(),portions:4,items:[{productId:a,quantity:1}],notes:''});assert.equal(finished.http,200,JSON.stringify(finished));assert.equal((await balance.get()).data().total,9);assert.equal((await root.collection('physicalBalances').doc(b).get()).data().total,4);
+
+ const same={...configuration,name:'Frango a passarinho',sourceProductId:a,outputProductId:a,portionWeight:500},sameId='frango-'+randomUUID();
+ assert.equal((await call(manager,'savePreparation',{id:sameId,configuration:same,activate:true})).http,200);
+ const before=(await balance.get()).data();const runId=randomUUID();
+ const portioned=await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,portions:10});assert.equal(portioned.http,200,JSON.stringify(portioned));assert.deepEqual((await balance.get()).data(),before,'Porcionamento não altera saldos físicos');
+ const status=await call(aux,'portionStatus',{recipeId:sameId});assert.equal(status.portionedWeight,5);assert.equal(status.unmarkedWeight,4);assert.equal(status.total,9);
+ const replay=await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,portions:10});assert.equal(replay.http,200);assert.equal(replay.duplicate,true);
+ assert.equal((await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,portions:9})).http,409);
+ assert.equal((await call(aux,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:10})).http,409,'Não porciona novamente o peso já marcado');
+ const concurrent=await Promise.all([call(aux,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:6}),call(manager,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:6})]);assert.deepEqual(concurrent.map(x=>x.http).sort(),[200,409]);assert.deepEqual((await balance.get()).data(),before);
+ await balance.update({reserve:10,total:10});const changed=await call(aux,'portionStatus',{recipeId:sameId});assert.equal(changed.ready,false,'Mudança externa exige conferência da gestão');
+ assert.equal((await call(aux,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:1})).http,409);
+ assert.equal((await call(aux,'reconcilePortioning',{recipeId:sameId,requestId:randomUUID(),portionedWeight:8,expectedBasis:changed.basis})).http,403);
+ assert.equal((await call(manager,'reconcilePortioning',{recipeId:sameId,requestId:randomUUID(),portionedWeight:8,expectedBasis:changed.basis})).http,200);
+ const reviewed=await call(aux,'portionStatus',{recipeId:sameId});assert.equal(reviewed.ready,true);assert.equal(reviewed.unmarkedWeight,2);assert.equal((await balance.get()).data().total,10);
+ assert.equal((await call(foreign,'portionStatus',{recipeId:sameId})).http,409);
  await db.doc('memberships/'+sub.uid).update({role:'auxiliar'});assert.equal((await call(sub,'savePreparation',{id,configuration,expectedDraftVersion:3,expectedVersion:1})).http,403);
 });

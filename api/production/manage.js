@@ -1,3 +1,4 @@
+import portioningHandler from '../../server/production/portioning-handler.js';
 import preparationHandler from '../../server/production/preparation-handler.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
@@ -23,6 +24,7 @@ function validLine(x){
   (x?.substitutes===undefined||Array.isArray(x.substitutes)&&x.substitutes.length<=4&&x.substitutes.every(id=>productIdPattern.test(id)));
 }
 export default async function handler(req,res){
+ if(['portionStatus','finishPortioning','reconcilePortioning'].includes(req.body?.action))return portioningHandler(req,res);
  if(['preparationList','savePreparation'].includes(req.body?.action))return preparationHandler(req,res);
  if(['dayList','dayAdd'].includes(req.body?.action))return dayListHandler(req,res);
  if(!checkRequest(req,res))return;
@@ -123,6 +125,7 @@ export default async function handler(req,res){
    }
    if(!recipe.exists||recipe.data().active!==true)throw Error('RECIPE_NOT_FOUND');
    if(taskRef&&(!task?.exists||task.data().recipeId!==recipeId||!['pending','partial'].includes(task.data().status)))throw Error('TASK_NOT_PENDING');
+   if(recipe.data().stockEffect==='portion_same_product')throw Error('INVALID_TRANSFORMATION');
    const recipeData=recipe.data(),productDocs=docs.slice(0,items.length),balanceDocs=docs.slice(items.length);
    const transformed=Boolean(recipeData.outputProductId);
    const outputRef=transformed?unit.collection('products').doc(recipeData.outputProductId):null;

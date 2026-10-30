@@ -16,7 +16,7 @@ export function validatePreparation(c){
  if(c.type!=='recipe'&&c.batchYield!==1)return 'O padrão de porcionamento deve representar uma porção.';
  if(c.type!=='recipe'&&!['porcao','un'].includes(c.resultUnit))return 'Selecione unidades ou porções para o resultado.';
  if(c.type!=='recipe'&&(!pid.test(c.sourceProductId||'')||!validQuantity(c.portionWeight)||!['g','kg'].includes(c.weightUnit)))return 'Selecione o insumo e o peso da porção pronta.';
- if(c.type!=='recipe'&&c.sourceProductId===c.outputProductId)return 'A origem e o produto preparado devem ser diferentes.';
+ if(c.type==='transform'&&c.sourceProductId===c.outputProductId)return 'A origem e o produto preparado devem ser diferentes.';
  if(!Array.isArray(c.ingredients)||c.ingredients.length>12||c.ingredients.some(i=>!i||typeof i.name!=='string'||!i.name.trim()||i.name.length>100||typeof i.amount!=='string'||!i.amount.trim()||i.amount.length>80||typeof i.tracked!=='boolean'||!['g','kg','L','ml','un','orientacao'].includes(i.unit)||i.tracked&&(!pid.test(i.productId||'')||!validQuantity(Number(i.amount))||i.unit==='orientacao')))return 'Revise os ingredientes e as quantidades.';
  if(c.type==='recipe'&&!c.ingredients.length)return 'Adicione os ingredientes da receita.';
  if(!['g','kg'].includes(c.weightUnit))return 'Revise a unidade de peso.';
@@ -26,6 +26,7 @@ export function validatePreparation(c){
 }
 export function preparationPlan(c,products){
  const errors=[],lines=[];const find=id=>products.find(p=>p.id===id);const out=find(c.outputProductId),outputUnit=physicalUnit(out);
+ const sameProduct=c.type==='portion'&&c.sourceProductId===c.outputProductId;
  const invalid=validatePreparation(c);if(invalid)return {ready:false,errors:[invalid],lines:[],outputUnit};
  if(!out||out.status!=='active')errors.push('O produto preparado precisa estar ativo.');
  if(c.type==='transform')errors.push('Definir a baixa da matéria-prima na separação antes de ativar. O peso final não será usado para presumir consumo.');
@@ -35,7 +36,7 @@ export function preparationPlan(c,products){
   if(!p||p.status!=='active')errors.push('O insumo de origem precisa estar ativo.');
   if(!converted.ok)errors.push('O peso da porção não pode ser convertido para a unidade física do insumo.');
   else lines.push({productId:p.id,quantity:converted.quantity,location:c.location,substitutes:[]});
-  if(!['un','porcao'].includes(outputUnit)||!['un','porcao'].includes(c.resultUnit))errors.push('O produto preparado precisa ser contado em unidades ou porções para este porcionamento. Revise a unidade no catálogo.');
+  if(!sameProduct&&(!['un','porcao'].includes(outputUnit)||!['un','porcao'].includes(c.resultUnit)))errors.push('O produto preparado precisa ser contado em unidades ou porções para este porcionamento. Revise a unidade no catálogo.');
   yieldQuantity=1;
  }
  if(c.type==='recipe'){
@@ -52,8 +53,8 @@ export function preparationPlan(c,products){
   }
   if(!lines.length)errors.push('Defina ao menos um ingrediente com baixa no estoque antes de ativar.');
  }
- if(lines.some(i=>i.productId===c.outputProductId))errors.push('O produto preparado não pode consumir a si próprio.');
+ if(!sameProduct&&lines.some(i=>i.productId===c.outputProductId))errors.push('O produto preparado não pode consumir a si próprio.');
  if(new Set(lines.map(i=>i.productId)).size!==lines.length)errors.push('Consolide os ingredientes repetidos em uma única linha.');
- if(!validQuantity(yieldQuantity,{unit:outputUnit}))errors.push('Rendimento incompatível com a unidade física do produto preparado.');
- return {ready:errors.length===0,errors,lines,outputUnit,yieldQuantity};
+ if(!sameProduct&&!validQuantity(yieldQuantity,{unit:outputUnit}))errors.push('Rendimento incompatível com a unidade física do produto preparado.');
+ return {ready:errors.length===0,errors,lines:sameProduct?[]:lines,outputUnit:sameProduct?'porcao':outputUnit,yieldQuantity,sameProduct,portionSize:sameProduct?lines[0]?.quantity:null,stockUnit:sameProduct?physicalUnit(find(c.sourceProductId)):null};
 }

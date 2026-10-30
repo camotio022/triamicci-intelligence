@@ -32,11 +32,11 @@ export default async function preparationHandler(req,res){
    if(ids.some(id=>!products.some(p=>p.id===id)))throw Error('PRODUCT');
    plan=preparationPlan(c,products);
    if(activate&&!plan.ready)throw Error('NOT_READY');
-   if(activate&&hasRecipeCycle([...graph.docs.filter(d=>d.id!==id&&d.data().active===true).map(d=>d.data()),{outputProductId:c.outputProductId,lines:plan.lines}]))throw Error('CYCLE');
+   if(activate&&!plan.sameProduct&&hasRecipeCycle([...graph.docs.filter(d=>d.id!==id&&d.data().active===true).map(d=>d.data()),{outputProductId:c.outputProductId,lines:plan.lines}]))throw Error('CYCLE');
    const now=new Date();
    const data={configurationDraft:c,draftVersion:expectedDraftVersion+1,draftUpdatedAt:now,draftUpdatedBy:actor.uid};
    if(!old.exists)Object.assign(data,{name:c.name,active:false,version:0});
-   if(activate)Object.assign(data,{name:c.name,active:true,version:expectedVersion+1,preparationConfig:c,method:c.method,outputProductId:c.outputProductId,outputUnit:plan.outputUnit,yieldQuantity:plan.yieldQuantity,lines:plan.lines,updatedAt:now,updatedBy:actor.uid});
+   if(activate)Object.assign(data,{name:c.name,active:true,version:expectedVersion+1,preparationConfig:c,stockEffect:plan.sameProduct?'portion_same_product':'transformation',portionSize:plan.portionSize||null,stockUnit:plan.stockUnit||null,method:c.method,outputProductId:c.outputProductId,outputUnit:plan.outputUnit,yieldQuantity:plan.yieldQuantity,lines:plan.lines,updatedAt:now,updatedBy:actor.uid});
    tx.set(ref,data,{merge:true});signalUnitChange(tx,db,m.unitId,['production','stock']);
    tx.create(db.collection('auditLogs').doc(),{event:activate?'production.configuration_activated':'production.configuration_draft_saved',unitId:m.unitId,recipeId:id,actorUid:actor.uid,at:now,draftVersion:expectedDraftVersion+1});
   });
