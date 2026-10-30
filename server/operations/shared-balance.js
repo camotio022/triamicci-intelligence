@@ -10,6 +10,15 @@ export async function operationalBalance(tx,ref){
  const source=current.exists?current:legacy;
  return {exists:!!source?.exists,id:ref.id,ref,data:()=>operationalView(source?.data())};
 }
+// Batch the primary reads, then read only missing legacy fallbacks.
+export async function operationalBalances(tx,refs){
+ if(!refs.length)return [];
+ const current=await tx.getAll(...refs);
+ const missing=refs.filter((_,i)=>!current[i].exists);
+ const legacy=missing.length?await tx.getAll(...missing.map(ref=>ref.parent.parent.collection('v3PhysicalBalances').doc(ref.id))):[];
+ const fallback=new Map(legacy.map(snap=>[snap.id,snap]));
+ return refs.map((ref,i)=>{const source=current[i].exists?current[i]:fallback.get(ref.id);return {exists:!!source?.exists,id:ref.id,ref,data:()=>operationalView(source?.data())}});
+}
 export function writeOperationalBalance(tx,ref,values,options={},before={}){
  const normalized=Object.fromEntries(Object.entries(values).map(([key,value])=>[balanceField(key),value]));
  normalized.productId=ref.id;

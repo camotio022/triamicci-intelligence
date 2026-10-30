@@ -11,9 +11,11 @@ Base revisada: main e692b55. Escopo: tornar a rotina e as pendências compreens�
 - Mobile: campo de mês/data contido no formulário; data máxima real do mês; configurações de folgas recolhíveis para reduzir rolagem; filtro de setor na matriz de habilidades/jornadas e fichas ativas.
 - Estoque: atalhos distinguem registro de movimentação de investigação; linguagem operacional substitui referências técnicas nos resumos.
 
+- Aprovação simultânea: leitura em lote dos documentos e saldos, com fallback apenas para ausentes. Uma falha específica de transação fechada reinicia em transação nova, no máximo três tentativas, preservando a chave idempotente da entrega. Outros erros não são mascarados. O teste que detectou a falha continua exigindo duas respostas 200 e apenas um crédito.
+
 ## Evidência e limites
 
-- 185 testes puros locais e build aprovados. Firebase E2E e telas reais são executados no CI do commit final; conferir os resultados antes de integrar.
+- 188 testes puros locais e build aprovados. Firebase E2E e telas reais são executados no CI do commit final; conferir os resultados antes de integrar.
 - Suíte Firebase: 56 produtos, revisão de identidade, pedido, conferência sem alterar saldo, aprovação idempotente, Reserva/Giro, lotes, produção idempotente e contagem. Cinco perfis, recusa de acesso entre unidades, jornada/intervalo, folgas, convites e revogação.
 - Novos cenários: arquivo de comunicado gerencial/idempotente/auditado, validade explícita, proteção entre unidades e encerramento de pedido passado sem aprovação retroativa.
 - Telas reais: Mural, escala com campo de mês, produção, inventário, folgas, ficha, cozinha, recebimento, contagem, acessos e cadastro; larguras 320/390/768/1280. APIs das telas usam fixtures; gravações e permissões são verificadas separadamente no emulador.

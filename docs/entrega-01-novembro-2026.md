@@ -16,7 +16,7 @@ Auditoria técnica de 29/10/2026. Base reconciliada: `875df93` (inclui históric
 
 ## Evidência automatizada local
 
-- 185 testes puros aprovados (atualização de 30/10), preservando as regras anteriores.
+- 188 testes puros aprovados (atualização de 30/10), preservando as regras anteriores.
 - Build Vite aprovado.
 - Firebase Auth/Firestore isolados (`demo-triamicci-v31`): V3.1, V4, integração dos 56 e suíte dos cinco perfis aprovadas.
 - Nenhum teste automatizado usa credenciais ou Firebase de produção. Nenhum e-mail é enviado nos testes de convites.
