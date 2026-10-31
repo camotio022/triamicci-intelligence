@@ -7,6 +7,7 @@ import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import { auth } from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import StockMovements from './StockMovements.jsx';
+import PreparedProductForm from './PreparedProductForm.jsx';
 import CatalogPicker from './CatalogPicker.jsx';
 import CatalogV2Review from './CatalogV2Review.jsx';
 import OperationalCatalogSetup from './OperationalCatalogSetup.jsx';
@@ -46,6 +47,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const [saving,setSaving] = useState(false);
   const [detailId,setDetailId] = useState(null);
  const [catalogArea,setCatalogArea]=useState('products');
+ const [creatingPrepared,setCreatingPrepared]=useState(false);
   const canEdit = isManagement(membership.role);
   const administration = mode === 'catalog';
   const load = useCallback(async (silent=false) => {
@@ -96,7 +98,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
     {administration&&catalogArea==='setup'&&canEdit&&<section className="ti-catalog-v41-pane"><OperationalCatalogSetup onActivated={load} /></section>}
     {administration&&catalogArea==='packages'&&canEdit&&<section className="ti-catalog-v41-pane"><h2>Embalagens e contagem</h2><MeasurementEditor products={products}/></section>}
     {administration && catalogArea==='review' && membership.role === 'admin' && <section className="ti-catalog-v41-pane"><h2>Revisão técnica do catálogo</h2><CatalogV2Review /></section>}
-    {administration && catalogArea==='attach' && canEdit && <section className="ti-catalog-v41-pane"><h2>Adicionar ao catálogo da unidade</h2><CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} /></section>}
+    {administration && catalogArea==='attach' && canEdit && <section className="ti-catalog-v41-pane"><h2>Adicionar ao catálogo da unidade</h2><button type="button" onClick={()=>setCreatingPrepared(true)}>Cadastrar insumo preparado</button>{creatingPrepared&&<PreparedProductForm key={membership.unitId} products={products} call={(_,action,payload)=>call(action,payload)} onCancel={()=>setCreatingPrepared(false)} onCreated={async p=>{setCreatingPrepared(false);setNotice(`${p.name} disponível no catálogo. Nenhum saldo foi lançado.`);await load();}}/>}<CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} /></section>}
     {administration && catalogArea==='products' && canEdit && editing && <form className="inventory-form" onSubmit={save}>
       <h2>{editing?'Editar insumo':'Cadastrar insumo'}</h2>
       <div className="inventory-fields">

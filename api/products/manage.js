@@ -1,4 +1,5 @@
 import {sendQuotaError} from '../../server/quota-error.js';
+import preparedProduct from '../../server/catalog/prepared-product.js';
 import {isOperationalProduct,belongsToOperationalCatalog,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import measurementsHandler from '../../server/operations/handlers/measurements.js';
@@ -15,10 +16,11 @@ const clean = snap => {
   const d = snap.data();
   return {id:snap.id,name:d.name,category:d.category,unit:d.unit,minStock:d.minStock,
     lotTrackingMode:usesPhysicalLots(d)?'per_lot':d.lotTrackingMode||null,trackExpiry:d.trackExpiry === true,status:d.status,quantity:d.quantity ?? 0,catalogId:d.catalogId||null,
-    labelCategory:d.labelCategory||null,operationalUnitOverride:d.operationalUnitOverride||null,receivingUnitOverride:d.receivingUnitOverride||null,
+    portionWeight:d.portionWeight??null,weightUnit:d.weightUnit||null,source:d.source||null,labelCategory:d.labelCategory||null,operationalUnitOverride:d.operationalUnitOverride||null,receivingUnitOverride:d.receivingUnitOverride||null,
     createdAt:d.createdAt?.toDate?.()?.toISOString?.() || null};
 };
 export default async function handler(req,res) {
+ if(req.body?.action==='createPrepared')return preparedProduct(req,res);
  if(req.body?.action==='measurementGet'||req.body?.action==='measurementSave'){
   req.body.action=req.body.action==='measurementGet'?'get':'save';
   return measurementsHandler(req,res);
