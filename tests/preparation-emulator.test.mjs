@@ -1,0 +1,37 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {generateKeyPairSync,randomUUID} from 'node:crypto';
+test('preparações: rascunho, ativação, concorrência, permissões e transformação sem consumo presumido',{timeout:90000},async()=>{
+ const project='demo-triamicci-v31',{privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});Object.assign(process.env,{APP_ENV:'staging',PUBLIC_APP_URL:'https://triamicci-e2e.test',FIREBASE_EXPECTED_PROJECT_ID:project,FIRESTORE_EMULATOR_HOST:'127.0.0.1:8080',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099',FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({project_id:project,client_email:'preparation@'+project+'.iam.gserviceaccount.com',private_key:privateKey.export({type:'pkcs8',format:'pem'}).toString()})});
+ const [{getDb},{default:handler}]=await Promise.all([import('../server/_lib.js'),import('../api/production/manage.js')]);const db=getDb(),unitId='prep-'+randomUUID(),root=db.collection('units').doc(unitId);
+ const user=async(role,tenant=unitId)=>{const r=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=local',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:randomUUID()+'@prep.test',password:'only-test-password',returnSecureToken:true})});const u=await r.json();assert.equal(r.status,200);await db.doc('memberships/'+u.localId).set({unitId:tenant,role,status:'active'});return {uid:u.localId,token:u.idToken}};
+ const manager=await user('manager'),aux=await user('auxiliar'),sub=await user('submanager'),foreign=await user('manager','foreign-'+unitId);
+ const call=async(actor,action,payload={})=>{const res={code:200,setHeader(){},status(code){this.code=code;return this},json(body){this.body=body;return this}};await handler({method:'POST',headers:{origin:'https://triamicci-e2e.test','content-type':'application/json',authorization:'Bearer '+actor.token},body:{action,...payload}},res);return {http:res.code,...res.body}};
+ const a='a'.repeat(40),b='b'.repeat(40);await root.collection('products').doc(a).set({name:'Cubos',unit:'kg',status:'active',operationalCatalogVersion:'56-v1'});await root.collection('products').doc(b).set({name:'Porções',unit:'un',status:'active',operationalCatalogVersion:'56-v1'});const balance=root.collection('physicalBalances').doc(a);await balance.set({unit:'kg',reserve:10,rotation:0,total:10});
+ const configuration={type:'portion',name:'Cubos de alcatra',sourceProductId:a,outputProductId:b,portionWeight:250,weightUnit:'g',resultUnit:'porcao',batchYield:1,method:'',location:'reserva',outputPerBatch:null,ingredients:[]},id='cubos-'+randomUUID();
+ assert.equal((await call(aux,'preparationList')).http,403);assert.equal((await call(aux,'savePreparation',{id,configuration})).http,403);
+ assert.equal((await call(manager,'savePreparation',{id,configuration})).http,200);assert.equal((await root.collection('productionRecipes').doc(id).get()).data().active,false);assert.equal((await call(aux,'list')).recipes.length,0);assert.equal((await balance.get()).data().total,10);
+ assert.equal((await call(manager,'savePreparation',{id,configuration})).http,409,'Versão antiga não sobrescreve rascunho');
+ assert.equal((await call(foreign,'savePreparation',{id,configuration})).http,409,'Insumos de outra unidade são recusados');
+ assert.equal((await call(sub,'savePreparation',{id,configuration,expectedDraftVersion:1,activate:true})).http,200);
+ const recipe=(await root.collection('productionRecipes').doc(id).get()).data();assert.equal(recipe.lines[0].quantity,.25);assert.equal(recipe.version,1);assert.equal(recipe.active,true);assert.equal((await balance.get()).data().total,10,'Ativar ficha não movimenta estoque');
+ const draft={...configuration,portionWeight:300};assert.equal((await call(manager,'savePreparation',{id,configuration:draft,expectedDraftVersion:2,expectedVersion:1})).http,200);assert.equal((await root.collection('productionRecipes').doc(id).get()).data().lines[0].quantity,.25,'Rascunho não substitui relações ativas');
+ const transformed={...configuration,type:'transform',name:'Iscas de tilápia',portionWeight:330},tid='iscas-'+randomUUID();assert.equal((await call(manager,'savePreparation',{id:tid,configuration:transformed,activate:true})).http,409);assert.equal((await call(manager,'savePreparation',{id:tid,configuration:transformed})).http,200);
+ assert.equal((await call(manager,'savePreparation',{id:'invalid-recipe',configuration:{...configuration,ingredients:[null]}})).http,400);
+ const finished=await call(aux,'finish',{recipeId:id,requestId:randomUUID(),portions:4,items:[{productId:a,quantity:1}],notes:''});assert.equal(finished.http,200,JSON.stringify(finished));assert.equal((await balance.get()).data().total,9);assert.equal((await root.collection('physicalBalances').doc(b).get()).data().total,4);
+
+ const same={...configuration,name:'Frango a passarinho',sourceProductId:a,outputProductId:a,portionWeight:500},sameId='frango-'+randomUUID();
+ assert.equal((await call(manager,'savePreparation',{id:sameId,configuration:same,activate:true})).http,200);
+ const before=(await balance.get()).data();const runId=randomUUID();
+ const portioned=await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,portions:10});assert.equal(portioned.http,200,JSON.stringify(portioned));assert.deepEqual((await balance.get()).data(),before,'Porcionamento não altera saldos físicos');
+ const status=await call(aux,'portionStatus',{recipeId:sameId});assert.equal(status.portionedWeight,5);assert.equal(status.unmarkedWeight,4);assert.equal(status.total,9);
+ const replay=await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,portions:10});assert.equal(replay.http,200);assert.equal(replay.duplicate,true);
+ assert.equal((await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,portions:9})).http,409);
+ assert.equal((await call(aux,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:10})).http,409,'Não porciona novamente o peso já marcado');
+ const concurrent=await Promise.all([call(aux,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:6}),call(manager,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:6})]);assert.deepEqual(concurrent.map(x=>x.http).sort(),[200,409]);assert.deepEqual((await balance.get()).data(),before);
+ await balance.update({reserve:10,total:10});const changed=await call(aux,'portionStatus',{recipeId:sameId});assert.equal(changed.ready,false,'Mudança externa exige conferência da gestão');
+ assert.equal((await call(aux,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:1})).http,409);
+ assert.equal((await call(aux,'reconcilePortioning',{recipeId:sameId,requestId:randomUUID(),portionedWeight:8,expectedBasis:changed.basis})).http,403);
+ assert.equal((await call(manager,'reconcilePortioning',{recipeId:sameId,requestId:randomUUID(),portionedWeight:8,expectedBasis:changed.basis})).http,200);
+ const reviewed=await call(aux,'portionStatus',{recipeId:sameId});assert.equal(reviewed.ready,true);assert.equal(reviewed.unmarkedWeight,2);assert.equal((await balance.get()).data().total,10);
+ assert.equal((await call(foreign,'portionStatus',{recipeId:sameId})).http,409);
+ await db.doc('memberships/'+sub.uid).update({role:'auxiliar'});assert.equal((await call(sub,'savePreparation',{id,configuration,expectedDraftVersion:3,expectedVersion:1})).http,403);
+});
