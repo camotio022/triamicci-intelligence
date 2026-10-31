@@ -52,6 +52,15 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  assert.equal((await call(manager,'savePreparation',{id:'isca-novo-insumo',configuration:newConfig})).http,200,'Produto novo já é aceito na preparação');
  assert.equal((await call(manager,'savePreparation',{id:'isca-novo-insumo',configuration:newConfig,expectedDraftVersion:1,activate:true})).http,409,'Criar o destino não resolve a baixa da origem');
  assert.equal((await call(foreign,'savePreparation',{id:'isca-outra-unidade',configuration:newConfig})).http,409);
+
+ const legacyId='c'.repeat(40),legacyRef=root.collection('products').doc(legacyId),legacyBalance=root.collection('physicalBalances').doc(legacyId);
+ await legacyRef.set({name:'Tilápia em iscas',category:'Preparações',unit:'un',quantity:8,status:'inactive',trackExpiry:false});await legacyBalance.set({reserve:5,rotation:2,total:7,unit:'un'});
+ const legacyPayload={...prepared,name:'Tilápia em iscas',requestId:randomUUID()},blocked=await productCall(manager,'createPrepared',legacyPayload);assert.equal(blocked.http,409);assert.equal(blocked.candidate.id,legacyId);assert.equal(blocked.candidate.physicalBalance.total,7);
+ const adoption={...legacyPayload,unit:'un',trackExpiry:false,existingProductId:legacyId,expectedRevision:blocked.candidate.revision};
+ const physicalBefore=(await legacyBalance.get()).data();assert.equal((await productCall(manager,'createPrepared',{...adoption,unit:'kg'})).http,409,'Não muda unidade de saldo antigo');assert.equal((await productCall(manager,'createPrepared',{...adoption,trackExpiry:true})).http,409,'Não muda regime de validade antigo');
+ const adopted=await productCall(manager,'createPrepared',adoption);assert.equal(adopted.http,200,JSON.stringify(adopted));assert.equal(adopted.id,legacyId);assert.equal((await legacyRef.get()).data().quantity,8);assert.deepEqual((await legacyBalance.get()).data(),physicalBefore);assert.equal((await productCall(manager,'list')).products.some(p=>p.id===legacyId),true);assert.equal((await productCall(manager,'createPrepared',adoption)).duplicate,true);
+ assert.equal((await productCall(manager,'createPrepared',{...adoption,requestId:randomUUID()})).http,409,'Revisão desatualizada não sobrescreve');
+ assert.equal((await productCall(foreign,'createPrepared',adoption)).http,409,'Revisão não acessa outra unidade');
  const racePayload={...prepared,name:'Molho de teste concorrente',requestId:randomUUID()};const race=await Promise.all([productCall(manager,'createPrepared',racePayload),productCall(sub,'createPrepared',{...racePayload,requestId:randomUUID()})]);assert.deepEqual(race.map(r=>r.http).sort(),[201,409]);
  await db.doc('memberships/'+sub.uid).update({status:'inactive'});assert.equal((await productCall(sub,'createPrepared',{...prepared,name:'Não cadastrar',requestId:randomUUID()})).http,403);
  await db.doc('memberships/'+sub.uid).update({role:'auxiliar'});assert.equal((await call(sub,'savePreparation',{id,configuration,expectedDraftVersion:3,expectedVersion:1})).http,403);

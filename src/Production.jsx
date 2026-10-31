@@ -17,7 +17,7 @@ async function call(path,action,payload={}){
  const token=await user.getIdToken();
  const res=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
   body:JSON.stringify({action,...payload})});
- const data=await res.json();if(!res.ok)throw Error(data.message||'Erro na operação.');return data;
+ const data=await res.json();if(!res.ok)throw Object.assign(Error(data.message||'Erro na operação.'),{data});return data;
 }
 export default function Production({membership}){
  const {notify}=useFeedback();
