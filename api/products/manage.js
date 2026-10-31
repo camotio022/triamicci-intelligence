@@ -114,6 +114,8 @@ export default async function handler(req,res) {
         throw new Error('FORBIDDEN');
       if (!productSnap.exists) throw new Error('NOT_FOUND');
       const previous = productSnap.data();
+      if(previous.operationalCatalogOrigin==='reviewed_prepared_product'&&(unit!==previous.unit||trackExpiry!==previous.trackExpiry))
+        throw new Error('PREPARED_CONFIG_LOCKED');
       if(status==='active'&&previous.operationalCatalogVersion!=='56-v1')throw new Error('REVIEW_REQUIRED');
       if (previous.catalogId && (safeName !== previous.name || safeCategory !== previous.category ||
           unit !== previous.unit || trackExpiry !== previous.trackExpiry))
@@ -135,6 +137,7 @@ export default async function handler(req,res) {
     if (e.message === 'UNAUTHENTICATED') return send(res,401,'Faça login.');
     if (e.message === 'FORBIDDEN') return send(res,403,'Sem permissão.');
     if (e.message === 'DUPLICATE') return send(res,409,'Já existe um insumo com este nome na unidade.');
+    if (e.message === 'PREPARED_CONFIG_LOCKED') return send(res,409,'Unidade e validade do insumo preparado exigem revisão das fichas e dos saldos antes de alterar.');
     if (e.message === 'REVIEW_REQUIRED') return send(res,409,'Cadastro pendente de conciliação; ative pela configuração dos 56 produtos após conferir vínculos e saldos.');
     if (e.message === 'NOT_FOUND') return send(res,404,'Insumo não encontrado.');
     if (e.message === 'EXPIRY_LOCKED') return send(res,409,'Não ative o controle de validade com saldo existente. Regularize o saldo antes de migrar para lotes.');

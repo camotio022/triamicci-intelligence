@@ -44,6 +44,7 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  assert.equal((await root.collection('physicalBalances').doc(newProduct.id).get()).exists,false,'Cadastro não inventa contagem zero');
  const created=(await root.collection('products').doc(newProduct.id).get()).data();assert.equal(created.status,'active');assert.equal(created.profile.origin,'internal');assert.equal(created.operationalUnitOverride,'porcao');assert.equal(created.lotTrackingMode,'per_lot');
  assert.equal((await productCall(manager,'list')).products.some(p=>p.id===newProduct.id&&p.physicalUnit==='porcao'),true);
+ assert.equal((await productCall(manager,'update',{productId:newProduct.id,name:prepared.name,category:prepared.category,unit:'kg',minStock:0,trackExpiry:true,status:'active'})).http,409,'Unidade revisada não muda pelo editor legado');
  assert.equal((await productCall(manager,'createPrepared',prepared)).duplicate,true,'Reenvio não duplica');
  assert.equal((await productCall(manager,'createPrepared',{...prepared,portionWeight:300})).http,409);
  assert.equal((await productCall(manager,'createPrepared',{...prepared,name:'  ISCA DE TILAPIA  ',requestId:randomUUID()})).http,409,'Acentos, espaços e caixa não criam duplicidade');
