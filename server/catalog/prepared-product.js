@@ -20,6 +20,15 @@ export default async function preparedProduct(req,res){
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!management(m)||!m.unitId)return send(res,403,'Somente gestão pode cadastrar insumos preparados.');
+  if(req.body.action==='preparedLookup'){
+   if(typeof req.body.name!=='string'||req.body.name.trim().length<3||req.body.name.length>100)return send(res,400,'Informe o nome do insumo para consultar.');
+   const db=getDb(),root=db.collection('units').doc(m.unitId),identity=normalizeProductName(req.body.name),catalog=await root.collection('products').limit(201).get();
+   if(catalog.size>200)return send(res,409,'Limite de consulta atingido.');
+   const match=catalog.docs.find(d=>[d.data().name,...(d.data().aliases||[]),...(d.data().profile?.aliases||[])].some(n=>normalizeProductName(n)===identity));
+   if(!match)return send(res,200,'Nenhum cadastro anterior encontrado.',{candidate:null});
+   const old=match.data(),[central,balance]=await Promise.all([old.catalogId?db.doc('productCatalog/'+old.catalogId).get():null,root.collection('physicalBalances').doc(match.id).get()]);
+   return send(res,200,'Cadastro consultado. Nenhum dado foi alterado.',{candidate:{id:match.id,name:old.name,category:old.category||'Preparações',unit:countUnit(old,central?.data()),minStock:old.minStock||0,trackExpiry:old.trackExpiry===true,countFrequency:old.countFrequency||'weekly',portionWeight:old.portionWeight??null,weightUnit:old.weightUnit||'g',quantity:old.quantity??0,revision:`${match.updateTime.seconds}:${match.updateTime.nanoseconds}`,physicalBalance:balance.exists?{total:balance.data().total,unit:balance.data().unit}:null}});
+  }
   const p=req.body,invalid=validatePreparedProduct(p);if(invalid)return send(res,400,invalid);
   const name=p.name.trim().replace(/\s+/g,' '),category=p.category.trim().replace(/\s+/g,' '),identity=normalizeProductName(name);
   const id=p.existingProductId||createHash('sha256').update(identity).digest('hex').slice(0,40),db=getDb(),root=db.collection('units').doc(m.unitId),ref=root.collection('products').doc(id),now=new Date();
