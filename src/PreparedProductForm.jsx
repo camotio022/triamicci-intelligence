@@ -8,10 +8,13 @@ export default function PreparedProductForm({products,call,onCreated,onCancel,in
  const [requestId]=useState(()=>crypto.randomUUID());
  const existing=products.find(p=>normalizeProductName(p.name)===normalizeProductName(form.name));
  const set=(key,value)=>{setForm(f=>({...f,[key]:value}));setConfirmed(false);setError('');};
+ const lookup=async()=>{const r=await call('/api/products/manage','preparedLookup',{name:form.name});setCandidate(r.candidate||null);return r.candidate;};
+ const consult=async()=>{if(busy)return;setBusy(true);setError('');try{const found=await lookup();if(!found)setError('Nenhum cadastro anterior encontrado. Confira os campos para cadastrar um novo insumo.');}catch(e){setError(e.message);}finally{setBusy(false);}};
  const submit=async e=>{
   e.preventDefault();if(busy||!confirmed||existing&&!reviewing)return;
   setBusy(true);setError('');
   try{
+   if(!reviewing&&await lookup()){setConfirmed(false);return;}
    const r=await call('/api/products/manage','createPrepared',{name:form.name,category:form.category,unit:form.unit,minStock:Number(form.minStock),countFrequency:form.countFrequency,trackExpiry:form.expiry==='yes',portionWeight:['porcao','un'].includes(form.unit)&&form.portionWeight!==''?Number(form.portionWeight):null,weightUnit:form.weightUnit,reviewConfirmed:confirmed,requestId,...(reviewing?{existingProductId:reviewing.id,expectedRevision:reviewing.revision}:{})});
    await onCreated(r.product);
   }catch(e){setError(e.message);if(e.data?.candidate)setCandidate(e.data.candidate);}finally{setBusy(false);}
@@ -23,6 +26,7 @@ export default function PreparedProductForm({products,call,onCreated,onCancel,in
   {error&&<p role="alert" className="prep-error">{error}</p>}
   <form className="prep-form" onSubmit={submit}>
    <label>Nome do novo insumo<input aria-label="Nome do novo insumo" required minLength={3} maxLength={100} disabled={busy||Boolean(reviewing)} value={form.name} onChange={e=>set('name',e.target.value)}/></label>
+   {!reviewing&&<button type="button" className="prep-secondary" disabled={busy||form.name.trim().length<3} onClick={consult}>Consultar cadastro existente</button>}
    <label>Categoria do novo insumo<input aria-label="Categoria do novo insumo" required minLength={2} maxLength={60} disabled={busy} value={form.category} onChange={e=>set('category',e.target.value)}/></label>
    {existing&&<aside className="prep-pending"><strong>Este insumo já existe: {existing.name}.</strong>{existing.status==='active'?<button type="button" className="prep-secondary" disabled={busy} onClick={()=>onCreated(existing)}>Usar insumo existente</button>:<p>Revise o cadastro inativo na Administração. Ele não será duplicado.</p>}</aside>}
    <label>Como contar o insumo pronto?<select aria-label="Como contar o insumo pronto?" value={form.unit} disabled={busy||Boolean(reviewing)} onChange={e=>set('unit',e.target.value)}><option value="porcao">Porções</option><option value="un">Unidades</option><option value="kg">Quilogramas (kg)</option><option value="g">Gramas (g)</option><option value="L">Litros (L)</option><option value="ml">Mililitros (ml)</option></select></label>

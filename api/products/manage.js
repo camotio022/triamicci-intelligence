@@ -20,7 +20,7 @@ const clean = snap => {
     createdAt:d.createdAt?.toDate?.()?.toISOString?.() || null};
 };
 export default async function handler(req,res) {
- if(req.body?.action==='createPrepared')return preparedProduct(req,res);
+ if(['createPrepared','preparedLookup'].includes(req.body?.action))return preparedProduct(req,res);
  if(req.body?.action==='measurementGet'||req.body?.action==='measurementSave'){
   req.body.action=req.body.action==='measurementGet'?'get':'save';
   return measurementsHandler(req,res);
