@@ -38,7 +38,7 @@ export default async function preparedProduct(req,res){
     if(!p.existingProductId)throw Error('DUPLICATE');
     if(match.id!==p.existingProductId||revision!==p.expectedRevision||normalizeProductName(old.name)!==identity)throw Error('CONFLICT');
     if(p.unit!==physicalUnit||p.trackExpiry!==(old.trackExpiry===true)||(balance.exists&&balance.data().unit!==physicalUnit))throw Error('MIGRATION');
-    const patch={...data,name:old.name,unit:old.unit,quantity:old.quantity??0,createdAt:old.createdAt||now,createdBy:old.createdBy||actor.uid,creationRequestId:old.creationRequestId||null,preparedReviewRequestId:p.requestId,preparedReviewBy:actor.uid,preparedReviewedAt:now,lotTrackingMode:old.lotTrackingMode||'legacy'};
+    const patch={...data,critical:old.critical===true,profile:{...old.profile,...data.profile,aliases:old.profile?.aliases||[],sourceProductIds:old.profile?.sourceProductIds||[],alternativeProductIds:old.profile?.alternativeProductIds||[],version:(old.profile?.version||0)+1},name:old.name,unit:old.unit,quantity:old.quantity??0,createdAt:old.createdAt||now,createdBy:old.createdBy||actor.uid,creationRequestId:old.creationRequestId||null,preparedReviewRequestId:p.requestId,preparedReviewBy:actor.uid,preparedReviewedAt:now,lotTrackingMode:old.lotTrackingMode||'legacy'};
     tx.set(ref,patch,{merge:true});product={id,...old,...patch,physicalUnit};
    }else{
     if(p.existingProductId)throw Error('CONFLICT');
