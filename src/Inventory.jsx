@@ -26,7 +26,7 @@ async function call(action, payload={}) {
     headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({action,...payload})});
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Erro ao consultar catálogo.');
+  if (!res.ok) throw Object.assign(new Error(data.message || 'Erro ao consultar catálogo.'),{data});
   return data;
 }
 import {balancePresentation} from './operation-time.js';
