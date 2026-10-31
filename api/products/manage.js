@@ -1,4 +1,5 @@
 import {sendQuotaError} from '../../server/quota-error.js';
+import preparedProduct from '../../server/catalog/prepared-product.js';
 import {isOperationalProduct,belongsToOperationalCatalog,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import measurementsHandler from '../../server/operations/handlers/measurements.js';
@@ -15,10 +16,11 @@ const clean = snap => {
   const d = snap.data();
   return {id:snap.id,name:d.name,category:d.category,unit:d.unit,minStock:d.minStock,
     lotTrackingMode:usesPhysicalLots(d)?'per_lot':d.lotTrackingMode||null,trackExpiry:d.trackExpiry === true,status:d.status,quantity:d.quantity ?? 0,catalogId:d.catalogId||null,
-    labelCategory:d.labelCategory||null,operationalUnitOverride:d.operationalUnitOverride||null,receivingUnitOverride:d.receivingUnitOverride||null,
+    portionWeight:d.portionWeight??null,weightUnit:d.weightUnit||null,source:d.source||null,labelCategory:d.labelCategory||null,operationalUnitOverride:d.operationalUnitOverride||null,receivingUnitOverride:d.receivingUnitOverride||null,
     createdAt:d.createdAt?.toDate?.()?.toISOString?.() || null};
 };
 export default async function handler(req,res) {
+ if(req.body?.action==='createPrepared')return preparedProduct(req,res);
  if(req.body?.action==='measurementGet'||req.body?.action==='measurementSave'){
   req.body.action=req.body.action==='measurementGet'?'get':'save';
   return measurementsHandler(req,res);
@@ -112,6 +114,8 @@ export default async function handler(req,res) {
         throw new Error('FORBIDDEN');
       if (!productSnap.exists) throw new Error('NOT_FOUND');
       const previous = productSnap.data();
+      if(previous.operationalCatalogOrigin==='reviewed_prepared_product'&&(unit!==previous.unit||trackExpiry!==previous.trackExpiry))
+        throw new Error('PREPARED_CONFIG_LOCKED');
       if(status==='active'&&previous.operationalCatalogVersion!=='56-v1')throw new Error('REVIEW_REQUIRED');
       if (previous.catalogId && (safeName !== previous.name || safeCategory !== previous.category ||
           unit !== previous.unit || trackExpiry !== previous.trackExpiry))
@@ -133,6 +137,7 @@ export default async function handler(req,res) {
     if (e.message === 'UNAUTHENTICATED') return send(res,401,'Faça login.');
     if (e.message === 'FORBIDDEN') return send(res,403,'Sem permissão.');
     if (e.message === 'DUPLICATE') return send(res,409,'Já existe um insumo com este nome na unidade.');
+    if (e.message === 'PREPARED_CONFIG_LOCKED') return send(res,409,'Unidade e validade do insumo preparado exigem revisão das fichas e dos saldos antes de alterar.');
     if (e.message === 'REVIEW_REQUIRED') return send(res,409,'Cadastro pendente de conciliação; ative pela configuração dos 56 produtos após conferir vínculos e saldos.');
     if (e.message === 'NOT_FOUND') return send(res,404,'Insumo não encontrado.');
     if (e.message === 'EXPIRY_LOCKED') return send(res,409,'Não ative o controle de validade com saldo existente. Regularize o saldo antes de migrar para lotes.');

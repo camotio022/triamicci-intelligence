@@ -33,5 +33,26 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  assert.equal((await call(manager,'reconcilePortioning',{recipeId:sameId,requestId:randomUUID(),portionedWeight:8,expectedBasis:changed.basis})).http,200);
  const reviewed=await call(aux,'portionStatus',{recipeId:sameId});assert.equal(reviewed.ready,true);assert.equal(reviewed.unmarkedWeight,2);assert.equal((await balance.get()).data().total,10);
  assert.equal((await call(foreign,'portionStatus',{recipeId:sameId})).http,409);
+
+ // O cadastro preparado usa a mesma coleção, é revisado e não cria saldo.
+ const {default:productHandler}=await import('../api/products/manage.js');
+ const productCall=async(actor,action,payload={})=>{const res={code:200,setHeader(){},status(code){this.code=code;return this},json(body){this.body=body;return this}};await productHandler({method:'POST',headers:{origin:'https://triamicci-e2e.test','content-type':'application/json',authorization:'Bearer '+actor.token},body:{action,...payload}},res);return {http:res.code,...res.body}};
+ const prepared={name:'Isca de tilápia',category:'Preparações',unit:'porcao',minStock:0,countFrequency:'weekly',trackExpiry:true,portionWeight:330,weightUnit:'g',reviewConfirmed:true,requestId:randomUUID()};
+ assert.equal((await productCall(aux,'createPrepared',prepared)).http,403);
+ assert.equal((await productCall(manager,'createPrepared',{...prepared,reviewConfirmed:false})).http,400);
+ const newProduct=await productCall(manager,'createPrepared',prepared);assert.equal(newProduct.http,201,JSON.stringify(newProduct));
+ assert.equal((await root.collection('physicalBalances').doc(newProduct.id).get()).exists,false,'Cadastro não inventa contagem zero');
+ const created=(await root.collection('products').doc(newProduct.id).get()).data();assert.equal(created.status,'active');assert.equal(created.profile.origin,'internal');assert.equal(created.operationalUnitOverride,'porcao');assert.equal(created.lotTrackingMode,'per_lot');
+ assert.equal((await productCall(manager,'list')).products.some(p=>p.id===newProduct.id&&p.physicalUnit==='porcao'),true);
+ assert.equal((await productCall(manager,'update',{productId:newProduct.id,name:prepared.name,category:prepared.category,unit:'kg',minStock:0,trackExpiry:true,status:'active'})).http,409,'Unidade revisada não muda pelo editor legado');
+ assert.equal((await productCall(manager,'createPrepared',prepared)).duplicate,true,'Reenvio não duplica');
+ assert.equal((await productCall(manager,'createPrepared',{...prepared,portionWeight:300})).http,409);
+ assert.equal((await productCall(manager,'createPrepared',{...prepared,name:'  ISCA DE TILAPIA  ',requestId:randomUUID()})).http,409,'Acentos, espaços e caixa não criam duplicidade');
+ const newConfig={...configuration,type:'transform',name:'Isca de tilápia',outputProductId:newProduct.id,portionWeight:330};
+ assert.equal((await call(manager,'savePreparation',{id:'isca-novo-insumo',configuration:newConfig})).http,200,'Produto novo já é aceito na preparação');
+ assert.equal((await call(manager,'savePreparation',{id:'isca-novo-insumo',configuration:newConfig,expectedDraftVersion:1,activate:true})).http,409,'Criar o destino não resolve a baixa da origem');
+ assert.equal((await call(foreign,'savePreparation',{id:'isca-outra-unidade',configuration:newConfig})).http,409);
+ const racePayload={...prepared,name:'Molho de teste concorrente',requestId:randomUUID()};const race=await Promise.all([productCall(manager,'createPrepared',racePayload),productCall(sub,'createPrepared',{...racePayload,requestId:randomUUID()})]);assert.deepEqual(race.map(r=>r.http).sort(),[201,409]);
+ await db.doc('memberships/'+sub.uid).update({status:'inactive'});assert.equal((await productCall(sub,'createPrepared',{...prepared,name:'Não cadastrar',requestId:randomUUID()})).http,403);
  await db.doc('memberships/'+sub.uid).update({role:'auxiliar'});assert.equal((await call(sub,'savePreparation',{id,configuration,expectedDraftVersion:3,expectedVersion:1})).http,403);
 });

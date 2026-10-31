@@ -7,6 +7,7 @@ import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import { auth } from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import StockMovements from './StockMovements.jsx';
+import PreparedProductForm from './PreparedProductForm.jsx';
 import CatalogPicker from './CatalogPicker.jsx';
 import CatalogV2Review from './CatalogV2Review.jsx';
 import OperationalCatalogSetup from './OperationalCatalogSetup.jsx';
@@ -46,6 +47,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const [saving,setSaving] = useState(false);
   const [detailId,setDetailId] = useState(null);
  const [catalogArea,setCatalogArea]=useState('products');
+ const [creatingPrepared,setCreatingPrepared]=useState(false);
   const canEdit = isManagement(membership.role);
   const administration = mode === 'catalog';
   const load = useCallback(async (silent=false) => {
@@ -96,17 +98,17 @@ export default function Inventory({membership,mode='stock',onAction}) {
     {administration&&catalogArea==='setup'&&canEdit&&<section className="ti-catalog-v41-pane"><OperationalCatalogSetup onActivated={load} /></section>}
     {administration&&catalogArea==='packages'&&canEdit&&<section className="ti-catalog-v41-pane"><h2>Embalagens e contagem</h2><MeasurementEditor products={products}/></section>}
     {administration && catalogArea==='review' && membership.role === 'admin' && <section className="ti-catalog-v41-pane"><h2>Revisão técnica do catálogo</h2><CatalogV2Review /></section>}
-    {administration && catalogArea==='attach' && canEdit && <section className="ti-catalog-v41-pane"><h2>Adicionar ao catálogo da unidade</h2><CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} /></section>}
+    {administration && catalogArea==='attach' && canEdit && <section className="ti-catalog-v41-pane"><h2>Adicionar ao catálogo da unidade</h2><button type="button" onClick={()=>setCreatingPrepared(true)}>Cadastrar insumo preparado</button>{creatingPrepared&&<PreparedProductForm key={membership.unitId} products={products} call={(_,action,payload)=>call(action,payload)} onCancel={()=>setCreatingPrepared(false)} onCreated={async p=>{setCreatingPrepared(false);setNotice(`${p.name} disponível no catálogo. Nenhum saldo foi lançado.`);await load();}}/>}<CatalogPicker onAttached={load} isAdmin={membership.role === 'admin'} /></section>}
     {administration && catalogArea==='products' && canEdit && editing && <form className="inventory-form" onSubmit={save}>
       <h2>{editing?'Editar insumo':'Cadastrar insumo'}</h2>
       <div className="inventory-fields">
         <label>Nome do insumo<input required maxLength={100} minLength={2} value={form.name} disabled={Boolean(editing)} onChange={e=>set('name',e.target.value)} placeholder="Ex.: Peito de frango"/></label>
         <label>Categoria<select value={form.category} disabled={Boolean(editing?.catalogId)} onChange={e=>set('category',e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label>
-        <label>Unidade de medida<select value={form.unit} disabled={Boolean(editing?.catalogId)} onChange={e=>set('unit',e.target.value)}>{units.map(u=><option key={u}>{u}</option>)}</select></label>
+        <label>Unidade de medida<select value={form.unit} disabled={Boolean(editing?.catalogId||editing?.source==='internal')} onChange={e=>set('unit',e.target.value)}>{units.map(u=><option key={u}>{u}</option>)}</select></label>
         <label>Estoque mínimo<input required type="number" min="0" max="100000000" step="any" value={form.minStock} onChange={e=>set('minStock',e.target.value)}/></label>
         {editing && <label>Situação<select value={form.status} onChange={e=>set('status',e.target.value)}><option value="active">Ativo</option><option value="inactive">Inativo</option></select></label>}
       </div>
-      <label className="inventory-check"><input type="checkbox" checked={form.trackExpiry} disabled={Boolean(editing?.catalogId)} onChange={e=>set('trackExpiry',e.target.checked)}/> Exigir controle de lote e validade nas futuras entradas</label>
+      <label className="inventory-check"><input type="checkbox" checked={form.trackExpiry} disabled={Boolean(editing?.catalogId||editing?.source==='internal')} onChange={e=>set('trackExpiry',e.target.checked)}/> Exigir controle de lote e validade nas futuras entradas</label>
       <div className="inventory-actions"><button type="submit" disabled={saving}>{saving?'Salvando...':editing?'Salvar alterações':'Cadastrar insumo'}</button>{editing && <button type="button" className="inventory-cancel" onClick={cancel} disabled={saving}>Cancelar</button>}</div>
       {notice && <p role="status">{notice}</p>}
     </form>}
