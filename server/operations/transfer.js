@@ -1,3 +1,4 @@
+import {historyActor} from './history-names.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from './catalog-identity.js';
 import {signalUnitChange} from '../live-signal.js';
@@ -66,7 +67,7 @@ export default async function handler(req,res){
    tx.update(bRef,{[from]:round(b[from]-quantity),[to]:round(b[to]+quantity),
      lastMovementAt:now,lastTransferId:requestId});
    const entry={productId,productName:p.name,from,to,quantity,unit:unitName,notes,
-    actorUid:actor.uid,unitId:m.unitId,at:now,
+    actorName:historyActor(a,actor),actorUid:actor.uid,unitId:m.unitId,at:now,
     lots:allocations.map(({lot,expiryDate,quantity})=>({lot,expiryDate,quantity}))};
    tx.create(opRef,entry);
    signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);

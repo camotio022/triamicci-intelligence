@@ -14,7 +14,7 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  assert.equal((await call(sub,'savePreparation',{id,configuration,expectedDraftVersion:1,activate:true})).http,200);
  const recipe=(await root.collection('productionRecipes').doc(id).get()).data();assert.equal(recipe.lines[0].quantity,.25);assert.equal(recipe.version,1);assert.equal(recipe.active,true);assert.equal((await balance.get()).data().total,10,'Ativar ficha não movimenta estoque');
  const draft={...configuration,portionWeight:300};assert.equal((await call(manager,'savePreparation',{id,configuration:draft,expectedDraftVersion:2,expectedVersion:1})).http,200);assert.equal((await root.collection('productionRecipes').doc(id).get()).data().lines[0].quantity,.25,'Rascunho não substitui relações ativas');
- const transformed={...configuration,type:'transform',name:'Iscas de tilápia',portionWeight:330},tid='iscas-'+randomUUID();assert.equal((await call(manager,'savePreparation',{id:tid,configuration:transformed,activate:true})).http,409);assert.equal((await call(manager,'savePreparation',{id:tid,configuration:transformed})).http,200);
+ const transformed={...configuration,type:'transform',name:'Iscas de tilápia',portionWeight:330},tid='iscas-'+randomUUID();assert.equal((await call(manager,'savePreparation',{id:tid,configuration:transformed,activate:true})).http,200);assert.equal((await call(manager,'savePreparation',{id:tid,configuration:transformed,expectedDraftVersion:1,expectedVersion:1})).http,200);
  assert.equal((await call(manager,'savePreparation',{id:'invalid-recipe',configuration:{...configuration,ingredients:[null]}})).http,400);
  const finished=await call(aux,'finish',{recipeId:id,requestId:randomUUID(),portions:4,items:[{productId:a,quantity:1}],notes:''});assert.equal(finished.http,200,JSON.stringify(finished));assert.equal((await balance.get()).data().total,9);assert.equal((await root.collection('physicalBalances').doc(b).get()).data().total,4);
 
@@ -50,7 +50,7 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  assert.equal((await productCall(manager,'createPrepared',{...prepared,name:'  ISCA DE TILAPIA  ',requestId:randomUUID()})).http,409,'Acentos, espaços e caixa não criam duplicidade');
  const newConfig={...configuration,type:'transform',name:'Isca de tilápia',outputProductId:newProduct.id,portionWeight:330};
  assert.equal((await call(manager,'savePreparation',{id:'isca-novo-insumo',configuration:newConfig})).http,200,'Produto novo já é aceito na preparação');
- assert.equal((await call(manager,'savePreparation',{id:'isca-novo-insumo',configuration:newConfig,expectedDraftVersion:1,activate:true})).http,409,'Criar o destino não resolve a baixa da origem');
+ assert.equal((await call(manager,'savePreparation',{id:'isca-novo-insumo',configuration:newConfig,expectedDraftVersion:1,activate:true})).http,200,'Destino válido permite ativar com consumo medido na execução');
  assert.equal((await call(foreign,'savePreparation',{id:'isca-outra-unidade',configuration:newConfig})).http,409);
 
  const legacyId='c'.repeat(40),legacyRef=root.collection('products').doc(legacyId),legacyBalance=root.collection('physicalBalances').doc(legacyId);

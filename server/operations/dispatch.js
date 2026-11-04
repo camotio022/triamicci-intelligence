@@ -1,3 +1,4 @@
+import {historyActor} from './history-names.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from './catalog-identity.js';
 import {signalUnitChange} from '../live-signal.js';
@@ -87,7 +88,7 @@ export default async function handler(req,res){
      qtyRound((current.exitsSinceCount||0)+quantity)}:{}),
     lastMovementAt:now,lastOutflowId:requestId});
    const record={productId,productName:p.name,quantity,unit:unitName,location,reason,
-    notes,actorUid:actor.uid,unitId:m.unitId,at:now,lots:lotAllocations.map(l=>({
+    notes,actorName:historyActor(a,actor),actorUid:actor.uid,unitId:m.unitId,at:now,lots:lotAllocations.map(l=>({
      lotId:l.id,lot:l.lot,expiryDate:l.expiryDate,quantity:l.quantity
     }))};
    tx.create(movementRef,record);

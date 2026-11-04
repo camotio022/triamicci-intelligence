@@ -5,7 +5,7 @@ import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {restaurantDay} from '../schedules/restaurant-today.js';
 import {TEAM_ROLES,MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
 const next={not_started:['clock_in'],working:['break_start','clock_out'],on_break:['break_end'],finished:[]};
-export function attendanceTransition(current,action){return (next[current]||[]).includes(action)?({clock_in:'working',break_start:'on_break',break_end:'working',clock_out:'finished'})[action]:null;}
+export function attendanceTransition(current,action){if(action==='continue_work')return ['working','on_break'].includes(current)?current:null;return (next[current]||[]).includes(action)?({clock_in:'working',break_start:'on_break',break_end:'working',clock_out:'finished'})[action]:null;}
 export default async function attendanceWorkflow(req,res){
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
@@ -26,9 +26,9 @@ export default async function attendanceWorkflow(req,res){
   if(action==='teamToday'){
    const [records,previous]=await Promise.all([attendance.where('day','==',day).limit(201).get(),attendance.where('day','==',previousDay).limit(201).get()]);
    if(records.size>200||previous.size>200)return send(res,409,'Muitos registros. Filtragem por unidade necessária.');
-   const current=records.docs.map(doc=>({uid:doc.data().uid,status:doc.data().status,lastAction:doc.data().events?.at(-1)?.action||null,updatedAt:doc.data().updatedAt?.toDate?.()?.toISOString?.()||null}));
+   const current=records.docs.map(doc=>({uid:doc.data().uid,day:doc.data().day,extendedUntil:doc.data().extendedUntil?.toDate?.()?.toISOString?.()||null,status:doc.data().status,lastAction:doc.data().events?.at(-1)?.action||null,updatedAt:doc.data().updatedAt?.toDate?.()?.toISOString?.()||null}));
    const found=new Set(current.map(x=>x.uid));
-   const overnightTeam=previous.docs.filter(doc=>!found.has(doc.data().uid)&&['working','on_break'].includes(doc.data().status)).map(doc=>({uid:doc.data().uid,status:doc.data().status,lastAction:doc.data().events?.at(-1)?.action||null,overnight:true}));
+   const overnightTeam=previous.docs.filter(doc=>!found.has(doc.data().uid)&&['working','on_break'].includes(doc.data().status)).map(doc=>({uid:doc.data().uid,day:doc.data().day,extendedUntil:doc.data().extendedUntil?.toDate?.()?.toISOString?.()||null,status:doc.data().status,lastAction:doc.data().events?.at(-1)?.action||null,overnight:true}));
    return send(res,200,'Situação operacional registrada hoje.',{day,presence:[...current,...overnightTeam]});
   }
   if(action==='correct'){
@@ -58,9 +58,9 @@ export default async function attendanceWorkflow(req,res){
   if(action==='today'){
    const selected=overnight?priorRef:refToday;
    const snap=await selected.get(),record=snap.data()||null;
-   return send(res,200,'Sua presença de hoje.',{day,workDay:overnight?previousDay:day,record:record?{status:record.status,events:record.events||[],day:record.day}:null});
+   return send(res,200,'Sua presença de hoje.',{day,workDay:overnight?previousDay:day,record:record?{extendedUntil:record.extendedUntil?.toDate?.()?.toISOString?.()||null,status:record.status,events:record.events||[],day:record.day}:null});
   }
-  if(!['clock_in','break_start','break_end','clock_out'].includes(action))return send(res,400,'Ação de presença desconhecida.');
+  if(!['clock_in','break_start','break_end','clock_out','continue_work'].includes(action))return send(res,400,'Ação de presença desconhecida.');
   const requestId=req.body?.requestId;
   if(typeof requestId!=='string'||!/^[0-9a-f-]{36}$/i.test(requestId))return send(res,400,'Identificador inválido.');
   if(action==='clock_in'&&overnight)return send(res,409,'Há uma jornada anterior em aberto. Registre a saída antes de iniciar outra.');
@@ -78,8 +78,8 @@ export default async function attendanceWorkflow(req,res){
    if(action==='break_end'&&!(old.events||[]).some(e=>e.action==='break_start'))throw Error('INVALID_TRANSITION');
    const status=attendanceTransition(old.status,action);
    if(!status)throw Error('INVALID_TRANSITION');
-   const at=new Date(),event={action,requestId,at,by:user.uid};
-   tx.set(ref,{uid:user.uid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at},{merge:true});
+   const at=new Date(),extendedUntil=action==='continue_work'?new Date(at.getTime()+60*60*1000):null,event={action,requestId,at,by:user.uid,...(extendedUntil?{extendedUntil}:{})};
+   tx.set(ref,{uid:user.uid,unitId:m.unitId,day:workDay,status,events:[...(old.events||[]),event],updatedAt:at,...(extendedUntil?{extendedUntil}:{})},{merge:true});
    signalUnitChange(tx,db,m.unitId,['attendance']);
    tx.create(db.collection('auditLogs').doc(),{event:'attendance.'+action,unitId:m.unitId,actorUid:user.uid,at,details:{day:workDay,requestId}});
    result=status;
