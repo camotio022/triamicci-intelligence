@@ -1,3 +1,4 @@
+import {balanceProblem,recipeAvailability,recipeProducts} from '../../server/production/readiness.js';
 import portioningHandler from '../../server/production/portioning-handler.js';
 import preparationHandler from '../../server/production/preparation-handler.js';
 import {sendQuotaError} from '../../server/quota-error.js';
@@ -38,8 +39,9 @@ export default async function handler(req,res){
   if(action==='list'){
    const [r,p,available]=await Promise.all([recipes.orderBy('name').limit(100).get(),runs.orderBy('at','desc').limit(30).get(),unit.collection('products').limit(201).get()]);
    if(available.size>200)return send(res,409,'Catálogo acima do limite desta consulta.');
-   const ids=new Set(available.docs.filter(d=>isOperationalProduct(d.data())).map(d=>d.id));
-   return send(res,200,'Produção carregada.',{recipes:r.docs.filter(d=>d.data().active===true&&(d.data().lines||[]).every(line=>ids.has(line.productId))&&(!d.data().outputProductId||ids.has(d.data().outputProductId))).map(clean),runs:p.docs.map(clean)});
+   const products=await recipeProducts(db,unit,r.docs.filter(d=>d.data().active===true).map(d=>d.data()),available.docs);
+   const reviewed=r.docs.map(d=>({...clean(d),...recipeAvailability(d.data(),products)}));
+   return send(res,200,'Produção carregada.',{recipes:reviewed.filter(r=>r.available),blockedRecipes:reviewed.filter(r=>r.active===true&&!r.available).map(r=>({id:r.id,name:r.name,errors:r.errors})),...(['admin','manager','submanager'].includes(member.role)?{reviewRecipes:reviewed}:{}),runs:p.docs.map(clean)});
   }
   if(action==='archiveRecipe'){
    if(!['admin','manager','submanager'].includes(member.role))return send(res,403,'Somente gestão pode arquivar fichas.');
@@ -144,17 +146,24 @@ export default async function handler(req,res){
    const lots=await Promise.all(items.map((item,index)=>usesPhysicalLots(productDocs[index].data())?
     tx.get(unit.collection('physicalLots').doc(item.productId).collection('lots').orderBy('expiryDate').limit(101)):Promise.resolve(null)));
    const outputUnit=transformed?countUnit(outputDoc.data(),outputCatalog?.data()):'un';
+   if(transformed&&recipeData.outputUnit&&recipeData.outputUnit!==outputUnit)throw Error('INVALID_OUTPUT');
    if(!validQuantity(portions,{unit:outputUnit}))throw Error('INVALID_UNIT_QUANTITY');
    const trackedOutput=transformed&&usesPhysicalLots(outputDoc.data());
    if(trackedOutput&&(!outputLot.trim()||!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)||!Number.isFinite(Date.parse(expiryDate+'T12:00:00Z'))||new Date(expiryDate+'T12:00:00Z').toISOString().slice(0,10)!==expiryDate||expiryDate<today))throw Error('OUTPUT_LOT_REQUIRED');
    const outputLotRef=trackedOutput?unit.collection('physicalLots').doc(recipeData.outputProductId).collection('lots').doc(createHash('sha256').update(outputLot.trim()+'|'+expiryDate).digest('hex')):null;
    const outputLotDoc=outputLotRef?await tx.get(outputLotRef):null;
    if(outputLotDoc?.exists&&outputLotDoc.data().unit!==outputUnit)throw Error('INVALID_OUTPUT');
+   if(recipeData.stockEffect==='measured_transformation'){
+    const c=recipeData.preparationConfig;
+    if(!c||c.type!=='transform'||!transformed||items.length!==1||items[0].productId!==c.sourceProductId||recipeData.outputProductId!==c.outputProductId||c.sourceProductId===c.outputProductId||!['un','porcao'].includes(outputUnit)||recipeData.lines[0].location!==c.location)throw Error('INVALID_TRANSFORMATION');
+   }
    if(transformed){
     const unitMap=Object.fromEntries(productDocs.map((p,i)=>[items[i].productId,countUnit(p.data(),centralDocs[i]?.data())]));
-    const check=transformationPreview({...recipeData,outputUnit},portions,unitMap);
-    if(!check.valid||check.inputs.some((x,i)=>x.productId!==items[i].productId||Math.abs(x.quantity-items[i].quantity)>0.000001))throw Error('INVALID_TRANSFORMATION');
-    if(outputBalanceDoc.exists&&(outputBalanceDoc.data().unit!==outputUnit||!Number.isFinite(outputBalanceDoc.data().reserve)||!Number.isFinite(outputBalanceDoc.data().total)))throw Error('INVALID_OUTPUT');
+    if(recipeData.stockEffect!=='measured_transformation'){
+     const check=transformationPreview({...recipeData,outputUnit},portions,unitMap);
+     if(!check.valid||check.inputs.some((x,i)=>x.productId!==items[i].productId||Math.abs(x.quantity-items[i].quantity)>0.000001))throw Error('INVALID_TRANSFORMATION');
+    }
+    if(outputBalanceDoc.exists&&balanceProblem({name:outputDoc.data().name,physicalUnit:outputUnit,physicalBalance:outputBalanceDoc.data()}))throw Error('INVALID_OUTPUT');
    }
    const updates=[],lotUpdates=[],used=[];
    for(let i=0;i<items.length;i++){
@@ -162,6 +171,7 @@ export default async function handler(req,res){
     const physicalUnit=countUnit(p,centralDocs[i]?.data());
     const sourceArea=recipeData.lines[i].location||(transformed?'reserva':'giro');
     const sourceField=sourceArea==='reserva'?'reserve':'rotation';
+    if(balanceProblem({name:p.name,physicalUnit,physicalBalance:b}))throw Error('INVALID_STOCK');
     if(!validQuantity(item.quantity,{unit:physicalUnit})||b.unit!==physicalUnit||
       b[sourceField]<item.quantity||b.total<item.quantity)throw Error('INSUFFICIENT');
     const allocations=[];
@@ -192,7 +202,7 @@ export default async function handler(req,res){
    for(const x of updates)tx.update(x.ref,x.data);
    if(transformed){const b=outputBalanceDoc.data()||{reserve:0,rotation:0,total:0};tx.set(outputBalanceRef,{productId:recipeData.outputProductId,unit:outputUnit,rotation:b.rotation,reserve:round(b.reserve+portions),total:round(b.total+portions),...(Number.isFinite(b.countedTotal)?{entriesSinceCount:round((b.entriesSinceCount||0)+portions)}:{}),lastProductionId:requestId,lastMovementAt:now},{merge:true});}
    if(outputLotRef){const old=outputLotDoc.data()||{};tx.set(outputLotRef,{productId:recipeData.outputProductId,unit:outputUnit,lot:outputLot.trim(),expiryDate,reserva:round((old.reserva||0)+portions),giro:old.giro||0,availableQuantity:round((old.reserva||0)+(old.giro||0)+portions),updatedAt:now},{merge:true});}
-   const record={recipeId,recipeName:recipeData.name,recipeVersion:recipeData.version,
+   const record={stockEffect:recipeData.stockEffect||'transformation',recipeId,recipeName:recipeData.name,recipeVersion:recipeData.version,
     outputUnit,outputLot:outputLot.trim(),expiryDate,portions,items:used,outputProductId:recipeData.outputProductId||null,sourceArea:new Set(used.map(i=>i.location)).size===1?used[0].location:'mixed',destinationArea:transformed?'reserva':null,payloadHash,notes,actorUid:actor.uid,
     actorName:a.data().displayName||a.data().name||actor.name||actor.email||actor.uid,
     unitId:member.unitId,at:now};
@@ -215,7 +225,8 @@ export default async function handler(req,res){
    INSUFFICIENT:[409,'Saldo insuficiente no local de origem ou unidade incompatível.'],
    LOTS_NOT_READY:[409,'Concilie os lotes do ingrediente antes de confirmar a produção.'],
    LOT_LIMIT:[409,'Há muitos lotes para baixa automática.'],CONFLICT:[409,'Identificador já utilizado.'],
-   INVALID_OUTPUT:[409,'Produto final indisponível ou estoque sem unidade válida.'],
+   INVALID_OUTPUT:[409,'Produto preparado ou unidade da ficha incompatível com o saldo físico. A gestão precisa revisar o catálogo, o saldo e os lotes antes de produzir.'],
+   INVALID_STOCK:[409,'Saldo físico do ingrediente incompatível com a unidade do catálogo ou com os totais. Solicite conciliação à gestão.'],
    INVALID_TRANSFORMATION:[409,'Revise as quantidades e unidades de transformação da ficha técnica.'],
    TASK_NOT_PENDING:[409,'Tarefa inexistente, já concluída ou incompatível com a preparação.']};
   if(errors[e.message])return send(res,...errors[e.message]);

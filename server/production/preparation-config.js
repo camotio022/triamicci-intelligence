@@ -1,3 +1,4 @@
+import {balanceProblem} from './readiness.js';
 import {convertPhysical} from '../operations/unit-engine.js';
 import {countUnit,validQuantity} from '../operations/logic.js';
 export const preparationTypes=[
@@ -29,7 +30,15 @@ export function preparationPlan(c,products){
  const sameProduct=c.type==='portion'&&c.sourceProductId===c.outputProductId;
  const invalid=validatePreparation(c);if(invalid)return {ready:false,errors:[invalid],lines:[],outputUnit};
  if(!out||out.status!=='active')errors.push('O produto preparado precisa estar ativo.');
- if(c.type==='transform')errors.push('Definir a baixa da matéria-prima na separação antes de ativar. O peso final não será usado para presumir consumo.');
+ if(c.type==='transform'){
+  const source=find(c.sourceProductId);
+  if(!source||source.status!=='active')errors.push('O insumo de origem precisa estar ativo.');
+  if(!['un','porcao'].includes(outputUnit))errors.push('A transformação precisa de um produto preparado contado em unidades ou porções.');
+  // Quantidade variável: esta relação identifica a origem, sem proporção de consumo.
+  lines.push({productId:c.sourceProductId,quantity:null,location:c.location,substitutes:[]});
+ }
+ const dependencyIds=[c.outputProductId,c.sourceProductId,...c.ingredients.filter(i=>i.tracked).map(i=>i.productId)].filter(Boolean);
+ for(const id of new Set(dependencyIds)){const problem=balanceProblem(find(id));if(problem)errors.push(problem);}
  let yieldQuantity=c.batchYield;
  if(c.type==='portion'){
   const p=find(c.sourceProductId),unit=physicalUnit(p),converted=convertPhysical({quantity:c.portionWeight,from:c.weightUnit,to:unit});
@@ -56,5 +65,5 @@ export function preparationPlan(c,products){
  if(!sameProduct&&lines.some(i=>i.productId===c.outputProductId))errors.push('O produto preparado não pode consumir a si próprio.');
  if(new Set(lines.map(i=>i.productId)).size!==lines.length)errors.push('Consolide os ingredientes repetidos em uma única linha.');
  if(!sameProduct&&!validQuantity(yieldQuantity,{unit:outputUnit}))errors.push('Rendimento incompatível com a unidade física do produto preparado.');
- return {ready:errors.length===0,errors,lines:sameProduct?[]:lines,outputUnit:sameProduct?'porcao':outputUnit,yieldQuantity,sameProduct,portionSize:sameProduct?lines[0]?.quantity:null,stockUnit:sameProduct?physicalUnit(find(c.sourceProductId)):null};
+ return {ready:errors.length===0,errors,lines:sameProduct?[]:lines,outputUnit:sameProduct?'porcao':outputUnit,measured:c.type==='transform',yieldQuantity,sameProduct,portionSize:sameProduct?lines[0]?.quantity:null,stockUnit:sameProduct?physicalUnit(find(c.sourceProductId)):null};
 }

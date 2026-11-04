@@ -172,10 +172,10 @@ export default function PhysicalStock({membership,mode='receive',initialProductI
    </tbody></table></div>
   </section>}
   <section className="receiving-card"><TriamicciHistory title="Histórico de operações" records={rows}
-    getTitle={r=>r.productName||r.recipeName||'Produto não identificado'} getDate={r=>r.at}
+    getTitle={r=>r.productName||r.recipeName||(r.productId?'Produto · '+r.productId:'Produto sem identificação no registro')} getDate={r=>r.at}
     getQuantity={r=>({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'}
     getDescription={r=>r.kind==='receive'?qty(r.physicalQuantity)+' '+r.unit:r.kind==='count'?qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro':r.kind==='production'?r.portions+' porções':r.kind==='transfer'?qty(r.quantity)+' '+r.unit+' · '+r.from+' → '+r.to:qty(r.quantity)+' '+r.unit}
-    getPerson={r=>r.actorName} renderDetails={r=><div>Tipo: {({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'} · ID: {r.id}</div>}
+    getPerson={r=>r.actorName||r.actorUid} renderDetails={r=><div>Tipo: {({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'} · ID: {r.id}{(r.productNameSource||r.actorNameSource)&&<p>Nome consultado no cadastro atual; o registro original foi preservado.</p>}</div>}
     empty="Nenhum registro encontrado para o período."/>
    {(more.receipts||more.counts||more.outflows||more.transfers||more.productions)&&<button type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore?'Carregando...':'Carregar registros anteriores'}</button>}
   </section>

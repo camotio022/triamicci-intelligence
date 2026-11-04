@@ -1,3 +1,4 @@
+import {historyActor} from './history-names.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from './catalog-identity.js';
 import {intervalFromBalance} from './inventory-summary.js';
@@ -268,7 +269,7 @@ export default async function v3Ledger(req,res){
     tx.create(recordRef,{kind:'receipt',actorUid:actor.uid,at:now(),unitId:m.unitId,productId,
      commercialQuantity,commercialUnit,stockQuantity: isCounted?stockQuantity:null,stockUnit:isCounted?cfg.countUnit:null,
      location,orderId,lot,expiryDate,supplier,notes,fingerprint});
-    if(isCounted)tx.create(unit.collection('physicalReceipts').doc(requestId),{productId,productName:product.data().name,physicalQuantity:stockQuantity,unit:cfg.countUnit,supplier,orderId,commercialQuantity,commercialUnit,lot,expiryDate,actorUid:actor.uid,unitId:m.unitId,at:now()});
+    if(isCounted)tx.create(unit.collection('physicalReceipts').doc(requestId),{productId,productName:product.data().name,actorName:historyActor(authSnap.data(),actor),physicalQuantity:stockQuantity,unit:cfg.countUnit,supplier,orderId,commercialQuantity,commercialUnit,lot,expiryDate,actorUid:actor.uid,unitId:m.unitId,at:now()});
     audit(tx,db,'v3.received',m.unitId,actor.uid,{requestId,productId,orderId,commercialQuantity,commercialUnit,stockQuantity});
    });
    return send(res,200,duplicate?'Recebimento já registrado.':'Recebimento salvo.',{duplicate,id:requestId});
@@ -315,7 +316,7 @@ export default async function v3Ledger(req,res){
       quality:'PARTIAL_LOCATION_COUNT',lastOperationId:requestId},{merge:true},prior);
     tx.create(ref,{kind:'count',actorUid:actor.uid,at:now(),productId,location,sessionId,quantity,unit:u,
       before:prior[location]||0,difference:round(quantity-(prior[location]||0)),notes});
-    if(prior.countSessions?.[location==='reserva'?'giro':'reserva']===sessionId){const reserve=location==='reserva'?quantity:prior.reserva,rotation=location==='giro'?quantity:prior.giro;const at=now();tx.set(balanceRef,{countedReserve:reserve,countedRotation:rotation,countedTotal:after,countId:requestId,entriesSinceCount:0,exitsSinceCount:0,at,quality:'PHYSICAL_COUNT'},{merge:true});tx.create(unit.collection('physicalCounts').doc(requestId),{inventorySummary:intervalFromBalance(prior),productId,unit:u,reserve,rotation,total:after,sessionId,actorUid:actor.uid,unitId:m.unitId,at});}
+    if(prior.countSessions?.[location==='reserva'?'giro':'reserva']===sessionId){const reserve=location==='reserva'?quantity:prior.reserva,rotation=location==='giro'?quantity:prior.giro;const at=now();tx.set(balanceRef,{countedReserve:reserve,countedRotation:rotation,countedTotal:after,countId:requestId,entriesSinceCount:0,exitsSinceCount:0,at,quality:'PHYSICAL_COUNT'},{merge:true});tx.create(unit.collection('physicalCounts').doc(requestId),{inventorySummary:intervalFromBalance(prior),productId,productName:p.data().name,actorName:historyActor(a.data(),actor),unit:u,reserve,rotation,total:after,sessionId,actorUid:actor.uid,unitId:m.unitId,at});}
     audit(tx,db,'v3.counted',m.unitId,actor.uid,{requestId,productId,location,quantity,sessionId});
    });
    return send(res,200,'Contagem registrada.');
@@ -344,7 +345,7 @@ export default async function v3Ledger(req,res){
     for(const c of changes)tx.update(c.ref,c.after);
     writeOperationalBalance(tx,balRef,{[from]:round(prior[from]-quantity),[to]:round(prior[to]+quantity),lastOperationId:requestId,updatedAt:now(),quality:'ESTIMATED_BY_MOVEMENTS'},{},prior);
     tx.create(ref,{kind:'transfer',actorUid:actor.uid,at:now(),productId,from,to,quantity,unit:u});
-    tx.create(unit.collection('physicalTransfers').doc(requestId),{productId,from,to,quantity,unit:u,actorUid:actor.uid,unitId:m.unitId,at:now()});
+    tx.create(unit.collection('physicalTransfers').doc(requestId),{productId,productName:p.data().name,actorName:historyActor(a.data(),actor),from,to,quantity,unit:u,actorUid:actor.uid,unitId:m.unitId,at:now()});
     audit(tx,db,'v3.transferred',m.unitId,actor.uid,{requestId,productId,from,to,quantity});
    });
    return send(res,200,'Transferência registrada. O total não mudou.');

@@ -21,6 +21,7 @@ async function call(path,action,payload={}){
 }
 export default function Production({membership}){
  const {notify}=useFeedback();
+ const [blockedRecipes,setBlockedRecipes]=useState([]),[reviewRecipes,setReviewRecipes]=useState([]);
  const [recipes,setRecipes]=useState([]),[runs,setRuns]=useState([]),[products,setProducts]=useState([]);
  const [recipeId,setRecipeId]=useState(''),[name,setName]=useState(''),[yieldQuantity,setYield]=useState('1'),[outputProductId,setOutputProductId]=useState('');
  const [editRecipeId,setEditRecipeId]=useState(''),[recipeVersion,setRecipeVersion]=useState(null),[method,setMethod]=useState(''),[outputLot,setOutputLot]=useState(''),[expiryDate,setExpiryDate]=useState('');
@@ -37,20 +38,20 @@ export default function Production({membership}){
  const load=useCallback(async(silent=false)=>{
   if(!silent)setLoading(true);try{
    const [p,r]=await Promise.all([call('/api/products/manage','list'),call('/api/production/manage','list')]);
-   setProducts(p.products||[]);setRecipes(r.recipes||[]);setRuns(r.runs||[]);return true;
+   setProducts(p.products||[]);setRecipes(r.recipes||[]);setBlockedRecipes(r.blockedRecipes||[]);setReviewRecipes(r.reviewRecipes||[]);setRuns(r.runs||[]);return true;
   }catch(e){setStatus(e.message);return false}finally{setLoading(false)}
  },[membership?.unitId]);
- useEffect(()=>{setProducts([]);setRecipes([]);setRuns([]);setDailyTasks([]);setRecipeId('');setActiveTaskId(null);},[membership?.unitId]);
+ useEffect(()=>{setProducts([]);setRecipes([]);setBlockedRecipes([]);setReviewRecipes([]);setRuns([]);setDailyTasks([]);setRecipeId('');setActiveTaskId(null);},[membership?.unitId]);
 
  const live=useUnitLive(membership?.unitId,initial=>Promise.all([load(!initial),loadTasks()]),{domains:['stock','catalog','production']});
  useEffect(()=>{const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=(id,task=null)=>{
-  setRecipeId(id);setRequestId(null);setConfirmed(false);setActiveTaskId(null);
+  setOutputLot('');setExpiryDate('');setRecipeId(id);setRequestId(null);setConfirmed(false);setActiveTaskId(null);
   const r=recipes.find(x=>x.id===id);
   const quantity=executionQuantity(task,r);
   setPortions(String(quantity));
-  setItems((r?.lines||[]).map(l=>({productId:l.productId,quantity:String(suggestedQuantity(l.quantity,quantity,r.yieldQuantity,{individual:false})??'')})));
+  setItems((r?.lines||[]).map(l=>({productId:l.productId,quantity:r.stockEffect==='measured_transformation'?'':String(suggestedQuantity(l.quantity,quantity,r.yieldQuantity,{individual:false})??'')})));
   setNotes('');
  };
  const selectProduct=(i,value)=>{setItems(a=>a.map((x,j)=>j===i?{...x,productId:value}:x));setRequestId(null);setConfirmed(false)};
@@ -77,7 +78,7 @@ export default function Production({membership}){
   }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const finish=async e=>{
-  e.preventDefault();if(busy||!confirmed)return;
+  e.preventDefault();if(busy||!confirmed||!selected)return;
   if(!window.confirm(selected?.outputProductId?'Confirmar a transformação? Os ingredientes sairão dos locais definidos na ficha e o produto preparado entrará na reserva.':'Confirmar a produção e descontar agora os ingredientes realmente utilizados do giro?'))return;
   setBusy(true);setStatus('');
   const id=requestId||crypto.randomUUID();setRequestId(id);
@@ -93,6 +94,7 @@ export default function Production({membership}){
  return <section className="inventory-page production-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId.toUpperCase()}</p>
   <h1>Produção da cozinha</h1><LiveStatus state={live}/><p>Planeje o preparo, registre a quantidade produzida e consulte o histórico.</p>
+  {blockedRecipes.length>0&&<details className="receiving-card"><summary>Preparações indisponíveis ({blockedRecipes.length})</summary><ul>{blockedRecipes.map(r=><li key={r.id}><strong>{r.name}</strong><ul>{r.errors.map((error,i)=><li key={i}>{error}</li>)}</ul></li>)}</ul><p>A gestão pode revisar os vínculos abaixo em Configurar preparação ou Fichas anteriores.</p></details>}
   {status&&<p role="status" className="receiving-notice">{status}</p>}
   <section className="receiving-card ti-v4-daily-tasks"><h2>Lista de produção de hoje</h2><p>Planejamento compartilhado da cozinha. Só a confirmação da quantidade realmente produzida movimenta o estoque.</p>
    {canPlan&&<form className="ti-v4-daily-task-form" onSubmit={addDailyTask}><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional ({recipes.find(r=>r.id===plannedRecipe)?.outputUnit||'un'})<input type="number" min="0.001" max="10000" step="0.001" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading}>Adicionar à lista</button></form>}
@@ -101,18 +103,18 @@ export default function Production({membership}){
   <div className="production-layout ti-v4-production-layout">
    <section className="receiving-card">
     <h2><ClipboardList size={19} aria-hidden="true"/> Registrar produção</h2>
-    {selected?.stockEffect==='portion_same_product'?<><label>Preparação<select value={recipeId} onChange={e=>choose(e.target.value)}><option value="">Selecione a preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><SameProductPortioning key={membership.unitId+recipeId+(activeTaskId||'')} taskId={activeTaskId} recipe={selected} call={call} management={admin} onSaved={async message=>{setStatus(message);notify(message,'success');await Promise.all([load(true),loadTasks()])}}/></>:<form className="stock-action-form" onSubmit={finish}>
-     <label>Preparação<select required value={recipeId} onChange={e=>choose(e.target.value)}>
+    {selected?.stockEffect==='portion_same_product'?<><label>Preparação<select aria-label="Preparação para registrar produção" value={recipeId} onChange={e=>choose(e.target.value)}><option value="">Selecione a preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><SameProductPortioning key={membership.unitId+recipeId+(activeTaskId||'')} taskId={activeTaskId} recipe={selected} call={call} management={admin} onSaved={async message=>{setStatus(message);notify(message,'success');await Promise.all([load(true),loadTasks()])}}/></>:<form className="stock-action-form" onSubmit={finish}>
+     <label>Preparação<select aria-label="Preparação para registrar produção" required value={recipeId} onChange={e=>choose(e.target.value)}>
       <option value="">Selecione a preparação</option>
       {recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
      </select></label>
      {selected&&<>
       <label>Quantidade produzida ({selected.outputUnit||'un'})<input type="number" required min={['un','porcao','pacote','duzia'].includes(selected.outputUnit||'un')?'1':'0.001'} step={['un','porcao','pacote','duzia'].includes(selected.outputUnit||'un')?'1':'0.001'} value={portions} onChange={e=>{const n=Number(e.target.value);setPortions(e.target.value);setRequestId(null);setConfirmed(false);
-       if(n>0&&selected)setItems(selected.lines.map(line=>({productId:line.productId,
+       if(n>0&&selected&&selected.stockEffect!=='measured_transformation')setItems(selected.lines.map(line=>({productId:line.productId,
         quantity:String(suggestedQuantity(line.quantity,n,selected.yieldQuantity,{individual:false})??'')})))}}/></label>
-      <p>{selected.outputProductId?'Esta ficha transforma os ingredientes dos locais definidos em um produto preparado na reserva. As quantidades precisam respeitar a ficha validada.':'Revise as quantidades reais. Os valores iniciais vêm da ficha técnica e podem ser corrigidos.'}</p>
-      {selected.outputProductId&&<div className="ti-v4-conversion-summary"><strong>{selected.name} → {option(selected.outputProductId)?.name||'Preparação final'}</strong><p>Destino: reserva · {portions||'—'} {selected.outputUnit||'un'} preparados.</p><small>Insumos previstos conforme ficha técnica:</small><ul>{items.map((item,i)=><li key={i}>{option(item.productId)?.name||item.productId}: {item.quantity||'—'} {inputUnit(item.productId)} de {selected.lines[i]?.location||'reserva'}</li>)}</ul></div>}
-      {!selected.outputProductId&&items.map((item,i)=>{
+      <p>{selected.stockEffect==='measured_transformation'?'Informe quanto da matéria-prima foi realmente separado para esta transformação e quantas porções ficaram prontas. Não inclua a parte destinada a grelhar ou empanar. A confirmação desconta somente o que foi separado e adiciona o rendimento final.':selected.outputProductId?'Esta ficha transforma os ingredientes dos locais definidos em um produto preparado na reserva. As quantidades precisam respeitar a ficha validada.':'Revise as quantidades reais. Os valores iniciais vêm da ficha técnica e podem ser corrigidos.'}</p>
+      {selected.outputProductId&&<div className="ti-v4-conversion-summary"><strong>{selected.name} → {option(selected.outputProductId)?.name||'Preparação final'}</strong><p>Destino: reserva · {portions||'—'} {selected.outputUnit||'un'} preparados.</p><small>{selected.stockEffect==='measured_transformation'?'Matéria-prima realmente separada (sem consumo presumido por porção):':'Insumos previstos conforme ficha técnica:'}</small><ul>{items.map((item,i)=><li key={i}>{option(item.productId)?.name||item.productId}: {item.quantity||'—'} {inputUnit(item.productId)} de {selected.lines[i]?.location||'reserva'}</li>)}</ul></div>}
+      {(!selected.outputProductId||selected.stockEffect==='measured_transformation')&&items.map((item,i)=>{
        const original=selected.lines[i];const allowed=[original.productId,...(original.substitutes||[])];
        return <div className="stock-lot-row" key={i}>
         <label>Ingrediente {i+1}<select value={item.productId} onChange={e=>selectProduct(i,e.target.value)}>
@@ -132,7 +134,7 @@ export default function Production({membership}){
    {admin&&<PreparationSetup key={membership.unitId} unitId={membership.unitId} products={products} call={call} onSaved={()=>load(true)}/>}
    {admin&&<details className="receiving-card ti-v4-recipe-details">
     <summary><BookOpen size={20} aria-hidden="true"/><span>Fichas anteriores <small>Revisar ou arquivar preparações já cadastradas</small></span></summary>
-    <h2>{editRecipeId?'Revisar ficha técnica':'Nova ficha técnica'}</h2><label>Ficha para revisar<select value={editRecipeId} onChange={e=>{const r=recipes.find(x=>x.id===e.target.value);setEditRecipeId(r?.id||'');setRecipeVersion(r?.version??null);setName(r?.name||'');setMethod(r?.method||'');setYield(String(r?.yieldQuantity||1));setOutputProductId(r?.outputProductId||'');setLines(r?.lines?.map(l=>({...l,substitutes:l.substitutes||[]}))||[{productId:'',quantity:'',substitutes:[]}])}}><option value="">Criar nova ficha</option>{recipes.filter(r=>!r.preparationConfig).map(r=><option key={r.id} value={r.id}>{r.name} · v{r.version}</option>)}</select></label>
+    <h2>{editRecipeId?'Revisar ficha técnica':'Nova ficha técnica'}</h2><label>Ficha para revisar<select value={editRecipeId} onChange={e=>{const r=reviewRecipes.find(x=>x.id===e.target.value);setEditRecipeId(r?.id||'');setRecipeVersion(r?.version??null);setName(r?.name||'');setMethod(r?.method||'');setYield(String(r?.yieldQuantity||1));setOutputProductId(r?.outputProductId||'');setLines(r?.lines?.map(l=>({...l,substitutes:l.substitutes||[]}))||[{productId:'',quantity:'',substitutes:[]}])}}><option value="">Criar nova ficha</option>{reviewRecipes.filter(r=>!r.preparationConfig).map(r=><option key={r.id} value={r.id}>{r.name} · v{r.version}{!r.available?' · indisponível':''}</option>)}</select></label>
     <p>Defina uma preparação validada, com quantidades por rendimento. Não invente pesos nem conversões entre kg e peças.</p>
     <form className="stock-action-form" onSubmit={saveRecipe}>
      <label>Nome da preparação<input required minLength={3} maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label>

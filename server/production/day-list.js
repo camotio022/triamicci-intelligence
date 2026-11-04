@@ -1,3 +1,4 @@
+import {recipeAvailability,recipeProducts} from './readiness.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from '../operations/catalog-identity.js';
 import {validQuantity} from '../operations/logic.js';
@@ -36,6 +37,8 @@ export default async function handler(req,res){
     const recipe=recipeDoc.data(),ids=[...new Set([...(recipe.lines||[]).map(line=>line.productId),recipe.outputProductId].filter(Boolean))];
     const products=await Promise.all(ids.map(id=>tx.get(unit.collection('products').doc(id))));
     if(products.some(p=>!p.exists||!isOperationalProduct(p.data())))throw Error('RECIPE_NOT_FOUND');
+    const context=await recipeProducts(db,unit,[recipe],products,tx);
+    if(!recipeAvailability(recipe,context).available)throw Error('RECIPE_NOT_FOUND');
     const outputUnit=recipeDoc.data().outputUnit||'un';if(plannedQuantity!==null&&!validQuantity(plannedQuantity,{unit:outputUnit}))throw Error('INVALID_QUANTITY');
     const now=new Date();
     tx.create(taskRef,{recipeId,recipeName:recipeDoc.data().name,unit:outputUnit,plannedQuantity,status:'pending',day,unitId:m.unitId,createdBy:actor.uid,createdAt:now});

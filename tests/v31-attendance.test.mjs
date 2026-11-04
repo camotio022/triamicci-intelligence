@@ -9,3 +9,5 @@ test('jornada somente aceita transições legais',()=>{
  assert.equal(attendanceTransition('on_break','clock_out'),null);
  assert.equal(attendanceTransition('finished','clock_in'),null);
 });
+
+test('prorrogação mantém a declaração atual, sem iniciar nem reabrir jornada',()=>{assert.equal(attendanceTransition('working','continue_work'),'working');assert.equal(attendanceTransition('on_break','continue_work'),'on_break');assert.equal(attendanceTransition('finished','continue_work'),null);assert.equal(attendanceTransition('not_started','continue_work'),null)});

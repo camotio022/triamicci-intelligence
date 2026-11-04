@@ -1,3 +1,4 @@
+import {historyNames,historyActor} from '../../server/operations/history-names.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
 import {intervalFromBalance} from '../../server/operations/inventory-summary.js';
@@ -154,7 +155,7 @@ export default async function handler(req,res){
     result[key]=snap.docs.slice(0,size).map(clean);
     result['hasMore_'+key]=snap.size>size;
    }));
-   return send(res,200,'Histórico físico carregado.',result);
+   return send(res,200,'Histórico físico carregado.',await historyNames(db,unit,result));
   }
   if(!['receive','count'].includes(action))return send(res,400,'Ação inválida.');
   const {productId,requestId}=req.body||{};
@@ -198,7 +199,7 @@ export default async function handler(req,res){
      new Date(payload.expiryDate+'T12:00:00Z').toISOString().slice(0,10)!==payload.expiryDate||payload.expiryDate<now.toISOString().slice(0,10))throw Error('INVALID');
    }
    const record={...payload,...(commercial||{}),productId,productName:p.name,unit:unitName,
-    actorUid:actor.uid,actorName:current.displayName||current.name||actor.email||actor.uid,
+    actorUid:actor.uid,actorName:historyActor(current,actor),
     unitId:m.unitId,at:now,kind:action,
     ...(action==='count'?{inventorySummary:intervalFromBalance(balanceSnap?.data()),difference:balanceSnap?.exists?Math.round((balanceSnap.data().total-payload.reserve-payload.rotation)*1000)/1000:null}:{} )};
    if(existing.exists){
