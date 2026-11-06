@@ -1,0 +1,8 @@
+rules_version = '2';
+service firebase.storage {
+ match /b/{bucket}/o {
+  // Evidence is served only through the authenticated unit-scoped backend.
+  match /checklists/{path=**} { allow read, write: if false; }
+  match /{path=**} { allow read, write: if false; }
+ }
+}
