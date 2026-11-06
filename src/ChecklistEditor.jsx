@@ -13,7 +13,7 @@ export default function ChecklistEditor({template,duplicate,call,onSaved,onCance
  const save=async e=>{e.preventDefault();setBusy(true);setError('');try{await call('saveTemplate',{id,model,expectedRevision:revision});setRevision(v=>v+1);setSaved(true);}catch(e){setError(e.message);}finally{setBusy(false);}};
  const publish=async()=>{setBusy(true);setError('');try{await call('publishTemplate',{id,expectedRevision:revision});onSaved('Checklist publicado.');}catch(e){setError(e.message);}finally{setBusy(false);}};
  return <section className="ti-check-card ti-check-editor" aria-label="Configurar checklist">
-  <h2>{duplicate?'Duplicar modelo':template?'Editar modelo':'Novo modelo'}</h2><p>Você define os itens da sua unidade. Alterações não mudam conferências já iniciadas.</p>
+  <h2>{duplicate?'Duplicar modelo':template?'Editar modelo':'Novo modelo'}</h2><p>Você define os itens da sua unidade. Alterações valem para novas listas; conferências já geradas ficam preservadas.</p>
   <form onSubmit={save}><fieldset disabled={busy}>
    <label>Nome do checklist<input required maxLength={100} value={model.name} onChange={e=>update('name',e.target.value)}/></label>
    <div className="ti-check-grid"><label>Momento<select value={model.moment} onChange={e=>update('moment',e.target.value)}><option value="opening">Abertura</option><option value="closing">Fechamento</option><option value="other">Outro</option></select></label><label>Horário limite<input type="time" required value={model.dueTime} onChange={e=>update('dueTime',e.target.value)}/></label></div>
