@@ -28,3 +28,20 @@ jobs:
         env:
           CI: true
         run: npx --yes firebase-tools@14.2.0 emulators:exec --project demo-triamicci-v31 --only auth,firestore,storage "node --test --test-concurrency=1 tests/auth-session-mobile.test.mjs tests/production-audit-emulator.test.mjs tests/preparation-emulator.test.mjs tests/preparation-mobile.test.mjs tests/adversarial-emulator.test.mjs tests/v31-emulator.test.mjs tests/v4-emulator.test.mjs tests/catalog-56-emulator.test.mjs tests/release-roles-emulator.test.mjs tests/unit-management-emulator.test.mjs tests/checklists-emulator.test.mjs tests/checklists-mobile.test.mjs tests/checklists-fullstack-emulator.test.mjs tests/v4-mobile.test.mjs"
+
+  cloudinary-private-smoke:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test synthetic evidence with real private storage
+        env:
+          CHECKLIST_CLOUDINARY_CLOUD_NAME: ${{ vars.CHECKLIST_CLOUDINARY_CLOUD_NAME }}
+          CHECKLIST_CLOUDINARY_PRESET: ${{ vars.CHECKLIST_CLOUDINARY_PRESET }}
+          CHECKLIST_CLOUDINARY_API_KEY: ${{ secrets.CHECKLIST_CLOUDINARY_API_KEY }}
+          CHECKLIST_CLOUDINARY_API_SECRET: ${{ secrets.CHECKLIST_CLOUDINARY_API_SECRET }}
+        run: node scripts/test-cloudinary-private.mjs
