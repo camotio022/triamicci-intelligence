@@ -1,0 +1,41 @@
+name: Checklist Cloudinary - private upload smoke
+on:
+  push:
+    branches:
+      - feat/unit-checklists
+    paths:
+      - '.github/workflows/checklist-cloudinary-smoke.yml'
+      - 'scripts/test-cloudinary-private.mjs'
+      - 'server/checklists/cloudinary-storage.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: checklist-cloudinary-smoke
+  cancel-in-progress: false
+jobs:
+  smoke:
+    name: Testar upload privado e exclusao de imagem ficticia
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CHECKLIST_CLOUDINARY_CLOUD_NAME: ${{ vars.CHECKLIST_CLOUDINARY_CLOUD_NAME }}
+      CHECKLIST_CLOUDINARY_PRESET: ${{ vars.CHECKLIST_CLOUDINARY_PRESET }}
+      CHECKLIST_CLOUDINARY_API_KEY: ${{ secrets.CHECKLIST_CLOUDINARY_API_KEY }}
+      CHECKLIST_CLOUDINARY_API_SECRET: ${{ secrets.CHECKLIST_CLOUDINARY_API_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar configuracao do GitHub sem exibir segredos
+        shell: bash
+        run: |
+          if [ -z "$CHECKLIST_CLOUDINARY_CLOUD_NAME" ] || [ -z "$CHECKLIST_CLOUDINARY_PRESET" ] || [ -z "$CHECKLIST_CLOUDINARY_API_KEY" ] || [ -z "$CHECKLIST_CLOUDINARY_API_SECRET" ]; then
+            echo "::error::Cloudinary ainda nao esta configurado nos Secrets/Variables do GitHub Actions. As credenciais da Vercel nao sao copiadas automaticamente."
+            exit 1
+          fi
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+      - name: Testar envio, acesso nao autenticado, leitura privada e exclusao
+        run: node scripts/test-cloudinary-private.mjs
