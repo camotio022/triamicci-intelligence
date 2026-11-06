@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/checklist-cloudinary-smoke.yml'
       - 'scripts/test-cloudinary-private.mjs'
+      - 'scripts/diagnose-cloudinary-preset.mjs'
       - 'server/checklists/cloudinary-storage.js'
   workflow_dispatch:
 permissions:
