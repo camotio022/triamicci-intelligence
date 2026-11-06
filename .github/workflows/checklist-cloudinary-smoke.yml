@@ -35,7 +35,7 @@ jobs:
             echo "::error::Cloudinary ainda nao esta configurado nos Secrets/Variables do GitHub Actions. As credenciais da Vercel nao sao copiadas automaticamente."
             exit 1
           fi
-      - name: Instalar dependencias
-        run: npm ci --no-audit --no-fund
+      - name: Validar codigo do teste (sem dependencias externas)
+        run: node --check scripts/test-cloudinary-private.mjs
       - name: Testar envio, acesso nao autenticado, leitura privada e exclusao
         run: node scripts/test-cloudinary-private.mjs
