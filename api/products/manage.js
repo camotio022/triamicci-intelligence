@@ -1,3 +1,4 @@
+import {isManagement} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import preparedProduct from '../../server/catalog/prepared-product.js';
 import {isOperationalProduct,belongsToOperationalCatalog,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
@@ -49,7 +50,7 @@ export default async function handler(req,res) {
       }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))});
     }
     if(action==='correctUnits'){
-      if(m.role!=='admin')return send(res,403,'Somente administrador pode corrigir unidades.');
+      if(!isManagement(m.role))return send(res,403,'Somente a gestão da unidade pode corrigir unidades.');
       const {productId,operationalUnit,receivingUnit,reason,confirm}=req.body||{};
       if(confirm!=='RECONTAR_UNIDADE'||typeof productId!=='string'||!/^[a-f0-9]{40}$/.test(productId)||
          !units.includes(operationalUnit)||!units.includes(receivingUnit)||
@@ -60,7 +61,7 @@ export default async function handler(req,res) {
       await db.runTransaction(async tx=>{
        const [member,product]=await Promise.all([tx.get(memberRef),tx.get(productRef)]);
        const current=member.data();
-       if(!current||current.status!=='active'||current.role!=='admin'||current.unitId!==m.unitId)throw Error('FORBIDDEN');
+       if(!current||current.status!=='active'||!isManagement(current.role)||current.unitId!==m.unitId)throw Error('FORBIDDEN');
        if(!product.exists)throw Error('NOT_FOUND');
        const old=product.data();
        tx.update(productRef,{operationalUnitOverride:operationalUnit,receivingUnitOverride:receivingUnit,

@@ -10,3 +10,13 @@ test('only matching immutable references can pass commit guards',()=>{
  assert.ok(canCommitPackageAdjustment({...base,lotAllocationsValid:false}).reasons.includes('LOTS_NOT_READY'));
  assert.ok(canCommitPackageAdjustment({...base,actor:{...base.actor,role:'cook'}}).reasons.includes('FORBIDDEN'));
 });
+test('gerência e subgerência conciliam somente na própria unidade com vínculo ativo',()=>{
+ for(const role of ['admin','manager','submanager']){
+  const actor={...base.actor,role};
+  assert.equal(canCommitPackageAdjustment({...base,actor}).ok,true);
+  for(const invalid of [{...actor,unitId:'other'},{...actor,status:'inactive'}])
+   assert.ok(canCommitPackageAdjustment({...base,actor:invalid}).reasons.includes('FORBIDDEN'));
+ }
+ for(const role of ['cook','auxiliar','unknown'])
+  assert.ok(canCommitPackageAdjustment({...base,actor:{...base.actor,role}}).reasons.includes('FORBIDDEN'));
+});

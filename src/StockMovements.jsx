@@ -1,3 +1,4 @@
+import {isManagement} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import React, {useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
@@ -29,7 +30,7 @@ export default function StockMovements({products,membership,onUpdated}) {
   const [saving,setSaving]=useState(false);
   // Manter o mesmo ID após erro de rede evita lançamentos duplicados no reenvio.
   const [requestId,setRequestId]=useState(()=>crypto.randomUUID());
-  const canEnter=['admin','manager'].includes(membership.role);
+  const canEnter=isManagement(membership.role);
   const selected=products.find(p=>p.id===productId);
   const eligible=products.filter(p=>p.status==='active');
   const load=useCallback(async()=>{

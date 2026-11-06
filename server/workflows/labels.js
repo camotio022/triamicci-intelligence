@@ -1,3 +1,4 @@
+import {isManagement} from '../permissions/v31-policy.js';
 import {sendQuotaError} from '../quota-error.js';
 import {getDb,getAuth,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {dateOk,cappedExpiry,canReplaceLabel} from '../labels/rules.js';
@@ -33,26 +34,26 @@ export default async function handler(req,res){
    return send(res,200,'Histórico da etiqueta.',{label:safeDoc(doc),events:events.map(e=>({...e,actorName:names.get(e.actorUid)||'Responsável não identificado'}))});
   }
   if(action==='policyDraft'){
-   if(m.role!=='admin')return send(res,403,'Apenas administradores configuram regras.');
+   if(!isManagement(m.role))return send(res,403,'Somente a gestão da unidade configura regras.');
    const {category,zone,days,reference,conditions}=req.body||{};
    if(!categories.includes(category)||!zones.includes(zone)||!Number.isInteger(days)||days<1||days>365||!textOk(reference,250)||!textOk(conditions,400))
     return send(res,400,'Informe regra, condições de conservação e referência sanitária verificável.');
    const ref=policies.doc(policyId(category,zone)),now=new Date();
    await db.runTransaction(async tx=>{
     const [u,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!u.exists||u.data().status!=='active'||u.data().unitId!==m.unitId||u.data().role!=='admin')throw Error('FORBIDDEN');
+    if(!u.exists||u.data().status!=='active'||u.data().unitId!==m.unitId||!isManagement(u.data().role))throw Error('FORBIDDEN');
     tx.set(ref,{category,zone,days,reference:reference.trim(),conditions:conditions.trim(),status:'draft',revision:(old.data()?.revision||0)+1,createdBy:actor.uid,unitId:m.unitId,updatedAt:now});
     tx.create(db.collection('auditLogs').doc(),{event:'label.policy_draft',unitId:m.unitId,actorUid:actor.uid,policyId:ref.id,at:now});
    });
    return send(res,200,'Regra salva como rascunho. Não está ativa.');
   }
   if(action==='policyApprove'){
-   if(m.role!=='admin')return send(res,403,'Aprovação restrita a administrador.');
+   if(!isManagement(m.role))return send(res,403,'Aprovação restrita à gestão da unidade.');
    const id=req.body?.id;if(!/^(massas|carnes|outros)_(reserva|giro)$/.test(id||''))return send(res,400,'Política inválida.');
    const ref=policies.doc(id),now=new Date();
    await db.runTransaction(async tx=>{
     const [u,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!u.exists||u.data().status!=='active'||u.data().unitId!==m.unitId||u.data().role!=='admin')throw Error('FORBIDDEN');
+    if(!u.exists||u.data().status!=='active'||u.data().unitId!==m.unitId||!isManagement(u.data().role))throw Error('FORBIDDEN');
     if(!old.exists||old.data().status!=='draft'||old.data().createdBy===actor.uid)throw Error('POLICY_STATE');
     tx.update(ref,{status:'approved',approvedBy:actor.uid,approvedAt:now});
     tx.create(db.collection('auditLogs').doc(),{event:'label.policy_approved',unitId:m.unitId,actorUid:actor.uid,policyId:id,at:now});
@@ -60,13 +61,13 @@ export default async function handler(req,res){
    return send(res,200,'Regra aprovada para a unidade.');
   }
   if(action==='classifyProduct'){
-   if(m.role!=='admin')return send(res,403,'Apenas administradores classificam produtos para validade.');
+   if(!isManagement(m.role))return send(res,403,'Somente a gestão da unidade classifica produtos para validade.');
    const {productId,category,reason}=req.body||{};
    if(!idOk(productId)||!categories.includes(category)||!textOk(reason,240)||reason.trim().length<10)return send(res,400,'Produto, categoria ou justificativa inválidos.');
    const ref=unit.collection('products').doc(productId),now=new Date();
    await db.runTransaction(async tx=>{
     const [ms,p]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!ms.exists||ms.data().status!=='active'||ms.data().unitId!==m.unitId||ms.data().role!=='admin')throw Error('FORBIDDEN');
+    if(!ms.exists||ms.data().status!=='active'||ms.data().unitId!==m.unitId||!isManagement(ms.data().role))throw Error('FORBIDDEN');
     if(!p.exists||p.data().status!=='active')throw Error('NOT_FOUND');
     tx.update(ref,{labelCategory:category,labelCategoryUpdatedAt:now,labelCategoryUpdatedBy:actor.uid});
     tx.create(db.collection('auditLogs').doc(),{event:'label.category_classified',unitId:m.unitId,actorUid:actor.uid,productId,category,previousCategory:p.data().labelCategory||null,reason:reason.trim(),at:now});

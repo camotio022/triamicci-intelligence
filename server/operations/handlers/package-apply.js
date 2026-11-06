@@ -1,3 +1,4 @@
+import {isManagement} from '../../permissions/v31-policy.js';
 import {sendQuotaError} from '../../quota-error.js';
 import {signalUnitChange} from '../../live-signal.js';
 // Aplicação transacional restrita. Revalida estado dentro da transação.
@@ -19,7 +20,7 @@ export default async function handler(req,res){
  if(process.env.ENABLE_PACKAGE_BALANCE_APPLY!=='true')return send(res,503,'Aplicação de ajustes ainda não habilitada. Use apenas a prévia.');
  try{
   const user=await authenticate(req),m=await membership(user.uid);
-  if(!m?.unitId||m.role!=='admin')return send(res,403,'Somente administrador pode aplicar ajustes.');
+  if(!m?.unitId||!isManagement(m.role))return send(res,403,'Somente a gestão da unidade pode aplicar ajustes.');
   const {action,productId,conferenceId,requestId,expected}=req.body||{};
   if(action!=='apply'||!productPattern.test(productId||'')||!requestPattern.test(conferenceId||'')||!requestPattern.test(requestId||'')||!expected||
     typeof expected!=='object'||Array.isArray(expected))return send(res,400,'Solicitação inválida.');
@@ -37,7 +38,7 @@ export default async function handler(req,res){
     if(existing.data().payloadHash!==payloadHash||existing.data().actorUid!==user.uid)throw Error('CONFLICT');
     duplicate=true;after=existing.data().after;return;
    }
-   if(!actor.exists||actor.data().status!=='active'||actor.data().role!=='admin'||actor.data().unitId!==m.unitId)throw Error('FORBIDDEN');
+   if(!actor.exists||actor.data().status!=='active'||!isManagement(actor.data().role)||actor.data().unitId!==m.unitId)throw Error('FORBIDDEN');
    if(!product.exists||!conference.exists||!profile.exists||!balance.exists)throw Error('MISSING');
    const p=product.data(),conf=conference.data(),cfg=profile.data(),b=balance.data();
    // Não lançar ajustes por este fluxo quando há lotes ou pacotes abertos.

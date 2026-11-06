@@ -1,3 +1,4 @@
+import {isManagement} from '../../permissions/v31-policy.js';
 import {sendQuotaError} from '../../quota-error.js';
 import {signalUnitChange} from '../../live-signal.js';
 // Cadastro de apresentações por unidade. Não altera saldo, lote ou histórico.
@@ -43,7 +44,7 @@ export default async function handler(req,res){
    return send(res,200,'Apresentações consultadas.',{profile:profile.exists?{...profile.data(),updatedAt:profile.data().updatedAt?.toDate?.()?.toISOString?.()||null}:null});
   }
   if(action!=='save')return send(res,400,'Ação inválida.');
-  if(!['admin','manager'].includes(member.role))return send(res,403,'Somente gerência pode configurar apresentações.');
+  if(!isManagement(member.role))return send(res,403,'Somente gerência pode configurar apresentações.');
   const validated=validatePackageConfiguration(req.body);
   if(!validated.ok)return send(res,400,'Confira apresentações e evidências: '+validated.reason);
   const countValidation=validateCountingMethod(req.body.countingMethod,validated.packages);
@@ -54,7 +55,7 @@ export default async function handler(req,res){
   await db.runTransaction(async tx=>{
    const [memberSnap,product,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(productRef),tx.get(profileRef)]);
    const active=memberSnap.data();
-   if(!active||active.status!=='active'||active.unitId!==member.unitId||!['admin','manager'].includes(active.role))throw Error('FORBIDDEN');
+   if(!active||active.status!=='active'||active.unitId!==member.unitId||!isManagement(active.role))throw Error('FORBIDDEN');
    if(!product.exists||product.data().status!=='active')throw Error('PRODUCT_NOT_FOUND');
    const oldVersion=old.exists?(old.data().version||0):0;
    if(req.body.expectedVersion!==oldVersion)throw Error('CONFLICT');
