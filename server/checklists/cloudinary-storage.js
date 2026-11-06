@@ -42,7 +42,7 @@ export function cloudinaryBucket({config=cloudinaryConfig(),fetcher=fetch}={}){
   const publicId=safePublicId(path);let metadata;
   return {
    async save(bytes){
-    const result=await request('upload',{public_id:publicId,type:'authenticated',overwrite:false,upload_preset:config.preset},bytes);
+    const result=await request('authenticated',{public_id:publicId,overwrite:false,upload_preset:config.preset},bytes);
     if(result.type!=='authenticated'||result.public_id!==publicId||result.resource_type!=='image'||result.format!=='jpg'||!result.asset_id||!result.version||result.existing)throw Error('PHOTO_PRIVACY_REQUIRED');
     metadata={generation:String(result.version),assetId:result.asset_id};
    },
