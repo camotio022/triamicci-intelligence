@@ -83,3 +83,9 @@ Essa configuração externa permanece pendente. Sem ela, o fluxo com fotos não 
 - A inspeção das variáveis da Vercel confirmou ausência de `CHECKLIST_STORAGE_BUCKET`. Não há credencial/variáveis de preview configuradas. Ativação de fotos na produção ainda depende dessa configuração externa; não afirmar homologação de produção.
 
 Validação do fechamento: diagnóstico do bucket, bloqueio de configuração para a equipe e teste de rotina automática ainda não iniciada incluídos. Os testes próprios de Firebase/Storage e UI passaram novamente. A câmera não abre depois que a tela é abandonada enquanto a autorização do servidor ainda está pendente.
+
+## Teste integrado de ponta a ponta
+
+`tests/checklists-fullstack-emulator.test.mjs` foi aprovado: navegador do gerente cria/publica modelo usando a API real, outro contexto autenticado como auxiliar recebe a rotina, captura JPEG pela câmera simulada, envia ao Storage isolado e conclui via API. O teste confirma documento/autor/arquivo e a atualização ao vivo para o gerente, que abre a evidência em sua sessão. Não há resposta de negócio simulada nesse teste; somente a câmera e a origem HTTPS do proxy local são de homologação. A fixture e seu proxy são exclusivos de teste e não fazem parte do build publicado.
+
+A proposta e o módulo continuam no PR #142. Código/testes não dependem da instalação da conexão Firebase no ChatGPT. Essa conexão seria apenas um caminho para configurar o projeto real; a alternativa é revisar a configuração no console com o titular da conta. Não atribuir a indisponibilidade da conexão ao plano do usuário sem verificar a causa.
