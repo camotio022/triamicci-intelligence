@@ -42,3 +42,36 @@ Configurar execução diária da limpeza com credencial protegida; não expor se
 ## Estado de continuidade
 
 Proposta registrada antes da implementação. Esta seção e o PR devem ser atualizados com testes efetivamente executados e configurações externas pendentes. Não fazer merge automático deste novo módulo.
+
+## Implementação entregue nesta branch
+
+- `server/checklists/`: validação, modelos, rotinas, respostas, tratamento de ocorrências, captura, acesso privado e limpeza.
+- `src/Checklists.jsx`, `ChecklistEditor.jsx`, `ChecklistCamera.jsx`: Hoje/Histórico/Gestão, editor de itens e câmera sem galeria. Navegação integrada no app.
+- Nenhuma lista de abertura/fechamento foi pré-cadastrada. Toda tarefa vem do modelo da unidade.
+- Modelos publicados ficam disponíveis à equipe; a rotina diária é materializada na primeira consulta do dia, sem exigir iniciar a conferência. O worker diário permite guardar também os dias sem nenhum acesso.
+- Limites explícitos: até 40 itens por modelo, 100 execuções por unidade/dia e 120 sessões de captura por execução. Hoje possui limite explícito de 100 modelos ativos/execuções. Gestão e histórico têm paginação de 30 registros, sem baixar todo o acervo.
+- `qa/checklists.html` usa exclusivamente Firebase de demonstração. Testes de câmera usam dispositivo simulado, sem imagens do restaurante.
+- Não há fila offline: falha de rede não conclui item. Rascunhos de formulário não são persistidos no navegador nesta versão.
+- Itens respondidos preservam o registro original; correção de uma resposta já concluída é uma evolução futura. Ocorrências têm tratamento separado e auditado.
+
+## Habilitação de fotos e rotina diária
+
+1. Conferir faturamento Blaze e escolher bucket privado do mesmo projeto. O código não cria bucket nem ativa faturamento.
+2. Definir `CHECKLIST_STORAGE_BUCKET` no ambiente servidor da Vercel. Nunca colocar credencial de serviço no frontend.
+3. Revisar e aplicar as regras de Storage. As evidências são servidas pelo backend autenticado; não usar URLs públicas/tokens permanentes.
+4. Mesclar `firestore.indexes.json` com eventuais índices existentes no projeto antes de publicar: `cleanupAt` necessita índice de collection group. Não excluir índices que outros módulos usam.
+5. Cadastrar segredo GitHub `CHECKLIST_CLEANUP_SERVICE_ACCOUNT_JSON` com credencial protegida do projeto e permissões mínimas de Firestore e leitura/exclusão dos objetos de evidência. Variáveis: `CHECKLIST_FIREBASE_PROJECT_ID` e `CHECKLIST_STORAGE_BUCKET`.
+6. Somente após revisão operacional, definir a variável GitHub `CHECKLIST_PHOTO_CLEANUP_ENABLED=true`. O workflow opt-in roda diariamente às 03:05 UTC; gera as rotinas do dia em São Paulo e remove fotos expiradas. É possível executar os scripts manualmente sem `--apply` para apenas simular.
+7. Monitorar falhas do workflow, uso de armazenamento, tráfego e custos. O horário do agendador é aproximado. A consulta do app mantém a geração idempotente caso o job atrase.
+8. Revisar soft delete/versões/backups do bucket: a remoção lógica não significa eliminação imediata de todas as cópias cobradas. Os arquivos normais deixam de ser acessíveis no app após 90 dias, mesmo que a limpeza física aguarde a próxima execução.
+
+Essa configuração externa permanece pendente. Sem ela, o fluxo com fotos não deve ser considerado homologado na produção. Ainda é necessário testar câmera/permissões no iPhone/PWA real, pois a validação automatizada usa Chromium e câmera simulada.
+
+## Validação executada
+
+- 217 testes de regras aprovados e build aprovado.
+- Seis cenários integrados aprovados no Firebase isolado: catálogo 56, checklists com Storage, telas dos checklists, rotina dos cinco perfis, gestão por unidade e telas gerais V4.
+- Teste próprio dos checklists verifica criação/publicação/edição/arquivo, snapshot, função atribuída, acesso cruzado, revisão concorrente, foto obrigatória, leitura privada, Storage público negado, retenção/limpeza, workers reais e paginação.
+- UI exercitada em 320, 390, 768 e 1280 px, incluindo gerente/subgerente/cozinheiro/auxiliar. Câmera simulada: captura, compressão, envio e confirmação; falha de envio não mostra sucesso. Sem seletor de arquivo/galeria.
+- A primeira execução da regressão V4 teve timeout no campo de mês da escala. Passou isoladamente e na repetição conjunta; nenhum teste foi removido ou enfraquecido.
+- Testes usam dados e imagens fictícios. Sem configuração de Storage de produção, sem merge/deploy e sem habilitação da limpeza de produção.

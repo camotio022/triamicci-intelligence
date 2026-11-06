@@ -1,3 +1,4 @@
+import checklistsWorkflow from '../../server/checklists/handler.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import {staffSeed,reconcileStaff,normalizeStaffName,defaultStaffAvailability} from '../../server/team/master-registry.js';
@@ -27,6 +28,7 @@ const cleanMember = (doc) => {
 };
 
 export default async function handler(req,res) {
+  if(req.body?.module==='checklists')return checklistsWorkflow(req,res);
   if(req.body?.module==='schedules')return schedulesWorkflow(req,res);
   if(req.body?.module==='attendanceV31')return attendanceWorkflow(req,res);
   if(req.body?.module==='mural')return muralWorkflow(req,res);

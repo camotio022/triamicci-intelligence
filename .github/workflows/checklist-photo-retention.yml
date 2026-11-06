@@ -1,0 +1,32 @@
+name: Checklist photo retention (opt-in)
+on:
+  schedule:
+    - cron: '5 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: checklist-photo-retention
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: vars.CHECKLIST_PHOTO_CLEANUP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - name: Generate daily routines, including unstarted ones
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.CHECKLIST_CLEANUP_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_EXPECTED_PROJECT_ID: ${{ vars.CHECKLIST_FIREBASE_PROJECT_ID }}
+        run: node scripts/materialize-checklist-days.mjs --apply
+      - name: Remove expired evidence; preserve open occurrences
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.CHECKLIST_CLEANUP_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_EXPECTED_PROJECT_ID: ${{ vars.CHECKLIST_FIREBASE_PROJECT_ID }}
+          CHECKLIST_STORAGE_BUCKET: ${{ vars.CHECKLIST_STORAGE_BUCKET }}
+        run: node scripts/cleanup-checklist-photos.mjs --apply

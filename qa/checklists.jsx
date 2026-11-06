@@ -1,0 +1,12 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {initializeApp} from 'firebase/app';
+import {getFirestore,connectFirestoreEmulator} from 'firebase/firestore';
+import {getAuth,connectAuthEmulator,signInAnonymously} from 'firebase/auth';
+import '../src/styles.css';
+const app=initializeApp({projectId:'demo-triamicci-v31',apiKey:'local-test',appId:'local-test'});
+const db=getFirestore(app),auth=getAuth(app);connectFirestoreEmulator(db,'127.0.0.1',8080);connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});await signInAnonymously(auth);
+const input=new URLSearchParams(location.search).get('role'),role=['admin','manager','submanager','cook','auxiliar'].includes(input)?input:'manager';
+await fetch('http://127.0.0.1:8080/v1/projects/demo-triamicci-v31/databases/(default)/documents/memberships/'+auth.currentUser.uid,{method:'PATCH',headers:{Authorization:'Bearer owner','Content-Type':'application/json'},body:JSON.stringify({fields:{unitId:{stringValue:'qa-checklists'},role:{stringValue:role},status:{stringValue:'active'}}})});
+const {default:Checklists}=await import('../src/Checklists.jsx');
+createRoot(document.getElementById('root')).render(<main style={{padding:16,fontFamily:'Inter, sans-serif'}}><Checklists membership={{unitId:'qa-checklists',role}}/></main>);
