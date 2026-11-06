@@ -93,3 +93,17 @@ A proposta e o módulo continuam no PR #142. Código/testes não dependem da ins
 ## Autonomia da unidade — reforço do contrato
 
 A lista pertence à unidade. Sua gestão define os itens e, individualmente, se cada um exige foto; o sistema não impõe foto a toda conferência. A tela oferece **Excluir item** e **Desfazer exclusão do item**, inclusive para o último item. É permitido salvar rascunho vazio, mas não publicar um modelo sem itens. Excluir/editar um item do modelo só vale para execuções futuras; as anteriores preservam a lista e as exigências que estavam publicadas. Testes cobrem exclusão, desfazer, rascunho vazio, impedimento de publicação vazia e confirmação real de item sem foto ao lado de item com foto obrigatória.
+
+## Cloudinary como alternativa ao Firebase Storage (06/11/2026)
+
+Decisão: manter dados/autenticação no Firebase e permitir Cloudinary somente para evidências. Conta Free confirmada no console; preset `triamicci_checklist_private` salvo como Signed, authenticated, JPG/JPEG e overwrite false, pasta `triamicci/checklists`. Isso não significa integração de produção ativa.
+
+Variáveis exclusivas de servidor (nunca VITE_*):
+- `CHECKLIST_PHOTO_PROVIDER=cloudinary`
+- `CHECKLIST_CLOUDINARY_CLOUD_NAME=on9luo58`
+- `CHECKLIST_CLOUDINARY_PRESET=triamicci_checklist_private`
+- `CHECKLIST_CLOUDINARY_API_KEY` e `CHECKLIST_CLOUDINARY_API_SECRET`, armazenadas como segredos.
+
+O backend assina uploads authenticated, usa identificador imutável por foto, não sobrescreve e valida a resposta. Leitura usa proxy autenticado por unidade; URLs assinadas e segredo não são retornados ao navegador. Cada captura registra provider/storageCloud; registros anteriores sem provider continuam Firebase, sem migração implícita. Limpeza usa o provedor original e continua preservando holds de ocorrências abertas. Não configurar lifecycle cego por idade.
+
+A rotina GitHub recebe as mesmas variáveis/segredos e só roda quando explicitamente habilitada. Ainda pendentes: chave dedicada autorizada, variáveis Vercel/GitHub, teste real de envio/read privado/acesso negado/exclusão de imagem sintética, CI e homologação iPhone. O diagnóstico CLOUDINARY_CONFIGURED informa apenas presença de configuração e não declara conexão validada. Testes locais usam respostas simuladas do provedor, não fotos do restaurante. Confirmar quota e alertas do Free antes de escalar.
