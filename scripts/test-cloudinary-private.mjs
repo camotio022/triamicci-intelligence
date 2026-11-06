@@ -15,6 +15,6 @@ try{
  assert.ok([401,403,404].includes(response.status),'Acesso sem assinatura precisa ser negado');await response.body?.cancel();
  const [read]=await file.download();assert.deepEqual(read,bytes,'Leitura privada deve preservar bytes');
  console.log('PASS: upload authenticated, acesso público negado e leitura privada confirmados.');
-}finally{
+}catch(error){console.error(JSON.stringify({status:error.providerStatus||null,reason:error.providerReason||'TEST_FAILURE'}));throw Error('Cloudinary smoke failed; see sanitized status above.');}finally{
  if(uploaded){await file.delete();console.log('PASS: imagem sintética removida.');await file.delete();console.log('PASS: exclusão idempotente.');}
 }

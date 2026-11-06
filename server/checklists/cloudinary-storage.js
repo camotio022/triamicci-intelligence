@@ -29,7 +29,11 @@ export function cloudinaryBucket({config=cloudinaryConfig(),fetcher=fetch}={}){
   form.set('api_key',config.key);form.set('signature',cloudinarySignature(signed,config.secret));
   if(bytes)form.set('file',new Blob([bytes],{type:'image/jpeg'}),'evidence.jpg');
   let response;try{response=await fetcher(`${base}/${operation}`,{method:'POST',body:form,redirect:'error',signal:AbortSignal.timeout(20000)});}catch{throw Error('PHOTO_UNAVAILABLE');}
-  if(!response.ok)throw Error('PHOTO_UNAVAILABLE');
+  if(!response.ok){
+   let message='';try{message=JSON.parse((await boundedBytes(response,32768)).toString('utf8')).error?.message||'';}catch{}
+   const providerReason=/invalid signature/i.test(message)?'INVALID_SIGNATURE':/preset/i.test(message)?'PRESET':/permission|not allowed|access|role/i.test(message)?'PERMISSION':'UNKNOWN';
+   throw Object.assign(Error('PHOTO_UNAVAILABLE'),{providerStatus:response.status,providerReason});
+  }
   let result;try{result=JSON.parse((await boundedBytes(response,32768)).toString('utf8'));}catch{throw Error('PHOTO_UNAVAILABLE');}
   return result;
  }
