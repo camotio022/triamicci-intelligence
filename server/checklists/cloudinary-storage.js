@@ -32,7 +32,7 @@ export function cloudinaryBucket({config=cloudinaryConfig(),fetcher=fetch}={}){
   let response;try{response=await fetcher(`${base}/${operation}`,{method:'POST',headers:{Authorization:authorization},body:form,redirect:'error',signal:AbortSignal.timeout(20000)});}catch{throw Error('PHOTO_UNAVAILABLE');}
   if(!response.ok){
    let message='';try{message=JSON.parse((await boundedBytes(response,32768)).toString('utf8')).error?.message||'';}catch{}
-   const providerReason=/invalid signature/i.test(message)?'INVALID_SIGNATURE':/preset/i.test(message)?'PRESET':/permission|not allowed|access|role/i.test(message)?'PERMISSION':'UNKNOWN';
+   const providerReason=/invalid signature/i.test(message)?'INVALID_SIGNATURE':/preset.{0,90}(not found|does not exist|unknown|invalid)/i.test(message)?'PRESET_NOT_FOUND':/(unsigned|not signed|signed upload|signature required)/i.test(message)?'SIGNING_MODE':/preset/i.test(message)?'PRESET':/permission|not allowed|access|role/i.test(message)?'PERMISSION':'UNKNOWN';
    throw Object.assign(Error('PHOTO_UNAVAILABLE'),{providerStatus:response.status,providerReason});
   }
   let result;try{result=JSON.parse((await boundedBytes(response,32768)).toString('utf8'));}catch{throw Error('PHOTO_UNAVAILABLE');}
