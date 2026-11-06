@@ -26,9 +26,10 @@ export function cloudinaryBucket({config=cloudinaryConfig(),fetcher=fetch}={}){
  async function request(operation,params,bytes){
   const signed={...params,timestamp:Math.floor(Date.now()/1000)};
   const form=new FormData();for(const [key,value] of Object.entries(signed))form.set(key,String(value));
-  form.set('api_key',config.key);form.set('signature',cloudinarySignature(signed,config.secret));
+  // Official server-to-server Basic authentication; secret stays in HTTPS header.
+  const authorization='Basic '+Buffer.from(config.key+':'+config.secret).toString('base64');
   if(bytes)form.set('file',new Blob([bytes],{type:'image/jpeg'}),'evidence.jpg');
-  let response;try{response=await fetcher(`${base}/${operation}`,{method:'POST',body:form,redirect:'error',signal:AbortSignal.timeout(20000)});}catch{throw Error('PHOTO_UNAVAILABLE');}
+  let response;try{response=await fetcher(`${base}/${operation}`,{method:'POST',headers:{Authorization:authorization},body:form,redirect:'error',signal:AbortSignal.timeout(20000)});}catch{throw Error('PHOTO_UNAVAILABLE');}
   if(!response.ok){
    let message='';try{message=JSON.parse((await boundedBytes(response,32768)).toString('utf8')).error?.message||'';}catch{}
    const providerReason=/invalid signature/i.test(message)?'INVALID_SIGNATURE':/preset/i.test(message)?'PRESET':/permission|not allowed|access|role/i.test(message)?'PERMISSION':'UNKNOWN';

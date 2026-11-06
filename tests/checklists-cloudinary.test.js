@@ -17,7 +17,7 @@ test('upload autenticado não sobrescreve e valida resposta do provedor',async()
  let observed;
  const bucket=cloudinaryBucket({config,fetcher:async(url,options)=>{observed={url,options};return json({type:'authenticated',resource_type:'image',format:'jpg',public_id:publicId,asset_id:'asset-test',version:123});}});
  const file=bucket.file(path);await file.save(Buffer.from(JPEG_BASE64,'base64'));
- assert.equal(observed.options.body.get('overwrite'),'false');assert.equal(observed.options.body.get('type'),'authenticated');assert.equal(observed.options.body.get('upload_preset'),config.preset);assert.equal(observed.options.body.get('api_secret'),null);assert.equal(observed.options.redirect,'error');assert.deepEqual(await file.getMetadata(),[{generation:'123',assetId:'asset-test'}]);
+ assert.equal(observed.options.body.get('overwrite'),'false');assert.equal(observed.options.body.get('type'),'authenticated');assert.equal(observed.options.body.get('upload_preset'),config.preset);assert.equal(observed.options.body.get('api_secret'),null);assert.equal(observed.options.headers.Authorization,'Basic '+Buffer.from(config.key+':'+config.secret).toString('base64'));assert.equal(observed.options.body.get('signature'),null);assert.equal(observed.options.redirect,'error');assert.deepEqual(await file.getMetadata(),[{generation:'123',assetId:'asset-test'}]);
  const bad=cloudinaryBucket({config,fetcher:async()=>json({type:'upload',public_id:publicId})});await assert.rejects(()=>bad.file(path).save(Buffer.from('x')),/PHOTO_PRIVACY_REQUIRED/);
 });
 test('download passa pelo servidor e valida JPEG; erro remoto não revela segredos',async()=>{
