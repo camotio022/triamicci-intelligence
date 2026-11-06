@@ -1,6 +1,7 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getAuth,initializeAuth,browserSessionPersistence,browserPopupRedirectResolver } from 'firebase/auth';
+import {authSession} from './auth-session.js';
 
 // Configuração pública do aplicativo Web Firebase.
 // A autorização real de leitura/escrita depende das regras do Firestore.
@@ -28,6 +29,8 @@ if (staging && (!firebaseConfig.projectId || !firebaseConfig.apiKey || !firebase
   firebaseConfig.projectId === productionConfig.projectId)) {
   throw new Error('Homologação sem configuração Firebase isolada válida. Não usar a produção.');
 }
-export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-export const auth = getAuth(app);
+const session=authSession(typeof window==='undefined'?'':window.location.search);
+export const isIndependentSession=session.independent;
+export const app=getApps().find(app=>app.name===session.appName)||initializeApp(firebaseConfig,session.appName);
+export const auth=session.independent?initializeAuth(app,{persistence:browserSessionPersistence,popupRedirectResolver:browserPopupRedirectResolver}):getAuth(app);
+export const db=getFirestore(app);
