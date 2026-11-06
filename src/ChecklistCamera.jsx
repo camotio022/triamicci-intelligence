@@ -10,6 +10,7 @@ export default function ChecklistCamera({runId,itemId,call,onUploaded,disabled})
   try{
    if(!navigator.mediaDevices?.getUserMedia)throw Error('Câmera indisponível neste navegador. Abra o app em HTTPS e permita o acesso à câmera.');
    session.current=await call('captureStart',{runId,itemId,requestId:crypto.randomUUID()});
+   if(!alive.current)return;
    const media=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:960}},audio:false});
    if(!alive.current){media.getTracks().forEach(t=>t.stop());return;}
    stream.current=media;setPhase('camera');

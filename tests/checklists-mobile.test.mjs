@@ -13,7 +13,7 @@ test('checklists: cadastro, publicação e conferência com câmera no mobile',{
   const day=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());
   for(const [width,role] of [[320,'manager'],[390,'submanager'],[768,'manager'],[1280,'submanager'],[390,'cook'],[390,'auxiliar']]){
    const page=await browser.newPage({viewport:{width,height:900}}),errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));
-   let template={id:'template-test',revision:2,version:1,hasDraft:false,archived:false,published:{name:'Conferência personalizada',moment:'other',frequency:'daily',dueTime:'22:20',roles:['cook','auxiliar'],weekdays:[],items:[{id:'custom-item',title:'Verificação personalizada',guidance:'Enquadramento definido pela gestão',critical:true,required:true,photoRequired:true,allowNA:false}]}};template.draft=structuredClone(template.published);let run=role==='auxiliar'?{id:'auto-run-0001',model:structuredClone(template.published),day,revision:0,answers:{}}:null,failAnswer=role==='auxiliar';
+   let template={id:'template-test',revision:2,version:1,hasDraft:false,archived:false,published:{name:'Conferência personalizada',moment:'other',frequency:'daily',dueTime:'22:20',roles:['cook','auxiliar'],weekdays:[],items:[{id:'custom-item',title:'Verificação personalizada',guidance:'Enquadramento definido pela gestão',critical:true,required:true,photoRequired:true,allowNA:false}]}};template.draft=structuredClone(template.published);let run=role==='auxiliar'?{id:'auto-run-0001',templateId:template.id,model:structuredClone(template.published),day,revision:0,answers:{}}:null,failAnswer=role==='auxiliar';
    await page.route('**/api/members/manage',async route=>{
     const b=route.request().postDataJSON(),action=b.action;requests.push(b);let result={message:'Operação de homologação'};
     if(action==='configuration')result={message:'Armazenamento verificado no teste',ready:true};
@@ -21,7 +21,7 @@ test('checklists: cadastro, publicação e conferência com câmera no mobile',{
     if(action==='templates')result.templates=[template];
     if(action==='saveTemplate')template={...template,id:b.id,draft:b.model,revision:b.expectedRevision+1,hasDraft:true};
     if(action==='publishTemplate')template={...template,published:structuredClone(template.draft),revision:b.expectedRevision+1,version:template.version+1,hasDraft:false};
-    if(action==='start'){run={id:'run-00001',model:structuredClone(template.published),day,revision:0,answers:{}};result.runId=run.id;}
+    if(action==='start'){run={id:'run-00001',templateId:template.id,model:structuredClone(template.published),day,revision:0,answers:{}};result.runId=run.id;}
     if(action==='run')result.run={...run,progress:runProgress(run)};
     if(action==='captureStart')result.photoId='photo-00001';
     if(action==='photoUpload'){assert.ok(b.base64.length>100);assert.ok(b.base64.length<819200);result.photoId=b.photoId;}

@@ -69,7 +69,7 @@ Essa configuração externa permanece pendente. Sem ela, o fluxo com fotos não 
 
 ## Validação executada
 
-- 217 testes de regras aprovados e build aprovado.
+- 218 testes de regras aprovados e build aprovado.
 - Seis cenários integrados aprovados no Firebase isolado: catálogo 56, checklists com Storage, telas dos checklists, rotina dos cinco perfis, gestão por unidade e telas gerais V4.
 - Teste próprio dos checklists verifica criação/publicação/edição/arquivo, snapshot, função atribuída, acesso cruzado, revisão concorrente, foto obrigatória, leitura privada, Storage público negado, retenção/limpeza, workers reais e paginação.
 - UI exercitada em 320, 390, 768 e 1280 px, incluindo gerente/subgerente/cozinheiro/auxiliar. Câmera simulada: captura, compressão, envio e confirmação; falha de envio não mostra sucesso. Sem seletor de arquivo/galeria.
@@ -81,3 +81,5 @@ Essa configuração externa permanece pendente. Sem ela, o fluxo com fotos não 
 - Corrigido o ambiente de CI dos dois jobs de navegador: Ubuntu 24.04 fixo, compatível com o Playwright utilizado. Os jobs anteriores falharam antes de executar os testes ao receber Ubuntu 26.04 em `ubuntu-latest`.
 - Gestão possui diagnóstico de armazenamento no próprio módulo. Envio exige bucket com prevenção explícita de acesso público (`iamConfiguration.publicAccessPrevention=enforced`), além das regras privadas. O código não muda políticas nem ativa cobrança.
 - A inspeção das variáveis da Vercel confirmou ausência de `CHECKLIST_STORAGE_BUCKET`. Não há credencial/variáveis de preview configuradas. Ativação de fotos na produção ainda depende dessa configuração externa; não afirmar homologação de produção.
+
+Validação do fechamento: diagnóstico do bucket, bloqueio de configuração para a equipe e teste de rotina automática ainda não iniciada incluídos. Os testes próprios de Firebase/Storage e UI passaram novamente. A câmera não abre depois que a tela é abandonada enquanto a autorização do servidor ainda está pendente.
