@@ -94,6 +94,8 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      assert.equal(await page.getByText('Revisar antes de enviar',{exact:true}).count(),1);
     }
     if(screen==='Contagem'){
+     const dismissMessages=async()=>{for(let i=0;i<4&&await page.getByRole('button',{name:'Fechar mensagem',exact:true}).count();i++)await page.getByRole('button',{name:'Fechar mensagem',exact:true}).first().click();};
+     await dismissMessages();
      await page.getByRole('button',{name:'Operações',exact:true}).click();
      await page.getByRole('button',{name:'Contagem oficial',exact:true}).click();
      await page.getByRole('combobox',{name:'Insumo',exact:true}).selectOption('c'.repeat(40));
@@ -106,6 +108,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       await page.getByRole('button',{name:'Salvar contagem',exact:true}).click();
       await page.waitForFunction(()=>Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Salvar contagem'&&!b.disabled));
       await page.getByRole('button',{name:'Salvar contagem',exact:true}).waitFor({state:'visible'});
+      await dismissMessages();
       assert.equal(await page.getByLabel('Identificador da rodada de contagem').inputValue(),session,'Salvar não pode desmontar a rodada');
       assert.equal(await page.getByRole('combobox',{name:'Insumo',exact:true}).inputValue(),'c'.repeat(40));
      }
