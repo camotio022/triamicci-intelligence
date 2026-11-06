@@ -1,3 +1,4 @@
+import {isManagement} from '../permissions/v31-policy.js';
 import {sendQuotaError} from '../quota-error.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -84,7 +85,7 @@ export default async function handler(req,res){
     const priorRef=old.data().supersedesId?items.doc(old.data().supersedesId):null;
     const prior=priorRef?await tx.get(priorRef):null;
     if(priorRef&&(!prior?.exists||prior.data().status!=='published'))throw Error('LOCKED');
-    if(old.data().kind==='preparation'&&member.data().role!=='admin')throw Error('FORBIDDEN');
+    if(old.data().kind==='preparation'&&!isManagement(member.data().role))throw Error('FORBIDDEN');
     if(old.data().kind==='preparation'&&old.data().createdBy===actor.uid)throw Error('SELF_APPROVAL');
     if(priorRef)tx.update(priorRef,{status:'superseded',supersededAt:now,supersededBy:id});
     tx.update(ref,{status:'published',publishedAt:now,publishedBy:actor.uid,publishedByName:actor.name||'Gestão da unidade',version:prior?prior.data().version+1:old.data().version});
@@ -97,7 +98,7 @@ export default async function handler(req,res){
  }catch(e){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
-  if(e.message==='SELF_APPROVAL')return send(res,409,'A publicação precisa ser aprovada por outro administrador.');
+  if(e.message==='SELF_APPROVAL')return send(res,409,'A publicação precisa ser aprovada por outro integrante da gestão.');
   if(e.message==='EXPIRED_NOTICE')return send(res,409,'A validade do comunicado já passou. Revise o rascunho antes de publicar.');
   if(e.message==='LOCKED')return send(res,409,'Item não encontrado ou não editável. Faça nova versão.');
   if(sendQuotaError(res,e))return;console.error('Mural:',e.message);return send(res,500,'Falha na operação do Mural.');

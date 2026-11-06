@@ -1,3 +1,4 @@
+import {isManagement} from '../permissions/v31-policy.js';
 import {sendQuotaError} from '../quota-error.js';
 import {coverageTimeline} from '../schedules/coverage-timeline.js';
 import {unitDay,publicationWindow} from '../schedules/temporal-policy.js';
@@ -148,8 +149,8 @@ export default async function handler(req,res){
    const ref=schedules.doc(id);const snap=await ref.get();
    if(!snap.exists)return send(res,404,'Escala não encontrada.');
    if(action==='submit'&&snap.data().status!=='draft'||action==='approve'&&snap.data().status!=='in_review'||action==='publish'&&snap.data().status!=='approved')return send(res,409,'Estado atual não permite essa transição.');
-   if(['approve','publish'].includes(action)&&m.role!=='admin')return send(res,403,'Aprovação e publicação exigem administrador.');
-   if(action==='approve'&&snap.data().createdBy===actor.uid)return send(res,409,'Outro administrador deve aprovar a escala.');
+   if(['approve','publish'].includes(action)&&!isManagement(m.role))return send(res,403,'Aprovação e publicação exigem gestão da unidade.');
+   if(action==='approve'&&snap.data().createdBy===actor.uid)return send(res,409,'Outro integrante da gestão deve aprovar a escala.');
    const memberSnap=await db.collection('memberships').where('unitId','==',m.unitId).limit(201).get();
    if(memberSnap.size>200)return send(res,409,'Equipe acima do limite.');
    const memberList=memberSnap.docs.filter(x=>x.data().status==='active').map(x=>({uid:x.id,...x.data()}));
@@ -180,7 +181,7 @@ export default async function handler(req,res){
     if(validateRosterSchedule({entries:current.data()?.entries||[],members:currentPeople.filter(p=>p.status==='active'),period:current.data()?.period,complete:true,enforceCoverage:!masterActive}).length)throw Error('CONFLICT');
     if([...new Set((current.data()?.entries||[]).map(e=>e.date))].some(date=>coverageTimeline({date,entries:current.data()?.entries||[],people:currentPeople,requirements}).some(r=>r.deficit>0)))throw Error('CONFLICT');
     if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
-    if(['approve','publish'].includes(action)&&member.data().role!=='admin')throw Error('FORBIDDEN');
+    if(['approve','publish'].includes(action)&&!isManagement(member.data().role))throw Error('FORBIDDEN');
     const expected={submit:'draft',approve:'in_review',publish:'approved'}[action];
     if(!current.exists||current.data().status!==expected||current.data().revision!==snap.data().revision)throw Error('CONFLICT');
     if(action==='approve'&&current.data().createdBy===actor.uid)throw Error('CONFLICT');

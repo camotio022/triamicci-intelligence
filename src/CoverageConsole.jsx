@@ -1,3 +1,4 @@
+import {isManagement} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
@@ -51,7 +52,7 @@ export default function CoverageConsole({membership}){
  {(data?.proposals||[]).length===0&&<p>Nenhuma proposta registrada.</p>}
  {(data?.proposals||[]).map(p=><article className="ti-cov-proposal" key={p.id}><div><strong>{p.name}</strong><span>{p.date} · {p.first?.start}–{p.first?.end} + {p.second?.start}–{p.second?.end}</span><span>{money(p.practicePayment)} (praticado) · {p.status.replaceAll('_',' ')}</span><small>{p.reason}</small></div><div className="ti-cov-actions">{['pending_approval','pending_acceptance'].includes(p.status)&&<button disabled={busy||note.trim().length<10} type="button" onClick={()=>run(()=>request('decide',{id:p.id,decision:'rejected',note}))}>Recusar</button>}{p.status==='pending_approval'&&<button type="button" disabled={busy||note.trim().length<10||!legalChecked||!consentVerified||consentEvidence.trim().length<10} onClick={()=>run(()=>request('decide',{id:p.id,decision:'approved',note,legalChecked,consentVerified,consentEvidence}))}>Aprovar após conferência</button>}</div></article>)}
  </section>
- {membership.role==='admin'&&<section className="ti-cov-panel"><h3>Regras de cobertura da unidade</h3><p>Defina o mínimo por setor, dia da semana e horário. A alteração não modifica escalas já publicadas.</p>
+ {isManagement(membership.role)&&<section className="ti-cov-panel"><h3>Regras de cobertura da unidade</h3><p>Defina o mínimo por setor, dia da semana e horário. A alteração não modifica escalas já publicadas.</p>
  <div className="ti-cov-fields">
   <label>Setor<select value={newRequirement.sector} onChange={e=>setNewRequirement(x=>({...x,sector:e.target.value}))}>{Object.entries(sectors).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
   <label>Dia<select value={newRequirement.weekday} onChange={e=>setNewRequirement(x=>({...x,weekday:Number(e.target.value)}))}>{['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'].map((v,i)=><option key={i} value={i}>{v}</option>)}</select></label>
@@ -64,6 +65,6 @@ export default function CoverageConsole({membership}){
  {requirements.map((x,i)=><article className="ti-cov-proposal" key={i}><span>{sectors[x.sector]} · {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][x.weekday]} {x.start}–{x.end} · mínimo {x.minimum} · {x.skill||'qualquer habilidade'}</span><button type="button" disabled={busy} onClick={()=>setRequirements(v=>v.filter((_,j)=>j!==i))}>Remover</button></article>)}
  <button type="button" disabled={busy||requirements.length>84} onClick={()=>run(()=>request('requirementsSet',{requirements}))}>Salvar regras da unidade</button>
  </section>}
- {membership.role==='admin'&&ratesEdit&&<section className="ti-cov-panel"><h3>4 · Tabela de valores praticados</h3><p>Não representa automaticamente o custo legal da dobra. Alterações só valem para novas propostas.</p><div className="ti-cov-fields">{Object.entries(roleNames).map(([key,label])=><label key={key}>{label}<input type="number" min="0" max="10000" value={ratesEdit[key]??0} onChange={e=>setRatesEdit(v=>({...v,[key]:Number(e.target.value)}))}/></label>)}</div><button type="button" disabled={busy} onClick={()=>run(()=>request('rates',{rates:ratesEdit}))}>Salvar tabela operacional</button></section>}
+ {isManagement(membership.role)&&ratesEdit&&<section className="ti-cov-panel"><h3>4 · Tabela de valores praticados</h3><p>Não representa automaticamente o custo legal da dobra. Alterações só valem para novas propostas.</p><div className="ti-cov-fields">{Object.entries(roleNames).map(([key,label])=><label key={key}>{label}<input type="number" min="0" max="10000" value={ratesEdit[key]??0} onChange={e=>setRatesEdit(v=>({...v,[key]:Number(e.target.value)}))}/></label>)}</div><button type="button" disabled={busy} onClick={()=>run(()=>request('rates',{rates:ratesEdit}))}>Salvar tabela operacional</button></section>}
  </section>;
 }

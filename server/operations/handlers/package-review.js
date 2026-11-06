@@ -1,3 +1,4 @@
+import {isManagement} from '../../permissions/v31-policy.js';
 import {sendQuotaError} from '../../quota-error.js';
 // Prévia de homologação: leitura e cálculo apenas. Nunca altera physicalBalances ou physicalLots.
 import {getDb,authenticate,membership,checkRequest,send} from '../../_lib.js';
@@ -13,7 +14,7 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
-  if(!m?.unitId||!['admin','manager'].includes(m.role))return send(res,403,'Somente gerência pode revisar conciliações.');
+  if(!m?.unitId||!isManagement(m.role))return send(res,403,'Somente gerência pode revisar conciliações.');
   const {productId,conferenceId,openedMeasurements=[],lotAllocations=[]}=req.body||{};
   if(req.body?.action!=='preview'||!productPattern.test(productId||'')||!requestPattern.test(conferenceId||'')||!Array.isArray(openedMeasurements)||openedMeasurements.length>100||!Array.isArray(lotAllocations)||lotAllocations.length>100)
    return send(res,400,'Revisão inválida.');

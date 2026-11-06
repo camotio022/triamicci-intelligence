@@ -1,3 +1,4 @@
+import {isManagement} from '../permissions/v31-policy.js';
 import {sendQuotaError} from '../quota-error.js';
 import {signalUnitChange} from '../live-signal.js';
 import {createHash} from 'node:crypto';
@@ -13,7 +14,7 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
-  if(!m?.unitId||m.role!=='admin')return send(res,403,'Somente administrador pode conciliar lotes.');
+  if(!m?.unitId||!isManagement(m.role))return send(res,403,'Somente a gestão da unidade pode conciliar lotes.');
   const {action,productId,requestId,lots}=req.body||{};
   if(action!=='reconcile'||!idPattern.test(productId||'')||!reqPattern.test(requestId||'')||
      !Array.isArray(lots)||lots.length<1||lots.length>80)
@@ -42,7 +43,7 @@ export default async function handler(req,res){
     tx.get(actorRef),tx.get(productRef),tx.get(balanceRef),tx.get(ref),
     tx.get(col.orderBy('expiryDate').limit(101))
    ]);
-   if(!a.exists||a.data().status!=='active'||a.data().role!=='admin'||a.data().unitId!==m.unitId)throw Error('FORBIDDEN');
+   if(!a.exists||a.data().status!=='active'||!isManagement(a.data().role)||a.data().unitId!==m.unitId)throw Error('FORBIDDEN');
    if(!p.exists||!p.data().trackExpiry)throw Error('INVALID');
    if(!b.exists)throw Error('NOT_COUNTED');
    if(prev.exists){

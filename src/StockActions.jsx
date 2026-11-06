@@ -1,3 +1,4 @@
+import {isManagement} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import React,{useEffect,useState} from 'react';
 import {auth} from './firebase.js';
@@ -22,8 +23,7 @@ export default function StockActions({product,lots,membership,onUpdated}){
  const [rows,setRows]=useState([]);
  const [newLot,setNewLot]=useState(''),[newExpiry,setNewExpiry]=useState('');
  const [pendingId,setPendingId]=useState(null),[saving,setSaving]=useState(false),[status,setStatus]=useState('');
- const admin=membership.role==='admin';
- const manager=admin||membership.role==='manager';
+ const manager=isManagement(membership.role);
  const b=product.physicalBalance;
  useEffect(()=>{setRows(lots.map(l=>({lot:l.lot,expiryDate:l.expiryDate,
   reserva:String(l.reserva??0),giro:String(l.giro??0)})))},[lots]);
@@ -60,7 +60,7 @@ export default function StockActions({product,lots,membership,onUpdated}){
   <div className="stock-action-switch">
    <button type="button" className={mode==='dispatch'?'selected':''} onClick={()=>change(setMode,'dispatch')}>Registrar saída</button>
    <button type="button" className={mode==='transfer'?'selected':''} onClick={()=>change(setMode,'transfer')}>Transferir área</button>
-   {admin&&product.trackExpiry&&<button type="button" className={mode==='lots'?'selected':''} onClick={()=>change(setMode,'lots')}>Conferir lotes</button>}
+   {manager&&product.trackExpiry&&<button type="button" className={mode==='lots'?'selected':''} onClick={()=>change(setMode,'lots')}>Conferir lotes</button>}
   </div>
   {mode&&<form className="stock-action-form" onSubmit={submit}>
    {mode==='lots'?<>

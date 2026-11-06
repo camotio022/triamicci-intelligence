@@ -1,3 +1,4 @@
+import {isManagement} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import React,{useState} from 'react';
 import {auth} from './firebase.js';
@@ -8,7 +9,7 @@ export default function UnitCorrection({product,membership,onUpdated}){
  const [receiving,setReceiving]=useState(product.receivingUnitOverride||product.unit);
  const [reason,setReason]=useState('');
  const [saving,setSaving]=useState(false),[status,setStatus]=useState('');
- if(membership.role!=='admin')return null;
+ if(!isManagement(membership.role))return null;
  const submit=async e=>{
   e.preventDefault();if(saving)return;
   if(!window.confirm('Esta alteração NÃO converterá contagens antigas. Será preciso fazer uma nova contagem na unidade corrigida. Confirmar?'))return;

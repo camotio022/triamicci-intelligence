@@ -1,3 +1,4 @@
+import {isManagement} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {pastProposal} from '../../src/operation-time.js';
 import {coverageTimeline} from '../../server/schedules/coverage-timeline.js';
@@ -89,7 +90,7 @@ export default async function handler(req,res){
    return send(res,200,'Solicitação analisada. A escala oficial continua inalterada até sua atualização e publicação.');
   }
   if(action==='requirementsSet'){
-   if(member.role!=='admin')return send(res,403,'Somente administradores configuram mínimos de cobertura.');
+   if(!isManagement(member.role))return send(res,403,'Somente a gestão da unidade configura mínimos de cobertura.');
    const requirements=req.body?.requirements;
    const valid=r=>r&&['cozinha','frente','caixa','apoio','gestao'].includes(r.sector)&&Number.isInteger(r.weekday)&&r.weekday>=0&&r.weekday<=6&&validTime(r.start)&&validTime(r.end)&&r.start!==r.end&&Number.isInteger(r.minimum)&&r.minimum>=1&&r.minimum<=30&&typeof r.skill==='string'&&r.skill.length<=40;
    if(!Array.isArray(requirements)||requirements.length>84||!requirements.every(valid))return send(res,400,'Regras de cobertura inválidas.');
@@ -97,7 +98,7 @@ export default async function handler(req,res){
    const now=new Date();
    await db.runTransaction(async tx=>{
     const m=await tx.get(db.collection('memberships').doc(actor.uid));
-    if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||m.data().role!=='admin')throw Error('FORBIDDEN');
+    if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!isManagement(m.data().role))throw Error('FORBIDDEN');
     tx.set(policyRef,{requirements:clean,updatedAt:now,updatedBy:actor.uid});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.requirements_updated',actorUid:actor.uid,unitId:member.unitId,count:clean.length,at:now});
@@ -105,13 +106,13 @@ export default async function handler(req,res){
    return send(res,200,'Regras de cobertura salvas. Escalas publicadas preservadas.');
   }
   if(action==='rates'){
-   if(member.role!=='admin')return send(res,403,'Somente administradores alteram valores.');
+   if(!isManagement(member.role))return send(res,403,'Somente a gestão da unidade altera valores.');
    const rates=req.body?.rates;
    if(!rates||rateKeys.some(k=>!Number.isInteger(rates[k])||rates[k]<0||rates[k]>10000))return send(res,400,'Valores inválidos.');
    const updated=Object.fromEntries(rateKeys.map(k=>[k,rates[k]]));const now=new Date();
    await db.runTransaction(async tx=>{
     const m=await tx.get(db.collection('memberships').doc(actor.uid));
-    if(!m.exists||m.data().status!=='active'||m.data().role!=='admin'||m.data().unitId!==member.unitId)throw Error('FORBIDDEN');
+    if(!m.exists||m.data().status!=='active'||!isManagement(m.data().role)||m.data().unitId!==member.unitId)throw Error('FORBIDDEN');
     tx.set(settings,{rates:updated,updatedAt:now,updatedBy:actor.uid});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.rates_updated',unitId:member.unitId,actorUid:actor.uid,rates:updated,at:now});

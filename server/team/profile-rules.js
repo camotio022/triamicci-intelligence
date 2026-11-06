@@ -1,3 +1,4 @@
+import {isManagement} from '../permissions/v31-policy.js';
 // Dados profissionais independentes de permissões de login.
 export const sectors=['cozinha','frente','caixa','apoio','gestao'];
 export const skillCatalog=['preparo','montagem','chapa','vitrine','vendas','ifood','caixa','recebimento','estoque','lideranca','etiquetagem'];
@@ -19,7 +20,7 @@ export const shifts=['manha','noite','intermediario','variavel'];
 const allowed=(x,values)=>typeof x==='string'&&values.includes(x);
 const clock=x=>typeof x==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(x);
 export function canManageProfessionalProfile(actor,target){
- return actor?.status==='active' && ['admin','manager'].includes(actor.role) &&
+ return actor?.status==='active' && isManagement(actor.role) &&
    !!actor.unitId && actor.unitId===target?.unitId &&
    (actor.role==='admin'||['cook','auxiliar'].includes(target.role));
 }
