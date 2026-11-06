@@ -54,6 +54,7 @@ test('checklist completo: navegador → API real → Firestore/Storage → outra
   await aux.getByRole('radio',{name:'Conferido',exact:true}).check();
   await aux.getByRole('button',{name:'Confirmar e continuar',exact:true}).click();
   await aux.getByRole('heading',{name:'Item sem foto definido pela unidade',exact:true}).waitFor();
+  await aux.getByText('A unidade não exige foto para este item. Você pode concluir sem fotografar.',{exact:true}).waitFor();
   await aux.getByRole('radio',{name:'Conferido',exact:true}).check();
   await aux.getByRole('button',{name:'Confirmar e continuar',exact:true}).click();
   await aux.getByText('Conferência concluída e enviada.',{exact:true}).waitFor();
