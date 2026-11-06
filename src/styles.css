@@ -363,3 +363,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 .ti-inventory-investigation textarea{width:100%;min-height:80px}
 
 .ti-mural-v4 .ti-stock-filters{display:flex;flex-wrap:wrap;overflow:visible;gap:8px}
+
+.profile-secondary-session{display:flex;align-items:center;min-height:44px;padding:10px 12px;border:1px solid #e5e9f0;border-radius:9px;color:#a52b2b;font-size:14px;font-weight:650;text-decoration:none}
+.profile-secondary-session:hover{background:#fff0ef}
+.profile-secondary-session:focus-visible{outline:2px solid #a52b2b;outline-offset:2px}

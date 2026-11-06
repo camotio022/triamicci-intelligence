@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {authSession} from '../src/auth-session.js';
+test('sessão principal conserva a autenticação padrão e ignora valores não reconhecidos',()=>{for(const search of ['', '?page=production','?session=admin','?session=other'])assert.deepEqual(authSession(search),{independent:false,appName:'[DEFAULT]'})});
+test('conta secundária tem um namespace fixo independente da rota e não contém credenciais',()=>{assert.deepEqual(authSession('?session=independent&page=production'),{independent:true,appName:'triamicci-independent'});assert.equal(authSession('?session=independent&page=people').appName,authSession('?session=independent').appName)});
