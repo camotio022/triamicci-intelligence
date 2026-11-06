@@ -4,11 +4,11 @@ export const MAX_PHOTO_BYTES=600*1024;
 const reservedIds=new Set([...Object.getOwnPropertyNames(Object.prototype),'prototype']);
 export const idOk=x=>typeof x==='string'&&/^[a-zA-Z0-9_-]{8,80}$/.test(x)&&!reservedIds.has(x);
 const text=(s,max,empty=false)=>typeof s==='string'&&s.trim().length<=(max)&& (empty||s.trim().length>0);
-export function normalizeTemplate(input){
+export function normalizeTemplate(input,{allowEmptyItems=false}={}){
  if(!input||!text(input.name,100)||!['opening','closing','other'].includes(input.moment)||!['daily','weekdays','manual'].includes(input.frequency)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.dueTime||''))return null;
  if(!Array.isArray(input.weekdays)||input.weekdays.length>7||input.weekdays.some(x=>!Number.isInteger(x)||x<0||x>6)||new Set(input.weekdays).size!==input.weekdays.length||input.frequency==='weekdays'&&!input.weekdays.length)return null;
  if(!Array.isArray(input.roles)||!input.roles.length||input.roles.length>TEAM_ROLES.length||input.roles.some(x=>!TEAM_ROLES.includes(x))||new Set(input.roles).size!==input.roles.length)return null;
- if(!Array.isArray(input.items)||!input.items.length||input.items.length>40)return null;
+ if(!Array.isArray(input.items)||!input.items.length&&!allowEmptyItems||input.items.length>40)return null;
  const ids=new Set();const items=[];
  for(const item of input.items){
   if(!item||!idOk(item.id)||ids.has(item.id)||!text(item.title,160)||!text(item.guidance,600,true)||['required','critical','photoRequired','allowNA'].some(k=>typeof item[k]!=='boolean')||item.critical&&(!item.required||item.allowNA))return null;

@@ -69,7 +69,7 @@ Essa configuração externa permanece pendente. Sem ela, o fluxo com fotos não 
 
 ## Validação executada
 
-- 218 testes de regras aprovados e build aprovado.
+- 219 testes de regras aprovados e build aprovado.
 - Seis cenários integrados aprovados no Firebase isolado: catálogo 56, checklists com Storage, telas dos checklists, rotina dos cinco perfis, gestão por unidade e telas gerais V4.
 - Teste próprio dos checklists verifica criação/publicação/edição/arquivo, snapshot, função atribuída, acesso cruzado, revisão concorrente, foto obrigatória, leitura privada, Storage público negado, retenção/limpeza, workers reais e paginação.
 - UI exercitada em 320, 390, 768 e 1280 px, incluindo gerente/subgerente/cozinheiro/auxiliar. Câmera simulada: captura, compressão, envio e confirmação; falha de envio não mostra sucesso. Sem seletor de arquivo/galeria.
@@ -89,3 +89,7 @@ Validação do fechamento: diagnóstico do bucket, bloqueio de configuração pa
 `tests/checklists-fullstack-emulator.test.mjs` foi aprovado: navegador do gerente cria/publica modelo usando a API real, outro contexto autenticado como auxiliar recebe a rotina, captura JPEG pela câmera simulada, envia ao Storage isolado e conclui via API. O teste confirma documento/autor/arquivo e a atualização ao vivo para o gerente, que abre a evidência em sua sessão. Não há resposta de negócio simulada nesse teste; somente a câmera e a origem HTTPS do proxy local são de homologação. A fixture e seu proxy são exclusivos de teste e não fazem parte do build publicado.
 
 A proposta e o módulo continuam no PR #142. Código/testes não dependem da instalação da conexão Firebase no ChatGPT. Essa conexão seria apenas um caminho para configurar o projeto real; a alternativa é revisar a configuração no console com o titular da conta. Não atribuir a indisponibilidade da conexão ao plano do usuário sem verificar a causa.
+
+## Autonomia da unidade — reforço do contrato
+
+A lista pertence à unidade. Sua gestão define os itens e, individualmente, se cada um exige foto; o sistema não impõe foto a toda conferência. A tela oferece **Excluir item** e **Desfazer exclusão do item**, inclusive para o último item. É permitido salvar rascunho vazio, mas não publicar um modelo sem itens. Excluir/editar um item do modelo só vale para execuções futuras; as anteriores preservam a lista e as exigências que estavam publicadas. Testes cobrem exclusão, desfazer, rascunho vazio, impedimento de publicação vazia e confirmação real de item sem foto ao lado de item com foto obrigatória.

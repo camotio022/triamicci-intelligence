@@ -14,3 +14,5 @@ test('retém fotos por exatamente 90 dias e rejeita bytes que não são JPEG',()
 test('identificadores de item não podem colidir com o protótipo das respostas',()=>{for(const id of ['__proto__','constructor','toString','hasOwnProperty'])assert.equal(normalizeTemplate({...model,items:[{...item,id}]}),null);});
 
 test('evidências exigem prevenção explícita de acesso público no bucket',()=>{assert.equal(privateEvidenceStorage({iamConfiguration:{publicAccessPrevention:'enforced'}}),true);for(const metadata of [{},{iamConfiguration:{}},{iamConfiguration:{publicAccessPrevention:'inherited'}}])assert.equal(privateEvidenceStorage(metadata),false);});
+
+test('a unidade pode excluir todos os itens do rascunho, mas não publicar uma lista vazia',()=>{const empty={...model,items:[]};assert.equal(normalizeTemplate(empty),null);assert.deepEqual(normalizeTemplate(empty,{allowEmptyItems:true}),empty);const optionalPhoto={...item,photoRequired:false};assert.equal(validateAnswer(optionalPhoto,{status:'checked',note:''}),true);});

@@ -47,7 +47,7 @@ export default async function handler(req,res){
   if(['saveTemplate','publishTemplate','archiveTemplate'].includes(action)){
    if(!isManagement(member.role))throw Error('FORBIDDEN');
    if(!idOk(body.id)||!Number.isInteger(body.expectedRevision)||body.expectedRevision<0)throw Error('INVALID');
-   const model=action==='saveTemplate'?normalizeTemplate(body.model):null;if(action==='saveTemplate'&&!model)throw Error('INVALID');
+   const model=action==='saveTemplate'?normalizeTemplate(body.model,{allowEmptyItems:true}):null;if(action==='saveTemplate'&&!model)throw Error('INVALID');
    const ref=templates.doc(body.id);
    await db.runTransaction(async tx=>{
     const [who,old]=await Promise.all([tx.get(actorRef),tx.get(ref)]);

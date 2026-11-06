@@ -19,6 +19,9 @@ test('checklists: modelos, versões, fotos privadas, concorrência e retenção 
  await call(cook,'configuration',{},403);
  await call(auxiliar,'configuration',{},403);
  for(const person of [cook,auxiliar]){await call(person,'templates',{},403);await call(person,'saveTemplate',{id:templateId,expectedRevision:0,model},403);}
+ const emptyId=randomUUID();await call(manager,'saveTemplate',{id:emptyId,expectedRevision:0,model:{...model,items:[]}});
+ await call(submanager,'publishTemplate',{id:emptyId,expectedRevision:1},400);
+ await call(manager,'archiveTemplate',{id:emptyId,expectedRevision:1});
  await call(manager,'saveTemplate',{id:templateId,expectedRevision:0,model});
  assert.equal((await call(cook,'today')).templates.length,0);
  await call(submanager,'publishTemplate',{id:templateId,expectedRevision:1});
@@ -30,9 +33,10 @@ test('checklists: modelos, versões, fotos privadas, concorrência e retenção 
  assert.equal((await call(cook,'start',{templateId,requestId:randomUUID()})).runId,runId,'One daily execution, shared by the team');
  await call(foreign,'run',{runId,unitId},404);
  await call(foreign,'start',{templateId,requestId:randomUUID(),unitId},404);
- await call(manager,'saveTemplate',{id:templateId,expectedRevision:2,model:{...model,name:'Novo nome'}});
+ await call(manager,'saveTemplate',{id:templateId,expectedRevision:2,model:{...model,name:'Novo nome',items:[model.items[1]]}});
  await call(manager,'publishTemplate',{id:templateId,expectedRevision:3});
  assert.equal((await call(auxiliar,'run',{runId})).run.model.name,model.name,'Run keeps published snapshot');
+ assert.equal((await call(auxiliar,'run',{runId})).run.model.items.length,2,'Deleting an item in the model preserves the existing execution');
  const answer={runId,itemId:model.items[0].id,expectedRevision:0,status:'checked',note:''};
  await call(auxiliar,'answer',answer,400);
  const photo=await call(auxiliar,'captureStart',{runId,itemId:answer.itemId,requestId:randomUUID()});
@@ -96,7 +100,7 @@ test('checklists: modelos, versões, fotos privadas, concorrência e retenção 
  assert.equal((await orphan.get()).data().status,'deleted');
  const batch=db.batch();for(let i=0;i<35;i++)batch.set(unit.collection('checklistTemplates').doc(randomUUID()),{draft:model,archived:true,updatedAt:new Date(),revision:1,version:0});await batch.commit();
  const first=await call(manager,'templates');assert.equal(first.templates.length,30);assert.ok(first.next);
- const second=await call(manager,'templates',{before:first.next});assert.equal(new Set([...first.templates,...second.templates].map(x=>x.id)).size,38);
+ const second=await call(manager,'templates',{before:first.next});assert.equal(new Set([...first.templates,...second.templates].map(x=>x.id)).size,39);
  await call(foreign,'templates',{before:first.next,unitId},404);
  // No Storage configuration means explicit failure, never a fictitious upload success.
  const bucket=process.env.CHECKLIST_STORAGE_BUCKET;delete process.env.CHECKLIST_STORAGE_BUCKET;

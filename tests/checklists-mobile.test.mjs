@@ -40,6 +40,14 @@ test('checklists: cadastro, publicação e conferência com câmera no mobile',{
     await page.getByRole('button',{name:'Criar checklist',exact:true}).click();
     await page.getByLabel('Nome do checklist',{exact:true}).fill('Minha rotina '+width);
     await page.getByLabel('Horário limite',{exact:true}).fill('22:20');
+    await page.getByRole('button',{name:'Excluir item 1',exact:true}).click();
+    await page.getByText(/Nenhum item no modelo/).waitFor();
+    await page.getByRole('button',{name:'Desfazer exclusão do item',exact:true}).click();
+    await page.getByRole('button',{name:'Excluir item 1',exact:true}).click();
+    await page.getByRole('button',{name:'Salvar rascunho',exact:true}).click();
+    await page.getByText(/Rascunho salvo/).waitFor();
+    assert.equal(await page.getByRole('button',{name:'Publicar checklist',exact:true}).isEnabled(),false);
+    await page.getByRole('button',{name:'Adicionar item',exact:true}).click();
     await page.getByLabel('O que conferir',{exact:true}).fill('Item criado pela gestão');
     await page.getByRole('checkbox',{name:'Crítico',exact:true}).check();
     await page.getByRole('checkbox',{name:'Foto na hora',exact:true}).check();
