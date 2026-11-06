@@ -44,5 +44,8 @@ jobs:
           fi
       - name: Validar codigo do teste (sem dependencias externas)
         run: node --check scripts/test-cloudinary-private.mjs
+      - name: Conferir preset no ambiente Cloudinary (somente leitura)
+        continue-on-error: true
+        run: node scripts/diagnose-cloudinary-preset.mjs
       - name: Testar envio, acesso nao autenticado, leitura privada e exclusao
         run: node scripts/test-cloudinary-private.mjs
