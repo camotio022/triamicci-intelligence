@@ -15,6 +15,9 @@ test('checklists: modelos, versões, fotos privadas, concorrência e retenção 
  const call=async(person,action,payload={},code=200)=>{const res={code:200,setHeader(){},status(c){this.code=c;return this},json(data){this.body=data;return this}};await handler({method:'POST',headers:{origin:'https://triamicci-e2e.test','content-type':'application/json',authorization:'Bearer '+person.token},body:{action,...payload}},res);assert.equal(res.code,code,JSON.stringify({action,expected:code,actual:res.code,body:res.body}));return res.body;};
  const model={name:'Checklist criado pela gestão',moment:'closing',frequency:'daily',dueTime:'22:20',weekdays:[],roles:['cook','auxiliar'],items:[{id:'critical-01',title:'Item crítico personalizado',guidance:'Orientação específica da unidade',required:true,critical:true,photoRequired:true,allowNA:false},{id:'other-00001',title:'Item simples',guidance:'',required:true,critical:false,photoRequired:false,allowNA:true}]};
  const templateId=randomUUID(),{manager,submanager,cook,auxiliar}=people;
+ assert.equal((await call(manager,'configuration')).ready,true);
+ await call(cook,'configuration',{},403);
+ await call(auxiliar,'configuration',{},403);
  for(const person of [cook,auxiliar]){await call(person,'templates',{},403);await call(person,'saveTemplate',{id:templateId,expectedRevision:0,model},403);}
  await call(manager,'saveTemplate',{id:templateId,expectedRevision:0,model});
  assert.equal((await call(cook,'today')).templates.length,0);
@@ -97,6 +100,7 @@ test('checklists: modelos, versões, fotos privadas, concorrência e retenção 
  await call(foreign,'templates',{before:first.next,unitId},404);
  // No Storage configuration means explicit failure, never a fictitious upload success.
  const bucket=process.env.CHECKLIST_STORAGE_BUCKET;delete process.env.CHECKLIST_STORAGE_BUCKET;
+ assert.equal((await call(manager,'configuration')).code,'MISSING_BUCKET');
  await call(manager,'captureStart',{runId,itemId:'other-00001',requestId:randomUUID()},503);
  process.env.CHECKLIST_STORAGE_BUCKET=bucket;
 });

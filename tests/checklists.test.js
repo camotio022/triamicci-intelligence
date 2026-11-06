@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeTemplate,canExecute,scheduledOn,validateAnswer,runProgress,expiresAfter,jpegDimensions} from '../server/checklists/rules.js';
+import {privateEvidenceStorage} from '../server/checklists/photos.js';
 const item={id:'item-00001',title:'Item personalizado',guidance:'Conferência definida pela gestão',required:true,critical:true,photoRequired:true,allowNA:false};
 const model={name:'Minha rotina',moment:'other',frequency:'weekdays',dueTime:'22:20',weekdays:[1,3,5],roles:['cook','auxiliar'],items:[item]};
 test('normaliza cadastro personalizado, sem converter texto em listas fixas',()=>{assert.deepEqual(normalizeTemplate(model),model);assert.equal(normalizeTemplate({...model,items:[item,item]}),null);assert.equal(normalizeTemplate({...model,items:[{...item,allowNA:true}]}),null);assert.equal(normalizeTemplate({...model,roles:['owner']}),null);assert.equal(normalizeTemplate({...model,dueTime:'25:00'}),null);assert.equal(normalizeTemplate({...model,weekdays:[]}),null);});
@@ -11,3 +12,5 @@ test('ocorrência crítica permanece aberta até tratamento, mesmo após respond
 test('retém fotos por exatamente 90 dias e rejeita bytes que não são JPEG',()=>{assert.equal(expiresAfter(new Date('2026-11-06T12:00:00Z')).toISOString(),'2027-02-04T12:00:00.000Z');assert.equal(jpegDimensions(Buffer.from('<script>')) ,null);});
 
 test('identificadores de item não podem colidir com o protótipo das respostas',()=>{for(const id of ['__proto__','constructor','toString','hasOwnProperty'])assert.equal(normalizeTemplate({...model,items:[{...item,id}]}),null);});
+
+test('evidências exigem prevenção explícita de acesso público no bucket',()=>{assert.equal(privateEvidenceStorage({iamConfiguration:{publicAccessPrevention:'enforced'}}),true);for(const metadata of [{},{iamConfiguration:{}},{iamConfiguration:{publicAccessPrevention:'inherited'}}])assert.equal(privateEvidenceStorage(metadata),false);});

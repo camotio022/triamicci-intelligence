@@ -13,9 +13,10 @@ test('checklists: cadastro, publicação e conferência com câmera no mobile',{
   const day=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());
   for(const [width,role] of [[320,'manager'],[390,'submanager'],[768,'manager'],[1280,'submanager'],[390,'cook'],[390,'auxiliar']]){
    const page=await browser.newPage({viewport:{width,height:900}}),errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));
-   let template={id:'template-test',revision:2,version:1,hasDraft:false,archived:false,published:{name:'Conferência personalizada',moment:'other',frequency:'daily',dueTime:'22:20',roles:['cook','auxiliar'],weekdays:[],items:[{id:'custom-item',title:'Verificação personalizada',guidance:'Enquadramento definido pela gestão',critical:true,required:true,photoRequired:true,allowNA:false}]}};template.draft=structuredClone(template.published);let run=null,failAnswer=role==='auxiliar';
+   let template={id:'template-test',revision:2,version:1,hasDraft:false,archived:false,published:{name:'Conferência personalizada',moment:'other',frequency:'daily',dueTime:'22:20',roles:['cook','auxiliar'],weekdays:[],items:[{id:'custom-item',title:'Verificação personalizada',guidance:'Enquadramento definido pela gestão',critical:true,required:true,photoRequired:true,allowNA:false}]}};template.draft=structuredClone(template.published);let run=role==='auxiliar'?{id:'auto-run-0001',model:structuredClone(template.published),day,revision:0,answers:{}}:null,failAnswer=role==='auxiliar';
    await page.route('**/api/members/manage',async route=>{
     const b=route.request().postDataJSON(),action=b.action;requests.push(b);let result={message:'Operação de homologação'};
+    if(action==='configuration')result={message:'Armazenamento verificado no teste',ready:true};
     if(action==='today')result={...result,day,photoEnabled:true,templates:[{id:template.id,version:template.version,model:template.published}],runs:run?[{...run,progress:runProgress(run)}]:[]};
     if(action==='templates')result.templates=[template];
     if(action==='saveTemplate')template={...template,id:b.id,draft:b.model,revision:b.expectedRevision+1,hasDraft:true};
@@ -34,6 +35,8 @@ test('checklists: cadastro, publicação e conferência com câmera no mobile',{
    await page.getByRole('heading',{name:'Checklists da unidade',exact:true}).waitFor();
    if(['manager','submanager'].includes(role)){
     await page.getByRole('button',{name:'Gestão',exact:true}).click();
+    await page.getByRole('button',{name:'Verificar armazenamento',exact:true}).click();
+    await page.getByText('Armazenamento verificado no teste',{exact:true}).waitFor();
     await page.getByRole('button',{name:'Criar checklist',exact:true}).click();
     await page.getByLabel('Nome do checklist',{exact:true}).fill('Minha rotina '+width);
     await page.getByLabel('Horário limite',{exact:true}).fill('22:20');
@@ -46,7 +49,8 @@ test('checklists: cadastro, publicação e conferência com câmera no mobile',{
     await page.getByRole('heading',{name:'Modelos da unidade',exact:true}).waitFor();
    }else assert.equal(await page.getByRole('button',{name:'Gestão',exact:true}).count(),0);
    await page.getByRole('button',{name:'Hoje',exact:true}).click();
-   await page.getByRole('button',{name:'Iniciar checklist',exact:true}).click();
+   if(role==='auxiliar')await page.getByText('Não iniciado',{exact:true}).waitFor();
+   await page.getByRole('button',{name:/^Iniciar (checklist|conferência)$/}).click();
    await page.getByRole('button',{name:'Fotografar conferência',exact:true}).click();
    await page.getByLabel('Câmera ao vivo para conferir o item').waitFor();
    await page.waitForFunction(()=>document.querySelector('video')?.videoWidth>0);

@@ -75,3 +75,9 @@ Essa configuração externa permanece pendente. Sem ela, o fluxo com fotos não 
 - UI exercitada em 320, 390, 768 e 1280 px, incluindo gerente/subgerente/cozinheiro/auxiliar. Câmera simulada: captura, compressão, envio e confirmação; falha de envio não mostra sucesso. Sem seletor de arquivo/galeria.
 - A primeira execução da regressão V4 teve timeout no campo de mês da escala. Passou isoladamente e na repetição conjunta; nenhum teste foi removido ou enfraquecido.
 - Testes usam dados e imagens fictícios. Sem configuração de Storage de produção, sem merge/deploy e sem habilitação da limpeza de produção.
+
+## Fechamento adicional
+
+- Corrigido o ambiente de CI dos dois jobs de navegador: Ubuntu 24.04 fixo, compatível com o Playwright utilizado. Os jobs anteriores falharam antes de executar os testes ao receber Ubuntu 26.04 em `ubuntu-latest`.
+- Gestão possui diagnóstico de armazenamento no próprio módulo. Envio exige bucket com prevenção explícita de acesso público (`iamConfiguration.publicAccessPrevention=enforced`), além das regras privadas. O código não muda políticas nem ativa cobrança.
+- A inspeção das variáveis da Vercel confirmou ausência de `CHECKLIST_STORAGE_BUCKET`. Não há credencial/variáveis de preview configuradas. Ativação de fotos na produção ainda depende dessa configuração externa; não afirmar homologação de produção.

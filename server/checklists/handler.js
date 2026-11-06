@@ -21,7 +21,7 @@ export default async function handler(req,res){
   if(!member?.unitId||!TEAM_ROLES.includes(member.role))return send(res,403,'Vínculo ativo necessário.');
   const db=getDb(),unit=db.collection('units').doc(member.unitId),actorRef=db.doc('memberships/'+actor.uid),templates=unit.collection('checklistTemplates'),runs=unit.collection('checklistRuns');
   const ctx={db,unit,actor,member,actorRef,activeActor,audit},body=req.body||{},action=body.action,day=unitDay();
-  if(['captureStart','photoUpload','photoRead'].includes(action))return await photoAction(req,res,ctx);
+  if(['configuration','captureStart','photoUpload','photoRead'].includes(action))return await photoAction(req,res,ctx);
   if(action==='today'){
    const [models,initial]=await Promise.all([templates.where('archived','==',false).limit(101).get(),runs.where('day','==',day).limit(101).get()]);
    if(models.size>100)throw Error('LIMIT');
@@ -124,7 +124,7 @@ export default async function handler(req,res){
   }
   return send(res,400,'Ação inválida.');
  }catch(e){
-  const errors={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem permissão nesta unidade ou função.'],NOT_FOUND:[404,'Registro não encontrado nesta unidade.'],INVALID:[400,'Revise os campos do checklist.'],CONFLICT:[409,'Outra pessoa alterou este registro. Recarregue antes de continuar.'],ARCHIVED:[409,'Modelo arquivado. Duplique para criar outro.'],INVALID_DAY:[409,'A conferência deve corresponder ao dia atual da unidade.'],ALREADY_ANSWERED:[409,'Este item já foi conferido. O registro original foi preservado.'],PHOTO_REQUIRED:[409,'Fotografe este item e aguarde o envio antes de confirmar.'],LIMIT:[409,'Limite de consulta atingido.'],PHOTO_UNAVAILABLE:[503,'Fotos ainda não configuradas. A gestão precisa configurar o armazenamento privado.'],CAPTURE_EXPIRED:[409,'A sessão da câmera expirou. Tire outra foto.'],PHOTO_INVALID:[400,'Envie uma foto JPEG de até 600 KB capturada pelo app.']};
+  const errors={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem permissão nesta unidade ou função.'],NOT_FOUND:[404,'Registro não encontrado nesta unidade.'],INVALID:[400,'Revise os campos do checklist.'],CONFLICT:[409,'Outra pessoa alterou este registro. Recarregue antes de continuar.'],ARCHIVED:[409,'Modelo arquivado. Duplique para criar outro.'],INVALID_DAY:[409,'A conferência deve corresponder ao dia atual da unidade.'],ALREADY_ANSWERED:[409,'Este item já foi conferido. O registro original foi preservado.'],PHOTO_REQUIRED:[409,'Fotografe este item e aguarde o envio antes de confirmar.'],LIMIT:[409,'Limite de consulta atingido.'],PHOTO_PRIVACY_REQUIRED:[503,'A gestão precisa ativar a prevenção de acesso público no armazenamento antes de enviar fotos.'],PHOTO_UNAVAILABLE:[503,'Fotos ainda não configuradas. A gestão precisa configurar o armazenamento privado.'],CAPTURE_EXPIRED:[409,'A sessão da câmera expirou. Tire outra foto.'],PHOTO_INVALID:[400,'Envie uma foto JPEG de até 600 KB capturada pelo app.']};
   if(errors[e.message])return send(res,...errors[e.message]);
   if(sendQuotaError(res,e))return;
   console.error('Checklists:',e.code||e.message);return send(res,500,'Não foi possível concluir. Nenhuma confirmação de envio foi recebida.');

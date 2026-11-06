@@ -2,16 +2,32 @@ import admin from 'firebase-admin';
 import {createHash,randomUUID} from 'node:crypto';
 import {send} from '../_lib.js';
 import {unitDay} from '../schedules/temporal-policy.js';
+import {isManagement} from '../permissions/v31-policy.js';
 import {canExecute,idOk,expiresAfter,jpegDimensions,MAX_PHOTO_BYTES} from './rules.js';
 export function photoBucket(){
  const name=process.env.CHECKLIST_STORAGE_BUCKET;
  if(!name||! /^[a-z0-9][a-z0-9._-]{2,221}$/.test(name))throw Error('PHOTO_UNAVAILABLE');
  return admin.storage().bucket(name);
 }
+export const privateEvidenceStorage=metadata=>metadata?.iamConfiguration?.publicAccessPrevention==='enforced';
+export async function privatePhotoBucket(){
+ const bucket=photoBucket();
+ // Only isolated demo projects can bypass cloud bucket metadata in the emulator.
+ if(process.env.APP_ENV==='staging'&&process.env.FIREBASE_EXPECTED_PROJECT_ID?.startsWith('demo-')&&process.env.FIREBASE_STORAGE_EMULATOR_HOST)return bucket;
+ let metadata;try{[metadata]=await bucket.getMetadata();}catch{throw Error('PHOTO_UNAVAILABLE');}
+ if(!privateEvidenceStorage(metadata))throw Error('PHOTO_PRIVACY_REQUIRED');
+ return bucket;
+}
 export async function photoAction(req,res,ctx){
  const {db,unit,actor,member,actorRef,activeActor}=ctx,body=req.body,photos=unit.collection('checklistPhotos'),now=new Date();
+ if(body.action==='configuration'){
+  if(!isManagement(member.role))throw Error('FORBIDDEN');
+  if(!process.env.CHECKLIST_STORAGE_BUCKET)return send(res,200,'Armazenamento de fotos não configurado.',{ready:false,code:'MISSING_BUCKET',retentionDays:90});
+  try{await privatePhotoBucket();return send(res,200,'Bucket acessível e protegido contra acesso público. Revise também as regras do Storage e a rotina diária.',{ready:true,code:'BUCKET_READY',retentionDays:90});}
+  catch(e){return send(res,200,e.message==='PHOTO_PRIVACY_REQUIRED'?'Ative a prevenção de acesso público no bucket antes de receber evidências.':'Não foi possível acessar o bucket. Confira o nome e as permissões da credencial de serviço.',{ready:false,code:e.message,retentionDays:90});}
+ }
  if(body.action==='captureStart'){
-  photoBucket();
+  await privatePhotoBucket();
   if(!idOk(body.runId)||!idOk(body.itemId)||!idOk(body.requestId))throw Error('INVALID');
   const id=createHash('sha256').update(body.runId+'|'+body.itemId+'|'+actor.uid+'|'+body.requestId).digest('hex').slice(0,40),ref=photos.doc(id),runRef=unit.collection('checklistRuns').doc(body.runId);
   await db.runTransaction(async tx=>{
@@ -40,6 +56,7 @@ export async function photoAction(req,res,ctx){
  if(body.action!=='photoUpload')throw Error('INVALID');
  if(typeof body.base64!=='string'||body.base64.length>Math.ceil(MAX_PHOTO_BYTES/3)*4||!/^[A-Za-z0-9+/]+={0,2}$/.test(body.base64))throw Error('PHOTO_INVALID');
  const bytes=Buffer.from(body.base64,'base64'),dimensions=jpegDimensions(bytes);if(!dimensions||bytes.length>MAX_PHOTO_BYTES)throw Error('PHOTO_INVALID');
+ const bucket=await privatePhotoBucket();
  const digest=createHash('sha256').update(bytes).digest('hex'),lease=randomUUID();let data,duplicate=false;
  await db.runTransaction(async tx=>{
   const [who,doc]=await Promise.all([tx.get(actorRef),tx.get(ref)]);data=doc.data();
@@ -51,7 +68,7 @@ export async function photoAction(req,res,ctx){
   tx.update(ref,{status:'uploading',lease,sha256:digest});
  });
  if(duplicate)return send(res,200,'Foto já enviada.',{photoId:ref.id});
- const file=photoBucket().file(data.path);
+ const file=bucket.file(data.path);
  try{
   await file.save(bytes,{resumable:false,preconditionOpts:{ifGenerationMatch:0},metadata:{contentType:'image/jpeg',cacheControl:'private, no-store',metadata:{unitId:unit.id,runId:data.runId,photoId:ref.id,sha256:digest}}});
   const [metadata]=await file.getMetadata();
