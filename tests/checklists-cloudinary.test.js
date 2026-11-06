@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -41,4 +42,11 @@ test('retenção seleciona provedor da foto e preserva ocorrências abertas',asy
  const bucket=p=>{provider=p.provider;return {file:()=>({delete:async()=>{deleted++;}})};};
  photo.hold=true;assert.equal((await cleanupPhoto(db,ref,{apply:true,bucket})).deleted,false);photo.hold=false;
  assert.equal((await cleanupPhoto(db,ref,{apply:true,bucket})).deleted,true);assert.equal(deleted,1);assert.equal(provider,'cloudinary');assert.equal((await cleanupPhoto(db,ref,{apply:true,bucket})).deleted,false);
+});
+
+test('tela Hoje reconhece credenciais Cloudinary sem depender de Firebase Storage',()=>{
+ const source=readFileSync(new URL('../server/checklists/handler.js',import.meta.url),'utf8');
+ assert.match(source,/CHECKLIST_PHOTO_PROVIDER==='cloudinary'/);
+ assert.match(source,/CHECKLIST_CLOUDINARY_CLOUD_NAME&&process\.env\.CHECKLIST_CLOUDINARY_API_KEY/);
+ assert.match(source,/CHECKLIST_CLOUDINARY_API_SECRET&&process\.env\.CHECKLIST_CLOUDINARY_PRESET/);
 });
