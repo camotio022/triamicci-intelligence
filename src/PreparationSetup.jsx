@@ -2,6 +2,7 @@ import React,{useEffect,useState,useRef} from 'react';
 import {ArrowLeft,ArrowRight,Check,ClipboardList,Info,Layers,Plus,Scissors,Trash2,UtensilsCrossed} from 'lucide-react';
 import {preparationTypes,preparationPlan,validatePreparation,physicalUnit} from '../server/production/preparation-config.js';
 import './preparation-setup.css';
+import './preparation-mobile-polish.css';
 import PreparedProductForm from './PreparedProductForm.jsx';
 import ConfirmSheet from './ConfirmSheet.jsx';
 const empty=()=>({type:'',name:'',sourceProductId:'',outputProductId:'',portionMode:'same',resultUnit:'porcao',batchYield:1,portionWeight:0,weightUnit:'g',method:'',location:'reserva',outputPerBatch:null,ingredients:[]});
