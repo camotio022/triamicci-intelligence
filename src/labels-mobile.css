@@ -1,0 +1,37 @@
+/* Etiquetas: pesquisa, filtros e cards utilizáveis com uma mão. */
+.ti-labels-page{min-width:0}
+.ti-labels-page .ti-planning-heading{gap:8px}
+.ti-labels-page .ti-planning-heading h1{font-size:clamp(20px,3vw,27px);line-height:1.25}
+.ti-labels-records-header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ti-labels-records-header h2{margin:0;font-size:18px}
+.ti-labels-records-header button{min-height:42px;padding:8px 12px}
+.ti-labels-search{display:grid;gap:9px;min-width:0}
+.ti-labels-search>label{display:grid;gap:5px;font-size:12px}
+.ti-labels-search input[type=search]{width:100%;min-height:44px;font-size:16px;min-width:0}
+.ti-labels-area{display:flex;gap:6px;overflow:auto;scrollbar-width:none}
+.ti-labels-area button{min-height:40px;flex:1 0 auto;font-size:12px;border-radius:20px;padding:8px 11px}
+.ti-labels-area button[aria-pressed=true]{background:#a71916!important;border-color:#a71916!important;color:#fff!important}
+.ti-labels-counter{font-size:12px;color:#647287;margin:0}
+.ti-labels-empty{padding:12px;background:#f7f8fa;border-radius:12px;color:#657386;font-size:13px}
+.ti-labels-records .ti-label-record{background:#fff;padding:12px;gap:7px;min-width:0}
+.ti-labels-records .ti-label-record strong{font-size:13px;overflow-wrap:anywhere}
+.ti-labels-records .ti-label-record span,.ti-labels-records .ti-label-record small{line-height:1.45;overflow-wrap:anywhere}
+.ti-labels-records .ti-label-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.ti-labels-records .ti-label-actions>button{min-height:44px;font-size:12px;padding:8px;white-space:normal;min-width:0}
+.ti-labels-records .ti-label-actions>button:last-child{grid-column:1/-1}
+.ti-labels-records .ti-label-record form{display:grid;gap:10px;padding:10px;background:#f7f8fa;border-radius:11px;min-width:0}
+.ti-labels-page .ti-planning-card :is(input,select,textarea){font-size:16px}
+.ti-labels-page .ti-planning-card :is(input,select,textarea,button):focus-visible{outline:2px solid #a71916;outline-offset:2px}
+@media(max-width:600px){
+ .ti-labels-page .ti-planning-grid{margin-top:12px;gap:12px}
+ .ti-labels-page .ti-planning-card{padding:12px;gap:10px;border-radius:14px}
+ .ti-labels-page .ti-planning-heading h1{font-size:21px}
+ .ti-labels-page>.ti-planning-heading{align-items:flex-start}
+ .ti-labels-page>.ti-planning-heading button{font-size:12px;min-height:44px}
+ .ti-labels-page>p:not(.eyebrow){font-size:12px}
+ .ti-labels-page .ti-label-form{grid-template-columns:minmax(0,1fr);gap:10px}
+ .ti-labels-records .ti-label-actions>button{font-size:11px}
+}
+@media print{
+ .ti-labels-search,.ti-labels-counter{display:none!important}
+}
