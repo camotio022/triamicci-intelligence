@@ -9,6 +9,7 @@ import {validQuantity} from '../server/operations/logic.js';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import {conferenceItem,timestamp,unitLabel} from './stock-conference-model.js';
 import './stock-conference.css';
+import ConferenceHistory from './ConferenceHistory.jsx';
 const areaName=area=>area==='giro'?'Giro':'Reserva';
 const fmt=n=>Number(n).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const date=value=>timestamp(value)?.toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})||'Sem registro';
@@ -84,7 +85,7 @@ function Conference({membership,initialProductId=null}){
    </fieldset></form>}
   </>:<>
    <nav className="conference-tabs" aria-label="Conferência e histórico">{[['today','Hoje'],['history','Histórico']].map(([key,label])=><button key={key} aria-pressed={tab===key} onClick={()=>setTab(key)}>{label}</button>)}</nav>
-   {tab==='history'?<section className="conference-history"><h2>Contagens registradas</h2><p>Registros por área, com data e responsável. Os registros anteriores permanecem preservados.</p>{historyError&&<p role="alert">{historyError}<button onClick={()=>historyLoad()}>Tentar novamente</button></p>}{!historyReady&&!historyError&&<p role="status">Carregando histórico…</p>}{history.filter(r=>r.kind==='count').map(r=><article className="conference-card" key={r.id}><strong>{r.productName||products.find(p=>p.id===r.productId)?.name||'Produto'}</strong><span>{fmt(r.quantity)} {unitLabel(r.unit)} · {areaName(r.location)}</span><small>{date(r.at)} · {r.actorName||r.actorUid||'Responsável não registrado'}</small><details><summary>Detalhes</summary><p>Rodada: {r.sessionId}</p><p>Registro: {r.id}</p>{r.notes&&<p>{r.notes}</p>}</details></article>)}{historyReady&&!history.some(r=>r.kind==='count')&&<p className="conference-empty">Nenhuma contagem nesta página de movimentações.</p>}{cursor&&<button disabled={busy} onClick={async()=>{setBusy(true);await historyLoad(true);setBusy(false)}}>Carregar anteriores</button>}</section>:<>
+   {tab==='history'?<ConferenceHistory operations={history} products={products} loading={!historyReady&&!historyError} error={historyError} hasMore={!!cursor} onRetry={()=>historyLoad()} busy={busy} onMore={async()=>{setBusy(true);try{await historyLoad(true)}finally{setBusy(false)}}}/>:<>
     <div className="conference-card conference-progress-card"><ClipboardCheck size={23}/><div><strong>{due.length?'Vamos conferir o '+areaName(area)+'?':'Conferência do '+areaName(area)}</strong><span>{done.length} de {countable.length} itens contados hoje</span><progress max={Math.max(countable.length,1)} value={done.length} aria-label="Progresso da contagem"/></div></div>
     <nav className="conference-areas" aria-label="Área de conferência">{['giro','reserva'].map(a=><button key={a} disabled={busy} aria-pressed={area===a} onClick={()=>{setArea(a);setMessage('')}}>{areaName(a)}</button>)}</nav>
     <label className="conference-search"><Search size={18}/><input type="search" placeholder="Buscar insumo" aria-label="Buscar insumo" value={search} onChange={e=>setSearch(e.target.value)}/></label>
