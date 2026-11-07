@@ -1,0 +1,19 @@
+/* P0 — planejamento de escala: matriz mensal continua no desktop;
+   no celular a leitura é por dia e colaborador, sem arraste horizontal. */
+.ti-roster-mobile-day{display:none}
+@media(max-width:760px){
+ .ti-roster-mobile-day{display:grid;gap:12px;margin:14px 0}
+ .ti-roster-mobile-day>label{display:grid;gap:6px;color:#536176;font-size:12px;font-weight:750}
+ .ti-roster-mobile-day>label>input{min-height:46px;max-width:100%;font-size:16px;padding:9px 12px;border-radius:11px;border:1px solid #d6dce7;background:#fff;color:#202a3d}
+ .ti-roster-day-summary{display:flex;align-items:center;justify-content:space-between;gap:9px}
+ .ti-roster-day-summary strong{color:#202a3d;font-size:14px}
+ .ti-roster-day-summary span{font-size:12px;color:#6b7789}
+ .ti-roster-day-list{display:grid;gap:8px}
+ .ti-roster-day-person{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #e4e8ee;background:#fff;border-radius:11px;padding:10px 12px;min-width:0}
+ .ti-roster-day-person span{font-size:13px;font-weight:650;color:#202a3d;min-width:0;overflow-wrap:anywhere}
+ .ti-roster-day-person b{font-size:11px;font-weight:750;padding:6px 8px;border-radius:20px;background:#edf1f5;color:#49586c;max-width:45%;text-align:right}
+ .ti-roster-day-person b[data-kind="off"],.ti-roster-day-person b[data-kind="monthly_sunday"]{background:#fff0e9;color:#8d4023}
+ .ti-roster-day-person b[data-kind="leave"]{background:#fff3d7;color:#815b15}
+ .ti-roster-day-empty{font-size:13px;color:#657386}
+ .ti-planning .ti-schedule-matrix{display:none}
+}
