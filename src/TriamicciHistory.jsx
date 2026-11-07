@@ -6,8 +6,8 @@ import {History,ChefHat,Search,ChevronDown,ChevronUp,MoreVertical} from 'lucide-
 import './triamicci-history.css';
 const day=recordDay;
 const stamp=v=>{if(!v)return 'Data indisponível';const d=new Date(v);return Number.isNaN(d.getTime())?'Data indisponível':new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(d)};
-export default function TriamicciHistory({title='Histórico',records=[],getId=r=>r.id,getTitle=r=>r.title,getQuantity=()=>'',getDate=r=>r.at,getDescription=()=>'',getPerson=r=>r.actorName,renderDetails,empty='Nenhum registro encontrado.',loading=false}){
- const [period,setPeriod]=useState('today'),[query,setQuery]=useState(''),[expanded,setExpanded]=useState(null),[from,setFrom]=useState(''),[to,setTo]=useState('');
+export default function TriamicciHistory({title='Histórico',records=[],getId=r=>r.id,getTitle=r=>r.title,getQuantity=()=>'',getDate=r=>r.at,getDescription=()=>'',getPerson=r=>r.actorName,renderDetails,empty='Nenhum registro encontrado.',loading=false,defaultPeriod='today'}){
+ const [period,setPeriod]=useState(defaultPeriod),[query,setQuery]=useState(''),[expanded,setExpanded]=useState(null),[from,setFrom]=useState(''),[to,setTo]=useState('');
  const today=useOperationDay(),yesterday=day(new Date(Date.parse(today+'T12:00:00Z')-86400000));
  const filtered=useMemo(()=>records.filter(r=>{const date=getDate(r),dateKey=day(date),when=date?new Date(date).getTime():NaN;const valid=period==='all'||period==='custom'&&inPeriod(date,from,to)||period==='today'&&dateKey===today||period==='yesterday'&&dateKey===yesterday||period==='week'&&Number.isFinite(when)&&when>=Date.now()-7*86400000&&when<=Date.now();const term=[getTitle(r),getDescription(r),getPerson(r)].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');return valid&&term.includes(query.trim().toLocaleLowerCase('pt-BR'))}),[records,period,query,today,yesterday,from,to,getDate,getTitle,getDescription,getPerson]);
  return <section className="ti-history-shell" aria-label={title}>
