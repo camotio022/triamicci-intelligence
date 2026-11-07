@@ -1,0 +1,13 @@
+.ti-confirm-backdrop{position:fixed;inset:0;z-index:120;background:rgba(22,26,38,.55);display:flex;align-items:center;justify-content:center;padding:max(12px,env(safe-area-inset-top,0px)) 12px max(12px,env(safe-area-inset-bottom,0px))}
+.ti-confirm-sheet{box-sizing:border-box;display:grid;gap:11px;background:#fff;color:#202a3d;width:min(100%,440px);max-height:calc(100dvh - 30px);overflow-y:auto;overscroll-behavior:contain;border-radius:18px;padding:19px;box-shadow:0 24px 72px #18202e44}
+.ti-confirm-header{display:flex;justify-content:space-between;align-items:center}.ti-confirm-symbol{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:#fff2ec;color:#a71916}
+.ti-confirm-sheet h2{font-size:19px;line-height:1.25;margin:0;letter-spacing:-.3px}.ti-confirm-sheet p{margin:0;color:#566274;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.ti-confirm-header>button{border:0;background:transparent;display:grid;place-items:center;width:44px;height:44px;padding:0;color:#596579}
+.ti-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:7px}
+.ti-confirm-actions>button{min-height:46px;min-width:0;border-radius:12px;border:1px solid #dce2ea;background:#fff;color:#243147;font-size:14px;font-weight:700;padding:10px;overflow-wrap:anywhere}
+.ti-confirm-actions .ti-confirm-primary{background:#a71916;color:#fff;border-color:#a71916}
+.ti-confirm-actions .ti-confirm-danger{background:#b42318;color:#fff;border-color:#b42318}
+.ti-confirm-actions button:disabled{opacity:.58;cursor:wait}
+.ti-confirm-sheet .ti-confirm-error{font-size:13px;color:#a71916}
+@media(max-width:600px){.ti-confirm-backdrop{align-items:flex-end;padding:0}.ti-confirm-sheet{border-radius:20px 20px 0 0;width:100%;max-height:calc(100dvh - env(safe-area-inset-top,0px) - 12px);padding:18px 16px max(19px,env(safe-area-inset-bottom,0px))}.ti-confirm-actions{grid-template-columns:1fr 1fr}}
+@media(max-width:359px){.ti-confirm-actions{grid-template-columns:1fr}}

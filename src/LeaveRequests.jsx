@@ -2,6 +2,7 @@ import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import TriamicciHistory from './TriamicciHistory.jsx';
+import ConfirmSheet from './ConfirmSheet.jsx';
 import {auth} from './firebase.js';
 import './operations-planning.css';
 import './leave-v4.css';
@@ -25,6 +26,7 @@ export default function LeaveRequests({membership}){
  const [requests,setRequests]=useState([]),[date,setDate]=useState(''),[reason,setReason]=useState(''),[notes,setNotes]=useState({}),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[notice,setNotice]=useState('');
  const [reviewId,setReviewId]=useState(null),[showForm,setShowForm]=useState(false),[filter,setFilter]=useState('pending');
  const [context,setContext]=useState(null);
+ const [pendingAction,setPendingAction]=useState(null);
  useEffect(()=>{let active=true;setContext(null);if(date)api('leaveContext',{date}).then(d=>{if(active)setContext(d)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[date,membership.unitId]);
  const manager=['admin','manager','submanager'].includes(membership.role);
  const load=useCallback(async(silent=false)=>{
@@ -38,23 +40,33 @@ export default function LeaveRequests({membership}){
  const overdue=x=>x.status==='pending'&&x.date<today;
  const filtered=useMemo(()=>requests.filter(x=>filter==='past'?x.status==='pending'&&x.date<today:filter==='pending'?x.status==='pending'&&x.date>=today:filter==='all'||x.status===filter),[requests,filter,today]);
  const pendingCount=requests.filter(x=>x.status==='pending'&&x.date>=today).length;
- const submit=async e=>{
+ const submit=e=>{
   e.preventDefault();if(busy)return;
   if(date<todayInUnit()){setError('Escolha uma data de hoje em diante.');return;}
-  if(!window.confirm('Enviar a solicitação de folga para '+dateLabel(date)+'? A aprovação não muda automaticamente a escala.'))return;
-  setBusy(true);setError('');setNotice('');
-  try{const d=await api('leaveRequest',{date,reason:reason.trim()});setNotice(d.message);setReason('');setDate('');setShowForm(false);await load();}
-  catch(e){setError(e.message);}
-  finally{setBusy(false);}
+  if(!date||reason.trim().length<10||context?.official||context?.pending)return;
+  setPendingAction({kind:'submit',date,reason:reason.trim()});
  };
- const decide=async(id,decision)=>{
+ const decide=(id,decision)=>{
   if(busy)return;
   const note=(notes[id]||'').trim();
   if(note.length<8){setError('Informe uma justificativa com pelo menos 8 caracteres.');return;}
-  if(!window.confirm((decision==='approved'?'Aprovar':'Recusar')+' esta solicitação? A decisão ficará registrada e não alterará a escala oficial automaticamente.'))return;
+  setPendingAction({kind:'decision',id,decision,note});
+ };
+ const confirmAction=async()=>{
+  if(busy||!pendingAction)return;
+  const action=pendingAction;
   setBusy(true);setError('');setNotice('');
-  try{const d=await api('leaveDecision',{id,decision,note});setNotice(d.message);setReviewId(null);await load();}
-  catch(e){setError(e.message);}
+  try{
+   if(action.kind==='submit'){
+    const d=await api('leaveRequest',{date:action.date,reason:action.reason});
+    setNotice(d.message);setReason('');setDate('');setShowForm(false);
+   }else{
+    const d=await api('leaveDecision',{id:action.id,decision:action.decision,note:action.note});
+    setNotice(d.message);setReviewId(null);
+   }
+   setPendingAction(null);
+   await load();
+  }catch(e){setError(e.message);}
   finally{setBusy(false);}
  };
  return <section className="ti-planning ti-leave-v4">
@@ -103,6 +115,7 @@ export default function LeaveRequests({membership}){
     renderDetails={x=><div>{x.note?'Decisão: '+x.note:'Sem observações'} · ID: {x.id}</div>}
     empty="Nenhuma solicitação concluída no período."/></section>
   {notice&&<p role="status" className="ti-leave-v4-message">{notice}</p>}
+  <ConfirmSheet open={!!pendingAction} title={pendingAction?.kind==='submit'?'Confirmar solicitação de folga':pendingAction?.decision==='approved'?'Aprovar solicitação':'Recusar solicitação'} description={pendingAction?.kind==='submit'?'Enviar pedido para '+dateLabel(pendingAction?.date)+'? A aprovação não altera automaticamente a escala.':'Esta decisão será registrada e não alterará a escala oficial automaticamente.'} confirmLabel={pendingAction?.kind==='submit'?'Enviar pedido':pendingAction?.decision==='approved'?'Aprovar':'Confirmar recusa'} tone={pendingAction?.decision==='rejected'?'danger':'primary'} busy={busy} error={error} onConfirm={confirmAction} onCancel={()=>setPendingAction(null)}/>
   {error&&<p role="alert" className="team-error">{error}</p>}
  </section>;
 }

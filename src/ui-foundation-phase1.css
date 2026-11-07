@@ -1,0 +1,37 @@
+/* Phase 1 / PR #158: small-screen geometry and reusable visual tokens.
+   This file intentionally loads AFTER legacy foundations. No business rules. */
+:root{
+ --ti-brand:#a71916;--ti-ink:#202a3d;--ti-muted:#657386;--ti-line:#e2e6ed;
+ --ti-surface:#fff;--ti-canvas:#f7f8fb;--ti-focus-ring:#a71916;
+ --ti-radius-sm:10px;--ti-radius-card:14px;--ti-space-1:4px;
+ --ti-space-2:8px;--ti-space-3:12px;--ti-space-4:16px;--ti-space-6:24px;
+}
+.app-shell :where(button,input,select,textarea,a):focus-visible{
+ outline:2px solid var(--ti-focus-ring);outline-offset:2px;
+}
+.app-shell :where(input,select,textarea){min-width:0;max-width:100%}
+.app-shell :where(.conference-card,.receiving-card,.ti-planning-card,.ti-premium-card,.panel){min-width:0}
+.app-shell :where(.ti-unified-modal,.ti-profile-dialog,.access-sheet){max-width:calc(100vw - 24px);max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 24px);overflow-y:auto;overscroll-behavior:contain}
+.ti-mobile-page-label{display:none}
+@media(max-width:760px){
+ .main-content{min-width:0}
+ .main-content>.topbar{position:sticky;z-index:20;top:0;background:var(--ti-canvas);border-bottom:1px solid var(--ti-line)}
+ .topbar .breadcrumb{min-width:0;max-width:100%;overflow:hidden}
+ .topbar .breadcrumb .ti-mobile-brand{white-space:nowrap}
+ /* The toolbar has two icon actions; the page title lives on its own line. */
+ .topbar .breadcrumb>b{display:none}
+ .ti-mobile-page-label{display:block;margin:6px 0 3px;min-width:0;font-weight:800;color:var(--ti-ink);font-size:clamp(19px,5vw,23px);line-height:1.24;letter-spacing:-.025em;overflow-wrap:anywhere}
+ .ti-mobile-context{padding:4px 1px 5px;min-height:0}
+ .ti-mobile-context span:first-child{min-width:0;max-width:70%}
+ .ti-mobile-context span:last-child{min-width:0;max-width:45%}
+ .ti-mobile-quicknav{gap:7px;margin-bottom:10px;padding-block:5px}
+ .ti-mobile-quicknav>button{min-height:44px;border-radius:11px;flex:0 0 auto}
+ .app-shell :where(.ti-unified-modal,.ti-profile-dialog,.access-sheet){width:min(100%,480px)}
+ .app-shell :where(.ti-unified-modal-backdrop,.ti-profile-backdrop,.access-sheet-backdrop){padding:12px max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px))}
+ .ti-sidebar-premium.sidebar-open{height:100dvh}
+}
+@media(max-width:359px){
+ .topbar .breadcrumb .ti-mobile-brand{font-size:12px}
+ .ti-mobile-context{gap:6px;font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){.app-shell :where(.ti-sidebar-premium,.ti-unified-modal,.access-sheet){scroll-behavior:auto;transition-duration:.01ms}}
