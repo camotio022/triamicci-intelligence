@@ -1,3 +1,5 @@
+import {configuredProduct} from './configured-product.js';
+import {countUnit} from './logic.js';
 import {conferenceProfile} from './conference-profile.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct,belongsToOperationalCatalog} from './catalog-identity.js';
@@ -50,7 +52,7 @@ export default async function kitchenV3(req,res){
    const legacy=await unit.collection('v3PhysicalBalances').limit(201).get();if(legacy.size>200)return send(res,409,'Limite de consulta atingido.');
    const bm=new Map(legacy.docs.map(obj).map(p=>[p.id,operationalView(p)]));for(const doc of e.docs)bm.set(doc.id,operationalView(obj(doc)));
    return send(res,200,'Painel operacional carregado.',{
-    products:a.docs.filter(s=>isOperationalProduct(s.data())).map(s=>{const data={...obj(s),profile:action==='v3Conference'?conferenceProfile(s.data(),pm.get(s.id)):pm.get(s.id)||null,v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
+    products:a.docs.filter(s=>isOperationalProduct(s.data())).map(s=>{const data={...configuredProduct(obj(s),pm.get(s.id)),profile:conferenceProfile(s.data(),pm.get(s.id)),v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
     availability:checks.docs.map(s=>({...obj(s),at:iso(s.data().at)})),
     signals:c.docs.map(obj).filter(s=>s.status!=='resolved'),
     orders:d.docs.map(obj).filter(o=>o.status!=='cancelled').map(x=>roles.includes(member.role)?x:redactFinancial(x)).sort((x,y)=>(x.etaDate||'').localeCompare(y.etaDate||'')),
@@ -63,7 +65,7 @@ export default async function kitchenV3(req,res){
    const ref=profiles.doc(productId),pref=products.doc(productId);
    let version=0;
    await db.runTransaction(async tx=>{
-    const [actor,p,prior,balance,allProfiles,allProducts]=await Promise.all([tx.get(actorRef),tx.get(pref),tx.get(ref),tx.get(balances.doc(productId)),tx.get(profiles.limit(201)),tx.get(products.limit(201))]);
+    const [actor,p,prior,balance,allProfiles,allProducts,oldLegacy]=await Promise.all([tx.get(actorRef),tx.get(pref),tx.get(ref),tx.get(balances.doc(productId)),tx.get(profiles.limit(201)),tx.get(products.limit(201)),tx.get(unit.collection('v3PhysicalBalances').doc(productId))]);
     if(!verify(actor,unitId,roles))throw Error('FORBIDDEN');
     if(!p.exists)throw Error('NOT_FOUND');
     if(allProfiles.size>200||allProducts.size>200)throw Error('TOO_MANY');
@@ -73,16 +75,28 @@ export default async function kitchenV3(req,res){
     const sourceIds=[...(profile.sourceProductIds||[]),...(profile.alternativeProductIds||[])];
     if(sourceIds.includes(productId))throw Error('INVALID_SOURCE');
     if(sourceIds.length){const sourceDocs=await Promise.all(sourceIds.map(id=>tx.get(products.doc(id))));if(sourceDocs.some(d=>!d.exists||!isOperationalProduct(d.data())))throw Error('INVALID_SOURCE');}
-    if(prior.exists&&prior.data().version!==expectedVersion||!prior.exists&&expectedVersion!==null)throw Error('STALE');
+    if(prior.exists&&prior.data().version!==expectedVersion||!prior.exists&&expectedVersion!==null&&expectedVersion!==p.data().profile?.version)throw Error('STALE');
     if(!isOperationalProduct(p.data()))throw Error('INACTIVE');
-    if(balance.exists&&balance.data().total>0&&balance.data().unit!==profile.countUnit)throw Error('UNIT_LOCKED');
-    // A configuração NÃO altera saldo legado nem unidades de movimentos já gravados.
+    const targetUnit=profile.countUnit||countUnit(p.data());
+    const unitChanged=countUnit(p.data())!==targetUnit||(balance.exists&&balance.data().unit!==targetUnit)||(!balance.exists&&oldLegacy.exists&&oldLegacy.data().unit!==targetUnit);
+    const legacy=unitChanged?oldLegacy:null;
+    const lots=unitChanged?await tx.get(unit.collection('physicalLots').doc(productId).collection('lots').limit(201)):null;
+    const recipes=unitChanged?await tx.get(unit.collection('productionRecipes').limit(101)):null;
+    if(lots?.size>200||recipes?.size>100)throw Error('TOO_MANY');
+    // Test-phase reconfiguration replaces current experimental balances; historical records remain unchanged.
     const next={displayName:profile.displayName.trim(),aliases:(profile.aliases||[]).map(x=>x.trim()),controlMode:profile.controlMode,origin:profile.origin,
       countUnit:profile.countUnit||null,locations:profile.locations,receivingPresentation:profile.receivingPresentation||null,
       sourceProductIds:profile.sourceProductIds||[],alternativeProductIds:profile.alternativeProductIds||[],
-      trackingNote:(profile.trackingNote||'').slice(0,240),version:(prior.data()?.version||0)+1,updatedAt:now(),updatedBy:user.uid};
+      trackingNote:(profile.trackingNote||'').slice(0,240),version:(prior.data()?.version||p.data().profile?.version||0)+1,updatedAt:now(),updatedBy:user.uid};
     version=next.version;tx.set(ref,next);
-    if(profile.controlMode==='quantitative'&&['kg','g','L','ml','mL','un','porcao','pacote','duzia'].includes(profile.countUnit))tx.update(pref,{operationalUnitOverride:profile.countUnit,updatedAt:now()});
+    tx.update(pref,{name:next.displayName,aliases:[...new Set([...(p.data().aliases||[]),...(next.aliases||[]),p.data().name].filter(Boolean))],profile:next,unit:targetUnit,operationalUnitOverride:targetUnit,receivingUnitOverride:[...unitNames,'ml'].includes(profile.receivingPresentation)?profile.receivingPresentation:unitChanged?targetUnit:p.data().receivingUnitOverride||null,...(unitChanged?{quantity:0,minStock:0}:{}),updatedAt:now()});
+    if(unitChanged){
+     tx.set(balances.doc(productId),{productId,unit:targetUnit,reserve:0,rotation:0,total:0,quality:'CONFIGURATION_RESET',at:null,countedTotal:null,countSessions:{},lastCountAtByArea:{},entriesSinceCount:0,exitsSinceCount:0,updatedAt:now(),configurationVersion:next.version});
+     if(legacy?.exists)tx.set(legacy.ref,{productId,unit:targetUnit,reserva:0,giro:0,total:0,quality:'CONFIGURATION_RESET',updatedAt:now()});
+     for(const lot of lots.docs)tx.delete(lot.ref);
+     for(const recipe of recipes.docs){const data=recipe.data();if(data.active&&(data.outputProductId===productId||data.lines?.some(l=>l.productId===productId)))tx.update(recipe.ref,{active:false,version:(data.version||0)+1,configurationReviewRequired:'A unidade de um insumo foi alterada. Revise as quantidades antes de usar.',updatedAt:now(),updatedBy:user.uid});}
+     newAudit(tx,db,'v3.experimental_stock_reset',unitId,user.uid,{productId,previousProduct:{name:p.data().name,unit:p.data().unit,quantity:p.data().quantity??null},previousBalance:balance.data()||null,previousLegacyBalance:legacy?.data()||null,previousLots:lots.docs.map(d=>({id:d.id,...d.data()})),nextUnit:targetUnit,requiresNewCount:true});
+    }
     newAudit(tx,db,'v3.profile_saved',unitId,user.uid,{productId,before:prior.data()||null,after:next});
    });
    return send(res,200,'Configuração operacional salva.',{version});

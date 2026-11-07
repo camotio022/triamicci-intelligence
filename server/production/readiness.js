@@ -1,3 +1,4 @@
+import {configuredProduct} from '../operations/configured-product.js';
 import {isOperationalProduct} from '../operations/catalog-identity.js';
 import {countUnit} from '../operations/logic.js';
 
@@ -27,10 +28,11 @@ export async function recipeProducts(db,root,recipes,productDocs,reader=db){
  const ids=new Set(recipes.flatMap(r=>[...(r.lines||[]).map(l=>l.productId),r.outputProductId].filter(Boolean)));
  const docs=productDocs.filter(d=>ids.has(d.id));
  const catalogIds=[...new Set(docs.map(d=>d.data().catalogId).filter(Boolean))];
- const [catalogs,balances]=await Promise.all([
+ const [catalogs,balances,profiles]=await Promise.all([
   catalogIds.length?reader.getAll(...catalogIds.map(id=>db.collection('productCatalog').doc(id))):[],
-  docs.length?reader.getAll(...docs.map(d=>root.collection('physicalBalances').doc(d.id))):[]
+  docs.length?reader.getAll(...docs.map(d=>root.collection('physicalBalances').doc(d.id))):[],
+  docs.length?reader.getAll(...docs.map(d=>root.collection('operationalProfiles').doc(d.id))):[]
  ]);
  const catalogMap=new Map(catalogs.map(d=>[d.id,d.data()]));
- return docs.map((d,i)=>({id:d.id,...d.data(),physicalUnit:countUnit(d.data(),catalogMap.get(d.data().catalogId)),physicalBalance:balances[i]?.data()||null}));
+ return docs.map((d,i)=>{const p=configuredProduct(d.data(),profiles[i]?.data());return {id:d.id,...p,physicalUnit:countUnit(p,catalogMap.get(p.catalogId)),physicalBalance:balances[i]?.data()||null};});
 }

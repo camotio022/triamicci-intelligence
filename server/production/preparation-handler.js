@@ -1,3 +1,4 @@
+import {configuredProduct} from '../operations/configured-product.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from '../operations/catalog-identity.js';
@@ -25,13 +26,14 @@ export default async function preparationHandler(req,res){
   const c={type:configuration.type,name:configuration.name.trim(),sourceProductId:configuration.type==='recipe'?'':configuration.sourceProductId,outputProductId:configuration.outputProductId,resultUnit:configuration.resultUnit,batchYield:configuration.batchYield,portionWeight:configuration.type==='recipe'?null:configuration.portionWeight,weightUnit:configuration.weightUnit,method:configuration.method,location:configuration.location,outputPerBatch:configuration.outputPerBatch,ingredients:configuration.ingredients.map(i=>({name:i.name.trim(),amount:i.amount.trim(),unit:i.unit,productId:i.productId||'',tracked:i.tracked}))};
   const ref=recipes.doc(id);
   await db.runTransaction(async tx=>{
-   const [a,old,catalog,graph]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref),tx.get(root.collection('products').limit(201)),tx.get(recipes.limit(101))]);
+   const [a,old,catalog,graph,profiles]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref),tx.get(root.collection('products').limit(201)),tx.get(recipes.limit(101)),tx.get(root.collection('operationalProfiles').limit(201))]);
    if(!management(a.data())||a.data().unitId!==m.unitId)throw Error('FORBIDDEN');
    if((old.data()?.draftVersion||0)!==expectedDraftVersion||(old.data()?.version||0)!==expectedVersion)throw Error('CONFLICT');
-   if(catalog.size>200||graph.size>100)throw Error('LIMIT');
+   if(catalog.size>200||profiles.size>200||graph.size>100)throw Error('LIMIT');
    const operational=catalog.docs.filter(d=>isOperationalProduct(d.data()));
    const central=await Promise.all(operational.map(d=>d.data().catalogId?tx.get(db.collection('productCatalog').doc(d.data().catalogId)):Promise.resolve(null)));
-   const products=operational.map((d,i)=>({id:d.id,...d.data(),physicalUnit:countUnit(d.data(),central[i]?.data())}));
+   const profileMap=new Map(profiles.docs.map(d=>[d.id,d.data()]));
+   const products=operational.map((d,i)=>{const p=configuredProduct(d.data(),profileMap.get(d.id));return {id:d.id,...p,physicalUnit:countUnit(p,central[i]?.data())};});
    const ids=[c.outputProductId,...(c.sourceProductId?[c.sourceProductId]:[]),...c.ingredients.filter(i=>i.tracked).map(i=>i.productId)];
    if(ids.some(id=>!products.some(p=>p.id===id)))throw Error('PRODUCT');
    const balanceIds=[...new Set(ids)],balances=await Promise.all(balanceIds.map(id=>tx.get(root.collection('physicalBalances').doc(id))));

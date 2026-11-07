@@ -1,3 +1,4 @@
+import {configuredProduct} from '../../server/operations/configured-product.js';
 import {isManagement} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import preparedProduct from '../../server/catalog/prepared-product.js';
@@ -13,9 +14,9 @@ const normalize = value => typeof value === 'string' ? value.trim().replace(/\s+
 const validName = value => value.length >= 2 && value.length <= 100;
 const validCategory = value => value.length >= 2 && value.length <= 60;
 const validMin = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100000000;
-const clean = snap => {
-  const d = snap.data();
-  return {id:snap.id,name:d.name,category:d.category,unit:d.unit,minStock:d.minStock,
+const clean = (snap,profile) => {
+  const d = configuredProduct(snap.data(),profile);
+  return {id:snap.id,name:d.name,profile:d.profile||null,aliases:d.aliases||[],category:d.category,unit:d.unit,minStock:d.minStock,
     lotTrackingMode:usesPhysicalLots(d)?'per_lot':d.lotTrackingMode||null,trackExpiry:d.trackExpiry === true,status:d.status,quantity:d.quantity ?? 0,catalogId:d.catalogId||null,
     portionWeight:d.portionWeight??null,weightUnit:d.weightUnit||null,source:d.source||null,labelCategory:d.labelCategory||null,operationalUnitOverride:d.operationalUnitOverride||null,receivingUnitOverride:d.receivingUnitOverride||null,
     createdAt:d.createdAt?.toDate?.()?.toISOString?.() || null};
@@ -36,15 +37,16 @@ export default async function handler(req,res) {
     const db = getDb();
     const products = db.collection('units').doc(m.unitId).collection('products');
     if (action === 'list') {
-      const [snap,balanceSnap] = await Promise.all([products.limit(201).get(),db.collection('units').doc(m.unitId).collection('physicalBalances').limit(201).get()]);
-      if (snap.size > 200) return send(res,409,'Catálogo acima do limite inicial de 200 itens. Paginação necessária.');
+      const [snap,balanceSnap,profileSnap] = await Promise.all([products.limit(201).get(),db.collection('units').doc(m.unitId).collection('physicalBalances').limit(201).get(),db.collection('units').doc(m.unitId).collection('operationalProfiles').limit(201).get()]);
+      if (snap.size > 200 || profileSnap.size>200 || balanceSnap.size>200) return send(res,409,'Catálogo acima do limite inicial de 200 itens. Paginação necessária.');
+      const profiles=new Map(profileSnap.docs.map(doc=>[doc.id,doc.data()]));
       const balances=new Map(balanceSnap.docs.map(doc=>[doc.id,doc.data()]));
       const visible=snap.docs.filter(doc=>belongsToOperationalCatalog(doc.data()));
       const catalogIds=[...new Set(visible.map(doc=>doc.data().catalogId).filter(Boolean))];
       const catalogDocs=catalogIds.length?await db.getAll(...catalogIds.map(id=>db.collection('productCatalog').doc(id))):[];
       const definitions=new Map(catalogDocs.map(doc=>[doc.id,doc.data()]));
       return send(res,200,'Catálogo carregado.',{products:visible.map(doc=>{
-       const p=clean(doc),b=balances.get(doc.id);
+       const p=clean(doc,profiles.get(doc.id)),b=balances.get(doc.id);
        return {...p,physicalUnit:countUnit(p,definitions.get(p.catalogId)),physicalBalance:b?{reserve:b.reserve,rotation:b.rotation,total:b.total,
         unit:b.unit,quality:b.quality||null,countedTotal:b.countedTotal??null,entriesSinceCount:b.entriesSinceCount??null,exitsSinceCount:b.exitsSinceCount??null,lastMovementAt:b.lastMovementAt?.toDate?.()?.toISOString?.()||null,at:b.at?.toDate?.()?.toISOString?.()||null}:null};
       }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))});

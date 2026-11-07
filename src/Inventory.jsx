@@ -1,3 +1,4 @@
+import {productMatches} from '../server/operations/configured-product.js';
 import {apiFetch} from './api-fetch.js';
 import {useViewState} from './useViewState.js';
 import {readViewCache,writeViewCache} from './fastCache.js';
@@ -61,7 +62,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const countDay=p=>{const at=p.physicalBalance?.at;if(!at)return null;const date=new Date(at);return Number.isNaN(date.getTime())?null:restaurantDay(date)};
   const todays=products.filter(p=>countDay(p)===today);
   const visible=useMemo(()=>products.filter(p=>{
-   if(!(p.name+' '+p.category).toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR')))return false;
+   if(!productMatches(p,search))return false;
    const day=countDay(p);
    return countFilter==='all'||countFilter==='today'&&day===today||countFilter==='previous'&&Boolean(day)&&day!==today||countFilter==='uncounted'&&!day;
   }).sort((a,b)=>countFilter==='all'?String(b.physicalBalance?.at||'').localeCompare(String(a.physicalBalance?.at||''))||a.name.localeCompare(b.name,'pt-BR'):a.name.localeCompare(b.name,'pt-BR')),[products,search,countFilter,today]);
