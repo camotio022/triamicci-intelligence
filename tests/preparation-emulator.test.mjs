@@ -63,6 +63,14 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  assert.equal((await productCall(manager,'createPrepared',{...adoption,requestId:randomUUID()})).http,409,'Revisão desatualizada não sobrescreve');
  assert.equal((await productCall(foreign,'createPrepared',adoption)).http,409,'Revisão não acessa outra unidade');
  const racePayload={...prepared,name:'Molho de teste concorrente',requestId:randomUUID()};const race=await Promise.all([productCall(manager,'createPrepared',racePayload),productCall(sub,'createPrepared',{...racePayload,requestId:randomUUID()})]);assert.deepEqual(race.map(r=>r.http).sort(),[201,409]);
+ const draftId='archive-draft';assert.equal((await call(manager,'savePreparation',{id:draftId,configuration})).http,200);
+ assert.equal((await call(aux,'archiveRecipe',{id:draftId,expectedVersion:0})).http,403);
+ assert.equal((await call(foreign,'archiveRecipe',{id:draftId,expectedVersion:0})).http,404);
+ assert.equal((await call(manager,'archiveRecipe',{id:draftId,expectedVersion:0})).http,200);
+ const archived=(await root.collection('productionRecipes').doc(draftId).get()).data();assert.ok(archived.archivedAt);assert.deepEqual(archived.configurationDraft.name,configuration.name);assert.equal(archived.active,false);
+ assert.equal((await call(manager,'preparationList')).configurations.some(r=>r.id===draftId),false,'Arquivada sai da lista operacional');
+ assert.equal((await call(manager,'savePreparation',{id:draftId,configuration,expectedDraftVersion:1,expectedVersion:0,activate:true})).http,409,'Editor anterior não reativa ficha arquivada');
+ assert.equal((await balance.get()).data().total,10,'Arquivar rascunho não altera estoque');
  await db.doc('memberships/'+sub.uid).update({status:'inactive'});assert.equal((await productCall(sub,'createPrepared',{...prepared,name:'Não cadastrar',requestId:randomUUID()})).http,403);
  await db.doc('memberships/'+sub.uid).update({role:'auxiliar'});assert.equal((await call(sub,'savePreparation',{id,configuration,expectedDraftVersion:3,expectedVersion:1})).http,403);
 });

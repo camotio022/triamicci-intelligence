@@ -57,12 +57,12 @@ test('auditoria produção: unidades, dependências, transformação medida, lot
  const {default:attendance}=await import('../server/workflows/attendance-v31.js');
  const {restaurantDay}=await import('../server/schedules/restaurant-today.js');
  assert.equal((await call(aux,'continue_work',{requestId:randomUUID()},attendance)).http,409,'Não abre jornada por prorrogação');
- assert.equal((await call(aux,'clock_in',{requestId:randomUUID()},attendance)).http,200);
+ const entry=await call(aux,'clock_in',{requestId:randomUUID()},attendance);assert.equal(entry.http,200);
  const extensionId=randomUUID();assert.equal((await call(aux,'continue_work',{requestId:extensionId},attendance)).http,200);
- const attendanceRef=unit.collection('attendanceV31').doc(restaurantDay()+'_'+aux.uid),declared=(await attendanceRef.get()).data();
+ const attendanceRef=unit.collection('attendanceV31').doc(entry.day+'_'+aux.uid),declared=(await attendanceRef.get()).data();
  assert.equal(declared.status,'working');assert.equal(declared.events.some(e=>e.action==='clock_out'),false);assert.equal(declared.events.at(-1).action,'continue_work');assert.ok(declared.extendedUntil.toMillis()>Date.now());
  assert.equal((await call(aux,'continue_work',{requestId:extensionId},attendance)).duplicate,true);assert.equal((await attendanceRef.get()).data().extendedUntil.toMillis(),declared.extendedUntil.toMillis());
- const team=await call(aux,'teamToday',{},attendance);assert.equal(team.presence.find(p=>p.uid===aux.uid).day,restaurantDay());assert.ok(team.presence.find(p=>p.uid===aux.uid).extendedUntil);
+ const team=await call(aux,'teamToday',{},attendance);assert.equal(team.presence.find(p=>p.uid===aux.uid).day,declared.day);assert.ok(team.presence.find(p=>p.uid===aux.uid).extendedUntil);
  assert.equal((await call(aux,'clock_out',{requestId:randomUUID()},attendance)).http,200);assert.equal((await call(aux,'continue_work',{requestId:randomUUID()},attendance)).http,409,'Não reabre jornada encerrada');
 
 });
