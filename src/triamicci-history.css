@@ -73,3 +73,28 @@
  .ti-history-toolbar{min-width:0;width:100%}
  .ti-history-search{flex:0 0 auto}
 }
+
+/* Shared history visual language — matches ConferenceHistory without changing record contracts. */
+.ti-history-shell .ti-history-banner{
+ background:transparent;color:#202a3d;padding:0 0 10px;border-radius:0;
+ border-bottom:1px solid #e5e9ef;min-height:44px;
+}
+.ti-history-shell .ti-history-banner h2{color:#202a3d!important;font-size:18px!important;line-height:1.3}
+.ti-history-shell .ti-history-banner small{color:#748196;font-size:10px;letter-spacing:.08em}
+.ti-history-shell .ti-history-banner>svg{color:#a71916;flex-shrink:0}
+.ti-history-shell .ti-history-toolbar{margin:10px 0 6px;gap:8px}
+.ti-history-shell .ti-history-periods button{border-radius:22px;min-height:40px;padding:8px 11px;font-size:12px}
+.ti-history-shell .ti-history-search{border-radius:12px;min-height:44px}
+.ti-history-shell .ti-history-card{border:1px solid #e2e6ed;border-radius:14px;box-shadow:0 2px 8px #19233705}
+.ti-history-shell .ti-history-inner{padding:12px}
+.ti-history-shell .ti-history-title strong{font-size:14px;line-height:1.3}
+.ti-history-shell .ti-history-meta{margin-top:4px}
+.ti-history-shell .ti-history-meta b{color:#202a3d}
+.ti-history-shell .ti-history-detail-btn,.ti-history-shell .ti-history-description button{min-width:40px;min-height:40px;border-radius:10px}
+.ti-history-shell .ti-history-description{margin-top:2px}
+@media(max-width:600px){
+ .ti-history-shell .ti-history-periods{display:flex;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;overscroll-behavior-x:contain;max-width:100%}
+ .ti-history-shell .ti-history-periods::-webkit-scrollbar{display:none}
+ .ti-history-shell .ti-history-periods button{flex:0 0 auto;white-space:nowrap}
+ .ti-history-shell .ti-history-cards{gap:8px}
+}
