@@ -2,3 +2,5 @@
 
 .conference-controls{display:contents;border:0;padding:0;margin:0;min-width:0}
 @media(max-width:699px){.ti-conference:has(.conference-count-form){gap:11px}.conference-count-form{gap:8px}.conference-main-count{padding:14px}.conference-main-count h2{font-size:24px;margin-top:8px}.conference-quantity{margin-top:13px}.ti-conference .conference-quantity input{min-height:58px;font-size:32px;padding:8px 12px}.conference-keypad{gap:6px}.ti-conference .conference-keypad button{min-height:44px;font-size:22px}.conference-main-count>p{font-size:13px}.main-content:has(.conference-count-form)>.ti-mobile-context,.main-content:has(.conference-count-form)>.mobile-page-tabs{display:none}}
+
+.ti-conference .conference-more{width:100%;margin-top:9px;font-size:12px;color:var(--conf-red)}
