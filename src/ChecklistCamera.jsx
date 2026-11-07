@@ -1,46 +1,61 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Camera,RotateCcw} from 'lucide-react';
+import {createPortal} from 'react-dom';
+import {Camera,CheckCircle2,RotateCcw,X,Check,Image as ImageIcon} from 'lucide-react';
+import ChecklistEvidence from './ChecklistEvidence.jsx';
 export default function ChecklistCamera({runId,itemId,call,onUploaded,disabled}){
  const video=useRef(null),stream=useRef(null),alive=useRef(true),session=useRef(null);
- const [phase,setPhase]=useState('idle'),[preview,setPreview]=useState(''),[error,setError]=useState('');
+ const [phase,setPhase]=useState('idle'),[preview,setPreview]=useState(''),[uploaded,setUploaded]=useState(''),[error,setError]=useState('');
  const stop=()=>{stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;};
- useEffect(()=>{alive.current=true;return()=>{alive.current=false;stop();}},[]);
+ useEffect(()=>{alive.current=true;return()=>{alive.current=false;stop();};},[]);
+ useEffect(()=>{if(!['starting','camera','review','uploading'].includes(phase))return;const previous=document.body.style.overflow;document.body.style.overflow='hidden';const esc=e=>{if(e.key==='Escape'&&phase!=='uploading')close();};document.addEventListener('keydown',esc);return()=>{document.body.style.overflow=previous;document.removeEventListener('keydown',esc);};},[phase]);
+ const close=()=>{stop();setPhase('idle');};
  const start=async()=>{
-  setError('');setPreview('');onUploaded(null);setPhase('starting');
+  if(disabled)return;
+  setError('');setPreview('');setUploaded('');onUploaded(null);setPhase('starting');
   try{
-   if(!navigator.mediaDevices?.getUserMedia)throw Error('Câmera indisponível neste navegador. Abra o app em HTTPS e permita o acesso à câmera.');
+   if(!navigator.mediaDevices?.getUserMedia)throw Error('Câmera indisponível. Abra o app por HTTPS e permita o acesso.');
    session.current=await call('captureStart',{runId,itemId,requestId:crypto.randomUUID()});
    if(!alive.current)return;
-   const media=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:960}},audio:false});
+   const media=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1600},height:{ideal:1200}},audio:false});
    if(!alive.current){media.getTracks().forEach(t=>t.stop());return;}
    stream.current=media;setPhase('camera');
-  }catch(e){if(alive.current){setError(e.name==='NotAllowedError'?'A câmera não foi autorizada. Permita o acesso para fotografar este item.':e.message);setPhase('idle');}stop();}
+  }catch(e){if(alive.current){setError(e.name==='NotAllowedError'?'Permita o acesso à câmera para continuar.':e.message);setPhase('idle');}stop();}
  };
- useEffect(()=>{if(phase==='camera'&&video.current){video.current.srcObject=stream.current;video.current.play().catch(()=>{setError('Não foi possível abrir a câmera. Tente novamente.');stop();setPhase('idle');});}},[phase]);
+ useEffect(()=>{if(phase==='camera'&&video.current){video.current.srcObject=stream.current;video.current.play().catch(()=>{setError('Não foi possível iniciar a câmera.');close();});}},[phase]);
  const capture=()=>{
   if(!video.current?.videoWidth)return;
-  const canvas=document.createElement('canvas'),ratio=Math.min(1,1280/Math.max(video.current.videoWidth,video.current.videoHeight));
-  canvas.width=Math.round(video.current.videoWidth*ratio);canvas.height=Math.round(video.current.videoHeight*ratio);canvas.getContext('2d').drawImage(video.current,0,0,canvas.width,canvas.height);
-  let quality=.78,data=canvas.toDataURL('image/jpeg',quality);
-  while(data.length>430000&&quality>.35){quality-=.1;data=canvas.toDataURL('image/jpeg',quality);}
-  if(data.length>819200){setError('A foto ficou muito grande. Tente um enquadramento mais simples.');return;}
+  const canvas=document.createElement('canvas'),ratio=Math.min(1,1600/Math.max(video.current.videoWidth,video.current.videoHeight));
+  canvas.width=Math.round(video.current.videoWidth*ratio);canvas.height=Math.round(video.current.videoHeight*ratio);
+  canvas.getContext('2d').drawImage(video.current,0,0,canvas.width,canvas.height);
+  let quality=.88,data=canvas.toDataURL('image/jpeg',quality);
+  while(data.length>430000&&quality>.35){quality-=.08;data=canvas.toDataURL('image/jpeg',quality);}
+  if(data.length>819200){setError('Foto muito grande. Tente um enquadramento mais simples.');return;}
   stop();setPreview(data);setPhase('review');
  };
  const upload=async()=>{
   setError('');setPhase('uploading');
-  try{const result=await call('photoUpload',{photoId:session.current.photoId,base64:preview.split(',')[1]});if(alive.current){onUploaded(result.photoId);setPhase('ready');}}
+  try{const result=await call('photoUpload',{photoId:session.current.photoId,base64:preview.split(',')[1]});if(alive.current){onUploaded(result.photoId);setUploaded(result.photoId);setPhase('ready');}}
   catch(e){if(alive.current){setError(e.message);setPhase('review');}}
  };
+ const modal=['starting','camera','review','uploading'].includes(phase);
  return <div className="ti-check-camera">
-  {phase==='camera'&&<video ref={video} autoPlay playsInline muted aria-label="Câmera ao vivo para conferir o item"/>}
-  {preview&&<img src={preview} alt="Foto capturada nesta conferência"/>}
-  {error&&<p role="alert" className="ti-check-alert">{error}</p>}
-  {phase==='idle'&&<button type="button" disabled={disabled} onClick={start}><Camera size={20}/> Fotografar conferência</button>}
-  {phase==='starting'&&<p role="status">Abrindo câmera…</p>}
-  {phase==='camera'&&<div className="ti-check-actions"><button type="button" onClick={capture}><Camera size={20}/> Tirar foto</button><button type="button" className="secondary" onClick={()=>{stop();setPhase('idle');}}>Cancelar câmera</button></div>}
-  {phase==='review'&&<div className="ti-check-actions"><button type="button" onClick={upload}>Enviar foto</button><button type="button" className="secondary" onClick={start}><RotateCcw size={17}/> Refazer foto</button></div>}
-  {phase==='uploading'&&<p role="status">Enviando foto… Aguarde a confirmação.</p>}
-  {phase==='ready'&&<><p role="status" className="ti-check-success">Foto enviada para esta conferência.</p><button type="button" className="secondary" disabled={disabled} onClick={start}>Refazer foto</button></>}
-  <small>Captura pela câmera do app. Sem seleção da galeria. Retenção de 90 dias; ocorrências abertas preservam a evidência.</small>
+  {uploaded&&preview?<div className="ti-check-camera-ready"><ChecklistEvidence id={uploaded} call={call} preview={preview} label="Evidência anexada"/><p className="ti-check-success"><CheckCircle2 size={17}/> Foto enviada e vinculada a este item.</p></div>:<button type="button" className="ti-check-camera-open" disabled={disabled||modal} onClick={start}><Camera size={20}/> {modal?'Câmera aberta…':'Adicionar foto'}</button>}
+  {uploaded&&<button type="button" className="secondary ti-check-retake-inline" disabled={disabled} onClick={start}><RotateCcw size={17}/> Tirar novamente</button>}
+  {error&&phase==='idle'&&<p role="alert" className="ti-check-alert">{error}</p>}
+  {modal&&createPortal(<div className="ti-check-camera-backdrop" role="presentation">
+   <section className="ti-check-camera-modal" role="dialog" aria-modal="true" aria-label="Capturar evidência">
+    <header className="ti-check-camera-modal-head"><h3><Camera size={21}/> Capturar evidência</h3><button type="button" className="secondary" aria-label="Fechar câmera" disabled={phase==='uploading'} onClick={close}><X size={22}/></button></header>
+    <div className="ti-check-camera-stage">
+     {phase==='starting'&&<div className="ti-check-camera-wait" role="status"><Camera size={34}/><p>Abrindo câmera…</p></div>}
+     {phase==='camera'&&<><video ref={video} autoPlay playsInline muted aria-label="Visualização da câmera ao vivo"/><div className="ti-check-camera-corners" aria-hidden="true"/></>}
+     {(phase==='review'||phase==='uploading')&&<img src={preview} alt="Prévia da foto capturada"/>}
+    </div>
+    {error&&<p role="alert" className="ti-check-alert">{error}</p>}
+    {phase==='camera'&&<div className="ti-check-shutter-bar"><span className="ti-check-shutter-hint">Enquadre o item solicitado</span><button type="button" className="ti-check-shutter" aria-label="Tirar foto" onClick={capture}><Camera size={28}/></button><span className="ti-check-shutter-hint">Sem galeria</span></div>}
+    {phase==='review'&&<div className="ti-check-camera-actions"><button type="button" onClick={upload}><Check size={19}/> Usar foto</button><button type="button" className="secondary" onClick={start}><RotateCcw size={18}/> Tirar novamente</button></div>}
+    {phase==='uploading'&&<p role="status" className="ti-check-camera-uploading"><ImageIcon size={20}/> Enviando foto privada…</p>}
+    <small>Foto capturada no aplicativo. O envio mantém a evidência privada e vinculada ao item.</small>
+   </section>
+  </div>,document.body)}
  </div>;
 }

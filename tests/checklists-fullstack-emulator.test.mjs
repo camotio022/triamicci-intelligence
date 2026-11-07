@@ -46,11 +46,13 @@ test('checklist completo: navegador → API real → Firestore/Storage → outra
   assert.equal(await aux.getByRole('button',{name:'Gestão',exact:true}).count(),0);
   await aux.getByRole('button',{name:'Iniciar conferência',exact:true}).click();
   assert.equal(await aux.getByRole('button',{name:'Confirmar e continuar',exact:true}).isEnabled(),false);
-  await aux.getByRole('button',{name:'Fotografar conferência',exact:true}).click();
+  await aux.getByRole('button',{name:'Adicionar foto',exact:true}).click();
+  await aux.getByRole('dialog',{name:'Capturar evidência'}).waitFor();
   await aux.waitForFunction(()=>document.querySelector('video')?.videoWidth>0);
   await aux.getByRole('button',{name:'Tirar foto',exact:true}).click();
-  await aux.getByRole('button',{name:'Enviar foto',exact:true}).click();
-  await aux.getByText('Foto enviada para esta conferência.',{exact:true}).waitFor();
+  await aux.getByRole('button',{name:'Usar foto',exact:true}).click();
+  await aux.getByText('Foto enviada e vinculada a este item.',{exact:true}).waitFor();
+  assert.equal(await aux.getByRole('dialog',{name:'Capturar evidência'}).count(),0);
   await aux.getByRole('radio',{name:'Conferido',exact:true}).check();
   await aux.getByRole('button',{name:'Confirmar e continuar',exact:true}).click();
   await aux.getByRole('heading',{name:'Item sem foto definido pela unidade',exact:true}).waitFor();
@@ -64,8 +66,10 @@ test('checklist completo: navegador → API real → Firestore/Storage → outra
   await manager.getByRole('button',{name:'Ver conferência',exact:true}).waitFor();
   await manager.getByRole('button',{name:'Ver conferência',exact:true}).click();
   await manager.getByRole('button',{name:'Item 1: Conferência integrada com foto',exact:true}).click();
-  await manager.getByRole('button',{name:'Ver foto',exact:true}).click();
-  await manager.getByAltText('Evidência privada da conferência').waitFor();
+  await manager.getByRole('button',{name:'Ampliar evidência da conferência'}).click();
+  await manager.getByRole('dialog',{name:'Visualizar evidência'}).waitFor();
+  await manager.getByRole('button',{name:'Aumentar zoom'}).click();
+  await manager.getByText('125%',{exact:true}).waitFor();
   assert.deepEqual(errors,[]);
  }finally{if(browser)await browser.close();server.kill('SIGTERM');api.closeAllConnections();await new Promise(resolve=>api.close(resolve));}
 });

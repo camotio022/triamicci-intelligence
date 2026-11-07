@@ -73,7 +73,10 @@ test('checklists: modelos, versões, fotos privadas, concorrência e retenção 
  assert.equal((await unit.collection('checklistRuns').doc(runId).get()).data().answers[answer.itemId].note,'Problema precisa de tratamento');
  await call(manager,'captureStart',{runId,itemId:'other-00001',requestId:randomUUID()},409);
  await call(manager,'archiveTemplate',{id:templateId,expectedRevision:4});
- assert.equal((await call(auxiliar,'today')).templates.length,0);
+ const activeAfterArchive=await call(auxiliar,'today');
+ assert.equal(activeAfterArchive.templates.length,0,'Archived model disappears from current templates');
+ assert.equal(activeAfterArchive.runs.some(r=>r.id===runId),false,'Archived model run leaves active Today screen');
+ assert.equal((await call(auxiliar,'history')).runs.some(r=>r.id===runId),true,'Same-day archived run is preserved in History');
  await call(auxiliar,'run',{runId});
  await call(cook,'start',{templateId,requestId:randomUUID()},404);
  // Avulso instances are explicitly created and retries are idempotent.
