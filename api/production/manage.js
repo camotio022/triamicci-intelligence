@@ -77,6 +77,7 @@ export default async function handler(req,res){
      ...[...new Set(lines.flatMap(x=>[x.productId,...(x.substitutes||[])]))].map(id=>tx.get(unit.collection('products').doc(id)))]);
     if(!a.exists||a.data().status!=='active'||!['admin','manager','submanager'].includes(a.data().role)||a.data().unitId!==member.unitId)throw Error('FORBIDDEN');
     if(products.some(x=>!x.exists||!isOperationalProduct(x.data())))throw Error('PRODUCT_NOT_FOUND');
+    if(prev.exists&&(prev.data().preparationConfig||prev.data().configurationDraft))throw Error('CONFLICT');
     if(prev.exists&&expectedVersion!==prev.data().version)throw Error('CONFLICT');
     let outputUnit='un';
     if(outputProductId){const output=await tx.get(unit.collection('products').doc(outputProductId));

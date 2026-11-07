@@ -10,6 +10,7 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  assert.equal((await call(aux,'preparationList')).http,403);assert.equal((await call(aux,'savePreparation',{id,configuration})).http,403);
  assert.equal((await call(manager,'savePreparation',{id,configuration})).http,200);assert.equal((await root.collection('productionRecipes').doc(id).get()).data().active,false);assert.equal((await call(aux,'list')).recipes.length,0);assert.equal((await balance.get()).data().total,10);
  assert.equal((await call(manager,'savePreparation',{id,configuration})).http,409,'Versão antiga não sobrescreve rascunho');
+ assert.equal((await call(manager,'saveRecipe',{id,name:configuration.name,yieldQuantity:1,outputProductId:b,expectedVersion:0,lines:[{productId:a,quantity:.25,location:'reserva',substitutes:[]}]})).http,409,'Editor antigo não substitui cadastro guiado');
  assert.equal((await call(foreign,'savePreparation',{id,configuration})).http,409,'Insumos de outra unidade são recusados');
  assert.equal((await call(sub,'savePreparation',{id,configuration,expectedDraftVersion:1,activate:true})).http,200);
  const recipe=(await root.collection('productionRecipes').doc(id).get()).data();assert.equal(recipe.lines[0].quantity,.25);assert.equal(recipe.version,1);assert.equal(recipe.active,true);assert.equal((await balance.get()).data().total,10,'Ativar ficha não movimenta estoque');
