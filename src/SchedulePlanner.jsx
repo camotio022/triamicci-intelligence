@@ -32,7 +32,7 @@ export default function SchedulePlanner({membership}){
 
  const chosen=plans.find(x=>x.id===selected);
  const legacyIds=useMemo(()=>registryState.activated?entries.filter(e=>!people.some(p=>p.uid===e.uid)).length:0,[entries,people,registryState.activated]);
- const dateSelected=date;
+ const dateSelected=monthDates(period).includes(date)?date:monthDates(period)[0]||'';
  const open=p=>{setSelected(p.id);setDraftRevision(p.revision);setTitle(p.title);setPeriod(p.period);setEntries(p.entries||[]);setError('')};
  const reset=()=>{setSelected('');setDraftRevision(null);setTitle('Escala da equipe');setEntries([]);setError('')};
  const sundays=useMemo(()=>weekdayOccurrences(period,0),[period]);
