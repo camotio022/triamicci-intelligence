@@ -42,7 +42,7 @@ export default function ChecklistCamera({runId,itemId,call,onUploaded,disabled})
  };
  const modal=['starting','camera','review','uploading'].includes(phase);
  return <div className="ti-check-camera">
-  {uploaded&&preview?<div className="ti-check-camera-ready"><ChecklistEvidence id={uploaded} call={call} preview={preview} label="Evidência anexada"/><p className="ti-check-success"><CheckCircle2 size={17}/> Foto enviada e vinculada a este item.</p></div>:<button type="button" className="ti-check-camera-open" disabled={disabled||modal} onClick={start}><Camera size={20}/> {modal?'Câmera aberta…':'Adicionar foto'}</button>}
+  {uploaded&&preview?<div className="ti-check-camera-ready"><ChecklistEvidence id={uploaded} call={call} preview={preview} label="Evidência anexada"/><p className="ti-check-success"><CheckCircle2 size={17}/> Foto enviada e vinculada a este item.</p></div>:<button ref={trigger} type="button" className="ti-check-camera-open" disabled={disabled||modal} onClick={start}><Camera size={20}/> {modal?'Câmera aberta…':'Adicionar foto'}</button>}
   {uploaded&&<button ref={trigger} type="button" className="secondary ti-check-retake-inline" disabled={disabled} onClick={start}><RotateCcw size={17}/> Tirar novamente</button>}
   {error&&phase==='idle'&&<p role="alert" className="ti-check-alert">{error}</p>}
   {modal&&createPortal(<div className="ti-check-camera-backdrop" role="presentation">
