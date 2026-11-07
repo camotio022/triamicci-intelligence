@@ -7,6 +7,7 @@ import {isManagement} from '../server/permissions/v31-policy.js';
 import ChecklistEditor from './ChecklistEditor.jsx';
 import ChecklistCamera from './ChecklistCamera.jsx';
 import ChecklistEvidence from './ChecklistEvidence.jsx';
+import TriamicciHistory from './TriamicciHistory.jsx';
 import './checklists.css';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 const statusName={pending:'Em andamento',problem:'Com pendências',completed:'Concluído'};
@@ -78,6 +79,14 @@ export default function Checklists({membership,call=checklistCall}){
    {!templates.length&&!busy&&<p className="ti-check-card">Nenhum modelo cadastrado.</p>}
    <div className="ti-check-card-grid ti-check-model-grid">{templates.map(t=><article className="ti-check-card ti-check-model-card" key={t.id}><div className="ti-check-card-top"><h3>{(t.draft||t.published).name}</h3><span className={"ti-check-pill "+(t.archived?"archived":t.published?"completed":"pending")}>{t.archived?"Arquivado":t.published?"Publicado":"Rascunho"}</span></div>{t.hasDraft&&t.published&&<p className="ti-check-model-draft">Alterações aguardando publicação</p>}<div className="ti-check-model-actions">{!t.archived&&<button type="button" className="ti-check-model-edit" onClick={()=>setEditor({template:t})}>Editar modelo</button>}<details className="ti-check-more-actions"><summary>Mais opções</summary><div className="ti-check-more-content"><button type="button" className="secondary" onClick={()=>setEditor({template:t,duplicate:true})}>Duplicar</button>{!t.archived&&<button type="button" className="secondary ti-check-archive" disabled={busy} onClick={async()=>{if(!window.confirm('Arquivar este modelo? Conferências existentes serão preservadas.'))return;setBusy(true);try{await call('archiveTemplate',{id:t.id,expectedRevision:t.revision});await changeTab('management');refresh();}catch(e){setError(e.message);}finally{setBusy(false);}}}>Arquivar</button>}</div></details></div></article>)}</div>
    {templateCursor&&<button type="button" className="secondary" disabled={busy} onClick={async()=>{setBusy(true);try{const d=await call('templates',{before:templateCursor});setTemplates(old=>[...old,...d.templates]);setTemplateCursor(d.next||null);}catch(e){setError(e.message);}finally{setBusy(false);}}}>Carregar outros modelos</button>}
-  </>:<><div className="ti-check-history-heading"><h2>Histórico e arquivados</h2><p>Conferências anteriores e evidências preservadas.</p></div>{!history.length&&!busy&&<p className="ti-check-card">Nenhuma conferência anterior encontrada.</p>}<div className="ti-check-card-grid">{history.map(r=><article className="ti-check-card" key={r.id}><h3>{r.model.name}</h3><p>{r.day.split('-').reverse().join('/')} · {progressLabel(r.progress)}</p><p>{r.progress.answered} de {r.progress.total} itens</p>{r.evidence?.length>0&&<ChecklistEvidence id={r.evidence[0]} compact call={call} label="Evidência anexada"/>}<button type="button" className="secondary" disabled={busy} onClick={()=>open(null,r)}>Ver conferência</button></article>)}</div>{cursor&&<button type="button" className="secondary" disabled={busy} onClick={async()=>{setBusy(true);try{const d=await call('history',{before:cursor});setHistory(old=>[...old,...d.runs]);setCursor(d.next);}catch(e){setError(e.message);}finally{setBusy(false);}}}>Carregar anteriores</button>}</>}
+  </>:<><TriamicciHistory title="Histórico e arquivados" records={history} defaultPeriod="all"
+     getId={r=>r.id} getTitle={r=>r.model?.name||'Checklist'} getDate={r=>r.completedAt||r.updatedAt||(r.day?r.day+'T12:00:00-03:00':null)}
+     getQuantity={r=>progressLabel(r.progress)} getDescription={r=>r.progress.answered+' de '+r.progress.total+' itens · '+(r.day?.split('-').reverse().join('/')||'Data não informada')}
+     getPerson={r=>r.actorName||r.responsibleName||r.completedByName}
+     renderDetails={r=><div className="ti-check-history-details">
+      {r.evidence?.length>0&&<ChecklistEvidence id={r.evidence[0]} compact call={call} label="Evidência anexada"/>}
+      <button type="button" className="secondary" disabled={busy} onClick={()=>open(null,r)}>Ver conferência</button>
+     </div>}
+     empty="Nenhuma conferência anterior ou arquivada encontrada." loading={busy}/>{cursor&&<button type="button" className="secondary" disabled={busy} onClick={async()=>{setBusy(true);try{const d=await call('history',{before:cursor});setHistory(old=>[...old,...d.runs]);setCursor(d.next);}catch(e){setError(e.message);}finally{setBusy(false);}}}>Carregar anteriores</button>}</>}
  </section>;
 }
