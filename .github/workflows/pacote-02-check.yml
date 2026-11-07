@@ -35,5 +35,7 @@ jobs:
         run: node --test tests/physical-operations.test.mjs tests/catalog-v2-regressions.test.mjs tests/lot-fefo.test.mjs tests/production-logic.test.mjs
       - name: Instalar dependências
         run: npm install --no-audit --no-fund
+      - name: Testar fluxo de aprovação e layout mobile do recebimento
+        run: node --test tests/shipment-receiving-mobile-ui.test.mjs
       - name: Compilar interface
         run: npm run build
