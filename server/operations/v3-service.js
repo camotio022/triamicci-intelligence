@@ -41,14 +41,16 @@ export default async function kitchenV3(req,res){
    return send(res,200,'Alertas operacionais carregados.',{signals:s.docs.map(obj).filter(x=>x.status!=='resolved'),
     deliveries:o.docs.map(obj).filter(x=>!['received','cancelled'].includes(x.status)).sort((a,b)=>a.etaDate.localeCompare(b.etaDate)),today});
   }
-  if(action==='v3Dashboard'){
-   const [a,b,c,d,e]=await Promise.all([products.limit(201).get(),profiles.limit(201).get(),issues.limit(201).get(),orders.limit(201).get(),balances.limit(201).get()]);
+  if(action==='v3Dashboard'||action==='v3Conference'){
+   const [a,b,c,d,e,checks]=await Promise.all([products.limit(201).get(),profiles.limit(201).get(),issues.limit(201).get(),action==='v3Conference'?Promise.resolve({docs:[],size:0}):orders.limit(201).get(),balances.limit(201).get(),action==='v3Conference'?unit.collection('availabilityChecks').limit(401).get():Promise.resolve({docs:[],size:0})]);
+   if(checks.size>400)return send(res,409,'Muitas conferências: paginação necessária.');
    if([a,b,c,d,e].some(s=>s.size>200))return send(res,409,'Limite de consulta atingido. Paginação necessária.');
    const pm=new Map(b.docs.map(obj).map(p=>[p.id,p]));
    const legacy=await unit.collection('v3PhysicalBalances').limit(201).get();if(legacy.size>200)return send(res,409,'Limite de consulta atingido.');
    const bm=new Map(legacy.docs.map(obj).map(p=>[p.id,operationalView(p)]));for(const doc of e.docs)bm.set(doc.id,operationalView(obj(doc)));
    return send(res,200,'Painel operacional carregado.',{
     products:a.docs.filter(s=>isOperationalProduct(s.data())).map(s=>{const data={...obj(s),profile:pm.get(s.id)||null,v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
+    availability:checks.docs.map(s=>({...obj(s),at:iso(s.data().at)})),
     signals:c.docs.map(obj).filter(s=>s.status!=='resolved'),
     orders:d.docs.map(obj).filter(o=>o.status!=='cancelled').map(x=>roles.includes(member.role)?x:redactFinancial(x)).sort((x,y)=>(x.etaDate||'').localeCompare(y.etaDate||'')),
    });

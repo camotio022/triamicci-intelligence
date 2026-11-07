@@ -3,6 +3,7 @@ import {sendQuotaError} from '../../server/quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
 import {intervalFromBalance} from '../../server/operations/inventory-summary.js';
 import {restaurantDay} from '../../server/schedules/restaurant-today.js';
+import availabilityCheck from '../../server/operations/availability-check.js';
 import shipments from '../../server/operations/shipments.js';
 import investigation from '../../server/operations/investigation.js';
 import {signalUnitChange} from '../../server/live-signal.js';
@@ -38,6 +39,7 @@ function error(res,e){
  if(sendQuotaError(res,e))return;console.error('Physical operations:',e.message);return send(res,500,'Não foi possível completar a operação.');
 }
 export default async function handler(req,res){
+ if(req.body?.action==='availabilityCheck')return availabilityCheck(req,res);
  if(typeof req.body?.action==='string'&&req.body.action.startsWith('v3'))return kitchenV3(req,res);
  const subaction=req.body?.action;
  if(['shipmentsList','shipmentInspect','shipmentApprove','shipmentReject'].includes(subaction))return shipments(req,res);

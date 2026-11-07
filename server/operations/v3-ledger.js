@@ -55,8 +55,11 @@ export default async function v3Ledger(req,res){
   if(action==='v3LedgerHistory'){
    const a=await actorRef.get();
    if(!active(a,m.unitId,TEAM_ROLES))return send(res,403,'Sem permissão.');
-   const h=await unit.collection('v3Operations').orderBy('at','desc').limit(60).get();
-   return send(res,200,'Movimentações recentes.',{operations:h.docs.map(snapMap)});
+   let query=unit.collection('v3Operations').orderBy('at','desc');
+   const cursor=req.body?.cursor;
+   if(cursor){if(!reqOk(cursor))return send(res,400,'Página inválida.');const last=await unit.collection('v3Operations').doc(cursor).get();if(!last.exists)return send(res,400,'Página indisponível.');query=query.startAfter(last);}
+   const h=await query.limit(61).get();
+   return send(res,200,'Movimentações recentes.',{operations:h.docs.slice(0,60).map(s=>({...snapMap(s),at:s.data().at?.toDate?.()?.toISOString?.()||null})),nextCursor:h.size>60?h.docs[59].id:null});
   }
 
   if(action==='v3LossReport'){
@@ -314,7 +317,7 @@ export default async function v3Ledger(req,res){
       lastCountAtByArea:{...(prior.lastCountAtByArea||{}),[location]:now()},
       countSessions:{...(prior.countSessions||{}),[location]:sessionId},
       quality:'PARTIAL_LOCATION_COUNT',lastOperationId:requestId},{merge:true},prior);
-    tx.create(ref,{kind:'count',actorUid:actor.uid,at:now(),productId,location,sessionId,quantity,unit:u,
+    tx.create(ref,{kind:'count',actorUid:actor.uid,actorName:historyActor(a.data(),actor),productName:p.data().name,at:now(),productId,location,sessionId,quantity,unit:u,
       before:prior[location]||0,difference:round(quantity-(prior[location]||0)),notes});
     if(prior.countSessions?.[location==='reserva'?'giro':'reserva']===sessionId){const reserve=location==='reserva'?quantity:prior.reserva,rotation=location==='giro'?quantity:prior.giro;const at=now();tx.set(balanceRef,{countedReserve:reserve,countedRotation:rotation,countedTotal:after,countId:requestId,entriesSinceCount:0,exitsSinceCount:0,at,quality:'PHYSICAL_COUNT'},{merge:true});tx.create(unit.collection('physicalCounts').doc(requestId),{inventorySummary:intervalFromBalance(prior),productId,productName:p.data().name,actorName:historyActor(a.data(),actor),unit:u,reserve,rotation,total:after,sessionId,actorUid:actor.uid,unitId:m.unitId,at});}
     audit(tx,db,'v3.counted',m.unitId,actor.uid,{requestId,productId,location,quantity,sessionId});
