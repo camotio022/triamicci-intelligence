@@ -8,7 +8,7 @@ import {validDate,validateRosterSchedule} from '../schedules/rules.js';
 const idOk=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 const yyyyMm=x=>typeof x==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(x);
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
-const clean=d=>({id:d.id,...d.data(),createdAt:iso(d.data().createdAt),updatedAt:iso(d.data().updatedAt),publishedAt:iso(d.data().publishedAt)});
+const clean=d=>({id:d.id,...d.data(),createdAt:iso(d.data().createdAt),updatedAt:iso(d.data().updatedAt),publishedAt:iso(d.data().publishedAt),archivedAt:iso(d.data().archivedAt)});
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
@@ -118,6 +118,33 @@ export default async function handler(req,res){
    return send(res,200,'Decisão registrada. A escala oficial precisa ser atualizada e publicada separadamente.');
   }
   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Somente gerência pode administrar escalas.');
+  if(action==='scheduleArchive'||action==='scheduleRestore'){
+   const id=req.body?.id;if(!idOk(id))return send(res,400,'Identificador de escala inválido.');
+   const ref=schedules.doc(id),now=new Date();
+   let changed=false,found=false;
+   await db.runTransaction(async tx=>{
+    const [actorDoc,plan]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
+    if(!actorDoc.exists||actorDoc.data().status!=='active'||actorDoc.data().unitId!==m.unitId||!isManagement(actorDoc.data().role))throw Error('FORBIDDEN');
+    if(!plan.exists)return;found=true;
+    const old=plan.data(),archived=!!old.archivedAt;
+    if(action==='scheduleArchive'){
+     if(archived)return;
+     // An official current-month schedule is never moved to the recycle bin.
+     if(old.status==='published'&&old.period>=unitDay().slice(0,7))throw Error('ACTIVE_SCHEDULE');
+     const lock=await tx.get(unit.collection('schedulePublicationState').doc(old.period));
+     if(lock.data()?.activeId===id)throw Error('ACTIVE_SCHEDULE');
+     tx.update(ref,{archivedAt:now,archivedBy:actor.uid});
+    }else{
+     if(!archived)return;
+     tx.update(ref,{archivedAt:null,restoredAt:now,restoredBy:actor.uid});
+    }
+    changed=true;signalUnitChange(tx,db,m.unitId,['schedules']);
+    tx.create(db.collection('auditLogs').doc(),{event:action==='scheduleArchive'?'schedule.archived':'schedule.restored',unitId:m.unitId,actorUid:actor.uid,scheduleId:id,at:now});
+   });
+   if(!found)return send(res,404,'Escala não encontrada.');
+   if(!changed)return send(res,409,'A escala já está nesse estado.');
+   return send(res,200,action==='scheduleArchive'?'Escala movida para a lixeira.':'Escala restaurada.');
+  }
   if(action==='saveDraft'){
    const {period,entries,title,id,expectedRevision}=req.body||{};
    if(!yyyyMm(period)||!Array.isArray(entries)||entries.length>1000||typeof title!=='string'||title.trim().length<3||title.length>100||id&&!idOk(id))
@@ -206,7 +233,7 @@ export default async function handler(req,res){
   }
   return send(res,400,'Ação inválida.');
  }catch(e){
-  const policyErrors={PAST_LEAVE:'A data solicitada já passou. Encerre o pedido sem aprovação e registre a justificativa.',APPROVED_LEAVE_CONFLICT:'A proposta deve respeitar as folgas aprovadas antes de publicar.',MONTH_PUBLISHED:'A escala deste mês já é oficial. Use troca, cobertura ou solicite revisão gerencial.',DUPLICATE_LEAVE:'Já existe um pedido em análise nesta data.',PUBLICATION_WINDOW:'A publicação abre vinte dias antes do início do mês. Meses encerrados não podem ser publicados.',PENDING_LEAVE:'Analise os pedidos de folga pendentes antes de publicar.',HISTORY_LIMIT:'Histórico acima do limite seguro. Refine a consulta.'};
+  const policyErrors={PAST_LEAVE:'A data solicitada já passou. Encerre o pedido sem aprovação e registre a justificativa.',APPROVED_LEAVE_CONFLICT:'A proposta deve respeitar as folgas aprovadas antes de publicar.',MONTH_PUBLISHED:'A escala deste mês já é oficial. Use troca, cobertura ou solicite revisão gerencial.',DUPLICATE_LEAVE:'Já existe um pedido em análise nesta data.',PUBLICATION_WINDOW:'A publicação abre vinte dias antes do início do mês. Meses encerrados não podem ser publicados.',ACTIVE_SCHEDULE:'A escala oficial em vigor está protegida e não pode ir para a lixeira.',PENDING_LEAVE:'Analise os pedidos de folga pendentes antes de publicar.',HISTORY_LIMIT:'Histórico acima do limite seguro. Refine a consulta.'};
   if(policyErrors[e.message])return send(res,409,policyErrors[e.message]);
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Permissão negada.');
