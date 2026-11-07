@@ -46,8 +46,9 @@ export default function PreparationSetup({products,call,onSaved,unitId,requested
   setBusy(true);setError('');
   try{
    await call('/api/production/manage','archiveRecipe',{id,expectedVersion:selected.version});
+   creationId.current=null;
    setConfirmation(null);
-   creationId.current=null;setId('');setC(empty());setStep(1);setDirty(false);
+   setId('');setC(empty());setStep(1);setDirty(false);
    setMessage('Preparação arquivada. Histórico e saldos preservados.');
    await load();await onSaved();setConfirmation(null);
   }catch(e){setError(e.message)}finally{setBusy(false)}
