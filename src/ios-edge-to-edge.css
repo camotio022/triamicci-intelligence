@@ -1,17 +1,17 @@
-/* iPhone PWA: white background beneath the status bar, with controls in safe areas.
+/* Mobile PWA: coordinated chrome backdrop with controls in safe areas.
    Scope to standalone only: ordinary Safari and desktop retain their layouts. */
 @media (display-mode: standalone) and (max-width: 760px) {
   html, body, #root {
     min-height: 100%;
-    background: #fff;
+    background: var(--ti-mobile-chrome, #f7f8fb);
   }
   .app-shell {
     min-height: 100dvh;
-    background: #fff;
+    background: var(--ti-mobile-chrome, #f7f8fb);
   }
   .main-content {
     min-height: 100dvh;
-    background: linear-gradient(to bottom, #fff 0, #fff env(safe-area-inset-top, 0px), #f7f8fb env(safe-area-inset-top, 0px), #f7f8fb 100%);
+    background: linear-gradient(to bottom, var(--ti-mobile-chrome, #f7f8fb) 0, var(--ti-mobile-chrome, #f7f8fb) env(safe-area-inset-top, 0px), #f7f8fb env(safe-area-inset-top, 0px), #f7f8fb 100%);
     padding-top: env(safe-area-inset-top, 0px) !important;
   }
   .main-content > .topbar {
@@ -43,10 +43,10 @@
   @media (max-width: 760px) {
     html.ti-ios-standalone, html.ti-ios-standalone body,
     html.ti-ios-standalone #root,
-    html.ti-ios-standalone .app-shell { background: #fff; }
+    html.ti-ios-standalone .app-shell { background: var(--ti-mobile-chrome, #f7f8fb); }
     html.ti-ios-standalone .main-content {
       padding-top: env(safe-area-inset-top, 0px) !important;
-      background: linear-gradient(to bottom, #fff 0, #fff env(safe-area-inset-top, 0px), #f7f8fb env(safe-area-inset-top, 0px), #f7f8fb 100%);
+      background: linear-gradient(to bottom, var(--ti-mobile-chrome, #f7f8fb) 0, var(--ti-mobile-chrome, #f7f8fb) env(safe-area-inset-top, 0px), #f7f8fb env(safe-area-inset-top, 0px), #f7f8fb 100%);
       min-height: 100dvh;
     }
     html.ti-ios-standalone .main-content > .topbar {
@@ -62,4 +62,11 @@
       padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
     }
   }
+}
+
+/* Shared mobile state: light page when closed, white drawer when open.
+   CSS variable also follows non-iOS browsers; no status-bar overlays. */
+@media (max-width: 760px) {
+  :root { --ti-mobile-chrome: #f7f8fb; }
+  html.ti-drawer-open { --ti-mobile-chrome: #ffffff; }
 }

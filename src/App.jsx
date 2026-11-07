@@ -68,6 +68,26 @@ export function Workspace({ user, membership, logout }) {
  const [today,setToday]=useState(()=>restaurantDay());
  useEffect(()=>{const refresh=()=>setToday(restaurantDay());const timer=setInterval(refresh,60000);document.addEventListener('visibilitychange',refresh);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh)}},[]);
  const [menuOpen, setMenuOpen] = useState(false);
+ // Coordinate app chrome across mobile platforms. iOS standalone may retain its
+ // installation-time native status-bar appearance; never overlay system icons.
+ useEffect(()=>{
+  const mobile=window.matchMedia('(max-width: 760px)');
+  const root=document.documentElement;
+  const theme=document.querySelector('meta[name="theme-color"]');
+  const initialTheme=theme?.getAttribute('content')||'#f7f8fb';
+  const sync=()=>{
+   const opened=mobile.matches&&menuOpen;
+   root.classList.toggle('ti-drawer-open',opened);
+   if(theme)theme.setAttribute('content',mobile.matches?(opened?'#ffffff':'#f7f8fb'):initialTheme);
+  };
+  sync();
+  mobile.addEventListener?.('change',sync);
+  return()=>{
+   mobile.removeEventListener?.('change',sync);
+   root.classList.remove('ti-drawer-open');
+   if(theme)theme.setAttribute('content',initialTheme);
+  };
+ },[menuOpen]);
  const [mobileExtraOpen,setMobileExtraOpen]=useState(false);
  const [mentorHint,setMentorHint]=useState(null);
  const [mentorSource,setMentorSource]=useState(null);
