@@ -68,6 +68,25 @@ export function Workspace({ user, membership, logout }) {
  const [today,setToday]=useState(()=>restaurantDay());
  useEffect(()=>{const refresh=()=>setToday(restaurantDay());const timer=setInterval(refresh,60000);document.addEventListener('visibilitychange',refresh);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh)}},[]);
  const [menuOpen, setMenuOpen] = useState(false);
+ // Keep the iOS standalone status-bar backdrop synchronized with the drawer.
+ // Theme color is a hint to the host; the CSS backdrop covers the web-rendered safe area.
+ useEffect(()=>{
+  const html=document.documentElement;
+  const body=document.body;
+  const theme=document.querySelector('meta[name="theme-color"]');
+  const originalTheme=theme?.getAttribute('content')||'#21191b';
+  const installed=window.matchMedia?.('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  const smallScreen=window.matchMedia?.('(max-width: 760px)').matches;
+  if(!installed||!smallScreen)return;
+  html.classList.toggle('ti-menu-status-open',menuOpen);
+  body.classList.toggle('ti-menu-status-open',menuOpen);
+  if(theme)theme.setAttribute('content',menuOpen?'#21191b':'#f7f8fb');
+  return()=>{
+   html.classList.remove('ti-menu-status-open');
+   body.classList.remove('ti-menu-status-open');
+   if(theme)theme.setAttribute('content',originalTheme);
+  };
+ },[menuOpen]);
  const [mobileExtraOpen,setMobileExtraOpen]=useState(false);
  const [mentorHint,setMentorHint]=useState(null);
  const [mentorSource,setMentorSource]=useState(null);
