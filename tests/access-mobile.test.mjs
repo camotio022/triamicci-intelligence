@@ -31,7 +31,7 @@ test('Acessos mobile: fotos, busca, filtros, histórico e convite em modal',{tim
   assert.equal(await edit.getByText('Conferir antes de salvar').count(),0,'Voltar não modifica permissões');
   await edit.getByRole('button',{name:'Revisar alteração'}).click();
   await edit.getByRole('button',{name:'Confirmar alteração'}).click();
-  await page.getByText('Acesso atualizado no teste.').waitFor();
+  await page.locator('.team-directory .team-notice').getByText('Acesso atualizado no teste.',{exact:true}).waitFor();
   assert.equal(updates.length,1,'A alteração é enviada uma única vez após confirmar');
   assert.equal(updates[0].uid,'person-a');
   assert.equal(updates[0].role,'auxiliar');
