@@ -1,0 +1,53 @@
+/* Menu Triamicci — compacto, com header e perfil fixos. */
+.sidebar.ti-sidebar-premium{background:#21191b;color:#e5dbdd;padding:0;display:flex;flex-direction:column;overflow:hidden;height:100dvh;min-height:0;overscroll-behavior:contain}
+.ti-sidebar-premium .ti-sidebar-top{padding:18px 16px 10px;flex:none;border-bottom:1px solid #ffffff12}
+.ti-sidebar-brand{display:flex;align-items:center;gap:10px;min-height:65px;margin-bottom:18px}
+.ti-sidebar-brand-icon{display:grid;place-items:center;flex:none;width:54px;height:54px;border-radius:13px;overflow:hidden;background:#007934}
+.ti-sidebar-brand-icon svg{width:54px;height:54px}
+.ti-sidebar-brand-name{min-width:0;display:flex;flex-direction:column;gap:2px;flex:1}
+.ti-sidebar-brand-name strong{font-size:22px;font-weight:800;letter-spacing:-.7px;line-height:1.05;color:#fff}
+.ti-sidebar-brand-name span{font-size:10px;letter-spacing:2px;font-weight:800;color:#c8b1b6}
+.ti-sidebar-premium .ti-sidebar-close{flex:none;display:none;place-items:center;width:44px;height:44px;padding:0;color:#fff;border:0;background:transparent;border-radius:9px}
+.ti-sidebar-unit{display:flex;align-items:center;gap:10px;min-height:66px;background:#38292c;border:1px solid #694a51;border-radius:13px;padding:10px;margin-bottom:12px}
+.ti-sidebar-unit-symbol{display:grid;place-items:center;background:#105438;color:#78dfa8;border-radius:10px;width:38px;height:38px;flex:none}
+.ti-sidebar-unit-name{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.ti-sidebar-unit-name small{font-size:10px;letter-spacing:1px;color:#c3a9af;font-weight:800}
+.ti-sidebar-unit-name strong{font-size:15px;color:#fff;text-transform:capitalize;overflow-wrap:anywhere}
+.ti-sidebar-unit-state{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:750;color:#85e8ab;white-space:nowrap}
+.ti-sidebar-pulse{position:relative;display:block;width:8px;height:8px;border-radius:50%;background:#65dc9d;box-shadow:0 0 0 2px #65dc9d22}
+.ti-sidebar-pulse::after{content:'';position:absolute;inset:-4px;border:1px solid #65dc9d99;border-radius:50%;animation:ti-sidebar-beacon 2.6s ease-out infinite}
+@keyframes ti-sidebar-beacon{0%{opacity:.65;transform:scale(.45)}75%,100%{opacity:0;transform:scale(1.3)}}
+.ti-sidebar-search{display:flex;align-items:center;gap:9px;background:#34282a;border:1px solid #524046;border-radius:11px;padding:0 12px;height:44px;color:#c5b7ba}
+.ti-sidebar-search:focus-within{border-color:#daacb2;box-shadow:0 0 0 2px #b3525a55}
+.ti-sidebar-search input{font-size:16px!important;line-height:1.2;width:100%;min-width:0;background:transparent!important;border:0!important;outline:0!important;color:#fff!important;min-height:42px;box-shadow:none!important}
+.ti-sidebar-search input::placeholder{color:#bdadb1;opacity:1}
+.sidebar.ti-sidebar-premium nav.ti-sidebar-scroll{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:13px 12px 20px;gap:5px;scrollbar-width:thin;scrollbar-color:#655357 transparent}
+.ti-sidebar-caption{font-size:10px;letter-spacing:1.3px;color:#ad9297;font-weight:800;margin:8px 10px 10px}
+.ti-sidebar-quick{display:flex;flex-direction:column;gap:3px;padding-bottom:12px;margin-bottom:5px;border-bottom:1px solid #ffffff19}
+.sidebar.ti-sidebar-premium .ti-sidebar-link{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;border:0;border-radius:11px;background:transparent;color:#e1d5d9;text-align:left;padding:10px 12px;font-size:14px;font-weight:540;line-height:1.3;cursor:pointer}
+.ti-sidebar-link svg{flex:none;color:#cbbdc1}
+.ti-sidebar-link span{min-width:0;overflow-wrap:anywhere}
+.sidebar.ti-sidebar-premium .ti-sidebar-link.is-active{background:#a71916;color:#fff;font-weight:730}
+.sidebar.ti-sidebar-premium .ti-sidebar-link.is-active svg{color:#fff}
+.sidebar.ti-sidebar-premium .ti-sidebar-link:hover:not(.is-active),.ti-sidebar-group-toggle:hover{background:#3d2b30}
+.ti-sidebar-group{display:flex;flex-direction:column;gap:3px}
+.sidebar.ti-sidebar-premium .ti-sidebar-group-toggle{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;border:0;background:transparent;border-radius:10px;padding:10px 12px;color:#f2e9eb;font-size:14px;font-weight:700;text-align:left}
+.ti-sidebar-group-toggle>span{flex:1}
+.ti-sidebar-group-toggle svg{flex:none;color:#c3adb2}
+.ti-sidebar-group-toggle .rotated{transform:rotate(180deg)}
+.ti-sidebar-group-toggle.has-active:not([aria-expanded="true"]){box-shadow:inset 3px 0 #b84442}
+.ti-sidebar-group-items{padding-left:12px;display:grid;gap:2px;border-left:1px solid #5c444a;margin-left:22px;margin-bottom:5px}
+.sidebar.ti-sidebar-premium .ti-sidebar-group-items .ti-sidebar-link{font-size:13px;min-height:44px}
+.ti-sidebar-no-results{font-size:13px;color:#c7afb5;text-align:center;padding:22px 8px}
+.ti-sidebar-footer{display:flex;align-items:center;gap:10px;flex:none;border-top:1px solid #574048;background:#21191b;padding:13px 14px max(13px,env(safe-area-inset-bottom));min-height:78px}
+.ti-sidebar-avatar{width:42px;height:42px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#553139;color:#fff;font-weight:800;flex:none}
+.ti-sidebar-user{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.ti-sidebar-user strong{font-size:13px;color:#fff;line-height:1.3;max-height:2.6em;overflow:hidden;overflow-wrap:anywhere}
+.ti-sidebar-user span{font-size:11px;color:#bba7ac}
+.ti-sidebar-logout{flex:none;border:1px solid #71545a;background:transparent;color:#e5d7da;border-radius:10px;display:grid;place-items:center;width:44px;height:44px}
+.sidebar.ti-sidebar-premium :is(button,input):focus-visible{outline:2px solid #93e3b5;outline-offset:2px}
+.ti-sidebar-premium .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:760px){.sidebar.ti-sidebar-premium{width:min(350px,86vw);max-width:86vw;z-index:31;transform:translateX(-105%);transition:transform .22s ease}.sidebar.ti-sidebar-premium.sidebar-open{transform:translateX(0)}.sidebar.ti-sidebar-premium .ti-sidebar-close{display:grid}}
+@media(min-width:761px){.sidebar.ti-sidebar-premium{width:248px}}
+@media(min-width:761px) and (max-width:1100px){.sidebar.ti-sidebar-premium{width:215px}.ti-sidebar-brand-name strong{font-size:19px}.ti-sidebar-brand-name span{letter-spacing:1.2px}}
+@media(prefers-reduced-motion:reduce){.ti-sidebar-pulse::after{animation:none;opacity:.35}.sidebar.ti-sidebar-premium{transition:none}}
