@@ -1,4 +1,4 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useState,useRef} from 'react';
 import {ArrowLeft,ArrowRight,Check,ClipboardList,Info,Layers,Plus,Scissors,Trash2,UtensilsCrossed} from 'lucide-react';
 import {preparationTypes,preparationPlan,validatePreparation,physicalUnit} from '../server/production/preparation-config.js';
 import './preparation-setup.css';
@@ -6,23 +6,28 @@ import PreparedProductForm from './PreparedProductForm.jsx';
 const empty=()=>({type:'',name:'',sourceProductId:'',outputProductId:'',portionMode:'same',resultUnit:'porcao',batchYield:1,portionWeight:0,weightUnit:'g',method:'',location:'reserva',outputPerBatch:null,ingredients:[]});
 const icons={portion:Scissors,transform:UtensilsCrossed,recipe:ClipboardList};
 const unitLabel=u=>({porcao:'porção',un:'unidade',balde:'balde',kg:'kg',L:'L'}[u]||u);
-export default function PreparationSetup({products,call,onSaved,unitId}){
+export default function PreparationSetup({products,call,onSaved,unitId,requestedRecipe,onDirtyChange}){
+ const appliedRequest=useRef(null);
  const [created,setCreated]=useState([]),[creating,setCreating]=useState(false);
  const [all,setAll]=useState([]),[id,setId]=useState(''),[c,setC]=useState(empty),[step,setStep]=useState(1),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[dirty,setDirty]=useState(false),[confirmed,setConfirmed]=useState(false);
+ useEffect(()=>{onDirtyChange?.(dirty);},[dirty,onDirtyChange]);
  const load=async()=>{setLoading(true);try{const r=await call('/api/production/manage','preparationList');setAll(r.configurations||[]);return true;}catch(e){setError(e.message);return false;}finally{setLoading(false)}};
  useEffect(()=>{setCreated([]);setCreating(false);setAll([]);setId('');setC(empty());setStep(1);setDirty(false);setMessage('');setError('');load();},[unitId]);
  const change=patch=>{setC(v=>({...v,...patch}));setDirty(true);setConfirmed(false);setError('');setMessage('');};
  const select=next=>{if(dirty&&!window.confirm('Trocar de preparação e descartar as alterações não salvas?'))return;const old=all.find(x=>x.id===next);setId(next);setC(old?.configuration?{...old.configuration,portionMode:old.configuration.type==='portion'?(old.configuration.sourceProductId===old.configuration.outputProductId?'same':'separate'):undefined}:empty());setStep(old?.configuration?2:1);setError('');setMessage('');setDirty(false);setConfirmed(false);};
+ useEffect(()=>{if(!loading&&requestedRecipe&&appliedRequest.current!==requestedRecipe&&(!requestedRecipe.id||all.some(r=>r.id===requestedRecipe.id))){appliedRequest.current=requestedRecipe;select(requestedRecipe.id);}},[requestedRecipe,loading,all]);
  const catalog=[...products,...created.filter(p=>!products.some(x=>x.id===p.id))];
  const active=catalog.filter(p=>p.status==='active'),selected=all.find(x=>x.id===id),plan=preparationPlan(c,catalog),type=preparationTypes.find(t=>t.id===c.type),source=catalog.find(p=>p.id===c.sourceProductId),out=catalog.find(p=>p.id===c.outputProductId);
  const ingredient=(index,patch)=>change({ingredients:c.ingredients.map((x,i)=>i===index?{...x,...patch}:x)});
  const save=async(activate=false)=>{if(busy)return;setError('');const invalid=validatePreparation(c);if(invalid){setError(invalid);return;}if(activate&&(!plan.ready||!confirmed)){setError('Revise as pendências e confirme a movimentação antes de ativar.');return;}setBusy(true);try{const key=id||crypto.randomUUID();const r=await call('/api/production/manage','savePreparation',{id:key,configuration:c,expectedDraftVersion:selected?.draftVersion||0,expectedVersion:selected?.version||0,activate});setId(key);setMessage(activate?r.message:`${r.message} A preparação continua em revisão e ainda não aparece na lista de produção.`);setDirty(false);setConfirmed(false);await load();await onSaved();}catch(e){setError(e.message);}finally{setBusy(false)}};
  const advance=e=>{e.preventDefault();const invalid=validatePreparation(c);if(invalid){setError(invalid);return;}setError('');setConfirmed(false);setStep(3);};
+ const archive=async()=>{if(busy||!selected||!window.confirm('Arquivar esta preparação? O histórico e os saldos serão preservados.'))return;setBusy(true);try{await call('/api/production/manage','archiveRecipe',{id,expectedVersion:selected.version});setId('');setC(empty());setStep(1);setDirty(false);setMessage('Preparação arquivada. Histórico e saldos preservados.');await load();await onSaved();}catch(e){setError(e.message)}finally{setBusy(false)}};
  const options=(exclude='')=><><option value="">Selecionar produto do catálogo</option>{active.filter(p=>p.id!==exclude).map(p=><option key={p.id} value={p.id}>{p.name} · {unitLabel(physicalUnit(p))}</option>)}</>;
  return <section className="prep-setup" aria-label="Configurar preparação">
   <div className="prep-heading"><div><span className="prep-eyebrow">PREPARAÇÕES DA COZINHA</span><h2>Configurar preparação</h2><p>Escolha o processo. O cadastro se adapta à rotina.</p></div><span className="prep-badge">Gestão</span></div>
   <label>Preparação para revisar<select aria-label="Preparação para revisar" value={id} disabled={busy||loading} onChange={e=>select(e.target.value)}><option value="">Criar preparação</option>{all.map(r=><option key={r.id} value={r.id}>{r.configuration?.name||r.name} · {r.active?(r.available?'Ativa':'Ativa · indisponível'):'Em revisão'}{!r.configuration?' · ficha anterior':''}</option>)}</select></label>
   {selected?.active&&selected.available===false&&<aside className="prep-pending" role="status"><strong>Preparação indisponível para produzir</strong><ul>{selected.errors?.map((message,i)=><li key={i}>{message}</li>)}</ul></aside>}
+  {selected&&<button type="button" className="prep-secondary" disabled={busy} onClick={archive}>Arquivar preparação</button>}
   {loading&&<p role="status">Carregando configurações…</p>}
   {selected&&!selected.configuration&&<aside className="prep-info"><Info size={18}/><span>Esta ficha usa o cadastro anterior. Você pode revisá-la abaixo em “Fichas anteriores”. Para adotar o novo processo, configure e revise todas as relações antes de ativar. Confira abaixo se a ficha está disponível para a operação.</span></aside>}
   <ol className="prep-steps" aria-label="Etapas do cadastro">{['Processo','Configuração','Revisão'].map((s,i)=><li key={s} aria-current={step===i+1?'step':undefined}><span>{step>i+1?<Check size={14}/>:i+1}</span>{s}</li>)}</ol>

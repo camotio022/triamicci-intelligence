@@ -46,17 +46,17 @@ export default async function handler(req,res){
   if(action==='archiveRecipe'){
    if(!['admin','manager','submanager'].includes(member.role))return send(res,403,'Somente gestão pode arquivar fichas.');
    const {id,expectedVersion}=req.body||{};
-   if(!idPattern.test(id||'')||!Number.isInteger(expectedVersion)||expectedVersion<1)return send(res,400,'Ficha ou versão inválida.');
+   if(!idPattern.test(id||'')||!Number.isInteger(expectedVersion)||expectedVersion<0)return send(res,400,'Ficha ou versão inválida.');
    const ref=recipes.doc(id),actorRef=db.doc('memberships/'+actor.uid);
    await db.runTransaction(async tx=>{
     const [a,old]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
     if(!a.exists||a.data().status!=='active'||a.data().unitId!==member.unitId||
        !['admin','manager','submanager'].includes(a.data().role))throw Error('FORBIDDEN');
     if(!old.exists)throw Error('RECIPE_NOT_FOUND');
-    if(old.data().version!==expectedVersion)throw Error('CONFLICT');
-    if(old.data().active===false)throw Error('RECIPE_ARCHIVED');
+    if((old.data().version||0)!==expectedVersion)throw Error('CONFLICT');
+    if(old.data().archivedAt)throw Error('CONFLICT');
     const now=new Date();
-    tx.update(ref,{active:false,archivedAt:now,archivedBy:actor.uid,updatedAt:now});
+    tx.update(ref,{active:false,version:expectedVersion+1,archivedAt:now,archivedBy:actor.uid,updatedAt:now});
     tx.create(db.collection('auditLogs').doc(),{event:'production.recipe_archived',unitId:member.unitId,recipeId:id,actorUid:actor.uid,at:now});
     signalUnitChange(tx,db,member.unitId,['production', 'stock']);
    });
