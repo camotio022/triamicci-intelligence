@@ -102,3 +102,76 @@
  .ti-check-camera-stage{height:min(55dvh,490px)}
  .ti-check-viewer-head{height:56px}
 }
+
+
+/* Triamicci checklist polish: compact, touch-friendly, no new visual version. */
+.ti-checklists{--check-ink:#273246;--check-sub:#69768a}
+.ti-check-heading{margin-bottom:3px}
+.ti-check-heading small{font-size:10px;letter-spacing:.07em}
+.ti-check-heading h1{margin:5px 0 3px;font-size:clamp(21px,2.2vw,27px);letter-spacing:-.025em}
+.ti-check-heading h1 svg{width:24px;height:24px;flex-shrink:0}
+.ti-check-heading p{font-size:13px;margin:4px 0 7px;color:var(--check-sub)}
+.ti-check-tabs{margin:11px 0 17px;max-width:450px;border-radius:12px}
+.ti-check-tabs button{min-height:40px;padding:7px 10px;font-size:13px}
+.ti-check-card-grid{gap:10px}
+.ti-check-card{padding:14px;border-radius:14px}
+.ti-check-pill.archived{background:#edf0f4;color:#546477}
+.ti-check-section-heading{margin:15px 0 4px}
+.ti-check-section-heading h2{font-size:19px}
+.ti-check-section-heading>button{min-height:42px;font-size:13px;padding:8px 12px}
+.ti-check-management-hint{font-size:12px;color:#718099;margin:4px 0 13px!important}
+.ti-check-storage{border:1px solid #e0e4ec;border-radius:13px;background:#fff;overflow:hidden}
+.ti-check-storage>summary{cursor:pointer;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;list-style:none;font-size:13px;font-weight:700;color:#364359}
+.ti-check-storage>summary::-webkit-details-marker{display:none}
+.ti-check-storage>summary>span:first-child{display:inline-flex;align-items:center;gap:9px}
+.ti-check-storage>summary svg{color:var(--check-red)}
+.ti-check-storage-sub{font-size:12px;color:#687891;font-weight:600;white-space:nowrap}
+.ti-check-storage[open] .ti-check-storage-sub span{display:inline-block;transform:rotate(180deg)}
+.ti-check-storage-body{padding:0 14px 13px}
+.ti-check-storage-body p{font-size:12px;line-height:1.45;margin:1px 0 10px}
+.ti-check-storage-body button{min-height:39px;font-size:12px;padding:8px 12px}
+.ti-check-storage-body [role=status]{margin:8px 0 0}
+.ti-check-model-grid{align-items:start}
+.ti-check-model-card h3{font-size:16px!important;line-height:1.3;margin:0}
+.ti-check-model-card>.ti-check-card-top{gap:7px;align-items:flex-start}
+.ti-check-model-card>.ti-check-card-top h3{flex:1;min-width:0}
+.ti-check-model-draft{color:#a35d08!important;font-size:12px!important}
+.ti-check-model-actions{display:flex;align-items:center;gap:8px;margin-top:13px;flex-wrap:wrap}
+.ti-checklists button.ti-check-model-edit{min-height:40px;padding:8px 13px;font-size:13px;width:auto}
+.ti-check-more-actions{position:relative;flex:1;min-width:112px}
+.ti-check-more-actions>summary{list-style:none;cursor:pointer;text-align:center;background:#fff;border:1px solid #d8dde6;border-radius:11px;min-height:40px;padding:9px 12px;font-size:13px;font-weight:650;color:#525f75;box-sizing:border-box}
+.ti-check-more-actions>summary::-webkit-details-marker{display:none}
+.ti-check-more-actions[open]>summary{background:#f4f5f8}
+.ti-check-more-content{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.ti-check-more-content button.secondary{flex:1;min-width:102px;min-height:40px;padding:8px 10px;font-size:13px;border-color:#e3e5eb;color:#536177}
+.ti-check-more-content button.ti-check-archive{color:#a8252b;border-color:#eed0d2}
+.ti-check-history-heading{margin:10px 0 13px}
+.ti-check-history-heading h2{font-size:19px;margin:0 0 4px}
+.ti-check-history-heading p{font-size:12px;color:#718099;margin:0}
+.ti-check-complete-notice,.ti-check-execution .ti-check-success.ti-check-complete-notice{padding:9px 11px;font-size:13px;display:flex;align-items:center;gap:8px;line-height:1.3}
+.ti-check-execution>h2{margin:10px 0 4px;font-size:21px}
+.ti-check-execution>p{margin:3px 0 9px;font-size:13px}
+.ti-check-execution>progress{height:5px;margin:9px 0}
+.ti-check-item-nav{gap:6px;margin-top:6px;padding:5px 2px 10px}
+.ti-check-item-nav button{min-height:40px;min-width:40px;padding:6px;font-size:13px;line-height:1.1}
+.ti-check-execution .ti-check-card{padding:14px}
+.ti-check-execution .ti-check-card h3{font-size:18px;margin:8px 0}
+.ti-check-badges{margin:7px 0}
+.ti-check-badges span{font-size:11px;padding:4px 8px}
+.ti-checklists button:focus-visible,.ti-checklists summary:focus-visible{outline:3px solid #df7779;outline-offset:2px}
+@media(max-width:640px){
+ .ti-check-heading h1{font-size:21px;gap:7px;margin:4px 0}
+ .ti-check-heading h1 svg{height:22px;width:22px}
+ .ti-check-heading p{font-size:12px;line-height:1.35}
+ .ti-check-tabs{margin:10px 0 13px}
+ .ti-check-tabs button{min-height:41px;font-size:13px}
+ .ti-check-section-heading{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;margin:15px 0 4px}
+ .ti-check-section-heading h2{font-size:17px}
+ .ti-check-section-heading>button{width:auto;padding:8px 10px;min-height:40px}
+ .ti-check-model-actions{display:grid;grid-template-columns:1fr 1fr}
+ .ti-checklists button.ti-check-model-edit{width:100%}
+ .ti-check-more-actions{min-width:0}
+ .ti-check-more-content{grid-column:1/-1}
+ .ti-check-execution>h2{font-size:20px}
+ .ti-check-execution .ti-check-card h3{font-size:17px}
+}

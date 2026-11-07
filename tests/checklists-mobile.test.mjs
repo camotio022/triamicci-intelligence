@@ -35,7 +35,8 @@ test('checklists: cadastro, publicação e conferência com câmera no mobile',{
    await page.getByRole('heading',{name:'Checklists da unidade',exact:true}).waitFor();
    if(['manager','submanager'].includes(role)){
     await page.getByRole('button',{name:'Gestão',exact:true}).click();
-    await page.getByRole('button',{name:'Verificar armazenamento',exact:true}).click();
+    await page.getByText('Fotos privadas e armazenamento',{exact:true}).click();
+   await page.getByRole('button',{name:'Verificar armazenamento',exact:true}).click();
     await page.getByText('Armazenamento verificado no teste',{exact:true}).waitFor();
     await page.getByRole('button',{name:'Criar checklist',exact:true}).click();
     await page.getByLabel('Nome do checklist',{exact:true}).fill('Minha rotina '+width);
