@@ -9,22 +9,35 @@ const empty=()=>({type:'',name:'',sourceProductId:'',outputProductId:'',portionM
 const icons={portion:Scissors,transform:UtensilsCrossed,recipe:ClipboardList};
 const unitLabel=u=>({porcao:'porção',un:'unidade',balde:'balde',kg:'kg',L:'L'}[u]||u);
 export default function PreparationSetup({products,call,onSaved,unitId,requestedRecipe,onDirtyChange}){
- const appliedRequest=useRef(null);
+ const appliedRequest=useRef(null),creationId=useRef(null);
  const [created,setCreated]=useState([]),[creating,setCreating]=useState(false);
  const [confirmation,setConfirmation]=useState(null);
- const [all,setAll]=useState([]),[id,setId]=useState(''),[c,setC]=useState(empty),[step,setStep]=useState(1),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[dirty,setDirty]=useState(false),[confirmed,setConfirmed]=useState(false);
+ const [all,setAll]=useState([]),[id,setId]=useState(''),[c,setC]=useState(empty),[step,setStep]=useState(1),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[dirty,setDirty]=useState(false);
  useEffect(()=>{onDirtyChange?.(dirty);},[dirty,onDirtyChange]);
  const load=async()=>{setLoading(true);try{const r=await call('/api/production/manage','preparationList');setAll(r.configurations||[]);return true;}catch(e){setError(e.message);return false;}finally{setLoading(false)}};
- useEffect(()=>{setCreated([]);setCreating(false);setAll([]);setId('');setC(empty());setStep(1);setDirty(false);setMessage('');setError('');setConfirmation(null);load();},[unitId]);
- const change=patch=>{setC(v=>({...v,...patch}));setDirty(true);setConfirmed(false);setError('');setMessage('');};
- const applySelection=next=>{const old=all.find(x=>x.id===next);setId(next);setC(old?.configuration?{...old.configuration,portionMode:old.configuration.type==='portion'?(old.configuration.sourceProductId===old.configuration.outputProductId?'same':'separate'):undefined}:empty());setStep(old?.configuration?2:1);setError('');setMessage('');setDirty(false);setConfirmed(false);};
+ useEffect(()=>{creationId.current=null;setCreated([]);setCreating(false);setAll([]);setId('');setC(empty());setStep(1);setDirty(false);setMessage('');setError('');setConfirmation(null);load();},[unitId]);
+ const change=patch=>{setC(v=>({...v,...patch}));setDirty(true);setError('');setMessage('');};
+ const applySelection=next=>{creationId.current=null;const old=all.find(x=>x.id===next);setId(next);setC(old?.configuration?{...old.configuration,portionMode:old.configuration.type==='portion'?(old.configuration.sourceProductId===old.configuration.outputProductId?'same':'separate'):undefined}:empty());setStep(old?.configuration?2:1);setError('');setMessage('');setDirty(false);};
  const select=next=>{if(busy)return;if(dirty){setConfirmation({kind:'switch',next});return;}applySelection(next);};
  useEffect(()=>{if(!loading&&requestedRecipe&&appliedRequest.current!==requestedRecipe&&(!requestedRecipe.id||all.some(r=>r.id===requestedRecipe.id))){appliedRequest.current=requestedRecipe;select(requestedRecipe.id);}},[requestedRecipe,loading,all]);
  const catalog=[...products,...created.filter(p=>!products.some(x=>x.id===p.id))];
  const active=catalog.filter(p=>p.status==='active'),selected=all.find(x=>x.id===id),plan=preparationPlan(c,catalog),type=preparationTypes.find(t=>t.id===c.type),source=catalog.find(p=>p.id===c.sourceProductId),out=catalog.find(p=>p.id===c.outputProductId);
  const ingredient=(index,patch)=>change({ingredients:c.ingredients.map((x,i)=>i===index?{...x,...patch}:x)});
- const save=async(activate=false)=>{if(busy)return;setError('');const invalid=validatePreparation(c);if(invalid){setError(invalid);return;}if(activate&&(!plan.ready||!confirmed)){setError('Revise as pendências e confirme a movimentação antes de ativar.');return;}setBusy(true);try{const key=id||crypto.randomUUID();const r=await call('/api/production/manage','savePreparation',{id:key,configuration:c,expectedDraftVersion:selected?.draftVersion||0,expectedVersion:selected?.version||0,activate});setId(key);setMessage(activate?r.message:`${r.message} A preparação continua em revisão e ainda não aparece na lista de produção.`);setDirty(false);setConfirmed(false);await load();await onSaved();}catch(e){setError(e.message);}finally{setBusy(false)}};
- const advance=e=>{e.preventDefault();const invalid=validatePreparation(c);if(invalid){setError(invalid);return;}setError('');setConfirmed(false);setStep(3);};
+ const save=async(activate=true)=>{
+  if(busy)return;setError('');
+  const invalid=validatePreparation(c);if(invalid){setError(invalid);return;}
+  if(activate&&!plan.ready){setError('Confira as pendências indicadas ou salve como rascunho.');return;}
+  const key=id||creationId.current||(creationId.current=crypto.randomUUID());
+  let persisted=false;setBusy(true);
+  try{
+   await call('/api/production/manage','savePreparation',{id:key,configuration:c,expectedDraftVersion:selected?.draftVersion||0,expectedVersion:selected?.version||0,activate});
+   persisted=true;setId(key);setDirty(false);
+   setMessage(activate?'Preparação salva e disponível para planejar e registrar produção. Nenhum saldo foi alterado.':'Rascunho salvo. Ele ainda não aparece na produção; conclua as pendências e use “Salvar preparação”.');
+   await load();await onSaved({id:key,available:activate});
+  }catch(e){if(persisted)setMessage('A preparação foi salva, mas não foi possível atualizar a tela. Reabra a preparação para continuar.');else setError(e.message);}
+  finally{setBusy(false)}
+ };
+ const advance=e=>{e.preventDefault();const invalid=validatePreparation(c);if(invalid){setError(invalid);return;}setError('');setStep(3);};
  const archive=()=>{if(busy||!selected)return;setConfirmation({kind:'archive'});};
  const confirmAction=async()=>{
   if(busy||!confirmation)return;
@@ -34,7 +47,7 @@ export default function PreparationSetup({products,call,onSaved,unitId,requested
   try{
    await call('/api/production/manage','archiveRecipe',{id,expectedVersion:selected.version});
    setConfirmation(null);
-   setId('');setC(empty());setStep(1);setDirty(false);
+   creationId.current=null;setId('');setC(empty());setStep(1);setDirty(false);
    setMessage('Preparação arquivada. Histórico e saldos preservados.');
    await load();await onSaved();setConfirmation(null);
   }catch(e){setError(e.message)}finally{setBusy(false)}
@@ -63,10 +76,10 @@ export default function PreparationSetup({products,call,onSaved,unitId,requested
    <div className="prep-actions"><button type="button" className="prep-secondary" onClick={()=>setStep(1)}><ArrowLeft size={17}/>Processo</button><button type="submit" className="prep-primary">Revisar configuração<ArrowRight size={17}/></button></div></form>}
   {step===3&&<section className="prep-review"><span className="prep-type">{type?.label}</span><h3>{c.name}</h3><dl><div><dt>Produto preparado</dt><dd>{out?.name}</dd></div>{source&&<div><dt>Insumo de origem</dt><dd>{source.name}</dd></div>}<div><dt>{c.type==='recipe'?'Rendimento por receita':'Peso da porção pronta'}</dt><dd>{c.type==='recipe'?`${c.batchYield} ${unitLabel(c.resultUnit)}`:`${c.portionWeight} ${c.weightUnit}`}</dd></div></dl>
    <div className="prep-stock"><h4>O que acontece no estoque?</h4>{plan.sameProduct&&plan.ready&&<p><strong>O estoque total não aumenta nem diminui.</strong><br/>Cada porção representa {plan.portionSize} {plan.stockUnit} do mesmo insumo. O registro distingue o peso já porcionado do saldo ainda não marcado como porcionado, no mesmo local.</p>}{plan.lines.length>0&&<><strong>Saída {c.type==='transform'?'medida na execução':c.type==='portion'?'por porção':'por receita'} · {c.location==='reserva'?'Reserva':'Giro'}</strong><ul>{plan.lines.map(l=><li key={l.productId}>{products.find(p=>p.id===l.productId)?.name}: {c.type==='transform'?'quantidade real a informar':l.quantity} {physicalUnit(catalog.find(p=>p.id===l.productId))}</li>)}</ul></>}{c.type==='transform'?<p>Informe ao finalizar a matéria-prima realmente separada e as porções prontas. A quantidade de filé não será calculada pelo peso das porções.</p>:!plan.sameProduct&&plan.ready&&<p>Entrada na Reserva: {plan.yieldQuantity} {unitLabel(plan.outputUnit)} de {out?.name}.</p>}{c.ingredients.some(i=>!i.tracked)&&<><strong>Somente orientação, sem baixa</strong><ul>{c.ingredients.filter(i=>!i.tracked).map((i,n)=><li key={n}>{i.name}: {i.amount} {i.unit==='orientacao'?'':i.unit}</li>)}</ul></>}</div>
-   {!plan.ready&&<aside className="prep-pending"><strong>Salvar para revisão · ainda não ativável</strong><ul>{plan.errors.map((s,i)=><li key={i}>{s}</li>)}</ul></aside>}
-   <p className="prep-info">Salvar para revisão não altera estoque nem substitui uma ficha ativa. A ativação libera novas produções com as relações acima; não movimenta saldos neste momento.</p>
-   {plan.ready&&<label className="prep-check"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>Conferi as unidades, o rendimento e as movimentações.</label>}
-   <div className="prep-actions"><button type="button" className="prep-secondary" disabled={busy} onClick={()=>setStep(2)}><ArrowLeft size={16}/>Editar</button><button type="button" className="prep-secondary" disabled={busy} onClick={()=>save(false)}>{busy?'Salvando…':'Salvar para revisão'}</button>{plan.ready&&<button type="button" className="prep-primary" disabled={busy||!confirmed} onClick={()=>save(true)}>Validar e ativar</button>}</div>
+   {!plan.ready&&<aside className="prep-pending"><strong>O que falta para disponibilizar</strong><ul>{plan.errors.map((s,i)=><li key={i}>{s}</li>)}</ul></aside>}
+   <p className="prep-info">Salvar preparação disponibiliza a ficha para planejar e registrar produção. Isso não movimenta estoque. Salvar rascunho mantém a configuração em revisão e preserva a ficha ativa anterior.</p>
+
+   <div className="prep-actions"><button type="button" className="prep-secondary" disabled={busy} onClick={()=>setStep(2)}><ArrowLeft size={16}/>Editar</button><button type="button" className="prep-secondary" disabled={busy} onClick={()=>save(false)}>{busy?'Salvando…':'Salvar rascunho'}</button><button type="button" className="prep-primary" disabled={busy||!plan.ready} onClick={()=>save(true)}>{busy?'Salvando…':'Salvar preparação'}</button></div>
   </section>}
   <ConfirmSheet open={!!confirmation} title={confirmation?.kind==='switch'?'Descartar alterações?':'Arquivar preparação?'} description={confirmation?.kind==='switch'?'As alterações não salvas serão perdidas ao trocar de preparação.':'A preparação deixará de aparecer nas novas produções. O histórico e os saldos serão preservados.'} confirmLabel={confirmation?.kind==='switch'?'Descartar e trocar':'Arquivar preparação'} tone={confirmation?.kind==='archive'?'danger':'primary'} busy={busy} error={error} onCancel={()=>setConfirmation(null)} onConfirm={confirmAction}/>
  </section>;

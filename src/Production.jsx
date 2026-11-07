@@ -135,7 +135,7 @@ export default function Production({membership}){
      </>}
     </form>}
    </section>}
-   {admin&&view==='preparations'&&<PreparationSetup key={membership.unitId} unitId={membership.unitId} products={products} requestedRecipe={setupRecipe} onDirtyChange={setSetupDirty} call={call} onSaved={()=>load(true)}/>}
+   {admin&&view==='preparations'&&<PreparationSetup key={membership.unitId} unitId={membership.unitId} products={products} requestedRecipe={setupRecipe} onDirtyChange={setSetupDirty} call={call} onSaved={async saved=>{const updated=await load(true);if(saved?.available&&updated){setSetupDirty(false);setPlannedRecipe(saved.id);setPlannedQuantity('');setView('today');notify('Preparação salva. Você já pode adicioná-la à produção de hoje.','success');}return updated;}}/>}
    {admin&&view==='preparations'&&<details className="receiving-card ti-v4-recipe-details">
     <summary><BookOpen size={20} aria-hidden="true"/><span>Fichas anteriores <small>Revisar ou arquivar preparações já cadastradas</small></span></summary>
     <h2>Revisar ficha anterior</h2><label>Ficha para revisar<select value={editRecipeId} onChange={e=>{const r=reviewRecipes.find(x=>x.id===e.target.value);setEditRecipeId(r?.id||'');setRecipeVersion(r?.version??null);setName(r?.name||'');setMethod(r?.method||'');setYield(String(r?.yieldQuantity||1));setOutputProductId(r?.outputProductId||'');setLines(r?.lines?.map(l=>({...l,substitutes:l.substitutes||[]}))||[{productId:'',quantity:'',substitutes:[]}])}}><option value="">Selecionar ficha existente</option>{reviewRecipes.filter(r=>!r.preparationConfig&&!r.configurationDraft&&!r.archivedAt).map(r=><option key={r.id} value={r.id}>{r.name} · v{r.version}{!r.available?' · indisponível':''}</option>)}</select></label>
