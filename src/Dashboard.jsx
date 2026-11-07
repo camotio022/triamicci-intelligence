@@ -3,6 +3,7 @@ import React,{useCallback,useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {AreaChart,Area,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell} from 'recharts';
 import {Package,ArrowDownRight,ArrowUpRight,AlertTriangle,RefreshCcw} from 'lucide-react';
+import './dashboard-mobile.css';
 
 const colors=['#A71916','#007934','#D88B20','#6B5555','#8C726A','#B5A5A0'];
 const format=n=>Number(n).toLocaleString('pt-BR',{maximumFractionDigits:3});
@@ -51,7 +52,7 @@ export default function Dashboard({membership,onInventory}){
         </article>
       </section>
       <section className="panel stock-panel"><div className="panel-heading stock-heading"><div><h2>Estoque que precisa de atenção</h2><p>Produtos ativos com saldo igual ou inferior ao mínimo cadastrado.</p></div><button type="button" className="link-button" onClick={onInventory}>Ver estoque</button></div>
-        {data.lowProducts.length?<div className="table-wrap"><table><thead><tr><th>INSUMO</th><th>CATEGORIA</th><th>SALDO</th><th>MÍNIMO</th></tr></thead><tbody>{data.lowProducts.map(p=><tr key={p.id}><td><b>{p.name}</b></td><td>{p.category}</td><td>{format(p.quantity)} {p.unit}</td><td>{format(p.minStock)} {p.unit}</td></tr>)}</tbody></table></div>:<p className="dashboard-empty">Nenhum insumo abaixo do mínimo cadastrado.</p>}
+        {data.lowProducts.length?<><div className="ti-dashboard-low-cards" aria-label="Produtos com estoque abaixo do mínimo">{data.lowProducts.map(p=><article className="ti-dashboard-low-card" key={p.id}><div className="ti-dashboard-low-top"><strong>{p.name}</strong><span>{p.category}</span></div><div className="ti-dashboard-low-values"><div><small>Disponível</small><b>{format(p.quantity)} {p.unit}</b></div><div><small>Mínimo</small><b>{format(p.minStock)} {p.unit}</b></div></div></article>)}</div><div className="table-wrap ti-dashboard-low-table"><table><thead><tr><th>INSUMO</th><th>CATEGORIA</th><th>SALDO</th><th>MÍNIMO</th></tr></thead><tbody>{data.lowProducts.map(p=><tr key={p.id}><td><b>{p.name}</b></td><td>{p.category}</td><td>{format(p.quantity)} {p.unit}</td><td>{format(p.minStock)} {p.unit}</td></tr>)}</tbody></table></div></>:<p className="dashboard-empty">Nenhum insumo abaixo do mínimo cadastrado.</p>}
         {data.attentionCount>10&&<p className="dashboard-empty">Mostrando 10 de {data.attentionCount} itens; consulte o estoque para mais detalhes.</p>}
       </section>
       <p className="dashboard-updated">Última consulta: {new Date(data.generatedAt).toLocaleString('pt-BR')} · Operações: últimos 7 dias · Sem dados de custo ou faturamento cadastrados.</p>
