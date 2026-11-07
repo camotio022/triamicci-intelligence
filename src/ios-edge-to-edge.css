@@ -1,13 +1,13 @@
-/* iPhone PWA: paint beneath the status bar, but keep controls in safe areas.
+/* iPhone PWA: white background beneath the status bar, with controls in safe areas.
    Scope to standalone only: ordinary Safari and desktop retain their layouts. */
 @media (display-mode: standalone) and (max-width: 760px) {
   html, body, #root {
     min-height: 100%;
-    background: #21191b;
+    background: #fff;
   }
   .app-shell {
     min-height: 100dvh;
-    background: #21191b;
+    background: #fff;
   }
   .main-content {
     min-height: 100dvh;
@@ -17,7 +17,7 @@
   .main-content > .topbar {
     top: env(safe-area-inset-top, 0px) !important;
   }
-  /* The drawer paints all the way to the physical screen edge. */
+  /* White drawer paints all the way to the physical screen edge. */
   .sidebar.ti-sidebar-premium,
   .sidebar.ti-sidebar-premium.sidebar-open {
     position: fixed;
@@ -25,7 +25,7 @@
     height: 100dvh;
     max-height: 100dvh;
     padding: 0 !important;
-    background: #21191b;
+    background: #fff;
   }
   /* Only the interactive header is inset; the background remains full bleed. */
   .sidebar.ti-sidebar-premium .ti-sidebar-top {
@@ -43,7 +43,7 @@
   @media (max-width: 760px) {
     html.ti-ios-standalone, html.ti-ios-standalone body,
     html.ti-ios-standalone #root,
-    html.ti-ios-standalone .app-shell { background: #21191b; }
+    html.ti-ios-standalone .app-shell { background: #fff; }
     html.ti-ios-standalone .main-content {
       padding-top: env(safe-area-inset-top, 0px) !important;
       background: #f7f8fb;
