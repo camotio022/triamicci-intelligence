@@ -23,13 +23,13 @@ export default function OperationalCatalogSetup({onActivated}){
  const [notice,setNotice]=useState('');
  const [busy,setBusy]=useState(false);
  const [filter,setFilter]=useState('');
- const [showAdvanced,setShowAdvanced]=useState(false);
+ const [showAdvanced,setShowAdvanced]=useState(false),[advancedReviewed,setAdvancedReviewed]=useState(false);
  const [showRegistered,setShowRegistered]=useState(false),[loaded,setLoaded]=useState(false),[statusFilter,setStatusFilter]=useState('all');
  const statusLabels={active:'Ativo',duplicate:'Possível duplicidade',not_registered:'Cadastro pendente',inactive:'Cadastro inativo',missing_profile:'Configuração pendente',review_required:'Revisão necessária'};
  const refresh=async()=>{try{const r=await request('status');setEntries(r.items||[]);setLoaded(true);setError('')}catch(e){setError(e.message)}};
  useEffect(()=>{refresh()},[]);
  const product=useMemo(()=>draft.products.find(p=>p.id===selected),[selected]);
- const choose=p=>{setShowAdvanced(false);setSelected(p.id);setError('');setNotice('');setForm({name:p.name,category:p.category,stockUnit:p.stockUnit,receivingUnit:p.receivingUnit||'',operationalUnit:p.operationalUnit||p.stockUnit,source:p.source,trackExpiry:p.trackExpiry,minStock:0,countFrequency:'weekly',critical:false,reviewConfirmed:false,existingProductId:null});const matches=entries.find(row=>row.id===p.id)?.matches||[];if(matches.length===1)useExisting(matches[0])};
+ const choose=p=>{setShowAdvanced(false);setAdvancedReviewed(false);setSelected(p.id);setError('');setNotice('');setForm({name:p.name,category:p.category,stockUnit:p.stockUnit,receivingUnit:p.receivingUnit||'',operationalUnit:p.operationalUnit||p.stockUnit,source:p.source,trackExpiry:p.trackExpiry,minStock:0,countFrequency:'weekly',critical:false,reviewConfirmed:false,existingProductId:null});const matches=entries.find(row=>row.id===p.id)?.matches||[];if(matches.length===1)useExisting(matches[0])};
  const useExisting=match=>setForm(f=>({...f,...match.configuration,existingProductId:match.id,reviewConfirmed:false}));
  const existingMatch=entries.find(row=>row.id===selected)?.matches?.find(row=>row.id===form?.existingProductId);
  const status=new Map(entries.map(p=>[p.id,p]));
@@ -52,11 +52,11 @@ export default function OperationalCatalogSetup({onActivated}){
  {form.source==='supplier'&&<label>Unidade de recebimento<select aria-label="Unidade de recebimento" value={form.receivingUnit} onChange={e=>set('receivingUnit',e.target.value)}><option value="">Selecione</option>{units.map(u=><option key={u}>{u}</option>)}</select></label>}
  <label>Unidade para contagem<select aria-label="Unidade para contagem" value={form.operationalUnit} onChange={e=>set('operationalUnit',e.target.value)}>{units.map(u=><option key={u}>{u}</option>)}</select></label>
  {form.source==='supplier'&&form.receivingUnit!==form.operationalUnit&&<p role="status">Na entrega, informe a quantidade recebida em {form.receivingUnit} e a quantidade física realmente conferida em {form.operationalUnit}. O sistema não calcula uma a partir da outra.</p>}
- <button type="button" className="ti-operational-advanced-toggle" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>{showAdvanced?'Ocultar opções adicionais':'Estoque mínimo, frequência e alertas'}</button><div className="ti-operational-advanced" hidden={!showAdvanced}><label>Estoque mínimo<input type="number" min="0" step="any" value={form.minStock} onChange={e=>set('minStock',Number(e.target.value))}/></label>
+ <button type="button" className="ti-operational-advanced-toggle" aria-expanded={showAdvanced} onClick={()=>{setShowAdvanced(v=>!v);setAdvancedReviewed(true)}}>{showAdvanced?'Ocultar opções adicionais':'Estoque mínimo, frequência e alertas'}</button><div className="ti-operational-advanced" hidden={!showAdvanced}><label>Estoque mínimo<input type="number" min="0" step="any" value={form.minStock} onChange={e=>set('minStock',Number(e.target.value))}/></label>
  <label>Frequência de contagem<select value={form.countFrequency} onChange={e=>set('countFrequency',e.target.value)}><option value="daily">Diária</option><option value="weekly">Semanal</option><option value="on_demand">Sob demanda</option></select></label>
  <label><input type="checkbox" checked={form.critical} onChange={e=>set('critical',e.target.checked)}/> Produto crítico</label>
  <label><input type="checkbox" checked={form.trackExpiry} onChange={e=>set('trackExpiry',e.target.checked)}/> Exigir controle de validade</label></div>
- <label className="ti-operational-confirm"><input type="checkbox" checked={form.reviewConfirmed} onChange={e=>setForm(f=>({...f,reviewConfirmed:e.target.checked}))}/> Conferi os campos deste produto na operação</label>
- <button className="ti-operational-submit" type="submit" disabled={busy||!form.reviewConfirmed||status.get(selected)?.active||(status.get(selected)?.needsReconciliation&&!form.existingProductId)}>{busy?'Salvando...':status.get(selected)?.active?'Já ativo':'Validar e ativar'}</button></form></>}
+ <label className="ti-operational-confirm"><input type="checkbox" disabled={!advancedReviewed} checked={form.reviewConfirmed} onChange={e=>setForm(f=>({...f,reviewConfirmed:e.target.checked}))}/> {advancedReviewed?'Conferi os campos deste produto na operação':'Abra e revise estoque mínimo, frequência e alertas antes de confirmar'}</label>
+ <button className="ti-operational-submit" type="submit" disabled={busy||!advancedReviewed||!form.reviewConfirmed||status.get(selected)?.active||(status.get(selected)?.needsReconciliation&&!form.existingProductId)}>{busy?'Salvando...':status.get(selected)?.active?'Já ativo':'Validar e ativar'}</button></form></>}
  {error&&<p role="alert">{error} <button type="button" onClick={refresh}>Tentar novamente</button></p>}{notice&&<p role="status">{notice}</p>}</div>;
 }
