@@ -121,7 +121,8 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      for(const role of ['admin','manager','submanager','cook','auxiliar']){
       await page.getByRole('navigation',{name:'Perfis de homologação'}).getByRole('button',{name:'Perfil '+role,exact:true}).click();
       const management=['admin','manager','submanager'].includes(role);
-      if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible())await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+      const menuToggle=page.getByRole('button',{name:'Abrir menu',exact:true});
+      if(await menuToggle.isVisible()&&await menuToggle.getAttribute('aria-expanded')!=='true')await menuToggle.click();
       const sidebar=page.locator('#primary-sidebar');
       const adminGroup=sidebar.getByRole('button',{name:'Administração',exact:true});
       assert.equal(await adminGroup.count(),management?1:0,'Grupo Administração respeita perfil '+role);
