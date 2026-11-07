@@ -82,12 +82,30 @@
 @media(max-width:600px){.ti-unified-modal-backdrop{padding:0}.ti-unified-modal{width:100%;height:100dvh;max-height:100dvh;border-radius:0;padding:0 16px 24px}}
 
 
-/* In the staff tab, navigation becomes a compact horizontal switcher. */
+/* Gestão compacta em TODAS as abas, não apenas na aba de colaboradores. */
+.ti-people-selected{display:none}
+.ti-access-review{display:grid;gap:8px;padding:12px;background:#fff7f5;border:1px solid #e8c4c1;border-radius:12px;color:#2e3444}
+.ti-access-review>strong{font-size:14px;color:#9d201d}
+.ti-access-review p{margin:0;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.ti-access-review dl{display:grid;gap:8px;margin:0}
+.ti-access-review dl>div{display:grid;grid-template-columns:minmax(65px,1fr) minmax(0,2fr);gap:8px;border-top:1px solid #eadcda;padding-top:8px}
+.ti-access-review dt{font-size:12px;color:#6f7582}
+.ti-access-review dd{margin:0;font-size:13px;overflow-wrap:anywhere}
+.ti-access-review b{font-weight:800;color:#202a3d}
 @media(max-width:760px){
- .ti-people-hub:has(.ti-master) .ti-people-hero{display:none}
- .ti-people-hub:has(.ti-master) .ti-people-nav{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;gap:7px;padding:2px 1px 10px;scroll-snap-type:x proximity}
- .ti-people-hub:has(.ti-master) .ti-people-nav::-webkit-scrollbar{display:none}
- .ti-people-hub:has(.ti-master) .ti-people-nav button{flex:0 0 auto!important;min-width:0!important;width:auto!important;min-height:44px!important;padding:9px 13px!important;display:flex!important;align-items:center!important;gap:5px!important;border-radius:12px!important;scroll-snap-align:start}
- .ti-people-hub:has(.ti-master) .ti-people-nav button small,.ti-people-hub:has(.ti-master) .ti-people-nav button span{display:none!important}
- .ti-people-hub:has(.ti-master) .ti-people-nav button strong{font-size:13px!important;white-space:nowrap}
+ .ti-people-hub{gap:9px;min-width:0}
+ .ti-people-hero{padding:9px 1px 3px;border:0;background:none;border-radius:0;color:#202a3d}
+ .ti-people-hero>span,.ti-people-hero p{display:none}
+ .ti-people-hero h1{font-size:21px;line-height:1.25;margin:0;color:#202a3d}
+ .ti-people-nav{display:flex;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:none;gap:7px;padding:3px 1px 10px;scroll-snap-type:x proximity;min-width:0}
+ .ti-people-nav::-webkit-scrollbar{display:none}
+ .ti-people-nav button{flex:0 0 auto;min-width:0;width:auto;min-height:44px;padding:9px 13px;display:flex;align-items:center;gap:5px;border-radius:12px;scroll-snap-align:start}
+ .ti-people-nav button small,.ti-people-nav button span{display:none}
+ .ti-people-nav button strong{font-size:13px;white-space:nowrap}
+ .ti-people-selected{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px 9px;color:#657386}
+ .ti-people-selected strong{font-size:14px;color:#202a3d}
+ .ti-people-selected span{font-size:12px;line-height:1.4}
+ .ti-people-content{min-width:0}
+ .ti-unified-modal .ti-access-review{margin-top:5px}
+ .ti-unified-modal .team-edit-actions button{min-height:44px}
 }
