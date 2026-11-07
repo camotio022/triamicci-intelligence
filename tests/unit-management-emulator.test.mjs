@@ -105,6 +105,19 @@ test('gestão completa da própria unidade sem conceder acesso à equipe ou a ou
   await call(schedules,author,'publish',{id});
   assert.equal((await unit.collection('schedules').doc(id).get()).data().status,'published');
  }
+ // Fotos usam a mesma fonte da Minha ficha e nunca expõem os campos pessoais.
+ const {default:membersHandler}=await import('../api/members/manage.js');
+ const avatar='data:image/png;base64,YWJj';
+ await unit.collection('memberPersonal').doc(cook.uid).set({avatar,fields:{phone:'privado',address:'privado'},privateMarker:'não retornar'});
+ await db.collection('units').doc('other-'+unitId).collection('memberPersonal').doc(foreign.uid).set({avatar:'data:image/png;base64,Zm9yZWlnbg==',fields:{secret:'fora da unidade'}});
+ const directory=await call(membersHandler,manager,'list');
+ assert.equal(directory.members.find(m=>m.uid===cook.uid).avatar,avatar);
+ assert.equal(directory.members.some(m=>m.uid===foreign.uid),false);
+ assert.equal(JSON.stringify(directory).includes('privado'),false);assert.equal(JSON.stringify(directory).includes('privateMarker'),false);
+ await call(membersHandler,cook,'list',{},403);
+ await call(membersHandler,cook,'avatarRemove');
+ const removed=await call(membersHandler,manager,'list');assert.equal(removed.members.find(m=>m.uid===cook.uid).avatar,null);
+ await call(membersHandler,manager,'update',{uid:manager.uid,role:'admin',status:'active'},403);
  // Inactive membership still denies operations after the role was initially allowed.
  await db.doc('memberships/'+submanager.uid).update({status:'inactive'});
  await call(coverage,submanager,'rates',{rates},403);

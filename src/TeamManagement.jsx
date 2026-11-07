@@ -1,5 +1,9 @@
 import {apiFetch} from './api-fetch.js';
-import React, { useCallback, useEffect, useState } from 'react';
+import {createPortal} from 'react-dom';
+import {useDialogFocus} from './useDialogFocus.js';
+import {invitationLabels,invitationState,invitationPending} from '../server/team/invitation-view.js';
+import './access-management.css';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { auth } from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import MemberDirectory from './MemberDirectory.jsx';
@@ -18,6 +22,11 @@ const roleOptions = [
 
 export default function TeamManagement({ user, membership, accessOnly = false }) {
  const {notify}=useFeedback();
+ const [inviteOpen,setInviteOpen]=useState(false),[tab,setTab]=useState('active'),[counts,setCounts]=useState({active:0,inactive:0});
+ const inviteDialog=useRef(null);
+ const closeInvite=()=>{if(!submitting){setInviteOpen(false);setShareInvite(null);setFeedback('');}};
+ useDialogFocus(inviteDialog,inviteOpen,closeInvite);
+ useEffect(()=>{setInviteOpen(false);setShareInvite(null);setEmail('');setInvitations([]);setTab('active');},[membership.unitId]);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('auxiliar');
   const [invitations, setInvitations] = useState([]);
@@ -90,7 +99,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Falha ao revogar convite.');
-      setFeedback(data.message);
+      setFeedback(data.message);notify(data.message,'success');
       setShareInvite(null);
       await refreshInvitations();
     } catch (error) { setFeedback(error.message || 'Não foi possível revogar.');notify(error.message,'error'); }
@@ -119,52 +128,23 @@ export default function TeamManagement({ user, membership, accessOnly = false })
 
   if (!allowed) return <section className="team-page"><h1>Gestão de colaboradores</h1><p>Esta área é reservada a gerentes e administradores.</p></section>;
 
-  return <section className="team-page">
-    {!accessOnly&&<p className="eyebrow">ADMINISTRAÇÃO · UNIDADE {membership.unitId.toUpperCase()}</p>}
-    <h1>{accessOnly?"Contas e convites":"Gestão de colaboradores"}</h1>
-    <p>{accessOnly?"Gerencie acesso ao sistema sem confundir contas com fichas profissionais.":"Prepare os convites e acompanhe os registos da sua unidade."}</p>
-    <div className="team-warning"><strong>Convites por link:</strong> gera um link único e envia manualmente pelo WhatsApp, sem precisar de domínio próprio. O destinatário deve entrar com o e-mail Google informado. Nunca publiques o link em grupos ou capturas de tela.</div>
-    {!accessOnly&&<TeamPreRegister membership={membership} onInvite={(targetEmail,targetRole)=>{setEmail(targetEmail);setRole(targetRole);setFeedback('Convite preparado. Escolha a forma de envio e confirme abaixo.');}} />}
-    <MemberDirectory user={user} membership={membership} />
-    {!accessOnly&&<TeamProfiles membership={membership} />}
-    <div className="team-grid">
-      <section className="team-panel">
-        <h2>Novo convite</h2>
-        <p>Gerentes podem convidar auxiliares e cozinheiros. Administradores podem atribuir os demais perfis.</p>
-        <div className="team-delivery" role="group" aria-label="Forma de envio">
-          <button type="button" className={deliveryMethod === 'link' ? 'selected' : ''} onClick={() => {setDeliveryMethod('link');setShareInvite(null);setFeedback('');}}>Link / WhatsApp</button>
-          <button type="button" className={deliveryMethod === 'email' ? 'selected' : ''} onClick={() => {setDeliveryMethod('email');setShareInvite(null);setFeedback('');}}>E-mail (Resend)</button>
-        </div>
-        <form onSubmit={sendInvitation}>
-          <label htmlFor="invite-email">E-mail do colaborador</label>
-          <input id="invite-email" type="email" autoComplete="email" value={email} onChange={event => {setEmail(event.target.value);setShareInvite(null);}} placeholder="colaborador@exemplo.com" />
-          <label htmlFor="invite-role">Função na unidade</label>
-          <select id="invite-role" value={role} onChange={event => {setRole(event.target.value);setShareInvite(null);}}>{roles.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
-          <p className="team-unit">Unidade de destino: <strong>{membership.unitId}</strong></p>
-          <button type="submit" disabled={submitting || !email.trim() || email.trim().toLowerCase() === user.email?.trim().toLowerCase()}>{submitting ? 'Aguarda...' : deliveryMethod === 'link' ? 'Gerar link de convite' : 'Enviar convite por e-mail'}</button>
-          {feedback && <p role="status">{feedback}</p>}
-          {shareInvite && <div className="team-share" role="status">
-            <strong>Link criado para {shareInvite.email}</strong>
-            <p>Válido por 7 dias, uma única utilização. Confirma o destinatário antes de enviar. O link só será mostrado nesta sessão.</p>
-            <div className="team-share-actions">
-              <button type="button" onClick={shareWhatsApp}>Compartilhar pelo WhatsApp</button>
-              <button type="button" className="team-secondary" onClick={copyInvitation}>Copiar mensagem</button>
-              <button type="button" className="team-secondary" onClick={() => setShareInvite(null)}>Ocultar link</button>
-            </div>
-          </div>}
-        </form>
-      </section>
-      <section className="team-panel">
-        <h2>Convites da unidade</h2>
-        {readState === 'loading' && <p>Carregando convites...</p>}
-        {readState === 'error' && <p role="alert">{readError}</p>}
-        {readState === 'ready' && (invitations.length === 0 ? <p>Ainda não existem convites registados.</p> : <div className="team-invite-list">{invitations.map(item => <div key={item.id} className="team-invite"><strong>{item.email || 'E-mail não informado'}</strong><span>{roleLabels[item.role] || item.role || 'Sem função'} · {item.status || 'Sem estado'} · {item.deliveryMethod === 'link' ? 'Link' : 'E-mail'}</span>
-          {['pending','delivery_failed'].includes(item.status) && (membership.role === 'admin' || item.createdBy === user.uid) &&
-            <button type="button" className="team-revoke" disabled={revokingId === item.id} onClick={() => revokeInvitation(item.id)}>{revokingId === item.id ? 'Revogando...' : 'Revogar convite'}</button>}
-          </div>)}</div>)}
-        <p className="team-note">Os convites devem ser criados exclusivamente pelo backend, com verificação de função e unidade.</p>
-      </section>
-    </div>
-    <p className="team-note">Sessão atual: {user.email} · {roleLabels[membership.role] || membership.role}. A listagem de colaboradores é consultada via API autenticada por unidade.</p>
+  const pending=invitations.filter(invitationPending),history=invitations.filter(item=>!invitationPending(item));
+  const inviteRow=item=><article key={item.id} className="access-invite-row"><div><strong>{item.email||'E-mail não informado'}</strong><span>{roleLabels[item.role]||'Função não informada'} · {invitationLabels[invitationState(item)]||'Situação indisponível'}</span><small>{item.deliveryMethod==='link'?'Link / WhatsApp':'E-mail'}{item.createdAt?' · '+new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeZone:'America/Sao_Paulo'}).format(new Date(item.createdAt)):''}</small></div>{invitationPending(item)&&(membership.role==='admin'||item.createdBy===user.uid)&&<button type="button" disabled={!!revokingId} onClick={()=>revokeInvitation(item.id)}>{revokingId===item.id?'Revogando…':'Revogar convite'}</button>}</article>;
+  return <section className="team-page access-page">
+    <header className="access-heading"><div><p className="eyebrow">EQUIPE · ACESSOS</p><h1>Acessos da unidade</h1><p>{membership.unitId} · {counts.active} {counts.active===1?'conta ativa':'contas ativas'}</p></div><button type="button" className="access-primary" onClick={()=>{setEmail('');setRole('auxiliar');setShareInvite(null);setFeedback('');setInviteOpen(true);}}>+ Convidar pessoa</button></header>
+    <nav className="access-tabs" aria-label="Situação dos acessos">{[['active','Ativos',counts.active],['pending','Pendentes',pending.length],['inactive','Desativados',counts.inactive]].map(([key,label,count])=><button type="button" key={key} aria-pressed={tab===key} onClick={()=>setTab(key)}>{label} <span>{count}</span></button>)}</nav>
+    <div hidden={tab==='pending'}><MemberDirectory key={membership.unitId} user={user} membership={membership} filterStatus={tab==='inactive'?'inactive':'active'} onCounts={setCounts}/></div>
+    {tab==='pending'&&<section className="team-panel access-pending"><h2>Convites pendentes</h2><p>A pessoa precisa aceitar com o e-mail informado.</p>{readState==='loading'?<p role="status">Carregando convites…</p>:readState==='error'?<p role="alert">{readError}</p>:pending.length?pending.map(inviteRow):<p className="access-empty">Nenhum convite pendente.</p>}</section>}
+    <details className="access-history"><summary><span>Histórico de convites<small>Aceitos, revogados e expirados</small></span><span aria-hidden="true">⌄</span></summary>{readState==='error'?<p role="alert">{readError}</p>:readState==='loading'?<p role="status">Carregando histórico…</p>:history.length?history.map(inviteRow):<p>Nenhum convite no histórico.</p>}</details>
+    {!accessOnly&&<details className="access-history"><summary>Cadastro e fichas da equipe</summary><TeamPreRegister membership={membership} onInvite={(targetEmail,targetRole)=>{setEmail(targetEmail);setRole(targetRole);setShareInvite(null);setFeedback('Confira os dados e gere o convite.');setInviteOpen(true);}}/><TeamProfiles membership={membership}/></details>}
+    {inviteOpen&&createPortal(<div className="access-sheet-backdrop"><section ref={inviteDialog} className="access-sheet" role="dialog" aria-modal="true" aria-labelledby="invite-title"><div className="access-sheet-handle" aria-hidden="true"/><header><div><h2 id="invite-title">Convidar pessoa</h2><p>Acesso à unidade {membership.unitId}</p></div><button type="button" className="access-close" aria-label="Fechar convite" disabled={submitting} onClick={closeInvite}>×</button></header><form onSubmit={sendInvitation}>
+      <label htmlFor="invite-email">E-mail da pessoa</label><input id="invite-email" type="email" required autoComplete="email" maxLength={254} value={email} onChange={event=>{setEmail(event.target.value);setShareInvite(null);}} placeholder="nome@exemplo.com" disabled={submitting}/>
+      <label htmlFor="invite-role">Função na unidade</label><select id="invite-role" value={role} onChange={event=>{setRole(event.target.value);setShareInvite(null);}} disabled={submitting}>{roles.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}</select>
+      <span className="access-form-label">Como enviar?</span><div className="team-delivery" role="group" aria-label="Forma de envio"><button type="button" disabled={submitting} aria-pressed={deliveryMethod==='link'} className={deliveryMethod==='link'?'selected':''} onClick={()=>{setDeliveryMethod('link');setShareInvite(null);setFeedback('');}}>Link / WhatsApp</button><button type="button" disabled={submitting} aria-pressed={deliveryMethod==='email'} className={deliveryMethod==='email'?'selected':''} onClick={()=>{setDeliveryMethod('email');setShareInvite(null);setFeedback('');}}>E-mail</button></div>
+      <p className="access-security">Somente o e-mail informado poderá aceitar.</p>
+      <button type="submit" className="access-primary" disabled={submitting||!email.trim()||email.trim().toLowerCase()===user.email?.trim().toLowerCase()}>{submitting?'Gerando…':deliveryMethod==='link'?'Gerar convite':'Enviar convite por e-mail'}</button>
+      {feedback&&<p role="status" className="access-feedback">{feedback}</p>}
+      {shareInvite?<section className="team-share" aria-label="Convite gerado"><strong>Convite criado para {shareInvite.email}</strong><p>Copie e envie apenas à pessoa convidada. O link fica disponível nesta janela e vale por 7 dias.</p><div className="team-share-actions"><button type="button" className="access-primary" onClick={shareWhatsApp}>Compartilhar pelo WhatsApp</button><button type="button" onClick={copyInvitation}>Copiar mensagem</button></div></section>:<small className="access-help">{deliveryMethod==='link'?'Você poderá copiar o link e enviá-lo.':'O convite será enviado ao e-mail informado.'}</small>}
+    </form></section></div>,document.body)}
   </section>;
 }
