@@ -1,3 +1,4 @@
+import {conferenceProfile} from './conference-profile.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {isOperationalProduct} from './catalog-identity.js';
@@ -18,7 +19,7 @@ export default async function availabilityCheck(req,res){
    const [a,p,profile,old,previous]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(unit.collection('products').doc(productId)),tx.get(unit.collection('operationalProfiles').doc(productId)),tx.get(event),tx.get(signal)]);
    if(a.data()?.status!=='active'||a.data()?.unitId!==m.unitId||!TEAM_ROLES.includes(a.data()?.role))throw Error('FORBIDDEN');
    if(old.exists){const x=old.data();if(x.actorUid===actor.uid&&x.productId===productId&&x.location===location&&x.observation===observation)return;throw Error('CONFLICT');}
-   if(!p.exists||!isOperationalProduct(p.data())||!profile.data()?.locations?.includes(location))throw Error('MISSING');
+   if(!p.exists||!isOperationalProduct(p.data())||!conferenceProfile(p.data(),profile.data())?.locations?.includes(location))throw Error('MISSING');
    const record={productId,productName:p.data().name,location,observation,at,actorUid:actor.uid,actorName:historyActor(a.data(),actor),unitId:m.unitId,requestId};
    tx.set(ref,record);tx.create(event,record);
    // A positive check never clears a shortage awaiting a management decision.

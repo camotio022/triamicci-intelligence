@@ -1,3 +1,4 @@
+import {conferenceProfile} from './conference-profile.js';
 import {historyActor} from './history-names.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from './catalog-identity.js';
@@ -286,8 +287,9 @@ export default async function v3Ledger(req,res){
     const [a,p,cfg,balance,record]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),operationalBalance(tx,balanceRef),tx.get(ref)]);
     if(!active(a,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
     if(record.exists){const old=record.data();if(old.kind==='count'&&old.actorUid===actor.uid&&old.sessionId===sessionId&&old.productId===productId&&old.location===location&&old.quantity===quantity&&old.notes===notes)return;throw Error('CONFLICT');}
-    if(!p.exists||!isOperationalProduct(p.data())||!cfg.exists||cfg.data().controlMode!=='quantitative'||!cfg.data().locations.includes(location))throw Error('MISSING');
-    const u=cfg.data().countUnit;if(!number(quantity,u,true))throw Error('QUANTITY');
+    const config=conferenceProfile(p.data(),cfg.data());
+    if(!p.exists||!isOperationalProduct(p.data())||config?.controlMode!=='quantitative'||!config.locations?.includes(location))throw Error('MISSING');
+    const u=config.countUnit;if(!number(quantity,u,true))throw Error('QUANTITY');
     const prior=balance.data()||{reserva:0,giro:0,total:0,unit:u};
     if(prior.unit!==u)throw Error('UNIT');
     const today=new Date().toISOString().slice(0,10);

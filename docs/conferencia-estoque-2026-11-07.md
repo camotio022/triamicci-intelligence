@@ -8,6 +8,8 @@ A contagem mostra um produto por vez, teclado numérico, zero explícito, observ
 
 ## Integridade e permissões
 
+Preparações revisadas com perfil operacional válido no próprio produto são reconhecidas sem recadastro; uma configuração explícita da unidade tem precedência. Nenhum perfil ou insumo paralelo é criado.
+
 A contagem usa o endpoint existente v3Count e o saldo canônico physicalBalances. Apenas administrador, gerente e subgerente podem lançar. A outra área é preservada; enquanto não houver a mesma rodada nas duas áreas, a qualidade continua parcial. O UUID da rodada é mantido por aba, conta, unidade e dia; não guarda quantidades nem credenciais. Nova rodada é uma ação explícita. Não há promessa de envio offline: só é exibido sucesso após confirmação da API.
 
 A conferência rápida Tem/Pouco/Acabou aceita os perfis operacionais da equipe. Registra responsável, data e histórico imutável em availabilityHistory; availabilityChecks contém a última observação por produto/local. Pouco e Acabou notificam a equipe no fluxo existente. Tem não resolve silenciosamente uma falta pendente da gestão. Nenhuma dessas ações grava saldo, recebimento ou contagem. Repetir o mesmo requestId é idempotente; reutilizá-lo com outro conteúdo é recusado.

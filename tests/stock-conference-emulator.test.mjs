@@ -17,6 +17,10 @@ test('conferência real: contagem parcial, rodada completa, lotes, idempotência
  assert.equal((await call(cook,'availabilityCheck',{...availability,requestId:randomUUID(),observation:'available'})).http,200);assert.equal((await root.collection('stockSignals').get()).docs[0].data().observation,'low','Tem não resolve uma falta anterior silenciosamente');
  const dashboard=await call(cook,'v3Conference');assert.equal(dashboard.http,200);assert.equal(dashboard.availability.length,1);assert.equal(dashboard.availability[0].observation,'available');assert.equal(dashboard.products[0].v3Balance.countedTotal,24);
  const history=await call(manager,'v3LedgerHistory');assert.equal(history.operations.length,2);assert.equal(history.operations[0].actorName,'Pessoa teste');assert.equal(typeof history.operations[0].at,'string');assert.equal((await call(other,'v3LedgerHistory',{cursor:reserve.requestId})).http,400);
+ const prepared='b'.repeat(40),profile={displayName:'Isca pronta',aliases:[],controlMode:'quantitative',countUnit:'porcao',origin:'internal',locations:['giro','reserva']};await root.collection('products').doc(prepared).set({name:'Isca pronta',status:'active',operationalCatalogVersion:'56-v1',profile});
+ const embeddedDashboard=await call(manager,'v3Conference');assert.equal(embeddedDashboard.products.find(p=>p.id===prepared).profile.countUnit,'porcao');
+ assert.equal((await call(manager,'v3Count',{productId:prepared,requestId:randomUUID(),sessionId:randomUUID(),location:'giro',quantity:5})).http,200,'Conta preparação já revisada sem exigir recadastro');
+ assert.equal((await call(cook,'availabilityCheck',{productId:prepared,requestId:randomUUID(),location:'giro',observation:'available'})).http,200);
  await root.collection('products').doc(id).update({lotTrackingMode:'per_lot',trackExpiry:true});assert.equal((await call(manager,'v3Count',{...count,requestId:randomUUID(),quantity:2})).http,409,'Não omitir lote obrigatório');
  await db.doc('memberships/'+cook.uid).update({status:'inactive'});assert.equal((await call(cook,'availabilityCheck',{...availability,requestId:randomUUID()})).http,403);
 });

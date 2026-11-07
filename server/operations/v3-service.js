@@ -1,3 +1,4 @@
+import {conferenceProfile} from './conference-profile.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct,belongsToOperationalCatalog} from './catalog-identity.js';
 import {operationalView} from './shared-balance.js';
@@ -49,7 +50,7 @@ export default async function kitchenV3(req,res){
    const legacy=await unit.collection('v3PhysicalBalances').limit(201).get();if(legacy.size>200)return send(res,409,'Limite de consulta atingido.');
    const bm=new Map(legacy.docs.map(obj).map(p=>[p.id,operationalView(p)]));for(const doc of e.docs)bm.set(doc.id,operationalView(obj(doc)));
    return send(res,200,'Painel operacional carregado.',{
-    products:a.docs.filter(s=>isOperationalProduct(s.data())).map(s=>{const data={...obj(s),profile:pm.get(s.id)||null,v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
+    products:a.docs.filter(s=>isOperationalProduct(s.data())).map(s=>{const data={...obj(s),profile:action==='v3Conference'?conferenceProfile(s.data(),pm.get(s.id)):pm.get(s.id)||null,v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
     availability:checks.docs.map(s=>({...obj(s),at:iso(s.data().at)})),
     signals:c.docs.map(obj).filter(s=>s.status!=='resolved'),
     orders:d.docs.map(obj).filter(o=>o.status!=='cancelled').map(x=>roles.includes(member.role)?x:redactFinancial(x)).sort((x,y)=>(x.etaDate||'').localeCompare(y.etaDate||'')),
