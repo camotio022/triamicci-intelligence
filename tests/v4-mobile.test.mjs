@@ -152,11 +152,11 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      await page.keyboard.press('Escape');assert.equal(await dialog.count(),0);
     }
     if(screen==='Navegação'){
-     if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible())await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+     if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible()&&await page.getByRole('button',{name:'Abrir menu',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
      await page.locator('#primary-sidebar').getByRole('button',{name:'Estoque e insumos',exact:true}).click();
      await page.getByRole('button',{name:'Hoje',exact:true}).click();
      await page.getByPlaceholder('Nome do insumo').fill('Frango');
-     if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible())await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+     if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible()&&await page.getByRole('button',{name:'Abrir menu',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
      await page.locator('#primary-sidebar').getByRole('button',{name:'Produção',exact:true}).click();
      await page.goBack();await page.waitForTimeout(200);
      assert.equal(await page.getByPlaceholder('Nome do insumo').inputValue(),'Frango');
