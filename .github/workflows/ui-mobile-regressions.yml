@@ -16,7 +16,7 @@ jobs:
           node-version: '24'
       - name: Validar componentes mobile e fluxos migrados
         run: |
-          node --test tests/*-mobile-ui.test.mjs tests/ui-foundation-phase1.test.mjs
+          node --test tests/*-ui.test.mjs tests/ui-foundation-phase1.test.mjs
       - name: Instalar dependências
         run: |
           if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
