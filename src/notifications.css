@@ -16,3 +16,9 @@
 .ti-notification-detail>div{display:grid;grid-template-columns:85px minmax(0,1fr);gap:8px;font-size:12px}
 .ti-notification-detail dt{color:#667085}.ti-notification-detail dd{margin:0;font-weight:600;color:#344054}
 @media(max-width:600px){.ti-notification-panel{max-height:calc(100dvh - 85px);overscroll-behavior:contain}.ti-notification-item{padding-block:12px}.ti-notification-actions button{flex:1;justify-content:center}.ti-notification-head button{min-width:44px;min-height:44px}}
+
+.ti-schedule-list-item{display:flex;align-items:center;gap:8px;border-bottom:1px solid #eceef3;padding:6px 0}
+.ti-schedule-list-item .ti-planning-row{flex:1;min-width:0;text-align:left;overflow-wrap:anywhere}
+.ti-schedule-recycle-action{flex-shrink:0;min-height:44px;border:1px solid #e6d4d4;border-radius:10px;background:#fff;color:#8f2b2b;font-size:12px;font-weight:700;padding:8px;cursor:pointer}
+.ti-schedule-recycle-action:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:400px){.ti-schedule-list-item{align-items:stretch;flex-direction:column}.ti-schedule-recycle-action{align-self:flex-end;min-width:90px}}
