@@ -33,11 +33,18 @@ export default async function handler(req,res){
    return send(res,200,'Checklists de hoje.',{day,photoEnabled:process.env.CHECKLIST_PHOTO_PROVIDER==='cloudinary'?Boolean(process.env.CHECKLIST_CLOUDINARY_CLOUD_NAME&&process.env.CHECKLIST_CLOUDINARY_API_KEY&&process.env.CHECKLIST_CLOUDINARY_API_SECRET&&process.env.CHECKLIST_CLOUDINARY_PRESET):Boolean(process.env.CHECKLIST_STORAGE_BUCKET),templates:models.docs.filter(d=>!d.data().archived&&d.data().published&&canExecute(member.role,d.data().published)&&(scheduledOn(d.data().published,day)||d.data().published.frequency==='manual')).map(d=>{const m=d.data().published;return {id:d.id,version:d.data().version,model:{name:m.name,dueTime:m.dueTime,frequency:m.frequency,roles:m.roles,items:m.items.map(i=>({critical:i.critical}))}};}),runs:instances.docs.filter(d=>activeIds.has(d.data().templateId)&&canExecute(member.role,d.data().model)).map(compactRun)});
   }
   if(action==='history'){
-   let query=runs.where('day','<=',day).orderBy('day','desc').orderBy('__name__','desc');
+   // The current-day archive is a separate collection pass, so active runs today
+   // never consume the pagination window reserved for older history.
+   let query=runs.where('day','<',day).orderBy('day','desc').orderBy('__name__','desc');
    if(body.before){if(!idOk(body.before))throw Error('INVALID');const cursor=await runs.doc(body.before).get();if(!cursor.exists)throw Error('NOT_FOUND');query=query.startAfter(cursor);}
-   const [snap,archived]=await Promise.all([query.limit(31).get(),templates.where('archived','==',true).limit(101).get()]);
-   const archivedIds=new Set(archived.docs.map(d=>d.id));
-   return send(res,200,'Histórico de checklists.',{runs:snap.docs.slice(0,30).filter(d=>(d.data().day<day||archivedIds.has(d.data().templateId))&&canExecute(member.role,d.data().model)).map(compactRun),next:snap.size>30?snap.docs[29].id:null});
+   const old=await query.limit(31).get();
+   let archivedToday=[];
+   if(!body.before){
+    const [archived,current]=await Promise.all([templates.where('archived','==',true).limit(101).get(),runs.where('day','==',day).limit(101).get()]);
+    const ids=new Set(archived.docs.map(d=>d.id));
+    archivedToday=current.docs.filter(d=>ids.has(d.data().templateId)&&canExecute(member.role,d.data().model)).map(compactRun);
+   }
+   return send(res,200,'Histórico de checklists.',{runs:[...archivedToday,...old.docs.slice(0,30).filter(d=>canExecute(member.role,d.data().model)).map(compactRun)],next:old.size>30?old.docs[29].id:null});
   }
   if(action==='templates'){
    if(!isManagement(member.role))throw Error('FORBIDDEN');
