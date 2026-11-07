@@ -35,5 +35,7 @@ jobs:
           node --check server/workflows/labels.js
       - name: Testar confirmação segura de revogação de convite
         run: node --test tests/access-revoke-confirm-ui.test.mjs
+      - name: Testar etiquetas mobile e integridade de auditoria
+        run: node --test tests/labels-mobile-ui.test.mjs
       - name: Build
         run: npm run build
