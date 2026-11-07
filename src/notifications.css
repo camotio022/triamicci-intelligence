@@ -3,3 +3,16 @@
 .ti-supply-alerts strong{font-size:.9rem;color:#6a2826}
 .ti-supply-alerts p{font-size:.84rem;color:#475569;line-height:1.4;margin:0}
 .ti-supply-alerts button{border:1px solid #ba8789;background:#fff;color:#7e2429;border-radius:9px;min-height:44px;font-weight:700;padding:10px}
+
+/* Central de notificações: alvos de toque, lixeira e trilha de leitura. */
+.ti-notification-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:14px 0 10px;padding:4px;background:#f4f5f7;border-radius:12px}
+.ti-notification-tabs button{border:0;border-radius:9px;background:transparent;color:#475467;font-size:13px;font-weight:650;min-height:40px;cursor:pointer}
+.ti-notification-tabs button.selected{background:#fff;color:#892524;box-shadow:0 1px 5px #10182814}
+.ti-notification-empty{color:#667085;font-size:13px;padding:18px 6px;text-align:center}
+.ti-notification-actions{display:flex;gap:7px;flex-wrap:wrap}
+.ti-notification-actions button{min-height:40px;margin-top:9px}
+.ti-notification-actions button:disabled{opacity:.45;cursor:wait}
+.ti-notification-detail{background:#f8f9fb;border:1px solid #eaecf0;border-radius:10px;padding:12px;margin:12px 0 0;display:grid;gap:7px;overflow-wrap:anywhere}
+.ti-notification-detail>div{display:grid;grid-template-columns:85px minmax(0,1fr);gap:8px;font-size:12px}
+.ti-notification-detail dt{color:#667085}.ti-notification-detail dd{margin:0;font-weight:600;color:#344054}
+@media(max-width:600px){.ti-notification-panel{max-height:calc(100dvh - 85px);overscroll-behavior:contain}.ti-notification-item{padding-block:12px}.ti-notification-actions button{flex:1;justify-content:center}.ti-notification-head button{min-width:44px;min-height:44px}}
