@@ -36,6 +36,7 @@ export default function MemberDirectory({user,membership,filterStatus=null,onCou
   const [role,setRole] = useState('auxiliar');
   const [status,setStatus] = useState('active');
   const [saving,setSaving] = useState(false);
+  const [confirmAccess,setConfirmAccess] = useState(false);
   const dialog=useRef(null);useDialogFocus(dialog,!!editing,()=>{if(!saving)setEditing(null)});
  const isAdmin = membership.role === 'admin';
 
@@ -57,7 +58,7 @@ export default function MemberDirectory({user,membership,filterStatus=null,onCou
   const canManage = item => item.uid !== user.uid &&
     (isAdmin || ['cook','auxiliar'].includes(item.role));
   const startEdit = item => {
-    setEditing(item);setRole(item.role);setStatus(item.status);setNotice('');
+    setEditing(item);setRole(item.role);setStatus(item.status);setConfirmAccess(false);setNotice('');
   };
   const save = async event => {
     event.preventDefault();
@@ -65,12 +66,12 @@ export default function MemberDirectory({user,membership,filterStatus=null,onCou
     if (role === editing.role && status === editing.status) {
       setNotice('Nenhuma alteração selecionada.');return;
     }
-    if (!window.confirm('Confirmar alteração do acesso de ' + (editing.name || editing.email) + '?')) return;
+    if (!confirmAccess) {setConfirmAccess(true);setNotice('');return;}
     setSaving(true);setNotice('');
     try {
       const data = await request('update',{uid:editing.uid,role,status});
       setNotice(data.message);notify(data.message,'success');
-      setEditing(null);
+      setEditing(null);setConfirmAccess(false);
       await load();
     } catch (err) {setNotice(err.message);notify(err.message,'error');}
     finally {setSaving(false);}
@@ -98,18 +99,20 @@ export default function MemberDirectory({user,membership,filterStatus=null,onCou
     {editing && <div className="ti-unified-modal-backdrop"><div ref={dialog} className="ti-unified-modal" role="dialog" aria-modal="true" aria-label="Gerir acesso"><form className="team-edit-form" onSubmit={save}>
       <div className="access-person-heading"><ProfileAvatar src={editing.avatar} name={editing.name||editing.email} large/><div><h3>{editing.name||'Gerir acesso'}</h3><p>{editing.email}</p><small>Unidade {membership.unitId}</small></div></div>
       <label htmlFor="member-role">Função</label>
-      <select id="member-role" value={role} onChange={event => setRole(event.target.value)}>
+      <select id="member-role" value={role} onChange={event => {setRole(event.target.value);setConfirmAccess(false);}}>
         {roles.filter(([value]) => isAdmin || ['cook','auxiliar'].includes(value)).map(([value,label]) =>
           <option key={value} value={value}>{label}</option>)}
       </select>
       <label htmlFor="member-status">Situação</label>
-      <select id="member-status" value={status} onChange={event => setStatus(event.target.value)}>
+      <select id="member-status" value={status} onChange={event => {setStatus(event.target.value);setConfirmAccess(false);}}>
         <option value="active">Ativo</option><option value="inactive">Desativado</option>
       </select>
       <p className="team-note">Desativar bloqueia novas verificações de acesso. O vínculo é acompanhado em tempo real para atualizar sessões abertas.</p>
+      {confirmAccess&&<section className="ti-access-review" role="status" aria-live="polite"><strong>Conferir antes de salvar</strong><p>{editing.name||editing.email||'Colaborador'} · {editing.email||'E-mail não informado'}</p><dl><div><dt>Função</dt><dd>{roleLabels[editing.role]||editing.role} → <b>{roleLabels[role]||role}</b></dd></div><div><dt>Situação</dt><dd>{statuses[editing.status]||editing.status} → <b>{statuses[status]||status}</b></dd></div></dl><p>As permissões serão verificadas pelo servidor para a unidade atual. Esta ação pode encerrar acessos existentes.</p></section>}
       <div className="team-edit-actions">
-        <button type="submit" disabled={saving}>{saving?'Salvando...':'Salvar alterações'}</button>
-        <button type="button" className="team-secondary" disabled={saving} onClick={() => setEditing(null)}>Cancelar</button>
+        <button type="submit" disabled={saving}>{saving?'Salvando...':confirmAccess?'Confirmar alteração':'Revisar alteração'}</button>
+        {confirmAccess&&<button type="button" className="team-secondary" disabled={saving} onClick={()=>setConfirmAccess(false)}>Voltar à edição</button>}
+        <button type="button" className="team-secondary" disabled={saving} onClick={() => {setEditing(null);setConfirmAccess(false);}}>Cancelar</button>
       </div>
     </form></div></div>}
   </section>;
