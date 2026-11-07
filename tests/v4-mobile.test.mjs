@@ -31,7 +31,23 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     await page.getByRole('navigation',{name:'Telas de teste'}).getByRole('button',{name:screen,exact:true}).click();
     await page.waitForTimeout(120);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${screen} overflows at ${width}`);
-    if(screen==='Escalas'){await page.getByLabel('Mês de referência',{exact:true}).fill('2026-11');const field=page.getByLabel('Mês de referência',{exact:true});assert.equal(await field.evaluate(el=>el.getBoundingClientRect().right<=el.closest('.ti-planning-card').getBoundingClientRect().right),true,'Campo de mês cabe no cartão');}
+    if(screen==='Escalas'){
+     await page.getByLabel('Mês de referência',{exact:true}).fill('2026-11');
+     const field=page.getByLabel('Mês de referência',{exact:true});
+     assert.equal(await field.evaluate(el=>el.getBoundingClientRect().right<=el.closest('.ti-planning-card').getBoundingClientRect().right),true,'Campo de mês cabe no cartão');
+     if(width<=760){
+      await page.getByText('Consultar escala por dia',{exact:true}).click();
+      const day=page.getByLabel('Dia para consultar',{exact:true});
+      assert.equal(await day.isVisible(),true,'Filtro diário disponível no celular');
+      await day.fill('2026-11-12');
+      assert.equal(await day.inputValue(),'2026-11-12');
+      assert.equal(await page.locator('.ti-schedule-matrix').isVisible(),false,'Matriz larga oculta no mobile');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'Escala mobile não transborda a página');
+     }else{
+      await page.getByText('Ver grade mensal completa',{exact:true}).click();
+      assert.equal(await page.locator('.ti-schedule-matrix').isVisible(),true,'Matriz completa disponível no desktop');
+     }
+    }
     if(screen==='Mural'){assert.equal(await page.getByText('Jornadas declaradas',{exact:true}).count(),1);assert.equal(await page.getByText('0 em trabalho ou intervalo declarado',{exact:true}).count(),1);await page.getByText('Publicar comunicado',{exact:true}).click();await page.getByLabel('Título',{exact:true}).fill('Comunicado de teste');}
     if(screen==='Produção'){if(width===390)await page.screenshot({path:'/tmp/triamicci-production-today-390.png',fullPage:true});await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Histórico',exact:true}).click();assert.equal(await page.getByText('Produção da semana passada',{exact:true}).isVisible(),false);await page.getByRole('region',{name:'Histórico de produção',exact:true}).getByRole('button',{name:'Todos',exact:true}).click();assert.equal(await page.getByText('Produção da semana passada',{exact:true}).isVisible(),true);const history=page.getByRole('region',{name:'Histórico de produção',exact:true});await history.getByRole('button',{name:'Personalizado',exact:true}).click();const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());await history.getByLabel('De',{exact:true}).fill(today);await history.getByLabel('Até',{exact:true}).fill(today);assert.equal(await page.getByText('Produção da semana passada',{exact:true}).count(),0);await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Hoje',exact:true}).click();await page.getByRole('button',{name:'Registrar execução'}).click();await page.getByLabel('Quantidade produzida (un)',{exact:true}).fill('10');
      assert.equal(await page.getByText('1 preparação precisa de revisão',{exact:true}).isVisible(),true);await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Preparações',exact:true}).click();assert.equal(await page.getByRole('heading',{name:'Preparações da unidade'}).isVisible(),true);await page.getByText('Fichas anteriores',{exact:false}).first().click();assert.equal(await page.getByRole('option',{name:'Criar nova ficha',exact:true}).count(),0);await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Hoje',exact:true}).click();

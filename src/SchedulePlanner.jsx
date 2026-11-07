@@ -3,7 +3,7 @@ import {coverageTimeline} from '../server/schedules/coverage-timeline.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {generateMonthlyRoster,weekdayOccurrences,weekdayOf,WEEKDAY_LABELS} from '../server/schedules/generator.js';
-import {auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';
+import {auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';import './roster-mobile-day.css';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 async function call(action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
@@ -32,7 +32,7 @@ export default function SchedulePlanner({membership}){
 
  const chosen=plans.find(x=>x.id===selected);
  const legacyIds=useMemo(()=>registryState.activated?entries.filter(e=>!people.some(p=>p.uid===e.uid)).length:0,[entries,people,registryState.activated]);
- const dateSelected=date;
+ const dateSelected=monthDates(period).includes(date)?date:monthDates(period)[0]||'';
  const open=p=>{setSelected(p.id);setDraftRevision(p.revision);setTitle(p.title);setPeriod(p.period);setEntries(p.entries||[]);setError('')};
  const reset=()=>{setSelected('');setDraftRevision(null);setTitle('Escala da equipe');setEntries([]);setError('')};
  const sundays=useMemo(()=>weekdayOccurrences(period,0),[period]);
@@ -89,9 +89,15 @@ export default function SchedulePlanner({membership}){
  </div></details>
  </section>
  <section className="ti-planning-card" style={{marginTop:16}}>
- <h3>Domingos e cobertura</h3>{!coverageRules.length&&<p role="status">Defina mínimos por setor e horário em Coberturas antes de publicar. Horários e pausas vêm do cadastro; domingo usa sua própria jornada.</p>}{sundays.map(day=>{const intervals=coverageTimeline({date:day,entries,people,requirements:coverageRules});return <details key={day}><summary>{day.split('-').reverse().join('/')} · {entries.filter(e=>e.date===day&&e.type!=='work').length} folgas · {intervals.filter(r=>r.deficit).length} intervalos a revisar</summary>{intervals.map((r,i)=><p key={i} className={r.deficit?'team-error':''}>{r.sector} {r.skill?'· '+r.skill:''} · {r.start}–{r.end} · {r.covered}/{r.minimum} pessoas {r.deficit?'· déficit '+r.deficit:'· coberto'}</p>)}</details>})}<details><summary>Ver grade mensal completa</summary><h3>Visão mensal da equipe</h3>
- <p>F = folga fixa; DM = domingo adicional; A = ausência; · = trabalho. Role horizontalmente para ver todos os dias.</p>
+ <h3>Domingos e cobertura</h3>{!coverageRules.length&&<p role="status">Defina mínimos por setor e horário em Coberturas antes de publicar. Horários e pausas vêm do cadastro; domingo usa sua própria jornada.</p>}{sundays.map(day=>{const intervals=coverageTimeline({date:day,entries,people,requirements:coverageRules});return <details key={day}><summary>{day.split('-').reverse().join('/')} · {entries.filter(e=>e.date===day&&e.type!=='work').length} folgas · {intervals.filter(r=>r.deficit).length} intervalos a revisar</summary>{intervals.map((r,i)=><p key={i} className={r.deficit?'team-error':''}>{r.sector} {r.skill?'· '+r.skill:''} · {r.start}–{r.end} · {r.covered}/{r.minimum} pessoas {r.deficit?'· déficit '+r.deficit:'· coberto'}</p>)}</details>})}<details><summary><span className="ti-roster-desktop-label">Ver grade mensal completa</span><span className="ti-roster-mobile-label">Consultar escala por dia</span></summary><h3>Visão mensal da equipe</h3>
+ <p className="ti-roster-grid-instructions">F = folga fixa; DM = domingo adicional; A = ausência; · = trabalho. Role horizontalmente para ver todos os dias.</p>
  <label>Filtrar setor <select value={matrixSector} onChange={e=>setMatrixSector(e.target.value)}><option value="todos">Todos</option><option value="cozinha">Cozinha</option><option value="frente">Frente</option><option value="caixa">Caixa</option><option value="apoio">Apoio</option><option value="gestao">Gestão</option></select></label>
+ <div className="ti-roster-mobile-day" aria-label="Escala por dia no celular">
+ <label>Dia para consultar<input type="date" value={dateSelected} min={period+'-01'} max={monthDates(period).at(-1)} onChange={e=>setDate(e.target.value)}/></label>
+ <div className="ti-roster-day-summary"><strong>{dateSelected?.split('-').reverse().join('/')||'Selecione uma data'}</strong><span>{filteredPeople.length} colaboradores</span></div>
+ <div className="ti-roster-day-list">{filteredPeople.map(person=>{const kind=entries.find(e=>e.uid===person.uid&&e.date===dateSelected)?.type||(dateSelected===sundayOff[person.uid]?'monthly_sunday':weekdayOf(dateSelected)===fixedOff[person.uid]?'off':'work');return <article key={person.uid} className="ti-roster-day-person"><span>{person.name||person.email||'Colaborador'}</span><b data-kind={kind}>{labels[kind]||kind}</b></article>})}</div>
+ {!filteredPeople.length&&<p className="ti-roster-day-empty">Nenhum colaborador disponível neste filtro de setor.</p>}
+ </div>
  <div className="ti-schedule-matrix" role="region" aria-label="Matriz mensal de folgas" tabIndex={0}>
  <table className="ti-schedule-matrix-table" style={{minWidth:Math.max(860,monthDates(period).length*30+150)}}>
  <thead><tr><th style={{position:'sticky',left:0,background:'var(--surface,#fff)',minWidth:140,textAlign:'left'}}>Funcionário</th>{monthDates(period).map(d=><th key={d} title={d===today?d+" · HOJE":d} aria-current={d===today?"date":undefined} style={{minWidth:26,textAlign:'center'}}>{WEEKDAY_LABELS[weekdayOf(d)].slice(0,1)}<div>{Number(d.slice(-2))}</div></th>)}</tr></thead>
