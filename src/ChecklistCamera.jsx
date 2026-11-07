@@ -4,7 +4,7 @@ import {Camera,CheckCircle2,RotateCcw,X,Check,Image as ImageIcon} from 'lucide-r
 import ChecklistEvidence from './ChecklistEvidence.jsx';
 export default function ChecklistCamera({runId,itemId,call,onUploaded,disabled}){
  const video=useRef(null),stream=useRef(null),alive=useRef(true),session=useRef(null),attempt=useRef(0),trigger=useRef(null),modalClose=useRef(null);
- const [phase,setPhase]=useState('idle'),[preview,setPreview]=useState(''),[uploaded,setUploaded]=useState(''),[error,setError]=useState('');
+ const [phase,setPhase]=useState('idle'),[preview,setPreview]=useState(''),[uploadedPreview,setUploadedPreview]=useState(''),[uploaded,setUploaded]=useState(''),[error,setError]=useState('');
  const stop=()=>{stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;};
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;attempt.current+=1;stop();};},[]);
  useEffect(()=>{if(!['starting','camera','review','uploading'].includes(phase))return;const previous=document.body.style.overflow;document.body.style.overflow='hidden';const esc=e=>{if(e.key==='Escape'&&phase!=='uploading')close();};document.addEventListener('keydown',esc);return()=>{document.body.style.overflow=previous;document.removeEventListener('keydown',esc);};},[phase]);
@@ -20,7 +20,7 @@ export default function ChecklistCamera({runId,itemId,call,onUploaded,disabled})
    if(!alive.current||attempt.current!==currentAttempt)return;
    const media=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1600},height:{ideal:1200}},audio:false});
    if(!alive.current||attempt.current!==currentAttempt){media.getTracks().forEach(t=>t.stop());return;}
-   session.current=captureSession;stream.current=media;setPreview('');setPhase('camera');
+   session.current=captureSession;stream.current=media;setPhase('camera');
   }catch(e){if(alive.current&&attempt.current===currentAttempt){setError(e.name==='NotAllowedError'?'Permita o acesso à câmera para continuar.':e.message);close();}}
  };
  useEffect(()=>{if(phase==='camera'&&video.current){video.current.srcObject=stream.current;video.current.play().catch(()=>{setError('Não foi possível iniciar a câmera.');close();});}},[phase]);
@@ -37,12 +37,12 @@ export default function ChecklistCamera({runId,itemId,call,onUploaded,disabled})
  const upload=async()=>{
   setError('');setPhase('uploading');
   const currentAttempt=attempt.current;
-  try{const result=await call('photoUpload',{photoId:session.current.photoId,base64:preview.split(',')[1]});if(alive.current&&attempt.current===currentAttempt){onUploaded(result.photoId);setUploaded(result.photoId);setPhase('ready');requestAnimationFrame(()=>trigger.current?.focus());}}
+  try{const result=await call('photoUpload',{photoId:session.current.photoId,base64:preview.split(',')[1]});if(alive.current&&attempt.current===currentAttempt){onUploaded(result.photoId);setUploaded(result.photoId);setUploadedPreview(preview);setPhase('ready');requestAnimationFrame(()=>trigger.current?.focus());}}
   catch(e){if(alive.current&&attempt.current===currentAttempt){setError(e.message);setPhase('review');}}
  };
  const modal=['starting','camera','review','uploading'].includes(phase);
  return <div className="ti-check-camera">
-  {uploaded&&preview?<div className="ti-check-camera-ready"><ChecklistEvidence id={uploaded} call={call} preview={preview} label="Evidência anexada"/><p className="ti-check-success"><CheckCircle2 size={17}/> Foto enviada e vinculada a este item.</p></div>:<button ref={trigger} type="button" className="ti-check-camera-open" disabled={disabled||modal} onClick={start}><Camera size={20}/> {modal?'Câmera aberta…':'Adicionar foto'}</button>}
+  {uploaded&&uploadedPreview?<div className="ti-check-camera-ready"><ChecklistEvidence id={uploaded} call={call} preview={uploadedPreview} label="Evidência anexada"/><p className="ti-check-success"><CheckCircle2 size={17}/> Foto enviada e vinculada a este item.</p></div>:<button ref={trigger} type="button" className="ti-check-camera-open" disabled={disabled||modal} onClick={start}><Camera size={20}/> {modal?'Câmera aberta…':'Adicionar foto'}</button>}
   {uploaded&&<button ref={trigger} type="button" className="secondary ti-check-retake-inline" disabled={disabled} onClick={start}><RotateCcw size={17}/> Tirar novamente</button>}
   {error&&phase==='idle'&&<p role="alert" className="ti-check-alert">{error}</p>}
   {modal&&createPortal(<div className="ti-check-camera-backdrop" role="presentation">
