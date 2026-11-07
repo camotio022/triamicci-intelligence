@@ -112,7 +112,7 @@ export default function LeaveRequests({membership}){
     getId={x=>x.id} getTitle={x=>dateLabel(x.date)} getDate={x=>x.decidedAt||x.updatedAt||x.createdAt||x.date||null}
     getQuantity={x=>statuses[x.status]||x.status} getDescription={x=>x.reason||'Solicitação de folga'}
     getPerson={x=>x.actorName||x.requesterName||x.employeeName}
-    renderDetails={x=><div>{x.note?'Decisão: '+x.note:'Sem observações'} · ID: {x.id}</div>}
+    renderDetails={x=><div>{x.note?'Decisão: '+x.note:'Sem observações adicionais'}</div>}
     empty="Nenhuma solicitação concluída no período."/></section>
   {notice&&<p role="status" className="ti-leave-v4-message">{notice}</p>}
   <ConfirmSheet open={!!pendingAction} title={pendingAction?.kind==='submit'?'Confirmar solicitação de folga':pendingAction?.decision==='approved'?'Aprovar solicitação':'Recusar solicitação'} description={pendingAction?.kind==='submit'?'Enviar pedido para '+dateLabel(pendingAction?.date)+'? A aprovação não altera automaticamente a escala.':'Esta decisão será registrada e não alterará a escala oficial automaticamente.'} confirmLabel={pendingAction?.kind==='submit'?'Enviar pedido':pendingAction?.decision==='approved'?'Aprovar':'Confirmar recusa'} tone={pendingAction?.decision==='rejected'?'danger':'primary'} busy={busy} error={error} onConfirm={confirmAction} onCancel={()=>setPendingAction(null)}/>
