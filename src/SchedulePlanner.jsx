@@ -3,7 +3,7 @@ import {coverageTimeline} from '../server/schedules/coverage-timeline.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {generateMonthlyRoster,weekdayOccurrences,weekdayOf,WEEKDAY_LABELS} from '../server/schedules/generator.js';
-import {auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';
+import {auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 async function call(action,extra={}){
  const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
@@ -20,6 +20,7 @@ export default function SchedulePlanner({membership}){
  const {notify}=useFeedback(),[plans,setPlans]=useState([]),[people,setPeople]=useState([]),[selected,setSelected]=useState(''),[title,setTitle]=useState('Escala da equipe'),[period,setPeriod]=useState(restaurantDay().slice(0,7)),[entries,setEntries]=useState([]);
  const [fixedOff,setFixedOff]=useState({}),[sundayOff,setSundayOff]=useState({}),[savingFixed,setSavingFixed]=useState(''),[selectedPerson,setSelectedPerson]=useState(''),[matrixSector,setMatrixSector]=useState('todos');
  const [coverageRules,setCoverageRules]=useState([]),[draftRevision,setDraftRevision]=useState(null);
+ const [scheduleView,setScheduleView]=useState('active');
  const [approvedLeaves,setApprovedLeaves]=useState([]);
  const [registryState,setRegistryState]=useState({activated:false,registeredCount:0});
  const [today,setToday]=useState(()=>restaurantDay());
@@ -53,11 +54,25 @@ export default function SchedulePlanner({membership}){
  const add=e=>{e.preventDefault();if(!uid||!date||!date.startsWith(period))return setError('Selecione colaborador e data dentro do mês.');setError('');setEntries(old=>[...old.filter(x=>!(x.uid===uid&&x.date===date)),{uid,date,type}].sort((a,b)=>a.date.localeCompare(b.date)))};
  const save=async()=>{if(legacyIds)return setError('Este rascunho contém contas antigas; gere uma nova proposta com a equipe real.');setBusy(true);try{const d=await call('saveDraft',{id:selected||undefined,expectedRevision:draftRevision,period,title,entries});notify(d.message,'success');await refresh();setSelected(d.id);setDraftRevision(d.revision)}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
  const transition=async action=>{setBusy(true);try{const d=await call(action,{id:selected});notify(d.message,'success');await refresh()}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
+ const archivedPlans=plans.filter(p=>!!p.archivedAt),activePlans=plans.filter(p=>!p.archivedAt);
+ const changeArchive=async(p,action)=>{
+  if(busy)return;
+  if(action==='scheduleArchive'&&!window.confirm('Mover esta escala para a lixeira? O histórico será preservado e a escala poderá ser restaurada.'))return;
+  setBusy(true);
+  try{const result=await call(action,{id:p.id});notify(result.message,'success');if(selected===p.id)reset();await refresh(true)}
+  catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}
+ };
  if(!allowed)return <section className="ti-planning"><h1>Escalas</h1><p>Consulte suas escalas publicadas no Mural.</p></section>;
  return <section className="ti-planning"><p className="eyebrow">ADMINISTRAÇÃO · EQUIPE</p><h1>Planejamento de escalas</h1><p>Crie o rascunho, revise conflitos, solicite aprovação e publique. Disponibilidade habitual não é escala oficial.</p>
  {!registryState.activated&&registryState.registeredCount>0&&<aside className="ti-roster-attention" role="status"><strong>{registryState.registeredCount} fichas profissionais aguardam ativação.</strong><span>O planejador ainda está usando contas de acesso, que podem incluir contas de teste. Ative o Cadastro Mestre após conferir a equipe para planejar com os funcionários reais.</span><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent("ti-navigate",{detail:"master-registry"}))}>Abrir Cadastro Mestre</button></aside>}
  {legacyIds>0&&<aside className="ti-roster-attention" role="alert"><strong>Rascunho com {legacyIds} lançamento(s) de contas antigas.</strong><span>Após ativar o Cadastro Mestre, a nova escala usa IDs das fichas profissionais. Para preservar o histórico, rascunhos antigos não são convertidos automaticamente. Crie uma proposta nova e confira as folgas antes de salvar.</span></aside>}
- <div className="ti-planning-grid"><section className="ti-planning-card"><div className="ti-planning-heading"><h2>Escalas da unidade</h2><button type="button" onClick={refresh} disabled={busy||loading}>Atualizar</button></div>{loading?<p>Carregando...</p>:plans.length?plans.map(x=><button type="button" key={x.id} className={'ti-planning-row'+(selected===x.id?' selected':'')} onClick={()=>open(x)}><strong>{x.title}</strong><span>{x.period} · {labels[x.status]||x.status} · v{x.revision}</span></button>):<p>Nenhuma escala cadastrada.</p>}<button type="button" onClick={reset}>Nova escala</button></section>
+ <div className="ti-planning-grid"><section className="ti-planning-card"><div className="ti-planning-heading"><h2>Escalas da unidade</h2><button type="button" onClick={()=>refresh()} disabled={busy||loading}>Atualizar</button></div>
+ <div className="ti-notification-tabs" role="group" aria-label="Lista de escalas"><button type="button" className={scheduleView==='active'?'selected':''} aria-pressed={scheduleView==='active'} onClick={()=>setScheduleView('active')}>Ativas ({activePlans.length})</button><button type="button" className={scheduleView==='trash'?'selected':''} aria-pressed={scheduleView==='trash'} onClick={()=>setScheduleView('trash')}>Lixeira ({archivedPlans.length})</button></div>
+ {loading?<p>Carregando...</p>:(scheduleView==='active'?activePlans:archivedPlans).length?(scheduleView==='active'?activePlans:archivedPlans).map(x=><div key={x.id} className="ti-schedule-list-item">
+  <button type="button" className={'ti-planning-row'+(selected===x.id?' selected':'')} onClick={()=>open(x)}><strong>{x.title}</strong><span>{x.period} · {labels[x.status]||x.status} · v{x.revision}</span></button>
+  {scheduleView==='trash'?<button type="button" disabled={busy} className="ti-schedule-recycle-action" onClick={()=>changeArchive(x,'scheduleRestore')}>Restaurar</button>:<button type="button" disabled={busy||(x.status==='published'&&x.period>=today.slice(0,7))} className="ti-schedule-recycle-action" title={x.status==='published'&&x.period>=today.slice(0,7)?'Escala oficial protegida':'Mover para a lixeira'} onClick={()=>changeArchive(x,'scheduleArchive')}>Excluir</button>}
+ </div>):<p>{scheduleView==='trash'?'Nenhuma escala na lixeira.':'Nenhuma escala cadastrada.'}</p>}
+ <button type="button" onClick={()=>{reset();setScheduleView('active')}}>Nova escala</button></section>
  <section className="ti-planning-card"><h2>{selected?'Detalhes da escala':'Nova escala'}</h2><label>Título<input maxLength={100} minLength={3} required disabled={!!chosen&&chosen.status!=='draft'} value={title} onChange={e=>setTitle(e.target.value)}/></label><label>Mês de referência<input type="month" disabled={!!chosen&&chosen.status!=='draft'} value={period} onChange={e=>{setPeriod(e.target.value);setEntries([])}}/></label>
  {(!chosen||chosen.status==='draft')&&<form className="ti-planning-add" onSubmit={add}><label>Colaborador<select required value={uid} onChange={e=>setUid(e.target.value)}><option value="">Selecione</option>{people.map(p=><option key={p.uid} value={p.uid}>{p.name||p.email}</option>)}</select></label><label>Data<input required type="date" value={date} min={period+'-01'} max={monthDates(period).at(-1)} onChange={e=>setDate(e.target.value)}/></label><label>Atividade<select value={type} onChange={e=>setType(e.target.value)}><option value="work">Trabalho</option><option value="off">Folga</option><option value="leave">Ausência</option><option value="monthly_sunday">Domingo mensal adicional</option></select></label><button type="submit">Adicionar</button></form>}
  {(!chosen||chosen.status==='draft')&&<button type="button" disabled={busy||people.length===0||(!registryState.activated&&registryState.registeredCount>0)} onClick={generate}>Gerar mês com folgas fixas e domingos</button>}
