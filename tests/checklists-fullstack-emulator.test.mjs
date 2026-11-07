@@ -24,7 +24,8 @@ test('checklist completo: navegador → API real → Firestore/Storage → outra
   for(const page of [manager,aux])page.on('pageerror',e=>errors.push(e.message));
   await manager.goto('http://127.0.0.1:4186/qa/checklists.html?role=manager&unit='+unitId);
   await manager.getByRole('button',{name:'Gestão',exact:true}).click();
-  await manager.getByRole('button',{name:'Verificar armazenamento',exact:true}).click();
+  await manager.getByText('Fotos privadas e armazenamento',{exact:true}).click();
+   await manager.getByRole('button',{name:'Verificar armazenamento',exact:true}).click();
   await manager.getByText(/Bucket acessível e protegido/).waitFor();
   await manager.getByRole('button',{name:'Criar checklist',exact:true}).click();
   await manager.getByLabel('Nome do checklist',{exact:true}).fill('Checklist integrado de teste');
