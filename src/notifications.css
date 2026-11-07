@@ -22,3 +22,26 @@
 .ti-schedule-recycle-action{flex-shrink:0;min-height:44px;border:1px solid #e6d4d4;border-radius:10px;background:#fff;color:#8f2b2b;font-size:12px;font-weight:700;padding:8px;cursor:pointer}
 .ti-schedule-recycle-action:disabled{opacity:.4;cursor:not-allowed}
 @media(max-width:400px){.ti-schedule-list-item{align-items:stretch;flex-direction:column}.ti-schedule-recycle-action{align-self:flex-end;min-width:90px}}
+
+/* Notification drawer — compact controls with iOS PWA safe areas. */
+.ti-notification-panel{min-width:0;overscroll-behavior:contain}
+.ti-notification-head{position:sticky;top:-16px;z-index:2;background:#fff;padding:2px 0 9px;border-bottom:1px solid #eef0f4}
+.ti-notification-head-actions{display:flex;gap:6px;align-items:center}
+.ti-notification-head-actions>button{display:grid;place-items:center;min-height:44px;min-width:44px;border:0;border-radius:10px;background:#f5f6f8;color:#46536a}
+.ti-notification-item{min-width:0;overflow-wrap:anywhere}
+.ti-notification-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.ti-notification-actions button{min-width:0;min-height:44px;margin:0;justify-content:center;padding:8px;white-space:normal}
+@media(max-width:600px){
+ .ti-notification-panel{
+  top:calc(60px + env(safe-area-inset-top,0px));
+  bottom:max(10px,env(safe-area-inset-bottom,0px));
+  left:max(10px,env(safe-area-inset-left,0px));
+  right:max(10px,env(safe-area-inset-right,0px));
+  width:auto;max-height:none;padding:12px;border-radius:15px;
+  box-shadow:0 20px 55px #11182738;
+ }
+ .ti-notification-head{top:-12px}
+ .ti-notification-item{padding:12px 0}
+ .ti-notification-item.unread{padding-left:9px}
+ .ti-notification-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
