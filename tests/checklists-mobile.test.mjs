@@ -62,12 +62,21 @@ test('checklists: cadastro, publicação e conferência com câmera no mobile',{
    await page.getByRole('button',{name:/^Iniciar (checklist|conferência)$/}).click();
    await page.getByRole('button',{name:'Adicionar foto',exact:true}).click();
    await page.getByRole('dialog',{name:'Capturar evidência'}).waitFor();
+   await page.getByRole('button',{name:'Fechar câmera'}).click();
+   assert.equal(await page.getByRole('dialog',{name:'Capturar evidência'}).count(),0,'Cancel camera restores the task');
+   await page.getByRole('button',{name:'Adicionar foto',exact:true}).click();
+   await page.getByRole('dialog',{name:'Capturar evidência'}).waitFor();
    await page.getByLabel('Visualização da câmera ao vivo').waitFor();
    await page.waitForFunction(()=>document.querySelector('video')?.videoWidth>0);
    await page.getByRole('button',{name:'Tirar foto',exact:true}).click();
    await page.getByRole('button',{name:'Usar foto',exact:true}).click();
    await page.getByText('Foto enviada e vinculada a este item.',{exact:true}).waitFor();
    assert.equal(await page.getByRole('dialog',{name:'Capturar evidência'}).count(),0,'Camera closes after upload');
+   await page.getByRole('button',{name:'Tirar novamente'}).click();
+   await page.getByRole('dialog',{name:'Capturar evidência'}).waitFor();
+   await page.getByRole('button',{name:'Fechar câmera'}).click();
+   assert.equal(await page.getByText('Foto enviada e vinculada a este item.',{exact:true}).count(),1,'Cancel retake preserves the previously uploaded photo');
+   assert.equal(await page.getByRole('button',{name:'Ampliar evidência da conferência'}).count(),1,'Existing evidence remains viewable');
    await page.getByRole('radio',{name:'Conferido',exact:true}).check();
    await page.getByRole('button',{name:'Confirmar e continuar',exact:true}).click();
    if(role==='auxiliar'){await page.getByRole('alert').filter({hasText:'Envio indisponível no teste'}).waitFor();assert.equal(await page.getByText('Conferência concluída e enviada.',{exact:true}).count(),0);await page.getByRole('button',{name:'Confirmar e continuar',exact:true}).click();}
