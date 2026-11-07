@@ -1,0 +1,62 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {generateKeyPairSync,randomUUID} from 'node:crypto';
+test('configuração da unidade prevalece globalmente e reinicia saldo experimental incompatível',{timeout:120000},async()=>{
+ const project='demo-triamicci-v31',unitId='catalog-56-'+randomUUID();
+ const {privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+ Object.assign(process.env,{APP_ENV:'staging',PUBLIC_APP_URL:'https://triamicci-e2e.test',FIREBASE_EXPECTED_PROJECT_ID:project,FIRESTORE_EMULATOR_HOST:'127.0.0.1:8080',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099',FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({project_id:project,client_email:'catalog@'+project+'.iam.gserviceaccount.com',private_key:privateKey.export({type:'pkcs8',format:'pem'}).toString()})});
+ const [{getDb},{default:activate},{default:products},{default:kitchen},{default:shipments},{default:production},{default:stock}]=await Promise.all([import('../server/_lib.js'),import('../api/catalog/manage.js'),import('../api/products/manage.js'),import('../server/operations/v3-service.js'),import('../server/operations/shipments.js'),import('../api/production/manage.js'),import('../api/operations/stock.js')]);
+ const db=getDb(),root=db.collection('units').doc(unitId);
+ const signup=async(role,tenant=unitId)=>{
+  const r=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=local',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:randomUUID()+'@catalog.test',password:'test-password-56',returnSecureToken:true})});const u=await r.json();assert.equal(r.status,200);
+  await db.doc('memberships/'+u.localId).set({unitId:tenant,status:'active',role});return {uid:u.localId,token:u.idToken};
+ };
+ const manager=await signup('manager'),aux=await signup('auxiliar'),foreign=await signup('manager','other-unit-'+randomUUID());
+ const call=async(handler,actor,action,extra={})=>{
+  const res={code:200,setHeader(){},status(c){this.code=c;return this},json(data){this.data=data;return this}};
+  await handler({method:'POST',headers:{origin:'https://triamicci-e2e.test','content-type':'application/json',authorization:'Bearer '+actor.token},body:{...(handler===activate?{module:'operationalCatalog'}:{}),action,...extra}},res);return {code:res.code,...res.data};
+ };
+
+ const id='a'.repeat(40),productRef=root.collection('products').doc(id),profileRef=root.collection('operationalProfiles').doc(id);
+ await productRef.set({name:'Farinha para empanar',unit:'kg',operationalUnitOverride:'kg',quantity:300,status:'active',operationalCatalogVersion:'56-v1',category:'Mercearia',trackExpiry:false,minStock:0});
+ const oldProfile={displayName:'Farinha de Rosca',aliases:['Farinha parme'],controlMode:'quantitative',countUnit:'kg',origin:'supplier',locations:['reserva','giro'],version:1};
+ await profileRef.set(oldProfile);
+ await root.collection('physicalBalances').doc(id).set({unit:'kg',reserve:200,rotation:100,total:300,at:new Date(),countSessions:{reserva:'old',giro:'old'},lastCountAtByArea:{reserva:new Date(),giro:new Date()}});
+ await root.collection('v3PhysicalBalances').doc(id).set({unit:'kg',reserva:300,giro:0,total:300});
+ const lotRef=root.collection('physicalLots').doc(id).collection('lots').doc('test-lot');
+ await lotRef.set({productId:id,unit:'kg',reserva:300,giro:0,availableQuantity:300,lot:'EXPERIMENTAL',expiryDate:'2099-12-31'});
+ await root.collection('physicalCounts').doc('old-count').set({productId:id,unit:'kg',total:300});
+ let list=await call(products,manager,'list');
+ assert.equal(list.products[0].name,'Farinha de Rosca','Configuração anterior já aparece sem recadastrar');
+ await root.collection('productionRecipes').doc('dependent').set({name:'Receita antiga',active:true,version:1,lines:[{productId:id,quantity:1}],outputUnit:'un'});
+ const next={...oldProfile,countUnit:'pacote'};delete next.version;
+ assert.equal((await call(kitchen,aux,'v3ProfileSave',{productId:id,expectedVersion:1,profile:next})).code,403);
+ assert.equal((await call(kitchen,foreign,'v3ProfileSave',{productId:id,expectedVersion:1,profile:next})).code,404);
+ const result=await call(kitchen,manager,'v3ProfileSave',{productId:id,expectedVersion:1,profile:next});
+ assert.equal(result.code,200,JSON.stringify(result));
+ const saved=(await productRef.get()).data();assert.equal(saved.name,'Farinha de Rosca');assert.equal(saved.unit,'pacote');assert.equal(saved.operationalUnitOverride,'pacote');assert.equal(saved.quantity,0);assert.equal(saved.profile.version,2);
+ assert.equal((await root.collection('productionRecipes').doc('dependent').get()).data().active,false,'Quantidades antigas da ficha não são reinterpretadas como pacotes');
+ const balance=(await root.collection('physicalBalances').doc(id).get()).data();assert.equal(balance.total,0);assert.equal(balance.unit,'pacote');assert.equal(balance.quality,'CONFIGURATION_RESET');assert.equal(balance.at,null);assert.deepEqual(balance.countSessions,{});
+ assert.equal((await lotRef.get()).exists,false,'Lotes experimentais antigos saem da operação');
+ assert.equal((await root.collection('physicalCounts').doc('old-count').get()).data().total,300,'Histórico permanece na unidade original');
+ const audits=await db.collection('auditLogs').where('unitId','==',unitId).get();
+ const reset=audits.docs.map(d=>d.data()).find(d=>d.event==='v3.experimental_stock_reset');assert.equal(reset.details.previousBalance.total,300);assert.equal(reset.details.previousLots[0].availableQuantity,300);
+ for(const action of ['v3Dashboard','v3Conference']){const r=await call(kitchen,aux,action);assert.equal(r.code,200);const p=r.products[0];assert.equal(p.id,id);assert.equal(p.name,'Farinha de Rosca');assert.equal(p.unit,'pacote');assert.equal(p.profile.countUnit,'pacote');assert.equal(p.v3Balance.total,0);}
+ list=await call(products,aux,'list');assert.equal(list.products[0].physicalUnit,'pacote');assert.equal(list.products[0].name,'Farinha de Rosca');assert.ok(list.products[0].aliases.includes('Farinha para empanar'));
+ assert.equal((await call(kitchen,manager,'v3ProfileSave',{productId:id,expectedVersion:1,profile:next})).code,409,'Versão antiga não repete reset');
+ const round=randomUUID();
+ for(const [location,quantity] of [['reserva',5],['giro',3]])assert.equal((await call(kitchen,manager,'v3Count',{requestId:randomUUID(),sessionId:round,productId:id,location,quantity})).code,200);
+ assert.equal((await root.collection('physicalBalances').doc(id).get()).data().total,8,'Nova contagem é em pacotes');
+ const renamed={...next,displayName:'Farinha de Rosca especial'};
+ assert.equal((await call(kitchen,manager,'v3ProfileSave',{productId:id,expectedVersion:2,profile:renamed})).code,200);
+ assert.equal((await root.collection('physicalBalances').doc(id).get()).data().total,8,'Renomear não reinicia saldo na mesma unidade');
+ const delivery={requestId:randomUUID(),supplier:'TESTE pacotes',notes:'Teste de unidade configurada',lines:[{productId:id,commercialQuantity:2,commercialUnit:'pacote',stockQuantity:2,location:'reserva',lot:'',expiryDate:''}]};
+ const inspected=await call(shipments,aux,'shipmentInspect',delivery);assert.equal(inspected.code,200,JSON.stringify(inspected));
+ const approved=await call(shipments,manager,'shipmentApprove',{requestId:delivery.requestId});assert.equal(approved.code,200,JSON.stringify(approved));
+ assert.equal((await root.collection('physicalBalances').doc(id).get()).data().total,10);
+ const recipeId='c'.repeat(40);
+ const recipe=await call(production,manager,'saveRecipe',{id:recipeId,name:'Mistura experimental',method:'Teste de consumo em pacotes',yieldQuantity:1,outputProductId:null,lines:[{productId:id,quantity:1,location:'reserva',substitutes:[]}]});assert.equal(recipe.code,200,JSON.stringify(recipe));
+ const finished=await call(production,aux,'finish',{requestId:randomUUID(),recipeId,portions:1,items:[{productId:id,quantity:1}]});assert.equal(finished.code,200,JSON.stringify(finished));
+ assert.equal((await root.collection('physicalBalances').doc(id).get()).data().total,9,'Recebimento e produção movimentam pacotes configurados');
+ assert.equal((await root.collection('products').get()).size,1,'Não duplica insumo');
+});
