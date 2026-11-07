@@ -1,3 +1,4 @@
+import StockConference from './StockConference.jsx';
 import {apiFetch} from './api-fetch.js';
 import {useViewState} from './useViewState.js';
 import {useUnitLive} from './useUnitLive.js';
@@ -98,7 +99,8 @@ export default function KitchenV3({membership}){
   {loading?<p role="status">Carregando dados reais da unidade…</p>:<>
    {tab==='history'&&<KitchenV3History products={products}/>}
    {tab==='loss'&&<KitchenV3Loss membership={membership} products={products} onChange={load}/>}
-   {['receive','produce','transfer','count'].includes(tab)&&<KitchenV3Workflows key={tab} kind={tab} products={products} orders={orders} membership={membership} onChange={()=>load(true)} onConfigure={p=>p?begin(p):setTab('catalog')}/>}
+   {tab==='count'&&<StockConference membership={membership}/>}
+   {['receive','produce','transfer'].includes(tab)&&<KitchenV3Workflows key={tab} kind={tab} products={products} orders={orders} membership={membership} onChange={()=>load(true)} onConfigure={p=>p?begin(p):setTab('catalog')}/>}
    {tab==='overview'&&<div className="ti-v4-stock-overview">
     <div className="ti-v4-stock-overview-stats" aria-label="Resumo de estoque">
      <button type="button" onClick={()=>setOverviewFilter('alerts')} aria-pressed={overviewFilter==='alerts'} className={overviewFilter==='alerts'?'selected':''}><strong>{signals.length}</strong><span>Avisos da equipe</span></button>

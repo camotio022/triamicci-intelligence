@@ -29,7 +29,7 @@ export default function KitchenHome({membership,navigate}){
  const latest=[...history.receipts.map(x=>({...x,label:'Recebimento'})),...history.counts.map(x=>({...x,label:'Contagem'})),...history.outflows.map(x=>({...x,label:'Saída'})),...history.transfers.map(x=>({...x,label:'Transferência'})),...history.productions.map(x=>({...x,label:'Produção'}))]
    .filter(x=>recordDay(x.at)===today).sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,5);
  const actions=[{name:'Registrar produção',description:'Registrar preparo e transformação de insumos',page:'production',Icon:CookingPot},{name:'Receber mercadoria',description:'Conferir fornecedor e entrega',page:'receiving',Icon:PackageCheck},
-  {name:'Contagem diária',description:'Registrar reserva e giro',page:'count',Icon:ClipboardCheck},
+  {name:'Conferência de estoque',description:'Contar por área e conferir disponibilidade',page:'count',Icon:ClipboardCheck},
   {name:'Estoque físico',description:'Consultar produtos da cozinha',page:'inventory',Icon:Boxes},
   {name:'Histórico',description:'Consultar operações registradas',page:'history',Icon:History}];
  if(!hasData)return <section className="inventory-page"><h1>Operação da cozinha</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>load()}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;

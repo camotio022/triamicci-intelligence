@@ -1,3 +1,4 @@
+import StockConference from './StockConference.jsx';
 import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import TriamicciHistory from './TriamicciHistory.jsx';
@@ -18,7 +19,8 @@ async function api(path,action,extra={}){
 const fmt=at=>at?new Date(at).toLocaleString('pt-BR'):'—';
 const qty=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const numeric=(s)=>s===''?null:Number(s);
-export default function PhysicalStock({membership,mode='receive',initialProductId=null}){
+export default function PhysicalStock(props){return props.mode==='count'?<StockConference membership={props.membership} initialProductId={props.initialProductId}/>:<PhysicalOperations {...props}/>;}
+function PhysicalOperations({membership,mode='receive',initialProductId=null}){
  const {notify}=useFeedback();
  const [products,setProducts]=useState([]),[catalog,setCatalog]=useState([]),[history,setHistory]=useState({receipts:[],counts:[],outflows:[],transfers:[],productions:[]});
  const [productId,setProductId]=useState(initialProductId||''),[supplier,setSupplier]=useState(''),[weight,setWeight]=useState('');

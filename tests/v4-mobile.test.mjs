@@ -18,7 +18,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     if(b.action==='shipmentsList'){base.shipments=[{id:'closed',status:'approved',supplier:'Entrega recente',createdAt:new Date().toISOString(),lines:[]}];base.pendingShipments=[{id:'pending-old',status:'pending',supplier:'Pendência antiga de teste',createdAt:'2020-01-01T12:00:00Z',lines:[]}];base.pendingComplete=true;}
     if(b.action==='list'&&route.request().url().includes('/api/operations/stock'))base.productions=base.runs;
     if(b.action==='v3Count')counts.push(b);
-    if(b.action==='v3Dashboard')base.products=[{...product,catalogId:'bacon',operationalCatalogVersion:'56-v1',name:'Bacon',trackExpiry:true,unit:'kg',profile:{origin:'supplier',controlMode:'quantitative',countUnit:'kg',locations:['reserva','giro']},v3Balance:{reserva:1,giro:1,total:2,unit:'kg'}}];
+    if(['v3Dashboard','v3Conference'].includes(b.action))base.products=[{...product,catalogId:'bacon',operationalCatalogVersion:'56-v1',name:'Bacon',trackExpiry:true,unit:'kg',profile:{origin:'supplier',controlMode:'quantitative',countUnit:'kg',locations:['reserva','giro']},v3Balance:{reserva:1,giro:1,total:2,unit:'kg'}}];
     if(b.action==='v3Lots')base.lots=[];
     if(b.action==='todayCounts')base.products=[{productId:a,name:'Frango grelhado',at:new Date().toISOString()}];
     return route.fulfill({contentType:'application/json',body:JSON.stringify(base)});
@@ -98,24 +98,18 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      await dismissMessages();
      await page.getByRole('button',{name:'Operações',exact:true}).click();
      await page.getByRole('button',{name:'Contagem oficial',exact:true}).click();
-     await page.getByRole('combobox',{name:'Insumo',exact:true}).selectOption('c'.repeat(40));
-     const session=await page.getByLabel('Identificador da rodada de contagem').inputValue();
-     for(const area of ['reserva','giro']){
-      await page.getByRole('combobox',{name:'Onde está contando?',exact:true}).selectOption(area);
-      await page.getByLabel('Quantidade encontrada (kg)',{exact:true}).fill('1');
+     for(const area of ['Reserva','Giro']){
+      await page.getByRole('navigation',{name:'Área de conferência'}).getByRole('button',{name:area,exact:true}).click();
+      await page.getByRole('button',{name:'Contar',exact:true}).first().click();
+      await page.getByLabel('Quantidade encontrada',{exact:true}).fill('1');
       await page.getByLabel('Lote físico inicial',{exact:true}).fill('TESTE-LOTE');
       await page.getByLabel('Validade do lote',{exact:true}).fill('2099-12-31');
-      await page.getByRole('button',{name:'Salvar contagem',exact:true}).click();
-      await page.waitForFunction(()=>Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Salvar contagem'&&!b.disabled));
-      await page.getByRole('button',{name:'Salvar contagem',exact:true}).waitFor({state:'visible'});
+      await page.getByRole('button',{name:'Confirmar e próximo',exact:true}).click();
+      await page.getByRole('navigation',{name:'Área de conferência'}).waitFor();
       await dismissMessages();
-      assert.equal(await page.getByLabel('Identificador da rodada de contagem').inputValue(),session,'Salvar não pode desmontar a rodada');
-      assert.equal(await page.getByRole('combobox',{name:'Insumo',exact:true}).inputValue(),'c'.repeat(40));
      }
      assert.equal(counts.length,2);assert.equal(counts[0].sessionId,counts[1].sessionId);
      assert.deepEqual(counts.map(c=>c.location),['reserva','giro']);
-     await page.getByRole('button',{name:'Iniciar nova rodada',exact:true}).click();
-     assert.notEqual(await page.getByLabel('Identificador da rodada de contagem').inputValue(),session);
     }
     if(screen==='Acessos'){
      for(const role of ['admin','manager','submanager','cook','auxiliar']){
@@ -154,7 +148,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     if(screen==='Navegação'){
      if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible()&&await page.getByRole('button',{name:'Abrir menu',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
      await page.locator('#primary-sidebar').getByRole('button',{name:'Estoque e insumos',exact:true}).click();
-     await page.getByRole('button',{name:'Hoje',exact:true}).click();
+     await page.getByRole('navigation',{name:'Seções de estoque e insumos',exact:true}).getByRole('button',{name:'Hoje',exact:true}).click();
      await page.getByPlaceholder('Nome do insumo').fill('Frango');
      if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible()&&await page.getByRole('button',{name:'Abrir menu',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
      await page.locator('#primary-sidebar').getByRole('button',{name:'Produção',exact:true}).click();
