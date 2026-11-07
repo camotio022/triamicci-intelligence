@@ -9,6 +9,7 @@ import {useFeedback} from './FeedbackProvider.jsx';
 import MemberDirectory from './MemberDirectory.jsx';
 import TeamProfiles from './TeamProfiles.jsx';
 import TeamPreRegister from './TeamPreRegister.jsx';
+import ConfirmSheet from './ConfirmSheet.jsx';
 import './team-preregister.css';
 
 const roleLabels = { admin: 'Administrador', manager: 'Gerente', submanager:'Subgerente', cook: 'Cozinheiro', auxiliar: 'Auxiliar' };
@@ -37,6 +38,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
   const [deliveryMethod, setDeliveryMethod] = useState('link');
   const [shareInvite, setShareInvite] = useState(null);
   const [revokingId, setRevokingId] = useState('');
+ const [pendingRevoke, setPendingRevoke] = useState(null);
   const allowed = ['admin','manager','submanager'].includes(membership.role);
   const roles = membership.role === 'admin' ? roleOptions : roleOptions.filter(item => ['auxiliar', 'cook'].includes(item.value));
 
@@ -87,8 +89,9 @@ export default function TeamManagement({ user, membership, accessOnly = false })
     if (!shareInvite) return;
     window.open('https://wa.me/?text=' + encodeURIComponent(invitationText), '_blank', 'noopener,noreferrer');
   };
-  const revokeInvitation = async invitationId => {
-    if (!window.confirm('Revogar este convite? O link deixará de funcionar.')) return;
+  const revokeInvitation = async () => {
+    if (!pendingRevoke || revokingId) return;
+    const invitationId=pendingRevoke.id;
     setRevokingId(invitationId); setFeedback('');
     try {
       const token = await auth.currentUser.getIdToken();
@@ -102,6 +105,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
       setFeedback(data.message);notify(data.message,'success');
       setShareInvite(null);
       await refreshInvitations();
+      setPendingRevoke(null);
     } catch (error) { setFeedback(error.message || 'Não foi possível revogar.');notify(error.message,'error'); }
     finally { setRevokingId(''); }
   };
@@ -129,7 +133,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
   if (!allowed) return <section className="team-page"><h1>Gestão de colaboradores</h1><p>Esta área é reservada a gerentes e administradores.</p></section>;
 
   const pending=invitations.filter(invitationPending),history=invitations.filter(item=>!invitationPending(item));
-  const inviteRow=item=><article key={item.id} className="access-invite-row"><div><strong>{item.email||'E-mail não informado'}</strong><span>{roleLabels[item.role]||'Função não informada'} · {invitationLabels[invitationState(item)]||'Situação indisponível'}</span><small>{item.deliveryMethod==='link'?'Link / WhatsApp':'E-mail'}{item.createdAt?' · '+new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeZone:'America/Sao_Paulo'}).format(new Date(item.createdAt)):''}</small></div>{invitationPending(item)&&(membership.role==='admin'||item.createdBy===user.uid)&&<button type="button" disabled={!!revokingId} onClick={()=>revokeInvitation(item.id)}>{revokingId===item.id?'Revogando…':'Revogar convite'}</button>}</article>;
+  const inviteRow=item=><article key={item.id} className="access-invite-row"><div><strong>{item.email||'E-mail não informado'}</strong><span>{roleLabels[item.role]||'Função não informada'} · {invitationLabels[invitationState(item)]||'Situação indisponível'}</span><small>{item.deliveryMethod==='link'?'Link / WhatsApp':'E-mail'}{item.createdAt?' · '+new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeZone:'America/Sao_Paulo'}).format(new Date(item.createdAt)):''}</small></div>{invitationPending(item)&&(membership.role==='admin'||item.createdBy===user.uid)&&<button type="button" disabled={!!revokingId} onClick={()=>setPendingRevoke({id:item.id,email:item.email||'destinatário não identificado',role:item.role})}>{revokingId===item.id?'Revogando…':'Revogar convite'}</button>}</article>;
   return <section className="team-page access-page">
     <header className="access-heading"><div><p className="eyebrow">EQUIPE · ACESSOS</p><h1>Acessos da unidade</h1><p>{membership.unitId} · {counts.active} {counts.active===1?'conta ativa':'contas ativas'}</p></div><button type="button" className="access-primary" onClick={()=>{setEmail('');setRole('auxiliar');setShareInvite(null);setFeedback('');setInviteOpen(true);}}>+ Convidar pessoa</button></header>
     <nav className="access-tabs" aria-label="Situação dos acessos">{[['active','Ativos',counts.active],['pending','Pendentes',pending.length],['inactive','Desativados',counts.inactive]].map(([key,label,count])=><button type="button" key={key} aria-pressed={tab===key} onClick={()=>setTab(key)}>{label} <span>{count}</span></button>)}</nav>
@@ -137,6 +141,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
     {tab==='pending'&&<section className="team-panel access-pending"><h2>Convites pendentes</h2><p>A pessoa precisa aceitar com o e-mail informado.</p>{readState==='loading'?<p role="status">Carregando convites…</p>:readState==='error'?<p role="alert">{readError}</p>:pending.length?pending.map(inviteRow):<p className="access-empty">Nenhum convite pendente.</p>}</section>}
     <details className="access-history"><summary><span>Histórico de convites<small>Aceitos, revogados e expirados</small></span><span aria-hidden="true">⌄</span></summary>{readState==='error'?<p role="alert">{readError}</p>:readState==='loading'?<p role="status">Carregando histórico…</p>:history.length?history.map(inviteRow):<p>Nenhum convite no histórico.</p>}</details>
     {!accessOnly&&<details className="access-history"><summary>Cadastro e fichas da equipe</summary><TeamPreRegister membership={membership} onInvite={(targetEmail,targetRole)=>{setEmail(targetEmail);setRole(targetRole);setShareInvite(null);setFeedback('Confira os dados e gere o convite.');setInviteOpen(true);}}/><TeamProfiles membership={membership}/></details>}
+    <ConfirmSheet open={!!pendingRevoke} title="Revogar convite?" description={pendingRevoke?'O convite de '+pendingRevoke.email+' ('+(roleLabels[pendingRevoke.role]||'Colaborador')+') será invalidado. O link não poderá mais ser usado para entrar nesta unidade.':''} confirmLabel="Revogar convite" tone="danger" busy={!!revokingId} error={feedback&&!revokingId?feedback:''} onCancel={()=>{if(!revokingId){setPendingRevoke(null);setFeedback('')}}} onConfirm={revokeInvitation}/>
     {inviteOpen&&createPortal(<div className="access-sheet-backdrop"><section ref={inviteDialog} className="access-sheet" role="dialog" aria-modal="true" aria-labelledby="invite-title"><div className="access-sheet-handle" aria-hidden="true"/><header><div><h2 id="invite-title">Convidar pessoa</h2><p>Acesso à unidade {membership.unitId}</p></div><button type="button" className="access-close" aria-label="Fechar convite" disabled={submitting} onClick={closeInvite}>×</button></header><form onSubmit={sendInvitation}>
       <label htmlFor="invite-email">E-mail da pessoa</label><input id="invite-email" type="email" required autoComplete="email" maxLength={254} value={email} onChange={event=>{setEmail(event.target.value);setShareInvite(null);}} placeholder="nome@exemplo.com" disabled={submitting}/>
       <label htmlFor="invite-role">Função na unidade</label><select id="invite-role" value={role} onChange={event=>{setRole(event.target.value);setShareInvite(null);}} disabled={submitting}>{roles.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}</select>
