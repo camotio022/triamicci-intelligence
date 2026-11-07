@@ -175,3 +175,11 @@
  .ti-check-execution>h2{font-size:20px}
  .ti-check-execution .ti-check-card h3{font-size:17px}
 }
+
+/* Shared history: checklist evidence remains attached to its original run. */
+.ti-check-history-details{display:grid;gap:10px;min-width:0}
+.ti-check-history-details>.secondary{min-height:44px;border-radius:11px;font-size:13px;font-weight:700}
+.ti-checklists .ti-history-shell{margin-top:8px}
+.ti-checklists .ti-history-card{box-shadow:none}
+.ti-checklists .ti-history-expanded{min-width:0}
+@media(max-width:600px){.ti-checklists .ti-history-toolbar{gap:7px}.ti-checklists .ti-history-card{border-radius:12px}}
