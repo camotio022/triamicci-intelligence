@@ -11,7 +11,7 @@
   }
   .main-content {
     min-height: 100dvh;
-    background: #f7f8fb;
+    background: linear-gradient(to bottom, #fff 0, #fff env(safe-area-inset-top, 0px), #f7f8fb env(safe-area-inset-top, 0px), #f7f8fb 100%);
     padding-top: env(safe-area-inset-top, 0px) !important;
   }
   .main-content > .topbar {
@@ -46,7 +46,7 @@
     html.ti-ios-standalone .app-shell { background: #fff; }
     html.ti-ios-standalone .main-content {
       padding-top: env(safe-area-inset-top, 0px) !important;
-      background: #f7f8fb;
+      background: linear-gradient(to bottom, #fff 0, #fff env(safe-area-inset-top, 0px), #f7f8fb env(safe-area-inset-top, 0px), #f7f8fb 100%);
       min-height: 100dvh;
     }
     html.ti-ios-standalone .main-content > .topbar {
