@@ -161,7 +161,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const [actorSnap,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
     if(!actorSnap.exists||actorSnap.data().unitId!==m.unitId||actorSnap.data().status!=='active'||!['admin','manager','submanager'].includes(actorSnap.data().role))throw Error('FORBIDDEN');
-    if(old.exists&&old.data().status!=='draft')throw Error('LOCKED');
+    if(old.exists&&(old.data().status!=='draft'||old.data().archivedAt))throw Error('LOCKED');
     if(old.exists&&old.data().revision!==expectedRevision)throw Error('CONFLICT');
     revision=(old.data()?.revision||0)+1;
     tx.set(ref,{title:title.trim(),period,entries:entries.map(e=>({date:e.date,uid:e.uid,type:e.type})),status:'draft',revision:(old.data()?.revision||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
@@ -175,6 +175,7 @@ export default async function handler(req,res){
    if(!idOk(id))return send(res,400,'Escala inválida.');
    const ref=schedules.doc(id);const snap=await ref.get();
    if(!snap.exists)return send(res,404,'Escala não encontrada.');
+   if(snap.data().archivedAt)return send(res,409,'Restaure a escala antes de continuar.');
    if(action==='submit'&&snap.data().status!=='draft'||action==='approve'&&snap.data().status!=='in_review'||action==='publish'&&snap.data().status!=='approved')return send(res,409,'Estado atual não permite essa transição.');
    if(['approve','publish'].includes(action)&&!isManagement(m.role))return send(res,403,'Aprovação e publicação exigem gestão da unidade.');
    if(action==='approve'&&snap.data().createdBy===actor.uid)return send(res,409,'Outro integrante da gestão deve aprovar a escala.');
