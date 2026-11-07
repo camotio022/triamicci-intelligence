@@ -17,7 +17,7 @@ export default async function preparationHandler(req,res){
    const snap=await recipes.orderBy('name').limit(101).get();if(snap.size>100)return send(res,409,'Limite de cem preparações atingido.');
    const catalog=await root.collection('products').limit(201).get();if(catalog.size>200)return send(res,409,'Catálogo acima do limite desta consulta.');
    const products=await recipeProducts(db,root,snap.docs.map(d=>d.data()),catalog.docs);
-   return send(res,200,'Configurações carregadas.',{configurations:snap.docs.map(d=>({id:d.id,name:d.data().name,active:d.data().active===true,...recipeAvailability(d.data(),products),version:d.data().version||0,draftVersion:d.data().draftVersion||0,configuration:d.data().configurationDraft||d.data().preparationConfig||null}))});
+   return send(res,200,'Configurações carregadas.',{configurations:snap.docs.filter(d=>!d.data().archivedAt).map(d=>({id:d.id,name:d.data().name,active:d.data().active===true,...recipeAvailability(d.data(),products),version:d.data().version||0,draftVersion:d.data().draftVersion||0,configuration:d.data().configurationDraft||d.data().preparationConfig||null}))});
   }
   const {id,configuration,expectedDraftVersion=0,expectedVersion=0,activate=false}=req.body;
   if(!/^[a-z0-9-]{3,64}$/.test(id||'')||!Number.isInteger(expectedDraftVersion)||!Number.isInteger(expectedVersion)||typeof activate!=='boolean')return send(res,400,'Identificador ou versão inválida.');

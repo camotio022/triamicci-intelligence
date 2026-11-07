@@ -21,6 +21,9 @@ test('auditoria produção: unidades, dependências, transformação medida, lot
  const id='isca-audit';assert.equal((await call(manager,'savePreparation',{id,configuration:config,activate:true})).http,200);
  const saved=(await unit.collection('productionRecipes').doc(id).get()).data();assert.equal(saved.stockEffect,'measured_transformation');assert.equal(saved.lines[0].quantity,null);assert.equal((await source.get()).data().total,10);assert.equal((await target.get()).exists,false);
  assert.equal((await call(aux,'list')).recipes.some(r=>r.id===id),true);
+ const planned=await call(aux,'dayAdd',{recipeId:id,plannedQuantity:5});assert.equal(planned.http,200,'Auxiliar pode planejar na própria unidade');
+ assert.equal((await call(foreign,'dayAdd',{recipeId:id})).http,404,'Planejamento não atravessa unidades');
+ assert.equal((await call(aux,'dayAdd',{recipeId:id,plannedQuantity:1.5})).http,400,'Meta de porções exige inteiro');
  const runId=randomUUID(),payload={recipeId:id,requestId:runId,portions:5,items:[{productId:a,quantity:2}],outputLot:'ISCA-1',expiryDate:'2099-12-30'};
  assert.equal((await call(foreign,'finish',payload)).http,404,'Nenhum acesso ao estoque da outra unidade');
  assert.equal((await call(aux,'savePreparation',{id:'aux-block',configuration:config,activate:true})).http,403);
