@@ -1,7 +1,9 @@
 /* P0 — planejamento de escala: matriz mensal continua no desktop;
    no celular a leitura é por dia e colaborador, sem arraste horizontal. */
-.ti-roster-mobile-day{display:none}
+.ti-roster-mobile-day,.ti-roster-mobile-label{display:none}
 @media(max-width:760px){
+ .ti-roster-mobile-label{display:inline}
+ .ti-roster-desktop-label,.ti-roster-grid-instructions{display:none}
  .ti-roster-mobile-day{display:grid;gap:12px;margin:14px 0}
  .ti-roster-mobile-day>label{display:grid;gap:6px;color:#536176;font-size:12px;font-weight:750}
  .ti-roster-mobile-day>label>input{min-height:46px;max-width:100%;font-size:16px;padding:9px 12px;border-radius:11px;border:1px solid #d6dce7;background:#fff;color:#202a3d}
