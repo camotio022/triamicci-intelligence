@@ -3,11 +3,12 @@ import {createPortal} from 'react-dom';
 import {Camera,CheckCircle2,RotateCcw,X,Check,Image as ImageIcon} from 'lucide-react';
 import ChecklistEvidence from './ChecklistEvidence.jsx';
 export default function ChecklistCamera({runId,itemId,call,onUploaded,disabled}){
- const video=useRef(null),stream=useRef(null),alive=useRef(true),session=useRef(null),attempt=useRef(0),trigger=useRef(null);
+ const video=useRef(null),stream=useRef(null),alive=useRef(true),session=useRef(null),attempt=useRef(0),trigger=useRef(null),modalClose=useRef(null);
  const [phase,setPhase]=useState('idle'),[preview,setPreview]=useState(''),[uploaded,setUploaded]=useState(''),[error,setError]=useState('');
  const stop=()=>{stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;};
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;attempt.current+=1;stop();};},[]);
  useEffect(()=>{if(!['starting','camera','review','uploading'].includes(phase))return;const previous=document.body.style.overflow;document.body.style.overflow='hidden';const esc=e=>{if(e.key==='Escape'&&phase!=='uploading')close();};document.addEventListener('keydown',esc);return()=>{document.body.style.overflow=previous;document.removeEventListener('keydown',esc);};},[phase]);
+ useEffect(()=>{if(phase!=='starting')return;const frame=requestAnimationFrame(()=>modalClose.current?.focus());return()=>cancelAnimationFrame(frame);},[phase]);
  const close=()=>{attempt.current+=1;stop();setPhase('idle');requestAnimationFrame(()=>trigger.current?.focus());};
  const start=async()=>{
   if(disabled)return;
@@ -46,7 +47,7 @@ export default function ChecklistCamera({runId,itemId,call,onUploaded,disabled})
   {error&&phase==='idle'&&<p role="alert" className="ti-check-alert">{error}</p>}
   {modal&&createPortal(<div className="ti-check-camera-backdrop" role="presentation">
    <section className="ti-check-camera-modal" role="dialog" aria-modal="true" aria-label="Capturar evidência">
-    <header className="ti-check-camera-modal-head"><h3><Camera size={21}/> Capturar evidência</h3><button type="button" className="secondary" aria-label="Fechar câmera" disabled={phase==='uploading'} onClick={close}><X size={22}/></button></header>
+    <header className="ti-check-camera-modal-head"><h3><Camera size={21}/> Capturar evidência</h3><button type="button" ref={modalClose} className="secondary" aria-label="Fechar câmera" disabled={phase==='uploading'} onClick={close}><X size={22}/></button></header>
     <div className="ti-check-camera-stage">
      {phase==='starting'&&<div className="ti-check-camera-wait" role="status"><Camera size={34}/><p>Abrindo câmera…</p></div>}
      {phase==='camera'&&<><video ref={video} autoPlay playsInline muted aria-label="Visualização da câmera ao vivo"/><div className="ti-check-camera-corners" aria-hidden="true"/></>}
