@@ -11,3 +11,94 @@
 @media(prefers-reduced-motion:reduce){.ti-checklists *{scroll-behavior:auto!important;transition:none!important}}
 
 .ti-check-item-tools,.ti-check-item-tools>div{flex-wrap:wrap}.ti-checklists button.ti-check-remove{font-size:14px;padding:9px;min-height:44px}
+
+
+/* Unified Triamicci compact cards — mobile-first checklist V2 */
+.ti-checklists{--check-red:#b51618;--check-vinho:#42141b;max-width:1100px}
+.ti-check-heading h1{font-size:clamp(24px,3vw,30px);gap:10px}
+.ti-check-tabs{max-width:520px;padding:4px;border-radius:12px;margin:18px 0 20px}
+.ti-check-tabs button{min-height:42px;padding:8px;border:0;border-radius:9px;font-size:14px}
+.ti-check-card-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:12px}
+.ti-check-card{border-radius:15px;padding:16px;box-shadow:0 2px 9px #24324b07}
+.ti-check-card h2,.ti-check-card h3{font-size:18px;margin:0 0 7px;line-height:1.3}
+.ti-check-card p{font-size:13px;margin:7px 0}
+.ti-check-card small{font-size:12px}
+.ti-check-card-top{align-items:center;flex-wrap:nowrap}
+.ti-check-pill{white-space:nowrap;font-size:11px;padding:5px 8px}
+.ti-check-card progress,.ti-checklists progress{height:6px;margin:9px 0 13px}
+.ti-check-card:has(.ti-check-pill.completed) progress::-webkit-progress-value{background:#18854b}
+.ti-check-card:has(.ti-check-pill.completed) progress::-moz-progress-bar{background:#18854b}
+.ti-check-progress-caption{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#627089;font-size:12px}
+.ti-check-progress-caption b{color:#263447;font-size:12px}
+.ti-check-card button.ti-check-card-action{width:auto;min-height:38px;padding:7px 12px;background:#fff;color:var(--check-red);border-color:#e9c0c1;font-size:13px;margin:10px 0 0 auto;display:flex}
+.ti-check-card button.ti-check-card-action:hover{background:#fff4f4}
+.ti-check-day{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:13px;margin:0 0 13px}
+.ti-check-execution{max-width:630px}
+.ti-check-execution>.ti-check-card{padding:19px}
+.ti-check-step-count{font-weight:750;letter-spacing:.07em}
+.ti-check-item-nav{padding-bottom:10px}
+.ti-check-item-nav button{min-width:40px;min-height:40px;border-radius:50%}
+.ti-check-response label{margin:7px 0}
+.ti-check-camera{padding:10px 0}
+.ti-check-camera-open{width:100%;background:var(--check-red);color:white}
+.ti-check-retake-inline{width:100%;margin-top:8px}
+.ti-check-camera-ready>.ti-check-success{font-size:13px;display:flex;align-items:center;gap:8px;margin:7px 0!important}
+.ti-check-evidence-inline{min-width:0;margin:10px 0}
+.ti-check-photo-preview{width:100%;border:1px solid #e6e8ee!important;background:#f7f8fb!important;color:#253247!important;border-radius:12px!important;min-height:65px!important;padding:6px!important;display:flex!important;align-items:center!important;gap:10px!important;text-align:left!important;box-shadow:none!important}
+.ti-check-photo-preview img{height:54px!important;width:65px!important;object-fit:cover!important;border-radius:8px!important;background:#dae0e9!important;margin:0!important;max-height:none!important}
+.ti-check-photo-preview .ti-check-evidence-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;line-height:1.25}
+.ti-check-photo-preview .ti-check-evidence-copy strong{font-size:12px}
+.ti-check-photo-preview .ti-check-evidence-copy small{font-size:11px;color:#67748a}
+.ti-check-photo-wait{display:flex;gap:8px;align-items:center;font-size:12px;color:#667389;min-height:42px}
+.ti-check-photo-wait button{min-height:36px!important;font-size:12px!important}
+.ti-check-editor{max-width:760px}
+.ti-check-edit-item{padding:14px}
+.ti-checklists input:not([type=checkbox]):not([type=radio]),.ti-checklists textarea,.ti-checklists select{font-size:16px}
+.ti-check-camera-backdrop,.ti-check-viewer{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:env(safe-area-inset-top,12px) 12px env(safe-area-inset-bottom,12px);box-sizing:border-box;background:#08090bba;backdrop-filter:blur(5px)}
+.ti-check-camera-modal{width:min(100%,480px);max-height:min(95dvh,850px);overflow:auto;overscroll-behavior:contain;border-radius:23px;background:#fff;box-shadow:0 22px 70px #0005;padding:15px;color:#1e2a3a}
+.ti-check-camera-modal-head,.ti-check-viewer-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ti-check-camera-modal-head h3{font-size:18px;margin:0;display:flex;gap:9px;align-items:center}
+.ti-check-camera-modal-head h3 svg{color:#b51618}
+.ti-check-camera-modal-head button,.ti-check-viewer-head button{width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:50%;color:inherit;cursor:pointer}
+.ti-check-camera-stage{height:min(52dvh,430px);background:#101923;position:relative;overflow:hidden;border-radius:16px;margin:12px 0}
+.ti-check-camera-stage video,.ti-check-camera-stage img{width:100%;height:100%;object-fit:contain;display:block}
+.ti-check-camera-corners{position:absolute;inset:14px;border:2px solid #ffffff77;border-radius:12px;pointer-events:none}
+.ti-check-camera-wait{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white}
+.ti-check-shutter-bar{display:flex;align-items:center;justify-content:space-around;gap:8px;padding:4px 0 12px}
+.ti-check-shutter-hint{font-size:12px;color:#667389;max-width:100px;text-align:center}
+.ti-check-shutter{height:70px;width:70px;flex-shrink:0;border:5px solid white;border-radius:50%;background:#b51618;color:#fff;outline:3px solid #b51618;display:grid;place-items:center;cursor:pointer}
+.ti-check-camera-actions{display:grid;gap:9px}
+.ti-check-camera-actions button{border:1px solid #b51618;background:#b51618;color:white;min-height:48px;border-radius:12px;font:inherit;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.ti-check-camera-actions button.secondary{background:white;color:#b51618}
+.ti-check-camera-modal>small{display:block;margin:10px 2px 0;color:#65738a;font-size:11px}
+.ti-check-camera-uploading{display:flex;align-items:center;justify-content:center;gap:8px;color:#6b2230}
+.ti-check-camera-modal .ti-check-alert{margin:8px 0}
+.ti-check-viewer{display:flex;flex-direction:column;background:#0b0c0ff5;backdrop-filter:none;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);color:white}
+.ti-check-viewer-head{height:62px;box-sizing:border-box;padding:8px 18px;width:100%;border-bottom:1px solid #ffffff25}
+.ti-check-viewer-head span{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px}
+.ti-check-viewer-stage{width:100%;min-height:0;flex:1;overflow:hidden;display:grid;place-items:center;touch-action:none;user-select:none}
+.ti-check-viewer-stage img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;transition:transform .08s linear;pointer-events:none;user-select:none}
+.ti-check-viewer-controls{padding:14px 12px 22px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;background:#15171c}
+.ti-check-viewer-controls button{height:42px;width:42px;border-radius:50%;border:1px solid #6e737c;background:#272b32;color:white;display:grid;place-items:center;cursor:pointer}
+.ti-check-viewer-controls button:disabled{opacity:.4}
+.ti-check-viewer-controls small{flex-basis:100%;text-align:center;color:#b0b9c9;font-size:11px}
+@media(max-width:640px){
+ .ti-checklists{padding-bottom:calc(26px + env(safe-area-inset-bottom,0px))}
+ .ti-check-card-grid{grid-template-columns:1fr;gap:10px}
+ .ti-check-card{border-radius:13px;padding:14px}
+ .ti-check-card h2,.ti-check-card h3{font-size:16px}
+ .ti-check-heading h1{font-size:24px}
+ .ti-check-tabs{max-width:none;margin:14px 0 15px}
+ .ti-check-tabs button{font-size:13px}
+ .ti-check-card button.ti-check-card-action{width:100%;margin-top:9px}
+ .ti-check-grid{grid-template-columns:1fr;gap:0}
+ .ti-check-edit-item{padding:12px}
+ .ti-check-editor-actions{position:sticky;bottom:0;z-index:5;background:#fff;padding:10px 0 calc(8px + env(safe-area-inset-bottom,0px));margin-top:10px}
+ .ti-check-execution>button:first-child{min-height:40px;padding:7px 10px}
+ .ti-check-execution>.ti-check-card{padding:14px}
+ .ti-check-confirm{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:4;box-shadow:0 6px 24px #0002}
+ .ti-check-camera-backdrop{padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);align-items:flex-end}
+ .ti-check-camera-modal{width:100%;max-height:95dvh;border-radius:24px 24px 0 0;padding:14px 14px calc(12px + env(safe-area-inset-bottom,0px))}
+ .ti-check-camera-stage{height:min(55dvh,490px)}
+ .ti-check-viewer-head{height:56px}
+}
