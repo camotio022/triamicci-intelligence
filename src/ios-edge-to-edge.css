@@ -63,3 +63,55 @@
     }
   }
 }
+
+/* Standalone drawer status-bar backdrop: render the wine color under iOS chrome.
+   This does not draw or recolor the system clock/icons, which remain OS-controlled. */
+@media (display-mode: standalone) and (max-width: 760px) {
+  html.ti-menu-status-open,
+  html.ti-menu-status-open body,
+  html.ti-menu-status-open #root,
+  html.ti-menu-status-open .app-shell {
+    background-color: #21191b !important;
+  }
+  html.ti-menu-status-open body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: max(env(safe-area-inset-top, 0px), 54px);
+    background: #21191b;
+    z-index: 29;
+    pointer-events: none;
+  }
+  html.ti-menu-status-open .sidebar.ti-sidebar-premium::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: max(env(safe-area-inset-top, 0px), 54px);
+    background: #21191b;
+    pointer-events: none;
+    z-index: 0;
+  }
+}
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 760px) {
+    html.ti-ios-standalone.ti-menu-status-open,
+    html.ti-ios-standalone.ti-menu-status-open body,
+    html.ti-ios-standalone.ti-menu-status-open #root,
+    html.ti-ios-standalone.ti-menu-status-open .app-shell {
+      background-color: #21191b !important;
+    }
+    html.ti-ios-standalone.ti-menu-status-open body::before {
+      content: "";
+      position: fixed;
+      inset: 0 0 auto;
+      height: max(env(safe-area-inset-top, 0px), 54px);
+      background: #21191b;
+      z-index: 29;
+      pointer-events: none;
+    }
+  }
+}
