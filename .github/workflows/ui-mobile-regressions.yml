@@ -1,0 +1,24 @@
+name: UI Mobile - regressao de componentes
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ui-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validar componentes mobile e fluxos migrados
+        run: |
+          node --test tests/*-mobile-ui.test.mjs tests/ui-foundation-phase1.test.mjs
+      - name: Instalar dependências
+        run: |
+          if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
+      - name: Compilar interface
+        run: npm run build
