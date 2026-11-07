@@ -1,3 +1,4 @@
+import ProfileAvatar from './ProfileAvatar.jsx';
 import {apiFetch} from './api-fetch.js';
 import {useDialogFocus} from './useDialogFocus.js';
 import {useUnitLive} from './useUnitLive.js';
@@ -24,7 +25,7 @@ async function request(action, payload = {}) {
   return data;
 }
 
-export default function MemberDirectory({user,membership}) {
+export default function MemberDirectory({user,membership,filterStatus=null,onCounts}) {
  const {notify}=useFeedback();
   const [members,setMembers] = useState([]);
   const [loading,setLoading] = useState(true);
@@ -42,16 +43,16 @@ export default function MemberDirectory({user,membership}) {
     if(!silent)setLoading(true);setError('');
     try {
       const data = await request('list');
-      setMembers(data.members || []);
+      setMembers(data.members || []);onCounts?.({active:(data.members||[]).filter(m=>m.status==='active').length,inactive:(data.members||[]).filter(m=>m.status!=='active').length});
     } catch (err) {setError(err.message);}
     finally {setLoading(false);}
-  },[]);
+  },[membership.unitId,onCounts]);
 
  useUnitLive(membership.unitId,initial=>load(!initial),{domains:['team'],refreshKey:membership.role});
 
-  const filtered = useMemo(() => members.filter(item =>
+  const filtered = useMemo(() => members.filter(item => (!filterStatus||item.status===filterStatus)&&
     ((item.name || '') + ' ' + (item.email || '') + ' ' + (roleLabels[item.role] || '')).toLocaleLowerCase('pt-BR')
-      .includes(query.trim().toLocaleLowerCase('pt-BR'))),[members,query]);
+      .includes(query.trim().toLocaleLowerCase('pt-BR'))),[members,query,filterStatus]);
 
   const canManage = item => item.uid !== user.uid &&
     (isAdmin || ['cook','auxiliar'].includes(item.role));
@@ -76,30 +77,26 @@ export default function MemberDirectory({user,membership}) {
   };
 
   return <section className="team-panel team-directory">
-    <div className="team-directory-heading">
-      <div><h2>Colaboradores cadastrados</h2><p>Funcionários vinculados à unidade {membership.unitId}. As alterações são auditadas.</p></div>
-      <button type="button" className="team-refresh" onClick={load} disabled={loading}>{loading?'Carregando...':'Atualizar'}</button>
-    </div>
-    <label htmlFor="member-search">Buscar colaborador</label>
-    <input id="member-search" type="search" placeholder="Nome, e-mail ou função" value={query} onChange={event => setQuery(event.target.value)}/>
-    {error && <p role="alert" className="team-error">{error}</p>}
+    <h2 className="access-sr-only">Contas da unidade</h2>
+    <label htmlFor="member-search">Buscar pessoa</label>
+    <input id="member-search" type="search" placeholder="Buscar nome, e-mail ou função" value={query} onChange={event => setQuery(event.target.value)}/>
+    {error && <div role="alert" className="team-error"><p>{error}</p><button type="button" onClick={()=>load()} disabled={loading}>Tentar novamente</button></div>}
     {notice && <p role="status" className="team-notice">{notice}</p>}
-    {!loading && !error && <p className="team-note">{filtered.length} de {members.length} colaboradores · {members.filter(m => m.status === 'active').length} ativos</p>}
+    {!loading && !error && <p className="team-note">{filtered.length} {filtered.length===1?'conta encontrada':'contas encontradas'}</p>}
     <div className="team-member-list">
       {filtered.map(item => <article className="team-member" key={item.uid}>
-        <div className="team-member-info">
+        <ProfileAvatar src={item.avatar} name={item.name||item.email}/><div className="team-member-info">
           <strong>{item.name || item.email || 'Colaborador'}</strong>
           <span>{item.email || 'E-mail não informado'}</span>
           <div className="team-member-tags"><span>{roleLabels[item.role] || item.role}</span><span className={item.status === 'active' ? 'team-status-active':'team-status-inactive'}>{statuses[item.status] || item.status}</span></div>
         </div>
-        {canManage(item) ? <button type="button" className="team-member-edit" onClick={() => startEdit(item)}>Gerir acesso</button> :
+        {canManage(item) ? <button type="button" className="team-member-edit" aria-label={'Gerir acesso de '+(item.name||item.email)} onClick={() => startEdit(item)}><span className="access-manage-label">Gerir acesso</span><span aria-hidden="true">›</span></button> :
           <span className="team-note">{item.uid === user.uid ? 'Sua conta' : 'Acesso protegido'}</span>}
       </article>)}
       {!loading && !error && filtered.length === 0 && <p>Nenhum colaborador encontrado.</p>}
     </div>
     {editing && <div className="ti-unified-modal-backdrop"><div ref={dialog} className="ti-unified-modal" role="dialog" aria-modal="true" aria-label="Gerir acesso"><form className="team-edit-form" onSubmit={save}>
-      <h3>Gerir acesso</h3>
-      <p>{editing.email} · unidade {membership.unitId}</p>
+      <div className="access-person-heading"><ProfileAvatar src={editing.avatar} name={editing.name||editing.email} large/><div><h3>{editing.name||'Gerir acesso'}</h3><p>{editing.email}</p><small>Unidade {membership.unitId}</small></div></div>
       <label htmlFor="member-role">Função</label>
       <select id="member-role" value={role} onChange={event => setRole(event.target.value)}>
         {roles.filter(([value]) => isAdmin || ['cook','auxiliar'].includes(value)).map(([value,label]) =>

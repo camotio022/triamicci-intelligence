@@ -1,3 +1,4 @@
+import {attachProfileAvatars} from '../../server/team/profile-avatar.js';
 import checklistsWorkflow from '../../server/checklists/handler.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {signalUnitChange} from '../../server/live-signal.js';
@@ -321,8 +322,10 @@ export default async function handler(req,res) {
         if (!item.name) item.name = profile?.displayName || '';
         if (!item.email) item.email = profile?.email || '';
       }
+      const avatarRefs=members.map(item=>db.collection('units').doc(actingMember.unitId).collection('memberPersonal').doc(item.uid));
+      const avatarDocs=avatarRefs.length?await db.getAll(...avatarRefs,{fieldMask:['avatar']}):[];
       return send(res,200,'Colaboradores carregados.',{
-        members:members.sort((a,b) => (a.name || a.email).localeCompare(b.name || b.email,'pt-BR'))
+        members:attachProfileAvatars(members,avatarDocs,profiles).sort((a,b) => (a.name || a.email).localeCompare(b.name || b.email,'pt-BR'))
       });
     }
 

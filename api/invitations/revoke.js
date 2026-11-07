@@ -21,7 +21,7 @@ export default async function handler(req, res) {
           const value = doc.data();
           return {id:doc.id,email:value.email||'',role:value.role||'',status:value.status||'',
             deliveryMethod:value.deliveryMethod||'',createdBy:value.createdBy||'',
-            createdAt:value.createdAt?.toDate?.()?.toISOString?.() || null};
+            createdAt:value.createdAt?.toDate?.()?.toISOString?.() || null,expiresAt:value.expiresAt?.toDate?.()?.toISOString?.()||null};
         });
       res.setHeader('Cache-Control','no-store');
       return send(res,200,'Convites carregados.',{invitations});
