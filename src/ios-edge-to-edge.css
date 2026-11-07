@@ -1,0 +1,65 @@
+/* iPhone PWA: paint beneath the status bar, but keep controls in safe areas.
+   Scope to standalone only: ordinary Safari and desktop retain their layouts. */
+@media (display-mode: standalone) and (max-width: 760px) {
+  html, body, #root {
+    min-height: 100%;
+    background: #21191b;
+  }
+  .app-shell {
+    min-height: 100dvh;
+    background: #21191b;
+  }
+  .main-content {
+    min-height: 100dvh;
+    background: #f7f8fb;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+  }
+  .main-content > .topbar {
+    top: env(safe-area-inset-top, 0px) !important;
+  }
+  /* The drawer paints all the way to the physical screen edge. */
+  .sidebar.ti-sidebar-premium,
+  .sidebar.ti-sidebar-premium.sidebar-open {
+    position: fixed;
+    inset: 0 auto 0 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding: 0 !important;
+    background: #21191b;
+  }
+  /* Only the interactive header is inset; the background remains full bleed. */
+  .sidebar.ti-sidebar-premium .ti-sidebar-top {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+  }
+  .sidebar.ti-sidebar-premium .ti-sidebar-footer {
+    padding-bottom: max(13px, env(safe-area-inset-bottom, 0px));
+  }
+  .sidebar-backdrop {
+    inset: 0;
+  }
+}
+/* iOS legacy standalone detection, if display-mode is unavailable. */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 760px) {
+    html.ti-ios-standalone, html.ti-ios-standalone body,
+    html.ti-ios-standalone #root,
+    html.ti-ios-standalone .app-shell { background: #21191b; }
+    html.ti-ios-standalone .main-content {
+      padding-top: env(safe-area-inset-top, 0px) !important;
+      background: #f7f8fb;
+      min-height: 100dvh;
+    }
+    html.ti-ios-standalone .main-content > .topbar {
+      top: env(safe-area-inset-top, 0px) !important;
+    }
+    html.ti-ios-standalone .sidebar.ti-sidebar-premium,
+    html.ti-ios-standalone .sidebar.ti-sidebar-premium.sidebar-open {
+      padding: 0 !important;
+      height: 100dvh;
+      max-height: 100dvh;
+    }
+    html.ti-ios-standalone .sidebar.ti-sidebar-premium .ti-sidebar-top {
+      padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+    }
+  }
+}
