@@ -121,10 +121,14 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      for(const role of ['admin','manager','submanager','cook','auxiliar']){
       await page.getByRole('navigation',{name:'Perfis de homologação'}).getByRole('button',{name:'Perfil '+role,exact:true}).click();
       const management=['admin','manager','submanager'].includes(role);
-      const adminNav=page.locator('#primary-sidebar').getByRole('button',{name:'Administração · Catálogo',exact:true});
+      if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible())await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
+      const sidebar=page.locator('#primary-sidebar');
+      const adminGroup=sidebar.getByRole('button',{name:'Administração',exact:true});
+      assert.equal(await adminGroup.count(),management?1:0,'Grupo Administração respeita perfil '+role);
+      if(management&&await adminGroup.getAttribute('aria-expanded')!=='true')await adminGroup.click();
+      const adminNav=sidebar.getByRole('button',{name:'Administração · Catálogo',exact:true});
       assert.equal(await adminNav.count(),management?1:0,'Menu respeita perfil '+role);
       if(management){
-       if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible())await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
        await adminNav.click();
        await page.getByRole('heading',{name:'Administração · Catálogo',exact:true}).waitFor();
        await page.getByRole('button',{name:'Configurar 56 produtos Validar e ativar insumos da nova lista',exact:true}).click();
