@@ -1,0 +1,42 @@
+/* Preparações: organização mobile compacta, sem modificar regras de produção. */
+.prep-setup{min-width:0}
+.prep-setup .prep-heading{min-width:0}
+.prep-setup .prep-heading>div{min-width:0}
+.prep-setup .prep-process{min-width:0}
+.prep-setup .prep-process>span{min-width:0}
+.prep-setup .prep-review{min-width:0;overflow-wrap:anywhere}
+.prep-setup .prep-review dl{min-width:0}
+.prep-setup .prep-review dd{overflow-wrap:anywhere}
+.prep-setup .prep-actions button{min-width:0;white-space:normal}
+.prep-setup :is(button,input,select,textarea):focus-visible{outline:2px solid #a71916;outline-offset:2px}
+@media(max-width:600px){
+ .prep-setup{border-radius:14px;padding:14px 12px;margin-top:10px}
+ .prep-setup .prep-heading{margin-bottom:12px;gap:8px;align-items:start}
+ .prep-setup .prep-heading h2{font-size:21px!important;line-height:1.25;margin:3px 0}
+ .prep-setup .prep-heading p{font-size:12px;line-height:1.4}
+ .prep-setup .prep-badge{font-size:10px;padding:5px 8px}
+ .prep-setup .prep-steps{margin:12px 0;gap:5px}
+ .prep-setup .prep-steps li{flex:1 1 0;min-width:0;gap:4px;font-size:11px;line-height:1.2}
+ .prep-setup .prep-steps li>span{width:23px;height:23px;flex:none;font-size:11px}
+ .prep-setup .prep-processes{gap:8px}
+ .prep-setup .prep-processes h3{font-size:16px}
+ .prep-setup .prep-process{padding:12px;gap:10px;border-radius:12px;min-height:68px}
+ .prep-setup .prep-process svg{flex:none;width:20px;height:20px}
+ .prep-setup .prep-process strong{font-size:13px}
+ .prep-setup .prep-process small{font-size:11px;line-height:1.45}
+ .prep-setup .prep-form{gap:12px}
+ .prep-setup label{font-size:12px;gap:5px}
+ .prep-setup fieldset{padding:11px;gap:10px}
+ .prep-setup legend{font-size:13px}
+ .prep-setup .prep-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+ .prep-setup :is(input:not([type=checkbox]),select,textarea){font-size:16px;min-height:44px;padding:9px 11px}
+ .prep-setup :is(.prep-info,.prep-pending,.prep-error,.prep-success){padding:11px;font-size:12px}
+ .prep-setup .prep-ingredients{gap:9px}
+ .prep-setup .prep-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+ .prep-setup .prep-actions button{width:100%;min-height:44px;font-size:13px}
+ .prep-setup .prep-stock{overflow-wrap:anywhere}
+}
+@media(min-width:601px) and (max-width:768px){
+ .prep-setup{padding:18px}
+ .prep-setup .prep-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
