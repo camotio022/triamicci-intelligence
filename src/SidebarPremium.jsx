@@ -6,17 +6,17 @@ import './sidebar-premium.css';
 
 const sections=[
  {id:'personal',title:'Meu espaço',icon:UserRound,items:[
-  {id:'my-profile',label:'Minha ficha profissional',icon:UserRound},
+  {id:'my-profile',label:'Minha ficha profissional',icon:UserRound,mentor:'mentor-profile'},
   {id:'leave-requests',label:'Solicitar folga',icon:CalendarDays},
-  {id:'mural',label:'Mural da equipe',icon:Users}
+  {id:'mural',label:'Mural da equipe',icon:Users,mentor:'mentor-mural'}
  ]},
  {id:'operations',title:'Mais operações',icon:Boxes,items:[
   {id:'daily-inventory',label:'Inventário inteligente',icon:ClipboardList},
-  {id:'history',label:'Histórico',icon:History}
+  {id:'history',label:'Histórico',icon:History,mentor:'mentor-history'}
  ]},
  {id:'management',title:'Administração',icon:Settings,management:true,items:[
   {id:'catalog',label:'Administração · Catálogo',icon:Package},
-  {id:'people',label:'Gestão de pessoas',icon:Users}
+  {id:'people',label:'Gestão de pessoas',icon:Users,mentor:'mentor-people'}
  ]},
  {id:'learning',title:'Aprendizagem',icon:BookOpen,items:[
   {id:'mentor',label:'Triamicci Mentor',icon:BookOpen}
@@ -48,7 +48,7 @@ export default function SidebarPremium({open,onClose,user,membership,avatar,logo
  const navItem=item=>{
   const Icon=item.icon;
   const active=page===item.id||item.id==='people'&&['team','master-registry','skills','shifts','schedule-planning'].includes(page);
-  return <button key={item.id} type="button" data-mentor={item.mentor||undefined} className={'ti-sidebar-link'+(active?' is-active':'')} aria-current={active?'page':undefined} onClick={()=>go(item)}><Icon aria-hidden="true" size={20} strokeWidth={1.9}/><span>{item.label}</span></button>;
+  return <button key={item.id} type="button" data-mentor={item.mentor||undefined} className={'nav-item ti-sidebar-link'+(active?' active is-active':'')} aria-current={active?'page':undefined} onClick={()=>go(item)}><Icon aria-hidden="true" size={20} strokeWidth={1.9}/><span>{item.label}</span></button>;
  };
  return <aside className={'sidebar ti-sidebar-premium'+(open?' sidebar-open':'')} id="primary-sidebar" aria-label="Menu principal">
   <div className="ti-sidebar-top">
