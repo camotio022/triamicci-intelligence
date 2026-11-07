@@ -5,6 +5,8 @@ import './confirm-sheet.css';
 /** Shared accessible confirmation sheet. No API calls: caller owns asynchronous action. */
 export default function ConfirmSheet({open,title,description,confirmLabel='Confirmar',cancelLabel='Cancelar',tone='primary',busy=false,error='',onConfirm,onCancel}){
  const dialogRef=useRef(null),confirmRef=useRef(null),previousFocus=useRef(null);
+ const latest=useRef({busy,onCancel});
+ latest.current={busy,onCancel};
  useEffect(()=>{
   if(!open)return;
   previousFocus.current=document.activeElement;
@@ -12,7 +14,7 @@ export default function ConfirmSheet({open,title,description,confirmLabel='Confi
   document.body.style.overflow='hidden';
   const frame=requestAnimationFrame(()=>confirmRef.current?.focus());
   const keydown=e=>{
-   if(e.key==='Escape'){e.preventDefault();if(!busy)onCancel?.();return;}
+   if(e.key==='Escape'){e.preventDefault();if(!latest.current.busy)latest.current.onCancel?.();return;}
    if(e.key!=='Tab')return;
    const buttons=[...dialogRef.current?.querySelectorAll('button:not(:disabled)')||[]];
    if(!buttons.length)return;
@@ -22,7 +24,7 @@ export default function ConfirmSheet({open,title,description,confirmLabel='Confi
   };
   document.addEventListener('keydown',keydown);
   return()=>{cancelAnimationFrame(frame);document.removeEventListener('keydown',keydown);document.body.style.overflow=previousOverflow;previousFocus.current?.focus?.();};
- },[open,busy,onCancel]);
+ },[open]);
  if(!open)return null;
  return <div className="ti-confirm-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)onCancel?.()}}>
   <section className="ti-confirm-sheet" role="alertdialog" aria-modal="true" aria-labelledby="ti-confirm-title" aria-describedby="ti-confirm-description" ref={dialogRef}>
