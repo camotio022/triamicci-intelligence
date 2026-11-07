@@ -24,6 +24,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Preservar todas as regras de negócio
         run: npm run test:rules
+      - name: Validar interface mobile de preparações
+        run: node --test tests/preparation-mobile-polish.test.mjs
       - name: Testar Firebase Auth + Firestore isolados
         env:
           CI: true
