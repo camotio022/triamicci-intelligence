@@ -24,5 +24,7 @@ jobs:
       - run: npm install --no-package-lock
       - name: Validar integridade dos 56 produtos
         run: node --test tests/catalog-56.test.mjs
+      - name: Testar experiência mobile do catálogo e conciliação
+        run: node --test tests/operational-catalog-mobile-ui.test.mjs
       - name: Build do aplicativo
         run: npm run build

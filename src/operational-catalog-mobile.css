@@ -1,0 +1,48 @@
+/* Catálogo operacional: uma única coluna operável, sem IDs ou tabelas largas no celular. */
+.ti-operational-setup{min-width:0;display:grid;gap:12px;color:#202a3d}
+.ti-operational-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ti-operational-head h2{margin:3px 0 0;font-size:clamp(20px,3vw,25px);line-height:1.22}
+.ti-operational-eyebrow{font-size:10px;letter-spacing:.1em;color:#a71916;font-weight:800}
+.ti-operational-count{font-size:12px;font-weight:800;background:#fff3f1;color:#a71916;padding:7px 10px;border-radius:20px;white-space:nowrap}
+.ti-operational-intro{font-size:13px;color:#647084;margin:0;line-height:1.5}
+.ti-operational-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
+.ti-operational-setup label{min-width:0}
+.ti-operational-filters label{display:grid;gap:5px;font-size:12px;font-weight:700}
+.ti-operational-setup :is(input:not([type=checkbox]),select,textarea){min-width:0;max-width:100%;box-sizing:border-box;font-size:16px}
+.ti-operational-setup :is(input,select,textarea,button):focus-visible{outline:2px solid #a71916;outline-offset:2px}
+.ti-operational-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));gap:8px;margin:2px 0}
+.ti-operational-products .ti-operational-product{display:grid;gap:4px;text-align:left;min-width:0;min-height:58px;padding:11px 12px;border:1px solid #dfe4eb;background:#fff;border-radius:12px;color:#202a3d}
+.ti-operational-product strong{font-size:13px;overflow-wrap:anywhere}
+.ti-operational-product small{font-size:11px;color:#68768a;line-height:1.4}
+.ti-operational-product[aria-pressed=true]{border-color:#a71916;background:#fff4f3}
+.ti-operational-products .ti-operational-product:disabled{opacity:.65}
+.ti-operational-empty{padding:14px;border:1px dashed #dce2ea;border-radius:12px;color:#6b7686;font-size:13px}
+.ti-operational-form{min-width:0;display:grid;gap:12px}
+.ti-operational-form-title{display:flex;justify-content:space-between;gap:9px;align-items:start}
+.ti-operational-form-title h3{margin:0;font-size:17px;overflow-wrap:anywhere}
+.ti-operational-form-title button{border:1px solid #dfe3eb;border-radius:10px;background:#fff;color:#576579;font-size:12px;padding:8px 12px;min-height:40px}
+.ti-operational-identity{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ti-operational-identity span{background:#f6f8fa;border-radius:10px;padding:10px;display:grid;gap:4px;font-size:13px;overflow-wrap:anywhere}
+.ti-operational-identity strong{font-size:11px;color:#697588}
+.ti-catalog-comparison-mobile{display:none}
+.ti-operational-advanced-toggle{min-height:44px;border:1px solid #dce2eb;color:#a71916;background:#fff;border-radius:11px;padding:10px 12px;font-size:13px;font-weight:700;text-align:left}
+.ti-operational-advanced{display:grid;gap:12px;min-width:0;padding:12px;background:#f7f8fa;border-radius:12px}
+.ti-operational-advanced[hidden]{display:none}
+.ti-operational-confirm{display:flex!important;align-items:flex-start;gap:9px;font-size:13px}
+.ti-operational-confirm input{flex:none;margin-top:3px}
+.ti-operational-submit{min-height:46px;background:#a71916!important;border-color:#a71916!important;color:#fff!important;border-radius:11px;font-weight:800}
+.ti-operational-submit:disabled{opacity:.55}
+@media(max-width:760px){
+ .ti-operational-filters{grid-template-columns:minmax(0,1fr)}
+ .ti-operational-products{grid-template-columns:minmax(0,1fr)}
+ .ti-operational-head{align-items:flex-start}
+ .ti-operational-identity{grid-template-columns:minmax(0,1fr)}
+ .ti-catalog-comparison-desktop{display:none}
+ .ti-catalog-comparison-mobile{display:grid;gap:8px}
+ .ti-catalog-comparison-row{display:grid;gap:7px;padding:10px;background:#f7f8fa;border:1px solid #e4e8ee;border-radius:11px}
+ .ti-catalog-comparison-row>strong{font-size:13px;color:#202a3d}
+ .ti-catalog-comparison-row>div{display:flex;align-items:start;justify-content:space-between;gap:10px}
+ .ti-catalog-comparison-row span{font-size:11px;color:#647084}
+ .ti-catalog-comparison-row b{text-align:right;font-size:12px;overflow-wrap:anywhere}
+ .ti-operational-setup .inventory-form{padding:12px}
+}
