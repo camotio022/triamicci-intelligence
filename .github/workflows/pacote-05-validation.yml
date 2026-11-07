@@ -33,5 +33,7 @@ jobs:
           node --check server/workflows/schedules.js
           node --check server/workflows/mural.js
           node --check server/workflows/labels.js
+      - name: Testar filtros e layout mobile de etiquetas
+        run: node --test tests/labels-mobile-ui.test.mjs
       - name: Build
         run: npm run build
