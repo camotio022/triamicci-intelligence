@@ -3,6 +3,7 @@ import {isManagement,TEAM_ROLES} from '../permissions/v31-policy.js';
 import {validQuantity} from '../operations/logic.js';
 import {STOCK_UNITS} from '../operations/unit-engine.js';
 import {createHash} from 'node:crypto';
+import {newUnifiedBalance,applyStorageCount,applyStorageTransfer,validateUnifiedBalance} from './balance-engine.js';
 import {signalUnitChange} from '../live-signal.js';
 import {STORAGE_TEMPLATES,STORAGE_ICONS,STORAGE_FREQUENCIES,validateStorage,scheduled,progress} from './storage-model.js';
 import {sendQuotaError} from '../quota-error.js';
@@ -43,13 +44,73 @@ export default async function handler(req,res){
     if(!storage.exists||storage.data().active===false||link.data()?.primaryStorageId!==storageId||!product.exists||product.data().status!=='active')throw Error('STORAGE');
     const unit=countedUnit(product.data());
     if(!unit||!validQuantity(quantity,{unit,allowZero:true}))throw Error('QUANTITY');
+    if(previous.data()?.status==='approved')throw Error('CLOSED');
     const now=new Date(),version=(previous.data()?.version||0)+1;
-    tx.set(countRef,{day:date,storageId,productId,quantity,unit,version,actorUid:actor.uid,at:now,kind:'PHYSICAL_OBSERVATION',affectsOfficialBalance:false});
+    tx.set(countRef,{day:date,storageId,productId,quantity,unit,version,actorUid:actor.uid,at:now,kind:'PHYSICAL_OBSERVATION',status:'pending',affectsOfficialBalance:false});
     tx.create(db.collection('auditLogs').doc(),{event:'storage.count_recorded',unitId:member.unitId,storageId,productId,actorUid:actor.uid,at:now,before:previous.data()?{quantity:previous.data().quantity,unit:previous.data().unit}:null,after:{quantity,unit,version}});
     signalUnitChange(tx,db,member.unitId,['stock']);
     recorded={day:date,storageId,productId,quantity,unit,version};
    });
    return send(res,200,'Conferência registrada para revisão gerencial. O saldo oficial não foi alterado.',{count:recorded});
+  }
+
+  if(action==='storageReview'){
+   const {storageId,productId,expectedVersion,decision,reason=''}=req.body||{};
+   if(!idOk(storageId)||!productOk(productId)||!Number.isInteger(expectedVersion)||!['approve','reject'].includes(decision)||typeof reason!=='string'||reason.length>240||decision==='reject'&&reason.trim().length<8)return send(res,400,'Revise a contagem, versão ou justificativa.');
+   const date=dayKey(),countRef=root.collection('storageCountsV1').doc(createHash('sha256').update(date+'|'+storageId+'|'+productId).digest('hex'));
+   const balanceRef=root.collection('storageBalancesV1').doc(productId),linkRef=links.doc(productId),storageRef=spaces.doc(storageId),productRef=root.collection('products').doc(productId);
+   let result;
+   await db.runTransaction(async tx=>{
+    const [who,count,balance,link,storage,product]=await tx.getAll(db.doc('memberships/'+actor.uid),countRef,balanceRef,linkRef,storageRef,productRef);
+    if(who.data()?.unitId!==member.unitId||who.data()?.status!=='active'||!isManagement(who.data()?.role))throw Error('FORBIDDEN');
+    if(!count.exists||count.data().storageId!==storageId||count.data().productId!==productId||count.data().day!==date||link.data()?.primaryStorageId!==storageId||!storage.exists||storage.data().active===false||!product.exists)throw Error('STORAGE');
+    const prior=count.data();
+    if(prior.status!=='pending'||prior.version!==expectedVersion)throw Error('CONFLICT');
+    const now=new Date(),nextStatus=decision==='approve'?'approved':'rejected';
+    if(decision==='approve'){
+     const current=balance.exists?balance.data():newUnifiedBalance(prior.unit);
+     if(!validateUnifiedBalance(current)||current.unit!==prior.unit)throw Error('UNIT');
+     const next=applyStorageCount(current,{storageId,quantity:prior.quantity,unit:prior.unit});
+     if(!next.ok)throw Error('QUANTITY');
+     const nextVersion=(current.version||0)+1;
+     tx.set(balanceRef,{...next.balance,productId,version:nextVersion,updatedAt:now,lastOperation:{type:'COUNT',storageId,countId:countRef.id,actorUid:actor.uid}},{merge:false});
+     result={status:nextStatus,quantity:prior.quantity,unit:prior.unit,stockVersion:nextVersion,difference:next.difference};
+    }else result={status:nextStatus};
+    tx.update(countRef,{status:nextStatus,reviewedBy:actor.uid,reviewedAt:now,reviewReason:reason.trim()});
+    tx.create(db.collection('auditLogs').doc(),{event:'storage.count_'+nextStatus,unitId:member.unitId,productId,storageId,actorUid:actor.uid,at:now,quantity:prior.quantity,unit:prior.unit,countVersion:expectedVersion,reason:reason.trim()});
+    signalUnitChange(tx,db,member.unitId,['stock']);
+   });
+   return send(res,200,decision==='approve'?'Conferência aprovada na nova estrutura de saldos.':'Conferência recusada; pode ser refeita.',{review:result,legacyStockUnchanged:true});
+  }
+  if(action==='storageBalance'){
+   const {productId}=req.body||{};
+   if(!productOk(productId))return send(res,400,'Insumo inválido.');
+   const [product,record]=await Promise.all([root.collection('products').doc(productId).get(),root.collection('storageBalancesV1').doc(productId).get()]);
+   if(!product.exists)return send(res,404,'Insumo indisponível.');
+   return send(res,200,'Saldo da nova estrutura.',{productId,balance:record.data()||null,legacyStockUnchanged:true});
+  }
+  if(action==='storageTransfer'){
+   const {requestId,productId,from,to,quantity,expectedVersion}=req.body||{};
+   if(!idOk(requestId)||!productOk(productId)||!idOk(from)||!idOk(to)||from===to||!Number.isInteger(expectedVersion))return send(res,400,'Transferência inválida.');
+   const balanceRef=root.collection('storageBalancesV1').doc(productId),opRef=root.collection('storageOperationsV1').doc(requestId);
+   const fromRef=spaces.doc(from),toRef=spaces.doc(to),linkRef=links.doc(productId);
+   let result;
+   await db.runTransaction(async tx=>{
+    const [who,bal,existing,source,target,link]=await tx.getAll(db.doc('memberships/'+actor.uid),balanceRef,opRef,fromRef,toRef,linkRef);
+    if(who.data()?.status!=='active'||who.data()?.unitId!==member.unitId||!TEAM_ROLES.includes(who.data()?.role))throw Error('FORBIDDEN');
+    if(existing.exists)throw Error('CONFLICT');
+    if(!source.exists||source.data().active===false||!target.exists||target.data().active===false||!link.exists||![from,to].every(s=>link.data().allowedStorageIds?.includes(s)))throw Error('STORAGE');
+    if(!bal.exists||!validateUnifiedBalance(bal.data())||bal.data().version!==expectedVersion)throw Error('CONFLICT');
+    const moved=applyStorageTransfer(bal.data(),{from,to,quantity,unit:bal.data().unit});
+    if(!moved.ok)throw Error(moved.reason==='INSUFFICIENT'?'INSUFFICIENT':'QUANTITY');
+    const now=new Date(),version=expectedVersion+1;
+    tx.set(balanceRef,{...moved.balance,productId,version,updatedAt:now,lastOperation:{type:'TRANSFER',operationId:requestId,actorUid:actor.uid}},{merge:false});
+    tx.create(opRef,{type:'TRANSFER',requestId,productId,from,to,quantity,unit:bal.data().unit,actorUid:actor.uid,at:now,balanceVersion:version});
+    tx.create(db.collection('auditLogs').doc(),{event:'storage.transferred',unitId:member.unitId,actorUid:actor.uid,productId,from,to,quantity,at:now});
+    signalUnitChange(tx,db,member.unitId,['stock']);
+    result={productId,balance:moved.balance,version};
+   });
+   return send(res,200,'Transferência registrada na nova estrutura; total preservado.',{transfer:result,legacyStockUnchanged:true});
   }
   if(!isManagement(member.role))return send(res,403,'Somente gestão pode configurar armazenamentos.');
   if(action==='storageSave'){
@@ -101,7 +162,7 @@ export default async function handler(req,res){
  }catch(e){
   if(sendQuotaError(res,e))return;
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
-  const errors={FORBIDDEN:[403,'Acesso restrito à gestão.'],CONFLICT:[409,'Configuração alterada por outro usuário. Atualize e tente novamente.'],DUPLICATE:[409,'Já existe um armazenamento com esse nome.'],STORAGE:[409,'Armazenamento indisponível.'],PRODUCT:[409,'Um ou mais insumos estão indisponíveis.'],LIMIT:[409,'Limite inicial de armazenamentos atingido.'],QUANTITY:[400,'Quantidade ou unidade inválida.']};
+  const errors={FORBIDDEN:[403,'Acesso restrito à gestão.'],CONFLICT:[409,'Configuração alterada por outro usuário. Atualize e tente novamente.'],DUPLICATE:[409,'Já existe um armazenamento com esse nome.'],STORAGE:[409,'Armazenamento indisponível.'],PRODUCT:[409,'Um ou mais insumos estão indisponíveis.'],LIMIT:[409,'Limite inicial de armazenamentos atingido.'],QUANTITY:[400,'Quantidade ou unidade inválida.'],UNIT:[409,'Unidade alterada; reconcilie a configuração.'],CLOSED:[409,'Contagem já aprovada; inicie uma nova sessão.'],INSUFFICIENT:[409,'Saldo insuficiente para transferência.']};
   if(errors[e.message])return send(res,...errors[e.message]);
   console.error('Storage spaces:',e.message);
   return send(res,500,'Não foi possível concluir a operação.');
