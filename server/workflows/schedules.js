@@ -1,3 +1,4 @@
+import {queuePush,tryDrainPush} from '../push/delivery.js';
 import {isManagement} from '../permissions/v31-policy.js';
 import {sendQuotaError} from '../quota-error.js';
 import {coverageTimeline} from '../schedules/coverage-timeline.js';
@@ -90,10 +91,12 @@ export default async function handler(req,res){
     if(prior.exists&&prior.data().status==='pending'||legacy.docs.some(d=>d.data().date===date&&d.data().status==='pending'))throw Error('DUPLICATE_LEAVE');
     if(!current.exists||current.data().status!=='active'||current.data().unitId!==m.unitId)throw Error('FORBIDDEN');
     tx.set(ref,{uid:actor.uid,date,reason:reason.trim(),status:'pending',createdAt:now,unitId:m.unitId});
+    queuePush(tx,db,m.unitId,'leave_request_'+ref.id+'_'+now.getTime(),{audience:'managers',title:'Nova solicitação de folga',page:'leave-requests'});
     tx.set(lockRef,{requestsUpdatedAt:now},{merge:true});
     signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'leave.requested',actorUid:actor.uid,unitId:m.unitId,requestId:ref.id,at:now});
    });
+   await tryDrainPush(m.unitId);
    return send(res,201,'Solicitação enviada. A folga depende de aprovação.',{id:ref.id});
   }
   if(action==='leaveList'){
@@ -111,10 +114,12 @@ export default async function handler(req,res){
     if(!old.exists||old.data().status!=='pending'||old.data().uid===actor.uid)throw Error('CONFLICT');
     if(decision==='approved'&&old.data().date<unitDay())throw Error('PAST_LEAVE');
     tx.update(ref,{status:decision,note:note.trim(),decidedAt:now,decidedBy:actor.uid});
-    tx.create(unit.collection('memberNotifications').doc(old.data().uid).collection('items').doc(),{title:'Solicitação de folga analisada',message:old.data().date+' · '+(decision==='approved'?'Aprovada':'Recusada')+'. Consulte a escala oficial para confirmar a programação.',recipientUid:old.data().uid,unitId:m.unitId,actorUid:actor.uid,at:now,read:false});
+    queuePush(tx,db,m.unitId,'leave_decision_'+id+'_'+now.getTime(),{uid:old.data().uid,title:'Sua solicitação de folga foi analisada',page:'leave-requests'});
+    tx.create(unit.collection('memberNotifications').doc(old.data().uid).collection('items').doc('leave_decision_'+id+'_'+now.getTime()),{title:'Solicitação de folga analisada',message:old.data().date+' · '+(decision==='approved'?'Aprovada':'Recusada')+'. Consulte a escala oficial para confirmar a programação.',recipientUid:old.data().uid,unitId:m.unitId,actorUid:actor.uid,at:now,read:false});
     signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'leave.'+decision,actorUid:actor.uid,targetUid:old.data().uid,requestId:id,unitId:m.unitId,at:now,note:note.trim()});
    });
+   await tryDrainPush(m.unitId);
    return send(res,200,'Decisão registrada. A escala oficial precisa ser atualizada e publicada separadamente.');
   }
   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Somente gerência pode administrar escalas.');

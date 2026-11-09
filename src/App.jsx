@@ -63,7 +63,7 @@ export default function App() {
 
 export function Workspace({ user, membership, logout }) {
  const routes=['checklists','kitchen','mural','production','receiving','count','inventory','daily-inventory','history','catalog','kitchen-v3','my-profile','people','master-registry','team','skills','shifts','schedule-planning','leave-requests','labels','mentor'];
- const initialRoute=()=>{const target=new URLSearchParams(window.location.search).get('page');return routes.includes(target)&&canAccessPage(membership.role,target)?target:'kitchen'};
+ const initialRoute=()=>{const params=new URLSearchParams(window.location.search);const target=params.get('page');if(params.get('pushUnit')&&params.get('pushUnit')!==membership.unitId)return 'kitchen';return routes.includes(target)&&canAccessPage(membership.role,target)?target:'kitchen'};
  const [requestedPage, setPage] = useState(initialRoute);
  const page=canAccessPage(membership.role,requestedPage)?requestedPage:'kitchen';
  const [today,setToday]=useState(()=>restaurantDay());

@@ -8,6 +8,7 @@ import TriamicciLogo from './TriamicciLogo.jsx';
 import { ShieldCheck, Package, CookingPot, Users, ArrowRight, AlertCircle } from 'lucide-react';
 import './auth-v41.css';
 import './mobile-launch.css';
+import {disableDevicePush} from './PushSettings.jsx';
 
 const installedMobile=()=>typeof window!=='undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone===true) && window.matchMedia?.('(max-width: 760px) and (pointer: coarse)').matches;
 
@@ -107,7 +108,7 @@ export default function AuthGate({ children }) {
     } catch(error) { setInviteFeedback(error.message || 'Não foi possível aceitar.'); }
     finally { setAccepting(false); }
   };
-  const logout = async () => { clearViewCache(user?.uid); await signOut(auth); };
+  const logout = async () => { try { await disableDevicePush(); } catch { /* Access is rechecked server-side before every push. */ } clearViewCache(user?.uid); await signOut(auth); };
   const login = async () => {
     if (loggingIn) return;
     setError('');setLoggingIn(true);

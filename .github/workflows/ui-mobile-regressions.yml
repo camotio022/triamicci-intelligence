@@ -20,5 +20,7 @@ jobs:
       - name: Instalar dependências
         run: |
           if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
+      - name: Validar notificações push
+        run: npm run test:push
       - name: Compilar interface
         run: npm run build

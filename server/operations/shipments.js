@@ -1,3 +1,4 @@
+import {queuePush,tryDrainPush} from '../push/delivery.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from './catalog-identity.js';
 import {createHash} from 'node:crypto';
@@ -83,6 +84,7 @@ export default async function shipments(req,res){
     normalized.push({...line,productName:p.data().name,stockUnit:quantitative?cfg.countUnit:null});
    }
    const now=new Date();
+   if(action==='shipmentInspect')queuePush(tx,db,m.unitId,'receipt_pending_'+requestId,{audience:'managers',title:'Recebimento aguardando aprovação',page:'kitchen-v3'});
    if(action==='shipmentInspect')tx.create(ref,{...data,lines:normalized,supplier:order?.data()?.supplier||data.supplier,status:'pending',fingerprint:hash({orderId,lines,supplier:supplier.trim(),notes:notes.trim()}),createdBy:actor.uid,createdAt:now,unitId:m.unitId});
    else if(action==='shipmentReject')tx.update(ref,{status:'rejected',reason:reason.trim(),decidedBy:actor.uid,decidedAt:now});
    else{
@@ -94,6 +96,7 @@ export default async function shipments(req,res){
    }
    signalUnitChange(tx,db,m.unitId,['stock', 'catalog']);tx.create(db.collection('auditLogs').doc(),{event:action,shipmentId:requestId,unitId:m.unitId,actorUid:actor.uid,at:now});
   });
+  await tryDrainPush(m.unitId);
   return send(res,200,duplicate?'Conferência já processada.':action==='shipmentInspect'?'Conferência enviada para aprovação.':action==='shipmentApprove'?'Entrega aprovada e estoque atualizado.':'Entrega recusada sem alterar o estoque.',{duplicate});
  }catch(e){const messages={RECEIVING_UNIT:'A unidade recebida difere da configuração do produto. Revise o cadastro antes de conferir.',RECEIVING_QUANTITY:'Na mesma unidade, a quantidade recebida e a quantidade física devem coincidir.',UNAUTHENTICATED:'Faça login.',FORBIDDEN:'Sem permissão.',NOT_FOUND:'Conferência indisponível.',CONFLICT:'A conferência mudou. Atualize antes de decidir.',ORDER:'Pedido encerrado, item ou unidade incompatível.',PRODUCT:'Produto ou perfil indisponível.',QUANTITY:'Quantidade ou local incompatível.',DIVERGENCE:'Justifique quantidades acima do pedido.',LOT:'Informe lote e validade reais.',UNIT:'Unidades de saldo e configuração divergem.',DUPLICATE_LINE:'Não repita o mesmo produto/local/lote.'};if(messages[e.message])return send(res,e.message==='UNAUTHENTICATED'?401:e.message==='FORBIDDEN'?403:409,messages[e.message]);if(sendQuotaError(res,e))return;console.error('Shipments:',e.message);return send(res,500,'Não foi possível processar a entrega.');}
 }
