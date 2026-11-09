@@ -1,6 +1,7 @@
 import {historyNames,historyActor} from '../../server/operations/history-names.js';
 import storageHandler from '../../server/storage/handler.js';
 import storageProduction from '../../server/storage/production.js';
+import storageReceiving from '../../server/storage/receiving.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from '../../server/operations/catalog-identity.js';
 import {intervalFromBalance} from '../../server/operations/inventory-summary.js';
@@ -42,6 +43,7 @@ function error(res,e){
 }
 export default async function handler(req,res){
  if(['storageProductionOptions','storagePrepare'].includes(req.body?.action))return storageProduction(req,res);
+ if(['storageReceiptList','storageReceiptInspect','storageReceiptApprove','storageReceiptReject'].includes(req.body?.action))return storageReceiving(req,res);
  if(typeof req.body?.action==='string'&&req.body.action.startsWith('storage'))return storageHandler(req,res);
  if(req.body?.action==='availabilityCheck')return availabilityCheck(req,res);
  if(typeof req.body?.action==='string'&&req.body.action.startsWith('v3'))return kitchenV3(req,res);
