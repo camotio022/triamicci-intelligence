@@ -23,6 +23,8 @@ test('embalagem somente com fator fixo; nenhuma contagem presumida para kg -> un
  assert.equal(validUnitModel(fixed,'un'),true);
  assert.deepEqual(previewStock(2,'caixa',fixed,'un'),{quantity:24,unit:'un',kind:'configured'});
  assert.equal(previewStock(18,'kg',model,'un'),null);
+ const bale={receivingUnit:'fardo',conversion:{fixed:true,fromUnit:'fardo',toUnit:'kg',factor:10},yields:model.yields};
+ assert.equal(previewYields(2,'fardo',bale)[0].quantity,166,'2 fardos de 10 kg preveem 166 porcoes de 120g');
  assert.equal(validUnitModel({...fixed,conversion:{...fixed.conversion,fixed:false}},'un'),false);
 });
 test('configuracao individual preserva validacao e quantidade fisica aferida',()=>{
