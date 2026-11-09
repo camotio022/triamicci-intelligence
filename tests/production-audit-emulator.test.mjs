@@ -40,10 +40,10 @@ test('auditoria produção: unidades, dependências, transformação medida, lot
  // Duas execuções disputam a mesma matéria-prima: só uma pode consumir 5 kg.
  const race=await Promise.all([aux,manager].map(actor=>call(actor,'finish',{...payload,requestId:randomUUID(),items:[{productId:a,quantity:5}],portions:10})));
  assert.deepEqual(race.map(r=>r.http).sort(),[200,409]);assert.equal((await source.get()).data().total,3);assert.equal((await target.get()).data().total,15);
- // Unidade incompatível é recusada já na ativação; a tentativa não muda estoque.
+ // Cadastro permite ativar a ficha com saldo físico divergente; a execução continua impedida até conciliar.
  const molho=unit.collection('physicalBalances').doc(c);await molho.set({unit:'kg',reserve:0,rotation:0,total:0});
  const recipe={...config,type:'recipe',name:'Molho audit',sourceProductId:'',outputProductId:c,resultUnit:'balde',outputPerBatch:900,ingredients:[{name:'Ingrediente',amount:'100',unit:'g',tracked:true,productId:a}]};
- const invalid=await call(manager,'savePreparation',{id:'molho-audit',configuration:recipe,activate:true});assert.equal(invalid.http,409);assert.match(invalid.message,/saldo em kg e cadastro em g/);assert.equal((await molho.get()).data().unit,'kg');assert.equal((await unit.collection('productionRecipes').doc('molho-audit').get()).exists,false);
+ const invalid=await call(manager,'savePreparation',{id:'molho-audit',configuration:recipe,activate:true});assert.equal(invalid.http,200,JSON.stringify(invalid));assert.equal((await molho.get()).data().unit,'kg');assert.equal((await unit.collection('productionRecipes').doc('molho-audit').get()).exists,true);
  // Cadastro ainda ativo, mas dependência inativa: mesmo diagnóstico nas duas listas.
  await unit.collection('products').doc(a).update({status:'inactive'});
  const list=await call(aux,'list');assert.equal(list.recipes.some(r=>r.id===id),false);assert.match(list.blockedRecipes.find(r=>r.id===id).errors.join(' '),/Tilápia/);
