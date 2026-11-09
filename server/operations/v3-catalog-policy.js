@@ -1,7 +1,7 @@
 import {validUnitModel} from './receiving-model.js';
 const MODES=['quantitative','availability','on_demand'];
 const LOCATIONS=['reserva','giro'];
-const UNITS=['kg','g','L','mL','un','duzia','porcao','pacote'];
+import {STOCK_UNITS} from './unit-engine.js';
 const safeText=s=>typeof s==='string'&&s.trim().length>0;
 export function validateOperationalProfile(p){
  const errors=[];
@@ -10,7 +10,7 @@ export function validateOperationalProfile(p){
  if(!MODES.includes(p.controlMode))errors.push('CONTROL_MODE_INVALID');
  if(!['supplier','internal','both'].includes(p.origin))errors.push('ORIGIN_INVALID');
  if(!Array.isArray(p.locations)||!p.locations.length||p.locations.some(x=>!LOCATIONS.includes(x))||new Set(p.locations).size!==p.locations.length)errors.push('LOCATIONS_INVALID');
- if(p.controlMode==='quantitative'&&!UNITS.includes(p.countUnit))errors.push('COUNT_UNIT_REQUIRED');
+ if(p.controlMode==='quantitative'&&!STOCK_UNITS.includes(p.countUnit))errors.push('COUNT_UNIT_REQUIRED');
  if(p.countUnit&&!UNITS.includes(p.countUnit))errors.push('COUNT_UNIT_INVALID');
  if(p.receivingPresentation&&!safeText(p.receivingPresentation))errors.push('RECEIVING_PRESENTATION_INVALID');
  if(p.unitConversion&&p.unitConversion.fixed!==true)errors.push('NO_ASSUMED_CONVERSION');
