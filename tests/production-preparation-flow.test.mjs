@@ -4,7 +4,7 @@ import {preparationPlan,validatePreparation} from '../server/production/preparat
 import {recipeAvailability} from '../server/production/readiness.js';
 
 const id=letter=>letter.repeat(40);
-const products=[
+const rawProducts=[
  {id:id('a'),name:'Frango a passarinho',status:'active',physicalUnit:'kg'},
  {id:id('b'),name:'File de tilapia (materia-prima)',status:'active',physicalUnit:'kg'},
  {id:id('c'),name:'Porcao de tilapia preparada',status:'active',physicalUnit:'porcao'},
@@ -12,6 +12,7 @@ const products=[
  {id:id('e'),name:'Tempero',status:'active',physicalUnit:'kg'},
  {id:id('f'),name:'Legumes preparados',status:'active',physicalUnit:'balde'}
 ];
+const products=rawProducts.map(product=>({...product,operationalCatalogVersion:'56-v1'}));
 const base={name:'Preparacao valida',sourceProductId:'',outputProductId:id('c'),portionMode:'separate',
  resultUnit:'porcao',batchYield:1,portionWeight:120,weightUnit:'g',method:'',location:'reserva',outputPerBatch:null,ingredients:[]};
 
