@@ -1,10 +1,11 @@
 import {sendQuotaError} from '../../server/quota-error.js';
+import {CATALOG_56_UNITS} from '../../server/operations/unit-engine.js';
 import operationalCatalog from '../../server/catalog/activate-draft.js';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 
-const allowedUnits = new Set(['kg','L','un']);
+const allowedUnits = new Set(CATALOG_56_UNITS);
 const approvedNames=new Set(JSON.parse(readFileSync(new URL('../../data/triamicci-catalogo-operacional-56.revisao.json',import.meta.url),'utf8')).products.map(p=>p.name));
 const genericIds = new Set(['queijos','massas','hortifruti','temperos']);
 const normalizedName=name=>String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('pt-BR');
@@ -12,8 +13,8 @@ const approvedNormalized=new Set([...approvedNames].map(normalizedName));
 const inRevisedCatalog=p=>approvedNormalized.has(normalizedName(p.name));
 const eligible=p=>p.schemaVersion===2&&p.reviewRequired!==true&&p.ingredientsPending!==true&&
   ['supplier','internal'].includes(p.source)&&
-  ['kg','L','un'].includes(p.operationalUnit)&&
-  (p.source==='internal'||['kg','L','un'].includes(p.receivingUnit));
+  CATALOG_56_UNITS.includes(p.operationalUnit)&&
+  (p.source==='internal'||CATALOG_56_UNITS.includes(p.receivingUnit));
 const hashId = name => createHash('sha256').update(name.trim().toLocaleLowerCase('pt-BR')).digest('hex').slice(0,40);
 
 export default async function handler(req,res){
