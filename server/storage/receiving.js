@@ -41,7 +41,7 @@ export default async function storageReceiving(req,res){
      const l=lines[i],p=docs[i*3],link=docs[i*3+1],space=docs[i*3+2];
      if(!p.exists||p.data().status!=='active'||!link.exists||link.data().primaryStorageId!==l.storageId||!space.exists||space.data().active===false)throw Error('CONFIGURATION');
      if(currentUnit(p.data())!==l.stockUnit)throw Error('UNIT');
-     if(p.data().trackExpiry&&(!l.lot.trim()||!dateValid(l.expiryDate)))throw Error('LOT');
+     if((p.data().trackExpiry||space.data().expiryPolicy==='required')&&(!l.lot.trim()||!dateValid(l.expiryDate)))throw Error('LOT');
      const unique=l.productId+'|'+l.lot+'|'+l.expiryDate;
      if(seen.has(unique))throw Error('DUPLICATE');seen.add(unique);
      const expected=order?.data()?.items?.find(item=>item.productId===l.productId);
