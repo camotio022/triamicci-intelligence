@@ -38,7 +38,7 @@ export function preparationPlan(c,products){
   lines.push({productId:c.sourceProductId,quantity:null,location:c.location,substitutes:[]});
  }
  const dependencyIds=[c.outputProductId,c.sourceProductId,...c.ingredients.filter(i=>i.tracked).map(i=>i.productId)].filter(Boolean);
- for(const id of new Set(dependencyIds)){const problem=balanceProblem(find(id));if(problem)errors.push(problem);}
+ // Cadastro não depende de saldo físico. Conferir contagem e lotes somente na execução.
  let yieldQuantity=c.batchYield;
  if(c.type==='portion'){
   const p=find(c.sourceProductId),unit=physicalUnit(p),converted=convertPhysical({quantity:c.portionWeight,from:c.weightUnit,to:unit});
