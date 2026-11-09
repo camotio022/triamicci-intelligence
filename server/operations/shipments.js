@@ -92,7 +92,7 @@ export default async function shipments(req,res){
    else{
     for(const [p,b] of stock)writeOperationalBalance(tx,unit.collection('physicalBalances').doc(p),{...b,updatedAt:now,quality:'ESTIMATED_BY_MOVEMENTS'},{},balances.get(p).data()||{});
     for(const change of lotUpdates.values())tx.set(change.ref,{...change.data,updatedAt:now},{merge:true});
-    for(const [i,line] of normalized.entries())if(line.stockUnit)tx.create(unit.collection('physicalReceipts').doc(requestId+'_'+i),{productId:line.productId,productName:line.productName,physicalQuantity:line.stockQuantity,unit:line.stockUnit,location:line.location,lot:line.lot,expiryDate:line.expiryDate,supplier:data.supplier,orderId:data.orderId,shipmentId:requestId,commercialQuantity:line.commercialQuantity,commercialUnit:line.commercialUnit,actorUid:actor.uid,unitId:m.unitId,at:now});
+    for(const [i,line] of normalized.entries())if(line.stockUnit)tx.create(unit.collection('physicalReceipts').doc(requestId+'_'+i),{productId:line.productId,productName:line.productName,physicalQuantity:line.stockQuantity,unit:line.stockUnit,location:line.location,lot:line.lot,expiryDate:line.expiryDate,supplier:data.supplier,orderId:data.orderId,shipmentId:requestId,commercialQuantity:line.commercialQuantity,commercialUnit:line.commercialUnit,measurementSnapshot:line.measurementSnapshot||null,actorUid:actor.uid,unitId:m.unitId,at:now});
     if(orderRef){const received={...(order.data().received||{})};for(const [p,q] of totals)received[p]=Math.round(((received[p]||0)+q)*1000)/1000;tx.update(orderRef,{received,status:order.data().items.every(i=>(received[i.productId]||0)>=i.quantity)?'received':'partially_received',updatedAt:now});}
     tx.update(ref,{status:'approved',decidedBy:actor.uid,decidedAt:now});
    }
