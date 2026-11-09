@@ -19,7 +19,7 @@ export function validatePreparation(c){
  if(c.type==='transform'&&c.sourceProductId===c.outputProductId)return 'A origem e o produto preparado devem ser diferentes.';
  if(!Array.isArray(c.ingredients)||c.ingredients.length>12||c.ingredients.some(i=>!i||typeof i.name!=='string'||!i.name.trim()||i.name.length>100||typeof i.amount!=='string'||!i.amount.trim()||i.amount.length>80||typeof i.tracked!=='boolean'||![...INGREDIENT_UNITS,'orientacao'].includes(i.unit)||i.tracked&&(!pid.test(i.productId||'')||!validQuantity(Number(i.amount))||i.unit==='orientacao')))return 'Revise os ingredientes e as quantidades.';
  if(c.type==='recipe'&&!c.ingredients.length)return 'Adicione os ingredientes da receita.';
- if(!['g','kg'].includes(c.weightUnit))return 'Revise a unidade de peso.';
+ if(!MASS_UNITS.includes(c.weightUnit))return 'Revise a unidade de peso.';
  if(c.outputPerBatch!==null&&(!validQuantity(c.outputPerBatch)||c.outputPerBatch>10000))return 'Revise a entrada no estoque por receita.';
  if(!['reserva','giro'].includes(c.location))return 'Selecione o local de origem.';
  return null;
