@@ -21,4 +21,4 @@ jobs:
       - name: Instalar navegador
         run: npx playwright install chromium
       - name: Verificar fluxos e responsividade
-        run: node --test tests/v31-mobile-ux.test.mjs
+        run: node --test tests/v31-mobile-ux.test.mjs tests/notifications-module-mobile.test.mjs

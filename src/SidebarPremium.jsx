@@ -1,11 +1,12 @@
 import React,{useEffect,useMemo,useState} from 'react';
-import {LayoutDashboard,ClipboardCheck,Package,ChefHat,UserRound,CalendarDays,Users,History,Boxes,Settings,BookOpen,Search,ChevronDown,X,LogOut,Building2,ClipboardList} from 'lucide-react';
+import {LayoutDashboard,ClipboardCheck,Package,ChefHat,UserRound,CalendarDays,Users,History,Boxes,Settings,BookOpen,Search,ChevronDown,X,LogOut,Building2,ClipboardList,Bell} from 'lucide-react';
 import {isManagement,canAccessPage} from '../server/permissions/v31-policy.js';
 import {isIndependentSession} from './firebase.js';
 import './sidebar-premium.css';
 
 const sections=[
  {id:'personal',title:'Meu espaço',icon:UserRound,items:[
+  {id:'notifications',label:'Notificações',icon:Bell},
   {id:'my-profile',label:'Minha ficha profissional',icon:UserRound,mentor:'mentor-profile'},
   {id:'leave-requests',label:'Solicitar folga',icon:CalendarDays},
   {id:'mural',label:'Mural da equipe',icon:Users,mentor:'mentor-mural'}
