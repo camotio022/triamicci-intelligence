@@ -13,6 +13,7 @@ test('18 kg rendem 150 porcoes de 120g ou 120 de 150g, sem arredondar para cima'
  const result=previewYields(18,'kg',model);
  assert.deepEqual(result.map(v=>v.quantity),[150,120]);
  assert.equal(previewStock(18,'kg',model,'kg').quantity,18);
+ assert.equal(previewYields(18.05,'kg',model)[0].quantity,150,'Porções inteiras não podem virar fração de estoque');
  assert.equal(inUnit(1200,'g','kg'),1.2);
  assert.equal(inUnit(1.5,'L','ml'),1500);
  assert.equal(inUnit(12,'un','kg'),null);
