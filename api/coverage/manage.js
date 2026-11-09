@@ -1,3 +1,4 @@
+import {queuePush,tryDrainPush} from '../../server/push/delivery.js';
 import {isManagement} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {pastProposal} from '../../src/operation-time.js';
@@ -53,8 +54,10 @@ export default async function handler(req,res){
     if(!who.exists||who.data().status!=='active'||who.data().unitId!==member.unitId)throw Error('FORBIDDEN');
     tx.create(staffRequests.doc(requestId),{staffId:linked.docs[0].id,accountUid:actor.uid,name:linked.docs[0].data().name||'',kind,date,reason:reason.trim(),status:'pending',createdAt:now,updatedAt:now,unitId:member.unitId});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
+    queuePush(tx,db,member.unitId,'coverage_request_'+requestId,{audience:'managers',title:'Nova solicitação de troca ou cobertura',page:'people'});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.change_requested',requestId,unitId:member.unitId,actorUid:actor.uid,at:now});
    });
+   await tryDrainPush(member.unitId);
    return send(res,201,'Solicitação enviada à gerência. Nenhuma escala foi alterada.',{id:requestId});
   }
   if(action==='respond'){
@@ -68,9 +71,11 @@ export default async function handler(req,res){
     const person=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
     if(!person.exists||person.data().status!=='active'||person.data().accountUid!==actor.uid)throw Error('FORBIDDEN');
     tx.update(ref,{status:decision==='accepted'?'pending_approval':'declined',...(decision==='accepted'?{acceptedAt:now}:{declinedAt:now}),updatedAt:now,respondedBy:actor.uid});
+    queuePush(tx,db,member.unitId,'coverage_response_'+id,{audience:'managers',title:'Convite de cobertura respondido',page:'people'});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.'+decision,proposalId:id,unitId:member.unitId,actorUid:actor.uid,at:now});
    });
+   await tryDrainPush(member.unitId);
    return send(res,200,'Resposta registrada. A escala publicada não foi alterada.');
   }
   if(!manager)return send(res,403,'Somente gerência.');
@@ -85,8 +90,10 @@ export default async function handler(req,res){
     if(!old.exists||old.data().status!=='pending'||old.data().accountUid===actor.uid)throw Error('CONFLICT');
     tx.update(ref,{status:decision,note:note.trim(),decidedBy:actor.uid,decidedAt:now,updatedAt:now});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
+    queuePush(tx,db,member.unitId,'coverage_request_decision_'+requestId,{uid:old.data().accountUid,title:'Sua solicitação de troca ou cobertura foi analisada',page:'my-profile'});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.change_'+decision,requestId,unitId:member.unitId,actorUid:actor.uid,at:now,note:note.trim()});
    });
+   await tryDrainPush(member.unitId);
    return send(res,200,'Solicitação analisada. A escala oficial continua inalterada até sua atualização e publicação.');
   }
   if(action==='requirementsSet'){
@@ -152,8 +159,10 @@ export default async function handler(req,res){
       legalEstimate:null,legalValidated:false,reviewReasons:review.reasons,status:person.data().accountUid?'pending_acceptance':'pending_approval',consentPending:!person.data().accountUid,
       createdAt:now,updatedAt:now,createdBy:actor.uid,unitId:member.unitId});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
+    if(person.data().accountUid)queuePush(tx,db,member.unitId,'coverage_invite_'+id,{uid:person.data().accountUid,title:'Você recebeu um convite de cobertura ou dobra',page:'my-profile'});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.proposed',unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,practicePayment:payment});
    });
+   await tryDrainPush(member.unitId);
    return send(res,201,'Proposta registrada; depende de aceite, verificação trabalhista e aprovação.',{id});
   }
   if(action==='decide'){
@@ -165,18 +174,20 @@ export default async function handler(req,res){
     const [m,p]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(ref)]);
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!roles.has(m.data().role))throw Error('FORBIDDEN');
     if(!p.exists||!['pending_approval','pending_acceptance'].includes(p.data().status)||decision==='approved'&&p.data().status!=='pending_approval')throw Error('CONFLICT');
+    const currentPerson=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
     if(decision==='approved'){
      if(pastProposal(p.data()))throw Error('EXPIRED');
-     const currentPerson=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
      const gate=approvalGate({status:p.data().status,createdBy:p.data().createdBy,actorUid:actor.uid,
       consentPending:p.data().consentPending,acceptedAt:p.data().acceptedAt,staffActive:currentPerson.exists&&currentPerson.data().status==='active',
       legalChecked,consentVerified});
      if(gate)throw Error(gate);
     }
     tx.update(ref,{status:decision,decisionNote:note.trim(),legalValidated:false,legalReviewConfirmed:decision==='approved',consentVerified:decision==='approved',consentEvidence:decision==='approved'?req.body.consentEvidence.trim():null,decidedBy:actor.uid,decidedAt:now,updatedAt:now});
+    if(currentPerson.data()?.accountUid)queuePush(tx,db,member.unitId,'coverage_decision_'+id,{uid:currentPerson.data().accountUid,title:'Sua proposta de cobertura ou dobra foi analisada',page:'my-profile'});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.'+decision,unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,note:note.trim()});
    });
+   await tryDrainPush(member.unitId);
    return send(res,200,'Decisão registrada. Aprovação não altera automaticamente a escala oficial.');
   }
   return send(res,400,'Ação desconhecida.');

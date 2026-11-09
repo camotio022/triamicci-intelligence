@@ -45,3 +45,5 @@
  .ti-notification-item.unread{padding-left:9px}
  .ti-notification-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+.ti-push-settings{padding:12px;margin-top:10px;background:#f7f8fb;border:1px solid #e5e9f0;border-radius:12px}.ti-push-settings strong{font-size:13px}.ti-push-settings p{font-size:12px;line-height:1.5;margin:6px 0;color:#475467}.ti-push-settings button{min-height:44px;border:1px solid #dfdfe6;background:white;color:#a71916;border-radius:9px;padding:8px;font:inherit;font-size:12px;cursor:pointer}.ti-push-settings button:disabled{opacity:.5}

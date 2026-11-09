@@ -1,3 +1,4 @@
+import pushWorkflow from '../../server/push/handler.js';
 import {attachProfileAvatars} from '../../server/team/profile-avatar.js';
 import checklistsWorkflow from '../../server/checklists/handler.js';
 import {sendQuotaError} from '../../server/quota-error.js';
@@ -29,6 +30,7 @@ const cleanMember = (doc) => {
 };
 
 export default async function handler(req,res) {
+  if(['pushConfiguration','pushSubscribe','pushUnsubscribe','pushTest'].includes(req.body?.action))return pushWorkflow(req,res);
   if(req.body?.module==='checklists')return checklistsWorkflow(req,res);
   if(req.body?.module==='schedules')return schedulesWorkflow(req,res);
   if(req.body?.module==='attendanceV31')return attendanceWorkflow(req,res);

@@ -3,6 +3,7 @@ import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {auth} from './firebase.js';
 import './notifications.css';
+import PushSettings from './PushSettings.jsx';
 import {Bell,Check,RefreshCw,Trash2,RotateCcw,Eye,X} from 'lucide-react';
 import {useFeedback} from './FeedbackProvider.jsx';
 
@@ -33,6 +34,7 @@ export default function NotificationCenter({unitId,openProfile,openKitchen}){
   <button type="button" className="icon-button notification" aria-label={notificationsReady&&supplyReady?'Notificações: '+unread+' não lidas':'Notificações: consulta indisponível ou carregando'} aria-expanded={open} onClick={()=>setOpen(x=>!x)}><Bell size={19}/>{notificationsReady&&supplyReady&&unread>0&&<span className="ti-bell-count">{unread>9?'9+':unread}</span>}</button>
   {open&&<div className="ti-notification-panel" role="region" aria-label="Central de notificações">
    <div className="ti-notification-head"><h2>Notificações</h2><div className="ti-notification-head-actions"><button type="button" onClick={()=>{load();loadSupply()}} aria-label="Atualizar notificações"><RefreshCw size={18}/></button><button type="button" onClick={()=>setOpen(false)} aria-label="Fechar notificações"><X size={18}/></button></div></div>
+   <PushSettings unitId={unitId}/>
    <div className="ti-notification-tabs" role="group" aria-label="Exibir notificações"><button type="button" className={view==='inbox'?'selected':''} aria-pressed={view==='inbox'} onClick={()=>setView('inbox')}>Recebidas ({active.length})</button><button type="button" className={view==='trash'?'selected':''} aria-pressed={view==='trash'} onClick={()=>setView('trash')}>Lixeira ({deleted.length})</button></div>
    {view==='inbox'&&(supplyAlerts.signals.length>0||supplyAlerts.deliveries.length>0)&&<section className="ti-supply-alerts" aria-label="Avisos de estoque e entregas"><strong>Cozinha · estoque e entregas</strong>
     {supplyAlerts.signals.slice(0,4).map(a=><p key={a.id}>⚠️ {a.productName} · {a.observation==='missing'?'Possível falta':'Estoque baixo'} ({a.location==='reserva'?'Reserva':'Giro'})</p>)}
