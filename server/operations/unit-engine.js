@@ -6,6 +6,9 @@ export const VOLUME_UNITS=Object.freeze(['L','mL','ml']); // ml preserva registr
 export const COUNT_UNITS=Object.freeze(['un','duzia','porcao','pacote']);
 export const STOCK_UNITS=Object.freeze([...MASS_UNITS,...VOLUME_UNITS,...COUNT_UNITS]);
 export const RECEIVING_UNITS=Object.freeze([...STOCK_UNITS,'caixa','fardo']);
+export const PREPARED_OUTPUT_UNITS=Object.freeze(['porcao','un','kg','g','L','ml']);
+export const RECIPE_RESULT_UNITS=Object.freeze(['balde','porcao','un','kg','L']);
+export const INGREDIENT_UNITS=Object.freeze(['g','kg','L','ml','un']);
 export const UNIT_LABELS=Object.freeze({kg:'Quilogramas',g:'Gramas',L:'Litros',mL:'Mililitros',ml:'Mililitros',un:'Unidades',duzia:'Dúzias',porcao:'Porções',pacote:'Pacotes',caixa:'Caixas',fardo:'Fardos'});
 export const normalizeUnit=unit=>unit==='ml'?'mL':unit;
 export const isStockUnit=unit=>STOCK_UNITS.includes(unit);
