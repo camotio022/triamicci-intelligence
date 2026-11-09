@@ -8,6 +8,8 @@ export const STOCK_UNITS=Object.freeze([...MASS_UNITS,...VOLUME_UNITS,...COUNT_U
 export const RECEIVING_UNITS=Object.freeze([...STOCK_UNITS,'caixa','fardo']);
 // O catálogo homologado de 56 itens mantém suas restrições até migração explícita.
 export const CATALOG_56_UNITS=Object.freeze(['kg','L','un']);
+export const PRODUCT_BASIC_UNITS=Object.freeze(['kg','g','L','ml','un']);
+export const PACKAGE_CONTENT_UNITS=Object.freeze(['kg','g','L','mL','ml','un','duzia']);
 export const PREPARED_OUTPUT_UNITS=Object.freeze(['porcao','un','kg','g','L','ml']);
 export const RECIPE_RESULT_UNITS=Object.freeze(['balde','porcao','un','kg','L']);
 export const INGREDIENT_UNITS=Object.freeze(['g','kg','L','ml','un']);
