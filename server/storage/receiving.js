@@ -65,13 +65,17 @@ export default async function storageReceiving(req,res){
    if(!receipt.exists)throw Error('RECEIPT');
    if(receipt.data().status!=='pending')throw Error('CONFLICT');
    const status=action==='storageReceiptApprove'?'approved':'rejected',now=new Date();
+   const allocations=await tx.getAll(...(receipt.data().lines||[]).map((l,i)=>root.collection('storageReceiptAllocationsV1').doc(createHash('sha256').update(requestId+'|'+i).digest('hex'))));
+   const reconciliation=(receipt.data().lines||[]).map((l,i)=>({lineIndex:i,productId:l.productId,received:l.stockQuantity,prepared:allocations[i].data()?.allocatedQuantity||0,remaining:Math.round((l.stockQuantity-(allocations[i].data()?.allocatedQuantity||0))*1000)/1000,unit:l.stockUnit}));
+   if(reconciliation.some(x=>x.remaining<0))throw Error('CONFLICT');
+   const requiresReview=status==='rejected'&&reconciliation.some(x=>x.prepared>0);
    // A aprovação administrativa nunca soma novamente produtos que já foram contados ou preparados.
-   tx.update(ref,{status,reason:reason.trim(),decidedBy:actor.uid,decidedAt:now});
+   tx.update(ref,{status,reason:reason.trim(),decidedBy:actor.uid,decidedAt:now,reconciliation,requiresReview});
    tx.create(db.collection('auditLogs').doc(),{event:'storage.receipt_'+status,unitId:m.unitId,receiptId:requestId,actorUid:actor.uid,at:now,reason:reason.trim()});
    signalUnitChange(tx,db,m.unitId,['stock']);
-   outcome={status,requiresBalanceCount:true,affectsBalance:false,preparationsPreserved:true};
+   outcome={status,requiresBalanceCount:status==='approved',affectsBalance:false,preparationsPreserved:true,requiresReview,reconciliation};
   });
-  return send(res,200,action==='storageReceiptApprove'?'Entrega aprovada; valide a contagem para registrar o saldo.':'Entrega recusada, com preparações preservadas para revisão.',{receipt:outcome});
+  return send(res,200,action==='storageReceiptApprove'?'Entrega aprovada; valide a contagem para registrar o saldo.':'Entrega recusada; preparações existentes permanecem registradas para revisão gerencial.',{receipt:outcome});
  }catch(e){
   if(sendQuotaError(res,e))return;
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
