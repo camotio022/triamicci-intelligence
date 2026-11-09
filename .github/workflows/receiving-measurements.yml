@@ -19,5 +19,5 @@ jobs:
         with:
           node-version: '22'
       - run: node --test tests/receiving-measurements.test.mjs
-      - run: npm ci --no-audit --no-fund
+      - run: npm install --no-audit --no-fund
       - run: npm run build
