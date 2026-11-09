@@ -22,7 +22,7 @@ export async function drainPush(unitId,{db=getDb(),transport=sendNotification,ev
   });
   if(!event)continue;
   try{
-   const members=event.audience==='managers'?(await db.collection('memberships').where('unitId','==',unitId).get()).docs:[await db.doc('memberships/'+event.uid).get()];
+   const members=['managers','unit'].includes(event.audience)?(await db.collection('memberships').where('unitId','==',unitId).get()).docs:[await db.doc('memberships/'+event.uid).get()];
    const recipients=members.filter(d=>d.exists&&allowedRecipient(d.data(),unitId,event.audience));
    let failed=false;
    for(const member of recipients){

@@ -8,6 +8,9 @@ Eventos conectados:
 
 | Evento | Destinatário | Destino |
 | --- | --- | --- |
+| Alteração de papel/acesso de conta ativa | Usuário alterado | Minha ficha |
+| Atualização da ficha profissional | Colaborador | Minha ficha |
+| Publicação de escala | Membros ativos da unidade | Mural |
 | Solicitação de folga | Gestão da unidade | Solicitações de folga |
 | Decisão sobre folga | Solicitante | Solicitações de folga |
 | Convite de cobertura/dobra | Conta vinculada ao colaborador | Minha ficha |
@@ -42,3 +45,7 @@ A notificação leva à área correspondente; não abre automaticamente um regis
 - Validado localmente: build, regras de negócio, contratos de UI e testes de política/entrega/worker, incluindo rollback, falha transitória, unidade, papel de gestão e navegação segura.
 - O teste visual automatizado não pôde ser executado: o navegador Chromium não estava instalado e o download retornou arquivo inválido. Não foi simulado um resultado visual aprovado.
 - Pendente de homologação física: ativar e testar em iPhone instalado e Android/desktop; conferir chegada com tela bloqueada, toque no aviso, desativação e logout. Nenhum aviso real foi disparado à equipe durante a implementação.
+
+## Correção após teste físico no iPhone
+
+O usuário confirmou chegada do aviso de teste no iPhone. A alteração de acesso gerava apenas o registro no sino: faltava a inclusão desse evento na fila de envio. Corrigido o vínculo para acesso, ficha profissional e publicação de escala, com o mesmo identificador do aviso existente. Regressões cobrem o fluxo real de alteração de papel no emulador e entrega após rebaixamento para auxiliar, preservando o aviso original sem duplicação. Contas desativadas continuam sem receber push por política de acesso; o aviso interno é preservado.

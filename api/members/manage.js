@@ -1,3 +1,4 @@
+import {queuePush,tryDrainPush} from '../../server/push/delivery.js';
 import pushWorkflow from '../../server/push/handler.js';
 import {attachProfileAvatars} from '../../server/team/profile-avatar.js';
 import checklistsWorkflow from '../../server/checklists/handler.js';
@@ -308,6 +309,7 @@ export default async function handler(req,res) {
       const actorRef=db.collection('memberships').doc(actor.uid);
       const memberRef=db.collection('memberships').doc(uid);
       const profileRef=db.collection('units').doc(actingMember.unitId).collection('staffProfiles').doc(uid);
+      const profileNoticeId='profile_'+randomUUID();
       await db.runTransaction(async tx=>{
        const [a,target,existing]=await Promise.all([tx.get(actorRef),tx.get(memberRef),tx.get(profileRef)]);
        if(!target.exists||target.data().unitId!==actingMember.unitId)throw Error('NOT_FOUND');
@@ -319,7 +321,8 @@ export default async function handler(req,res) {
        const now=new Date();
        const changes=profileChanges(existing.data()?.profile,normalized);
        if(!changes.length)throw Error('NO_CHANGES');
-       const noticeRef=db.collection('units').doc(actingMember.unitId).collection('memberNotifications').doc(uid).collection('items').doc();
+       const noticeRef=db.collection('units').doc(actingMember.unitId).collection('memberNotifications').doc(uid).collection('items').doc(profileNoticeId);
+       queuePush(tx,db,actingMember.unitId,profileNoticeId,{uid,title:'Ficha profissional atualizada',page:'my-profile'});
        tx.create(noticeRef,{title:'Ficha profissional atualizada',message:professionalNotice(changes),changes,
          unitId:actingMember.unitId,recipientUid:uid,actorUid:actor.uid,at:now,read:false});
        tx.set(profileRef,{uid,unitId:actingMember.unitId,profile:normalized,updatedAt:now,
@@ -328,6 +331,7 @@ export default async function handler(req,res) {
        tx.create(db.collection('auditLogs').doc(),{event:'team.professional_updated',unitId:actingMember.unitId,
          actorUid:actor.uid,targetUid:uid,at:now,before:existing.data()?.profile||null,after:normalized});
       });
+      await tryDrainPush(actingMember.unitId,profileNoticeId);
       return send(res,200,'Perfil profissional atualizado com auditoria.');
     }
     if (action === 'list') {
@@ -363,6 +367,7 @@ export default async function handler(req,res) {
     const targetRef = db.doc('memberships/' + uid);
     const actorRef = db.doc('memberships/' + actor.uid);
     const auditRef = db.collection('auditLogs').doc();
+    const accessNoticeId='access_'+randomUUID();
 
     await db.runTransaction(async tx => {
       const [actorSnap,targetSnap] = await Promise.all([tx.get(actorRef),tx.get(targetRef)]);
@@ -398,7 +403,8 @@ export default async function handler(req,res) {
       const parts=[];
       if(target.role!==role)parts.push('Perfil de acesso: '+target.role+' → '+role);
       if(target.status!==status)parts.push('Situação: '+target.status+' → '+status);
-      const noteRef=db.collection('units').doc(currentActor.unitId).collection('memberNotifications').doc(uid).collection('items').doc();
+      const noteRef=db.collection('units').doc(currentActor.unitId).collection('memberNotifications').doc(uid).collection('items').doc(accessNoticeId);
+      queuePush(tx,db,currentActor.unitId,accessNoticeId,{uid,title:'Acesso atualizado',page:'my-profile'});
       tx.create(noteRef,{title:'Acesso atualizado',message:parts.join(' · '),changes:parts,read:false,
        recipientUid:uid,actorUid:actor.uid,unitId:currentActor.unitId,at:now});
       signalUnitChange(tx,db,actingMember.unitId,['team', 'profile', 'schedules', 'notifications']);
@@ -407,6 +413,7 @@ export default async function handler(req,res) {
         targetUid:uid,fromRole:target.role,toRole:role,fromStatus:target.status,toStatus:status,at:now
       });
     });
+    await tryDrainPush(actingMember.unitId,accessNoticeId);
     return send(res,200,'Colaborador atualizado.');
   } catch(error) {
     if (error.message === 'UNAUTHENTICATED') return send(res,401,'Faça login.');

@@ -200,6 +200,7 @@ export default async function handler(req,res){
    const coverageIssues=[...new Set((snap.data().entries||[]).map(e=>e.date))].flatMap(date=>coverageTimeline({date,entries:snap.data().entries||[],people:masterActive?registryList:members,requirements})).filter(r=>r.deficit>0);
    if(coverageIssues.length)return send(res,409,'Há intervalos sem cobertura mínima.',{issues:coverageIssues.slice(0,20).map(r=>r.date+' · '+r.sector+' · '+r.start+'–'+r.end+' · déficit '+r.deficit+(r.skill?' em '+r.skill:''))});
    const states={submit:'in_review',approve:'approved',publish:'published'},now=new Date();
+   const publicationNoticeId='schedule_'+id+'_'+now.getTime();
    const lockRef=unit.collection('schedulePublicationState').doc(snap.data().period);
    await db.runTransaction(async tx=>{
     const [member,current,lock]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref),action==='publish'?tx.get(lockRef):Promise.resolve(null)]);
@@ -226,8 +227,9 @@ export default async function handler(req,res){
      for(const request of requests.docs.filter(d=>d.data().status==='approved')){const r=request.data();const uid=masterActive?registryList.find(x=>x.accountUid===r.uid||x.uid===r.uid)?.uid:r.uid;if(!uid||!(current.data().entries||[]).some(e=>e.uid===uid&&e.date===r.date&&['off','leave','monthly_sunday'].includes(e.type)))throw Error('APPROVED_LEAVE_CONFLICT');}
      if(previous?.exists&&previous.data().status==='published')tx.update(previousRef,{status:'superseded',supersededAt:now,supersededBy:id});
      tx.set(lockRef,{activeId:id,unitId:m.unitId,period:current.data().period,updatedAt:now});
+     queuePush(tx,db,m.unitId,publicationNoticeId,{audience:'unit',title:'Nova escala publicada',page:'mural'});
      for(const worker of memberList){
-      const noticeRef=unit.collection('memberNotifications').doc(worker.accountUid||worker.uid).collection('items').doc();
+      const noticeRef=unit.collection('memberNotifications').doc(worker.accountUid||worker.uid).collection('items').doc(publicationNoticeId);
       tx.create(noticeRef,{title:'Nova escala publicada',message:current.data().title+' · '+current.data().period,unitId:m.unitId,recipientUid:worker.accountUid||worker.uid,actorUid:actor.uid,read:false,at:now});
      }
     }
@@ -235,6 +237,7 @@ export default async function handler(req,res){
     signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'schedule.'+action,unitId:m.unitId,actorUid:actor.uid,scheduleId:id,at:now,revision:current.data().revision});
    });
+   if(action==='publish')await tryDrainPush(m.unitId,publicationNoticeId);
    return send(res,200,action==='publish'?'Escala publicada no Mural.':'Escala encaminhada para próxima etapa.');
   }
   return send(res,400,'Ação inválida.');
