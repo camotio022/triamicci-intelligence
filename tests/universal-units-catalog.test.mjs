@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {MASS_UNITS,VOLUME_UNITS,COUNT_UNITS,STOCK_UNITS,RECEIVING_UNITS,PREPARED_OUTPUT_UNITS,RECIPE_RESULT_UNITS,INGREDIENT_UNITS,UNIT_LABELS,normalizeUnit,convertPhysical,convertPackage} from '../server/operations/unit-engine.js';
+import {MASS_UNITS,VOLUME_UNITS,COUNT_UNITS,STOCK_UNITS,RECEIVING_UNITS,CATALOG_56_UNITS,PREPARED_OUTPUT_UNITS,RECIPE_RESULT_UNITS,INGREDIENT_UNITS,UNIT_LABELS,normalizeUnit,convertPhysical,convertPackage} from '../server/operations/unit-engine.js';
 import {RECEIVING_UNITS as receivingUnits,STOCK_UNITS as stockUnits,inUnit,previewStock} from '../server/operations/receiving-model.js';
 import {countUnit,validQuantity} from '../server/operations/logic.js';
 import {validateOperationalProfile} from '../server/operations/v3-catalog-policy.js';
@@ -14,6 +14,8 @@ test('cadastro central define códigos únicos para o projeto e preserva alias l
  assert.equal(normalizeUnit('ml'),'mL');
  assert.equal(normalizeUnit('kg'),'kg');
  assert.ok(RECEIVING_UNITS.includes('fardo'));
+ for(const u of CATALOG_56_UNITS)assert.ok(STOCK_UNITS.includes(u));
+ assert.deepEqual(CATALOG_56_UNITS,['kg','L','un']);
  for(const unit of PREPARED_OUTPUT_UNITS)assert.ok(STOCK_UNITS.includes(unit));
  for(const unit of INGREDIENT_UNITS)assert.ok(STOCK_UNITS.includes(unit));
  for(const unit of RECIPE_RESULT_UNITS)assert.ok(STOCK_UNITS.includes(unit)||unit==='balde');
