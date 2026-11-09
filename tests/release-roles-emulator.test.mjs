@@ -130,6 +130,19 @@ test('entrega: rotina e fronteiras dos cinco perfis, folgas, cobertura e revoga�
  const bulk=db.batch();for(let i=0;i<25;i++)bulk.set(unit.collection('receiptShipments').doc(randomUUID()),{status:'approved',createdAt:new Date(Date.now()+i),lines:[],supplier:'TESTE histórico'});
  const pendingId=randomUUID();bulk.set(unit.collection('receiptShipments').doc(pendingId),{status:'pending',createdAt:new Date('2020-01-01'),lines:[],supplier:'TESTE pendência antiga'});await bulk.commit();
  const pending=await expect(shipments,manager,'shipmentsList',{},200);assert.equal(pending.pendingShipments.some(s=>s.id===pendingId),true);assert.equal(pending.pendingComplete,true);
+ // Regressão: trocar o papel de uma conta ativa gera inbox e push do MESMO aviso.
+ await expect(members,manager,'update',{uid:people.cook.uid,role:'auxiliar',status:'active'},200);
+ const accessInbox=await unit.collection('memberNotifications').doc(people.cook.uid).collection('items').get();
+ const accessNotice=accessInbox.docs.find(d=>d.data().title==='Acesso atualizado');assert.ok(accessNotice);
+ const accessEvent=await unit.collection('pushOutbox').doc(accessNotice.id).get();
+ assert.equal(accessEvent.data().uid,people.cook.uid);assert.equal(accessEvent.data().audience,'member');
+ assert.equal((await db.doc('memberships/'+people.cook.uid).get()).data().role,'auxiliar');
+ await db.doc('pushDevices/release-device-'+unitId).set({uid:people.cook.uid,unitId,subscription:{endpoint:'https://web.push.apple.com/test'}});
+ const {drainPush}=await import('../server/push/delivery.js');let pushes=0;
+ process.env.WEB_PUSH_PUBLIC_KEY='test';process.env.WEB_PUSH_PRIVATE_KEY='test';
+ try{await drainPush(unitId,{db,eventId:accessNotice.id,transport:async(_sub,payload)=>{pushes++;assert.equal(JSON.parse(payload).title,'Acesso atualizado')}})}finally{delete process.env.WEB_PUSH_PUBLIC_KEY;delete process.env.WEB_PUSH_PRIVATE_KEY}
+ assert.equal(pushes,1);assert.equal((await accessEvent.ref.get()).data().state,'sent');
+ assert.equal((await unit.collection('memberNotifications').doc(people.cook.uid).collection('items').get()).size,accessInbox.size);
  await db.doc('memberships/'+people.cook.uid).update({status:'inactive'});
  for(const [handler,action] of [[members,'myProfile'],[mural,'publicNotices'],[kitchen,'v3Dashboard'],[attendance,'today']])await expect(handler,people.cook,action,{},403);
 });

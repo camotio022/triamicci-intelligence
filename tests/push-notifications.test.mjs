@@ -65,3 +65,17 @@ test('failed transaction never leaves a push event to deliver',async()=>{
  const db=memoryDb();await assert.rejects(db.runTransaction(async tx=>{queuePush(tx,db,'a','rollback',{uid:'u',title:'Aviso'});throw Error('business rejected')}));
  assert.equal(db.rows.has('units/a/pushOutbox/rollback'),false);
 });
+
+test('access change still delivers after downgrade to auxiliar, without duplicating the existing inbox',async()=>{
+ const db=memoryDb();seed(db,'u','a','auxiliar');
+ db.rows.set('units/a/memberNotifications/u/items/access',{title:'Acesso atualizado',message:'admin → auxiliar',read:false});
+ await enqueue(db,'access',{uid:'u',title:'Acesso atualizado',page:'my-profile'});let count=0;
+ await drainPush('a',{db,eventId:'access',transport:async()=>{count++}});
+ assert.equal(count,1);assert.equal(db.rows.get('units/a/memberNotifications/u/items/access').message,'admin → auxiliar');
+});
+test('published schedule reaches active unit members only',async()=>{
+ const db=memoryDb();seed(db,'cook','a','cook');seed(db,'aux','a','auxiliar');seed(db,'foreign','b','manager');
+ await enqueue(db,'publication',{audience:'unit',title:'Nova escala publicada',page:'mural'});let count=0;
+ await drainPush('a',{db,eventId:'publication',transport:async()=>{count++}});assert.equal(count,2);
+ assert.equal(db.rows.has('units/a/memberNotifications/foreign/items/publication'),false);
+});
