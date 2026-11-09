@@ -17,7 +17,7 @@ export function recipeAvailability(recipe,products){
  for(const id of ids){
   const p=products.find(p=>p.id===id);
   if(!p||!isOperationalProduct(p)){errors.push(`${p?.name||'Insumo vinculado'}: indisponível no catálogo operacional desta unidade.`);continue;}
-  const problem=balanceProblem(p);if(problem)errors.push(problem);
+  // Cadastro e planejamento independem dos saldos físicos; a execução valida a contagem.
  }
  const output=products.find(p=>p.id===recipe.outputProductId);
  if(output&&recipe.stockEffect!=='portion_same_product'&&recipe.outputUnit&&recipe.outputUnit!==(output.physicalUnit||countUnit(output)))errors.push('A unidade de saída da ficha mudou no catálogo. Revise e ative novamente a preparação.');
