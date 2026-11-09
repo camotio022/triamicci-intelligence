@@ -36,20 +36,24 @@ export default async function handler(req,res){
    if(!idOk(storageId)||!productOk(productId))return send(res,400,'Armazenamento ou produto inválido.');
    const date=dayKey(),docId=createHash('sha256').update(date+'|'+storageId+'|'+productId).digest('hex');
    const countRef=root.collection('storageCountsV1').doc(docId);
-   const storageRef=spaces.doc(storageId),linkRef=links.doc(productId),productRef=root.collection('products').doc(productId);
+   const storageRef=spaces.doc(storageId),linkRef=links.doc(productId),productRef=root.collection('products').doc(productId),balanceRef=root.collection('storageBalancesV1').doc(productId);
    let recorded;
    await db.runTransaction(async tx=>{
-    const [who,storage,link,product,previous]=await tx.getAll(db.doc('memberships/'+actor.uid),storageRef,linkRef,productRef,countRef);
+    const [who,storage,link,product,previous,balance]=await tx.getAll(db.doc('memberships/'+actor.uid),storageRef,linkRef,productRef,countRef,balanceRef);
     if(who.data()?.status!=='active'||who.data()?.unitId!==member.unitId||!TEAM_ROLES.includes(who.data()?.role))throw Error('FORBIDDEN');
     if(!storage.exists||storage.data().active===false||!link.data()?.allowedStorageIds?.includes(storageId)||!product.exists||product.data().status!=='active')throw Error('STORAGE');
     const unit=countedUnit(product.data());
     if(!unit||!validQuantity(quantity,{unit,allowZero:true}))throw Error('QUANTITY');
     if(previous.data()?.status==='approved')throw Error('CLOSED');
+    if(balance.exists&&(balance.data().unit!==unit||!validateUnifiedBalance(balance.data())))throw Error('UNIT');
+    const previousStock=balance.exists?balance.data().byStorage?.[storageId]||0:null;
+    const difference=previousStock===null?null:Math.round((quantity-previousStock)*1000)/1000;
+    const balanceVersion=balance.exists?balance.data().version||0:0;
     const now=new Date(),version=(previous.data()?.version||0)+1;
-    tx.set(countRef,{day:date,storageId,productId,quantity,unit,version,actorUid:actor.uid,at:now,kind:'PHYSICAL_OBSERVATION',status:'pending',affectsOfficialBalance:false});
+    tx.set(countRef,{day:date,storageId,productId,quantity,unit,version,actorUid:actor.uid,at:now,kind:'PHYSICAL_OBSERVATION',status:'pending',expected:previousStock,difference,balanceVersionAtCount:balanceVersion,affectsOfficialBalance:false});
     tx.create(db.collection('auditLogs').doc(),{event:'storage.count_recorded',unitId:member.unitId,storageId,productId,actorUid:actor.uid,at:now,before:previous.data()?{quantity:previous.data().quantity,unit:previous.data().unit}:null,after:{quantity,unit,version}});
     signalUnitChange(tx,db,member.unitId,['stock']);
-    recorded={day:date,storageId,productId,quantity,unit,version};
+    recorded={day:date,storageId,productId,quantity,unit,version,difference,expected:previousStock};
    });
    return send(res,200,'Conferência registrada para revisão gerencial. O saldo oficial não foi alterado.',{count:recorded});
   }
@@ -70,6 +74,7 @@ export default async function handler(req,res){
     if(decision==='approve'){
      const current=balance.exists?balance.data():newUnifiedBalance(prior.unit);
      if(!validateUnifiedBalance(current)||current.unit!==prior.unit)throw Error('UNIT');
+     if((current.version||0)!==(prior.balanceVersionAtCount||0))throw Error('CONFLICT');
      const next=applyStorageCount(current,{storageId,quantity:prior.quantity,unit:prior.unit});
      if(!next.ok)throw Error('QUANTITY');
      const nextVersion=(current.version||0)+1;
