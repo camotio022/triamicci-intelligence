@@ -1,10 +1,9 @@
 // Regras puras de apresentação de recebimento, conversão fixa e previsão de rendimento.
 // Nenhum cálculo desta unidade altera saldos: só a conferência aprovada o faz.
-export const RECEIVING_UNITS=['kg','g','L','ml','mL','un','porcao','pacote','duzia','caixa','fardo'];
-export const STOCK_UNITS=['kg','g','L','ml','mL','un','porcao','pacote','duzia'];
+import {RECEIVING_UNITS,STOCK_UNITS,normalizeUnit} from './unit-engine.js';
+export {RECEIVING_UNITS,STOCK_UNITS};
 const quantityUnits=new Set(['un','porcao','pacote','duzia','caixa','fardo']);
-const normalizeUnit=u=>u==='mL'?'ml':u;
-const exactFactors={kg:1000,g:1,L:1000,ml:1};
+const exactFactors={kg:1000,g:1,L:1000,mL:1};
 const dimension=u=>['kg','g'].includes(u)?'weight':['L','ml','mL'].includes(u)?'volume':quantityUnits.has(u)?'count':null;
 export function inUnit(amount,from,to){
  if(!Number.isFinite(amount)||amount<0)return null;
