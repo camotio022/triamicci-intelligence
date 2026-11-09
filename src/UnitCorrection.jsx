@@ -1,8 +1,9 @@
 import {isManagement} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
+import {STOCK_UNITS,RECEIVING_UNITS,UNIT_LABELS} from '../server/operations/unit-engine.js';
 import React,{useState} from 'react';
 import {auth} from './firebase.js';
-const units=['un','kg','g','L','ml'];
+const renderUnit=unit=><option key={unit} value={unit}>{unit} · {UNIT_LABELS[unit]}</option>;
 export default function UnitCorrection({product,membership,onUpdated}){
  const [open,setOpen]=useState(false);
  const [operational,setOperational]=useState(product.operationalUnitOverride||product.unit);
@@ -27,12 +28,12 @@ export default function UnitCorrection({product,membership,onUpdated}){
  };
  return <section className="product-detail-panel stock-actions-panel">
   <h2>Configuração administrativa</h2>
-  <p>Corrija a unidade de contagem ou de recebimento deste produto sem modificar saldos anteriores. A correção é auditada e exige nova contagem física.</p>
+  <p>Selecione as unidades padronizadas de contagem e recebimento deste produto sem modificar saldos anteriores. A correção é auditada e exige nova contagem física.</p>
   <button type="button" onClick={()=>setOpen(v=>!v)}>{open?'Cancelar revisão':'Revisar unidades de medida'}</button>
   {open&&<form className="stock-action-form" onSubmit={submit}>
    <div className="inventory-fields">
-    <label>Unidade física (reserva/giro)<select value={operational} onChange={e=>setOperational(e.target.value)}>{units.map(u=><option key={u}>{u}</option>)}</select></label>
-    <label>Unidade comercial do pedido<select value={receiving} onChange={e=>setReceiving(e.target.value)}>{units.map(u=><option key={u}>{u}</option>)}</select></label>
+    <label>Unidade física (reserva/giro)<select value={operational} onChange={e=>setOperational(e.target.value)}>{STOCK_UNITS.map(renderUnit)}</select></label>
+    <label>Unidade comercial do pedido<select value={receiving} onChange={e=>setReceiving(e.target.value)}>{RECEIVING_UNITS.map(renderUnit)}</select></label>
     <label>Justificativa<input required minLength={8} maxLength={240} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Ex.: latinha contada por unidade, não por mililitros"/></label>
    </div>
    <p>Ao salvar, o saldo legado e as contagens históricas permanecem na unidade original. Faça uma nova contagem imediatamente para validar o estoque físico.</p>

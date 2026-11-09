@@ -8,7 +8,7 @@ import measurementsHandler from '../../server/operations/handlers/measurements.j
 import { createHash } from 'node:crypto';
 import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
 import {countUnit} from '../../server/operations/logic.js';
-import {PRODUCT_BASIC_UNITS} from '../../server/operations/unit-engine.js';
+import {PRODUCT_BASIC_UNITS,STOCK_UNITS,RECEIVING_UNITS} from '../../server/operations/unit-engine.js';
 
 const units = PRODUCT_BASIC_UNITS;
 const normalize = value => typeof value === 'string' ? value.trim().replace(/\s+/g,' ') : '';
@@ -56,7 +56,7 @@ export default async function handler(req,res) {
       if(!isManagement(m.role))return send(res,403,'Somente a gestão da unidade pode corrigir unidades.');
       const {productId,operationalUnit,receivingUnit,reason,confirm}=req.body||{};
       if(confirm!=='RECONTAR_UNIDADE'||typeof productId!=='string'||!/^[a-f0-9]{40}$/.test(productId)||
-         !units.includes(operationalUnit)||!units.includes(receivingUnit)||
+         !STOCK_UNITS.includes(operationalUnit)||!RECEIVING_UNITS.includes(receivingUnit)||
          typeof reason!=='string'||reason.trim().length<8||reason.trim().length>240)
        return send(res,400,'Informe as unidades, justificativa e confirme a necessidade de nova contagem.');
       const productRef=products.doc(productId),memberRef=db.doc('memberships/'+actor.uid);

@@ -14,6 +14,10 @@ test('cadastro central define códigos únicos para o projeto e preserva alias l
  assert.equal(normalizeUnit('ml'),'mL');
  assert.equal(normalizeUnit('kg'),'kg');
  assert.ok(RECEIVING_UNITS.includes('fardo'));
+ // Correção administrativa deve aceitar a mesma lista do motor, inclusive embalagens comerciais.
+ for(const u of STOCK_UNITS)assert.ok(RECEIVING_UNITS.includes(u));
+ assert.ok(!STOCK_UNITS.includes('caixa'));
+ assert.ok(RECEIVING_UNITS.includes('caixa'));
  for(const u of CATALOG_56_UNITS)assert.ok(STOCK_UNITS.includes(u));
  for(const u of PRODUCT_BASIC_UNITS)assert.ok(STOCK_UNITS.includes(u));
  for(const u of PACKAGE_CONTENT_UNITS)assert.ok(STOCK_UNITS.includes(u));
