@@ -8,8 +8,9 @@ import measurementsHandler from '../../server/operations/handlers/measurements.j
 import { createHash } from 'node:crypto';
 import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
 import {countUnit} from '../../server/operations/logic.js';
+import {PRODUCT_BASIC_UNITS} from '../../server/operations/unit-engine.js';
 
-const units = ['kg','g','L','ml','un'];
+const units = PRODUCT_BASIC_UNITS;
 const normalize = value => typeof value === 'string' ? value.trim().replace(/\s+/g,' ') : '';
 const validName = value => value.length >= 2 && value.length <= 100;
 const validCategory = value => value.length >= 2 && value.length <= 60;
