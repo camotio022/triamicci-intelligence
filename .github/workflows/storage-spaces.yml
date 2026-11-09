@@ -23,5 +23,6 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
-      - run: node --test tests/storage-spaces.test.mjs tests/storage-balance-engine.test.mjs tests/storage-receipt-allocation.test.mjs
+      - run: node --test tests/storage-spaces.test.mjs tests/storage-balance-engine.test.mjs tests/storage-receipt-allocation.test.mjs tests/storage-access.test.mjs
+      - run: node --check server/storage/handler.js && node --check server/storage/receiving.js && node --check server/storage/production.js && node --check api/operations/stock.js
       - run: npm run build
