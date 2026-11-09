@@ -27,3 +27,17 @@ test('pré-recebimento é rastreável sem movimentar o saldo oficial',()=>{
  assert.deepEqual(receiptStage({receiptId:'r1',productId:'p1',quantity:20,unit:'kg',alreadyAllocated:12}),{ok:true,receiptId:'r1',productId:'p1',quantity:20,unit:'kg',remaining:8,status:'pending_manager_approval',affectsOfficialBalance:false});
  assert.equal(receiptStage({receiptId:'r1',productId:'p1',quantity:10,unit:'kg',alreadyAllocated:12}).ok,false);
 });
+
+test('revisão independente: um local não invalida a contagem de outro',()=>{
+ const base=newUnifiedBalance('un');
+ const a=applyStorageCount(base,{storageId:'reserva',quantity:20,unit:'un'}).balance;
+ assert.equal(a.locationVersions.reserva,1);
+ assert.equal(a.locationVersions.giro||0,0);
+ const b=applyStorageCount(a,{storageId:'giro',quantity:5,unit:'un'}).balance;
+ assert.equal(b.locationVersions.reserva,1);
+ assert.equal(b.locationVersions.giro,1);
+ const transferred=applyStorageTransfer(b,{from:'reserva',to:'giro',quantity:3,unit:'un'}).balance;
+ assert.equal(transferred.locationVersions.reserva,2);
+ assert.equal(transferred.locationVersions.giro,2);
+ assert.equal(transferred.total,25);
+});

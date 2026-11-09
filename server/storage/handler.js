@@ -68,7 +68,7 @@ export default async function handler(req,res){
     if(!availability&&balance.exists&&(balance.data().unit!==unit||!validateUnifiedBalance(balance.data())))throw Error('UNIT');
     const previousStock=availability?null:balance.exists?balance.data().byStorage?.[storageId]||0:null;
     const difference=previousStock===null?null:Math.round((quantity-previousStock)*1000)/1000;
-    const balanceVersion=balance.exists?balance.data().version||0:0;
+    const balanceVersion=balance.exists?balance.data().locationVersions?.[storageId]||0:0;
     const now=new Date(),version=(previous.data()?.version||0)+1;
     tx.set(countRef,{day:date,storageId,productId,quantity:availability?null:quantity,unit,version,actorUid:actor.uid,at:now,kind:availability?'AVAILABILITY_OBSERVATION':'PHYSICAL_OBSERVATION',status:availability?'approved':'pending',observation:availability?observation:null,expected:previousStock,difference,balanceVersionAtCount:balanceVersion,affectsOfficialBalance:false});
     tx.create(db.collection('auditLogs').doc(),{event:'storage.count_recorded',unitId:member.unitId,storageId,productId,actorUid:actor.uid,at:now,before:previous.data()?{quantity:previous.data().quantity,unit:previous.data().unit}:null,after:{quantity:availability?null:quantity,unit,version,observation:availability?observation:null}});
@@ -94,7 +94,7 @@ export default async function handler(req,res){
     if(decision==='approve'){
      const current=balance.exists?balance.data():newUnifiedBalance(prior.unit);
      if(!validateUnifiedBalance(current)||current.unit!==prior.unit)throw Error('UNIT');
-     if((current.version||0)!==(prior.balanceVersionAtCount||0))throw Error('CONFLICT');
+     if((current.locationVersions?.[storageId]||0)!==(prior.balanceVersionAtCount||0))throw Error('CONFLICT');
      const next=applyStorageCount(current,{storageId,quantity:prior.quantity,unit:prior.unit});
      if(!next.ok)throw Error('QUANTITY');
      const nextVersion=(current.version||0)+1;
