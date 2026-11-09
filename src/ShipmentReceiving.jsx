@@ -12,7 +12,6 @@ import {auth} from './firebase.js';
 import {useUnitLive} from './useUnitLive.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {receivingUnit, receivingLineError} from '../server/operations/receiving-input.js';
-import {RECEIVING_UNITS} from '../server/operations/unit-engine.js';
 const blank=()=>({productId:'',commercialQuantity:'',commercialUnit:'kg',stockQuantity:'',location:'reserva',lot:'',expiryDate:''});
 async function api(action,payload={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login.');const r=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
 export default function ShipmentReceiving({approvedReceipts=[],products,orders,membership,onChange,onConfigure}){
