@@ -108,7 +108,7 @@ export default function KitchenV3({membership}){
    {tab==='history'&&<KitchenV3History products={products}/>}
    {tab==='loss'&&<KitchenV3Loss membership={membership} products={products} onChange={load}/>}
    {tab==='count'&&<StockConference membership={membership}/>}
-   {tab==='storages'&&canManage&&<StorageManager membership={membership}/>}
+   {tab==='storages'&&canManage&&<StorageManager membership={membership} initialProducts={products}/>}
    {['receive','produce','transfer'].includes(tab)&&<KitchenV3Workflows key={tab} kind={tab} products={products} orders={orders} membership={membership} onChange={()=>load(true)} onConfigure={p=>p?begin(p):setTab('catalog')}/>}
    {tab==='overview'&&<div className="ti-v4-stock-overview">
     <div className="ti-v4-stock-overview-stats" aria-label="Resumo de estoque">
