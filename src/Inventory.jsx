@@ -90,7 +90,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
   if(!hasData)return <section className="inventory-page"><h1>Catálogo e estoque</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>load()}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
  return <section className="inventory-page">
     <p className="eyebrow">OPERAÇÃO · UNIDADE {membership.unitId.toUpperCase()}</p>
-    <h1>{administration?'Administração · Catálogo':'Estoque físico da cozinha'}</h1>
+    <h1>{administration?'Gestão de Insumos':'Estoque físico da cozinha'}</h1>
     <p>{administration?'Revise cadastros, aprovações e configurações sem misturar essas tarefas com a rotina de estoque.':'Consulte a última contagem de reserva e giro. Produtos sem primeira contagem aparecem como não conferidos.'}</p>
     {!administration&&<nav className="inventory-actions" aria-label="Ações do estoque"><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent('ti-navigate',{detail:'kitchen-v3'}))}>Registrar movimentação</button><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent('ti-navigate',{detail:'daily-inventory'}))}>Investigar diferenças</button></nav>}
     {administration&&<div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>}
