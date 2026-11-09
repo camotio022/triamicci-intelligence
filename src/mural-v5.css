@@ -33,3 +33,19 @@
 .ti-mural-v5-nav button:first-child{background:#a71919;color:#fff;border-color:#a71919}
 #mural-v5-team,#mural-v5-notices,#mural-v5-schedule,#mural-v5-production{scroll-margin-top:100px}
 .ti-mural-v5-roster .ti-v4-roster-summary{margin-bottom:12px}
+
+
+/* Mural mirrors the production checklist without duplicating execution state. */
+.ti-mural-prod-count{color:#a71916;font-weight:800;font-size:12px;white-space:nowrap}
+.ti-mural-prod-mini{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:6px}
+.ti-mural-prod-mini li{display:flex;gap:8px;align-items:center;min-width:0;padding:9px 8px;border:1px solid #e7e8ec;border-radius:11px;background:#fff}
+.ti-mural-prod-mini li.is-complete{background:#f7faf8;border-color:#d6eadd}
+.ti-mural-prod-icon{display:flex;flex:0 0 19px;color:#8b95a3}
+.ti-mural-prod-mini li.is-complete .ti-mural-prod-icon{color:#16854d}
+.ti-mural-prod-content{display:block;flex:1;min-width:0}
+.ti-mural-prod-content strong{display:block;font-size:12px;line-height:1.25}
+.ti-mural-prod-content small{display:block;color:#6b7280;font-size:10px;line-height:1.3;margin-top:3px}
+.ti-mural-prod-track{display:block;overflow:hidden;height:3px;border-radius:999px;background:#e6ebef;margin-top:5px}
+.ti-mural-prod-track>span{display:block;height:100%;background:#a71916}
+.ti-mural-prod-mini li.is-complete .ti-mural-prod-track>span{background:#16854d}
+.ti-mural-prod-action{flex:none;border:1px solid #a71916;background:#fff;color:#a71916;border-radius:9px;min-height:36px;padding:7px 9px;font-size:11px;font-weight:800;cursor:pointer}
