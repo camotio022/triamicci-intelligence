@@ -1,8 +1,8 @@
 import SameProductPortioning from './SameProductPortioning.jsx';
 import PreparationSetup from './PreparationSetup.jsx';
 import {apiFetch} from './api-fetch.js';
-import React,{useCallback,useEffect,useState} from 'react';
-import {BookOpen,ClipboardList} from 'lucide-react';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
+import {CheckCircle2,ClipboardList,Clock3} from 'lucide-react';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import './production-v4.css';
 import {useUnitLive} from './useUnitLive.js';
@@ -18,8 +18,9 @@ async function call(path,action,payload={}){
   body:JSON.stringify({action,...payload})});
  const data=await res.json();if(!res.ok)throw Object.assign(Error(data.message||'Erro na operação.'),{data});return data;
 }
-export default function Production({membership}){
+export default function Production({membership,initialTaskId}){
  const {notify}=useFeedback();
+ const openedTaskRef=useRef(null);
  const [view,setView]=useState('today'),[setupRecipe,setSetupRecipe]=useState(null),[setupDirty,setSetupDirty]=useState(false);
  const switchView=next=>{if(next!==view&&setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setView(next);};
  const [blockedRecipes,setBlockedRecipes]=useState([]),[reviewRecipes,setReviewRecipes]=useState([]);
@@ -46,6 +47,14 @@ export default function Production({membership}){
 
  const live=useUnitLive(membership?.unitId,initial=>Promise.all([load(!initial),loadTasks()]),{domains:['stock','catalog','production']});
  useEffect(()=>{const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
+ const openExecution=(task)=>{choose(task.recipeId,task);setActiveTaskId(task.id);requestAnimationFrame(()=>document.querySelector('.production-page .ti-v4-production-layout')?.scrollIntoView({behavior:'smooth',block:'start'}));};
+ useEffect(()=>{
+  if(!initialTaskId||openedTaskRef.current===initialTaskId||!dailyTasks.length||!recipes.length)return;
+  const task=dailyTasks.find(t=>t.id===initialTaskId);
+  if(!task||task.status==='completed'||!recipes.some(r=>r.id===task.recipeId))return;
+  openedTaskRef.current=initialTaskId;
+  openExecution(task);
+ },[initialTaskId,dailyTasks,recipes]);
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=(id,task=null)=>{
   setOutputLot('');setExpiryDate('');setRecipeId(id);setRequestId(null);setConfirmed(false);setActiveTaskId(null);
@@ -102,7 +111,18 @@ export default function Production({membership}){
   {view==='today'&&<section className="receiving-card ti-v4-daily-tasks"><h2>Lista de produção de hoje</h2><p>Planejamento compartilhado da cozinha. Só a confirmação da quantidade realmente produzida movimenta o estoque.</p>
    {!loading&&recipes.length===0&&<p className="production-empty">Ainda não há preparações disponíveis. {admin?'Abra Preparações para revisar e ativar o cadastro.':'A gestão precisa revisar e ativar as preparações.'}</p>}
    {canPlan&&recipes.length>0&&<form className="ti-v4-daily-task-form" onSubmit={addDailyTask}><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional ({recipes.find(r=>r.id===plannedRecipe)?.outputUnit||'un'})<input type="number" min="0.001" max="10000" step="0.001" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading||loading}>Adicionar à lista</button></form>}
-   {dailyTasks.length===0?<p className="ti-v4-production-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-daily-task-list">{dailyTasks.map(task=><li key={task.id}><div><strong>{task.recipeName}</strong><small>{task.status==="completed"?`Concluída: ${task.completedQuantity} ${task.unit||'un'}`:task.status==="partial"?`Parcial: ${task.completedQuantity} de ${task.plannedQuantity} ${task.unit||'un'}`:task.plannedQuantity?`Meta: ${task.plannedQuantity} ${task.unit||'un'}`:"Quantidade a definir"}</small></div>{task.status!=="completed"?<button type="button" disabled={!recipes.some(r=>r.id===task.recipeId)} title={!recipes.some(r=>r.id===task.recipeId)?'Preparação indisponível; solicite revisão à gestão':undefined} onClick={()=>{choose(task.recipeId,task);setActiveTaskId(task.id);document.querySelector(".production-page .ti-v4-production-layout")?.scrollIntoView({behavior:"smooth",block:"start"})}}>{recipes.some(r=>r.id===task.recipeId)?'Registrar execução':'Preparação indisponível'}</button>:<span className="ti-v4-task-done">Concluída</span>}</li>)}</ul>}
+   <div className="ti-production-today-heading"><span>{dailyTasks.filter(t=>t.status==='completed').length} de {dailyTasks.length} concluídas</span><small>Marcação automática depois do registro confirmado</small></div>
+   {dailyTasks.length===0?<p className="ti-v4-production-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-daily-task-list ti-production-checklist">{dailyTasks.map(task=>{
+    const done=task.status==='completed',partial=task.status==='partial',available=recipes.some(r=>r.id===task.recipeId);
+    const progress=task.plannedQuantity?Math.min(100,Math.round(100*(Number(task.completedQuantity)||0)/task.plannedQuantity)):null;
+    return <li key={task.id} className={'ti-production-check-card'+(done?' is-complete':'')}>
+     <span className={'ti-production-check-icon'+(done?' is-complete':'')} aria-hidden="true">{done?<CheckCircle2 size={22}/>:<Clock3 size={20}/>}</span>
+     <div className="ti-production-check-info"><strong>{task.recipeName}</strong><small>{done?'Concluída':partial?'Parcial · continuar':task.plannedQuantity?'Pendente':'Sem meta definida'} · {task.plannedQuantity?task.plannedQuantity+' '+(task.unit||'un')+' planejadas':'Quantidade livre'}</small>
+      {(partial||done)&&<small>{task.completedQuantity||0} {task.unit||'un'} registradas</small>}
+      {progress!==null&&<div className="ti-production-progress" role="progressbar" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100" aria-label={'Progresso de '+task.recipeName}><span style={{width:progress+'%'}}/></div>}
+     </div>
+     {done?<span className="ti-v4-task-done"><CheckCircle2 size={14}/> Feito</span>:<button type="button" disabled={!available} title={!available?'Preparação indisponível; solicite revisão à gestão':undefined} onClick={()=>openExecution(task)}>{available?(partial?'Continuar':'Registrar feito'):'Indisponível'}</button>}
+    </li>})}</ul>}
   </section>}
   <div className="production-layout ti-v4-production-layout">
    {view==='today'&&<section className="receiving-card">
