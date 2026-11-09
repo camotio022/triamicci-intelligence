@@ -1,8 +1,9 @@
+import {RECEIVING_UNITS} from './receiving-model.js';
 import {validQuantity} from './logic.js';
-const units=['kg','g','L','ml','mL','un','porcao','pacote','duzia'];
+const units=RECEIVING_UNITS;
 const normalized=unit=>unit==='mL'?'ml':unit;
 export function receivingConflict(product,profile,line){
- const expected=product.receivingUnitOverride||(units.includes(profile.receivingPresentation)?profile.receivingPresentation:product.unit);
+ const expected=profile.receivingModel?.receivingUnit||product.receivingUnitOverride||(units.includes(profile.receivingPresentation)?profile.receivingPresentation:product.unit);
  if(!units.includes(expected)||normalized(line.commercialUnit)!==normalized(expected))return 'RECEIVING_UNIT';
  if(profile.controlMode==='quantitative'){
   if(!validQuantity(line.stockQuantity,{unit:profile.countUnit}))return 'QUANTITY';
