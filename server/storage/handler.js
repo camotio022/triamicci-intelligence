@@ -11,7 +11,7 @@ import {sendQuotaError} from '../quota-error.js';
 const idOk=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,60}$/.test(x);
 const productOk=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
 const dayKey=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-const countedUnit=p=>[p.operationalUnitOverride,p.operationalUnit,p.unit].find(u=>STOCK_UNITS.includes(u))||null;
+const countedUnit=p=>[p.operationalUnitOverride,p.profile?.countUnit,p.operationalUnit,p.unit].find(u=>STOCK_UNITS.includes(u))||null;
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
@@ -28,7 +28,7 @@ export default async function handler(req,res){
    const bindings=l.docs.map(d=>({productId:d.id,...d.data()}));
    const counts=countsSnap.docs.map(d=>({id:d.id,...d.data(),at:d.data().at?.toDate?.()?.toISOString?.()||null}));
    const active=new Set(bindings.map(l=>l.productId+'|'+l.primaryStorageId));
-   const confirmed=counts.filter(x=>active.has(x.productId+'|'+x.storageId));
+   const confirmed=counts.filter(x=>active.has(x.productId+'|'+x.storageId)&&x.status!=='rejected');
    return send(res,200,'Armazenamentos configurados.',{storages:all,links:bindings,counts:confirmed,templates:STORAGE_TEMPLATES,day:today,progress:all.map(s=>({id:s.id,...progress(bindings.filter(l=>l.primaryStorageId===s.id).length,confirmed.filter(c=>c.storageId===s.id).length),scheduled:scheduled(s,today)})),countingEnabled:true,countsAffectOfficialBalance:false});
   }
   if(action==='storageCount'){
