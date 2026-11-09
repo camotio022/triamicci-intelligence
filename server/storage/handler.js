@@ -1,8 +1,8 @@
-import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
-import {isManagement} from '../../server/permissions/v31-policy.js';
-import {signalUnitChange} from '../../server/live-signal.js';
-import {STORAGE_TEMPLATES,STORAGE_ICONS,STORAGE_FREQUENCIES,validateStorage,scheduled,progress} from '../../server/storage/storage-model.js';
-import {sendQuotaError} from '../../server/quota-error.js';
+import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
+import {isManagement} from '../permissions/v31-policy.js';
+import {signalUnitChange} from '../live-signal.js';
+import {STORAGE_TEMPLATES,STORAGE_ICONS,STORAGE_FREQUENCIES,validateStorage,scheduled,progress} from './storage-model.js';
+import {sendQuotaError} from '../quota-error.js';
 
 const idOk=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,60}$/.test(x);
 const productOk=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
@@ -14,7 +14,7 @@ export default async function handler(req,res){
   if(!member?.unitId)return send(res,403,'Vínculo ativo necessário.');
   const db=getDb(),root=db.collection('units').doc(member.unitId),spaces=root.collection('storageSpacesV1'),links=root.collection('storageLinksV1');
   const {action}=req.body||{};
-  if(action==='list'){
+  if(action==='storageList'){
    const [s,l]=await Promise.all([spaces.limit(81).get(),links.limit(201).get()]);
    if(s.size>80||l.size>200)return send(res,409,'Limite inicial atingido; é necessário paginar.');
    const all=s.docs.map(d=>({id:d.id,...d.data(),updatedAt:d.data().updatedAt?.toDate?.()?.toISOString?.()||null}));
@@ -23,7 +23,7 @@ export default async function handler(req,res){
    return send(res,200,'Armazenamentos configurados.',{storages:all,links:bindings,templates:STORAGE_TEMPLATES,day:today,progress:all.map(s=>({id:s.id,...progress(bindings.filter(l=>l.primaryStorageId===s.id).length,0),scheduled:scheduled(s,today)})),countingEnabled:false});
   }
   if(!isManagement(member.role))return send(res,403,'Somente gestão pode configurar armazenamentos.');
-  if(action==='save'){
+  if(action==='storageSave'){
    const {storage={},storageId=null,expectedVersion=0}=req.body;
    if(storageId!==null&&!idOk(storageId)||!Number.isInteger(expectedVersion)||expectedVersion<0)return send(res,400,'Identificação ou versão inválida.');
    const problem=validateStorage(storage);
@@ -46,7 +46,7 @@ export default async function handler(req,res){
    });
    return send(res,200,'Armazenamento salvo.',{storage:result});
   }
-  if(action==='assign'){
+  if(action==='storageAssign'){
    const {storageId,productIds}=req.body;
    if(!idOk(storageId)||!Array.isArray(productIds)||productIds.length<1||productIds.length>60||productIds.some(x=>!productOk(x))||new Set(productIds).size!==productIds.length)return send(res,400,'Selecione até 60 insumos válidos.');
    const ref=spaces.doc(storageId);

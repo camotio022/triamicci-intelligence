@@ -9,7 +9,7 @@ const icons={package:Package,leaf:Leaf,snowflake:Snowflake,beef:Beef,refrigerato
 const empty=()=>({name:'',icon:'warehouse',area:'reserva',frequency:'daily',weekdays:[1,2,3,4,5]});
 async function call(action,extra={}){
  const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');
- const res=await apiFetch('/api/storage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
+ const res=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'storage'+action.charAt(0).toUpperCase()+action.slice(1),...extra})});
  const data=await res.json();if(!res.ok)throw Error(data.message||'Não foi possível carregar os armazenamentos.');
  return data;
 }
