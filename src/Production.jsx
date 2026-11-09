@@ -1,8 +1,8 @@
 import SameProductPortioning from './SameProductPortioning.jsx';
 import PreparationSetup from './PreparationSetup.jsx';
 import {apiFetch} from './api-fetch.js';
-import React,{useCallback,useEffect,useState} from 'react';
-import {BookOpen,ClipboardList} from 'lucide-react';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
+import {CheckCircle2,ClipboardList,Clock3} from 'lucide-react';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import './production-v4.css';
 import {useUnitLive} from './useUnitLive.js';
@@ -18,8 +18,9 @@ async function call(path,action,payload={}){
   body:JSON.stringify({action,...payload})});
  const data=await res.json();if(!res.ok)throw Object.assign(Error(data.message||'Erro na operação.'),{data});return data;
 }
-export default function Production({membership}){
+export default function Production({membership,initialTaskId}){
  const {notify}=useFeedback();
+ const openedTaskRef=useRef(null);
  const [view,setView]=useState('today'),[setupRecipe,setSetupRecipe]=useState(null),[setupDirty,setSetupDirty]=useState(false);
  const switchView=next=>{if(next!==view&&setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setView(next);};
  const [blockedRecipes,setBlockedRecipes]=useState([]),[reviewRecipes,setReviewRecipes]=useState([]);
@@ -46,6 +47,14 @@ export default function Production({membership}){
 
  const live=useUnitLive(membership?.unitId,initial=>Promise.all([load(!initial),loadTasks()]),{domains:['stock','catalog','production']});
  useEffect(()=>{const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
+ const openExecution=(task)=>{choose(task.recipeId,task);setActiveTaskId(task.id);requestAnimationFrame(()=>document.querySelector('.production-page .ti-v4-production-layout')?.scrollIntoView({behavior:'smooth',block:'start'}));};
+ useEffect(()=>{
+  if(!initialTaskId||openedTaskRef.current===initialTaskId||!dailyTasks.length||!recipes.length)return;
+  const task=dailyTasks.find(t=>t.id===initialTaskId);
+  if(!task||task.status==='completed'||!recipes.some(r=>r.id===task.recipeId))return;
+  openedTaskRef.current=initialTaskId;
+  openExecution(task);
+ },[initialTaskId,dailyTasks,recipes]);
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=(id,task=null)=>{
   setOutputLot('');setExpiryDate('');setRecipeId(id);setRequestId(null);setConfirmed(false);setActiveTaskId(null);
@@ -97,12 +106,23 @@ export default function Production({membership}){
   <h1>Produção da cozinha</h1><LiveStatus state={live}/><p>Planeje o preparo, registre a quantidade produzida e consulte o histórico.</p>
   <nav className="production-tabs" aria-label="Seções da produção">{[['today','Hoje'],...(admin?[['preparations','Preparações']]:[]),['history','Histórico']].map(([key,label])=><button key={key} type="button" aria-pressed={view===key} onClick={()=>switchView(key)}>{label}</button>)}</nav>
   {view==='today'&&blockedRecipes.length>0&&<aside className="production-attention"><div><strong>{blockedRecipes.length} {blockedRecipes.length===1?'preparação precisa':'preparações precisam'} de revisão</strong><p>Vínculos ou unidades pendentes impedem novas produções.</p></div>{admin?<button type="button" onClick={()=>setView('preparations')}>Revisar</button>:<span>Solicite à gestão</span>}</aside>}
-  {admin&&view==='preparations'&&<section className="receiving-card production-catalog"><h2>Preparações da unidade</h2><p>Configure uma vez. Depois, use a preparação na rotina de hoje.</p><div className="production-recipe-list">{reviewRecipes.filter(r=>!r.archivedAt&&(r.active!==false||r.configurationDraft)).map(r=><article key={r.id}><div><strong>{r.name}</strong><span className={r.available?'recipe-ready':'recipe-pending'}>{r.available?'Disponível':r.active?'Revisar vínculos':'Em revisão'}</span>{!r.available&&r.errors?.map((error,i)=><p key={i}>{error}</p>)}</div><button type="button" onClick={()=>{setSetupRecipe({id:r.id,nonce:Date.now()});if(!r.preparationConfig&&!r.configurationDraft){setEditRecipeId(r.id);setRecipeVersion(r.version??null);setName(r.name||'');setMethod(r.method||'');setYield(String(r.yieldQuantity||1));setOutputProductId(r.outputProductId||'');setLines((r.lines||[]).map(l=>({...l,substitutes:l.substitutes||[]})));document.querySelector('.ti-v4-recipe-details')?.setAttribute('open','');}requestAnimationFrame(()=>document.querySelector(r.preparationConfig||r.configurationDraft?'.prep-setup':'.ti-v4-recipe-details')?.scrollIntoView({behavior:'smooth',block:'start'}));}}>Revisar</button></article>)}</div><button type="button" className="production-new" onClick={()=>{setSetupRecipe({id:'',nonce:Date.now()});requestAnimationFrame(()=>document.querySelector('.prep-setup')?.scrollIntoView({behavior:'smooth',block:'start'}));}}>+ Nova preparação</button></section>}
+  {admin&&view==='preparations'&&<section className="receiving-card production-catalog"><h2>Preparações da unidade</h2><p>Configure uma vez. Depois, use a preparação na rotina de hoje.</p><div className="production-recipe-list">{reviewRecipes.filter(r=>!r.archivedAt&&(r.preparationConfig||r.configurationDraft)).map(r=><article key={r.id}><div><strong>{r.name}</strong><span className={r.available&&r.preparationConfig?'recipe-ready':'recipe-pending'}>{r.available&&r.preparationConfig?'Disponível':!r.preparationConfig?'Concluir novo cadastro':r.active?'Revisar vínculos':'Em revisão'}</span>{!r.available&&r.errors?.map((error,i)=><p key={i}>{error}</p>)}</div><button type="button" onClick={()=>{setSetupRecipe({id:r.id,nonce:Date.now()});requestAnimationFrame(()=>document.querySelector('.prep-setup')?.scrollIntoView({behavior:'smooth',block:'start'}));}}>Revisar</button></article>)}</div><button type="button" className="production-new" onClick={()=>{setSetupRecipe({id:'',nonce:Date.now()});requestAnimationFrame(()=>document.querySelector('.prep-setup')?.scrollIntoView({behavior:'smooth',block:'start'}));}}>+ Nova preparação</button></section>}
   {status&&<p role="status" className="receiving-notice">{status}</p>}
   {view==='today'&&<section className="receiving-card ti-v4-daily-tasks"><h2>Lista de produção de hoje</h2><p>Planejamento compartilhado da cozinha. Só a confirmação da quantidade realmente produzida movimenta o estoque.</p>
    {!loading&&recipes.length===0&&<p className="production-empty">Ainda não há preparações disponíveis. {admin?'Abra Preparações para revisar e ativar o cadastro.':'A gestão precisa revisar e ativar as preparações.'}</p>}
    {canPlan&&recipes.length>0&&<form className="ti-v4-daily-task-form" onSubmit={addDailyTask}><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional ({recipes.find(r=>r.id===plannedRecipe)?.outputUnit||'un'})<input type="number" min="0.001" max="10000" step="0.001" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading||loading}>Adicionar à lista</button></form>}
-   {dailyTasks.length===0?<p className="ti-v4-production-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-daily-task-list">{dailyTasks.map(task=><li key={task.id}><div><strong>{task.recipeName}</strong><small>{task.status==="completed"?`Concluída: ${task.completedQuantity} ${task.unit||'un'}`:task.status==="partial"?`Parcial: ${task.completedQuantity} de ${task.plannedQuantity} ${task.unit||'un'}`:task.plannedQuantity?`Meta: ${task.plannedQuantity} ${task.unit||'un'}`:"Quantidade a definir"}</small></div>{task.status!=="completed"?<button type="button" disabled={!recipes.some(r=>r.id===task.recipeId)} title={!recipes.some(r=>r.id===task.recipeId)?'Preparação indisponível; solicite revisão à gestão':undefined} onClick={()=>{choose(task.recipeId,task);setActiveTaskId(task.id);document.querySelector(".production-page .ti-v4-production-layout")?.scrollIntoView({behavior:"smooth",block:"start"})}}>{recipes.some(r=>r.id===task.recipeId)?'Registrar execução':'Preparação indisponível'}</button>:<span className="ti-v4-task-done">Concluída</span>}</li>)}</ul>}
+   <div className="ti-production-today-heading"><span>{dailyTasks.filter(t=>t.status==='completed').length} de {dailyTasks.length} concluídas</span><small>Marcação automática depois do registro confirmado</small></div>
+   {dailyTasks.length===0?<p className="ti-v4-production-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-daily-task-list ti-production-checklist">{dailyTasks.map(task=>{
+    const done=task.status==='completed',partial=task.status==='partial',available=recipes.some(r=>r.id===task.recipeId);
+    const progress=task.plannedQuantity?Math.min(100,Math.round(100*(Number(task.completedQuantity)||0)/task.plannedQuantity)):null;
+    return <li key={task.id} className={'ti-production-check-card'+(done?' is-complete':'')}>
+     <span className={'ti-production-check-icon'+(done?' is-complete':'')} aria-hidden="true">{done?<CheckCircle2 size={22}/>:<Clock3 size={20}/>}</span>
+     <div className="ti-production-check-info"><strong>{task.recipeName}</strong><small>{done?'Concluída':partial?'Parcial · continuar':task.plannedQuantity?'Pendente':'Sem meta definida'} · {task.plannedQuantity?task.plannedQuantity+' '+(task.unit||'un')+' planejadas':'Quantidade livre'}</small>
+      {(partial||done)&&<small>{task.completedQuantity||0} {task.unit||'un'} registradas</small>}
+      {progress!==null&&<div className="ti-production-progress" role="progressbar" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100" aria-label={'Progresso de '+task.recipeName}><span style={{width:progress+'%'}}/></div>}
+     </div>
+     {done?<span className="ti-v4-task-done"><CheckCircle2 size={14}/> Feito</span>:<button type="button" disabled={!available} title={!available?'Preparação indisponível; solicite revisão à gestão':undefined} onClick={()=>openExecution(task)}>{available?(partial?'Continuar':'Registrar execução'):'Indisponível'}</button>}
+    </li>})}</ul>}
   </section>}
   <div className="production-layout ti-v4-production-layout">
    {view==='today'&&<section className="receiving-card">
@@ -136,38 +156,7 @@ export default function Production({membership}){
     </form>}
    </section>}
    {admin&&view==='preparations'&&<PreparationSetup key={membership.unitId} unitId={membership.unitId} products={products} requestedRecipe={setupRecipe} onDirtyChange={setSetupDirty} call={call} onSaved={async saved=>{const updated=await load(true);if(saved?.available&&updated){setSetupDirty(false);setPlannedRecipe(saved.id);setPlannedQuantity('');setView('today');notify('Preparação salva. Você já pode adicioná-la à produção de hoje.','success');}return updated;}}/>}
-   {admin&&view==='preparations'&&<details className="receiving-card ti-v4-recipe-details">
-    <summary><BookOpen size={20} aria-hidden="true"/><span>Fichas anteriores <small>Revisar ou arquivar preparações já cadastradas</small></span></summary>
-    <h2>Revisar ficha anterior</h2><label>Ficha para revisar<select value={editRecipeId} onChange={e=>{const r=reviewRecipes.find(x=>x.id===e.target.value);setEditRecipeId(r?.id||'');setRecipeVersion(r?.version??null);setName(r?.name||'');setMethod(r?.method||'');setYield(String(r?.yieldQuantity||1));setOutputProductId(r?.outputProductId||'');setLines(r?.lines?.map(l=>({...l,substitutes:l.substitutes||[]}))||[{productId:'',quantity:'',substitutes:[]}])}}><option value="">Selecionar ficha existente</option>{reviewRecipes.filter(r=>!r.preparationConfig&&!r.configurationDraft&&!r.archivedAt).map(r=><option key={r.id} value={r.id}>{r.name} · v{r.version}{!r.available?' · indisponível':''}</option>)}</select></label>
-    <p>Este espaço mantém as fichas existentes. Para criar, use Nova preparação.</p>
-    {editRecipeId&&<form className="stock-action-form" onSubmit={saveRecipe}>
-     <label>Nome da preparação<input required minLength={3} maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label>
-     <label>Rendimento padrão ({inputUnit(outputProductId)})<input type="number" min="0.001" step="0.001" value={yieldQuantity} onChange={e=>setYield(e.target.value)}/></label>
-     <label>Produto preparado que entrará na reserva (opcional)<select value={outputProductId} onChange={e=>setOutputProductId(e.target.value)}><option value="">Somente consumo de ingredientes (sem produto final)</option>{products.filter(p=>p.status==="active").map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-     {recipeOutputConflict&&<p role="alert" className="v3-error">O produto final também está selecionado como ingrediente ou substituto. Corrija antes de salvar.</p>}
-     {recipeDuplicateInputs&&<p role="alert" className="v3-error">Há ingredientes principais repetidos. Consolide a quantidade numa única linha.</p>}
-     {outputProductId&&<p>Ficha transformacional: os ingredientes deverão existir nos locais de origem selecionados; ao confirmar produção, o preparado entrará na reserva na mesma transação. Se houver controle de validade, cada produção exigirá lote e validade reais.</p>}
 
-     <label>Modo de preparo<textarea maxLength={2000} value={method} onChange={e=>setMethod(e.target.value)}/></label>
-     {lines.map((line,i)=><div className="stock-lot-row" key={i}>
-      <p className="v3-info" role="note">Confira a unidade física de cada insumo e o rendimento real da ficha antes de salvar. O sistema não converte kg, peças ou porções por suposição.</p>
-     <label>Insumo principal<select required value={line.productId} onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,productId:e.target.value}:x))}>
-       <option value="">Selecionar insumo</option>{line.productId&&!products.some(p=>p.id===line.productId)&&<option value={line.productId} disabled>Insumo indisponível · selecione o correto</option>}{products.filter(p=>p.status==='active'||p.id===line.productId).map(p=><option key={p.id} value={p.id} disabled={p.status!=='active'||p.id===outputProductId}>{p.name}{p.status!=='active'?' (inativo)':''}</option>)}
-      </select></label>
-      <label>Quantidade por rendimento ({inputUnit(line.productId)})<input required type="number" min={inputStep(line.productId)} step={inputStep(line.productId)} value={line.quantity}
-       onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,quantity:e.target.value}:x))}/></label>
-      <label>Local de origem<select value={line.location||(outputProductId?'reserva':'giro')} onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,location:e.target.value}:x))}><option value="reserva">Reserva</option><option value="giro">Giro</option></select></label>
-      <label>Substituto autorizado<select value={line.substitutes[0]||''}
-       onChange={e=>setLines(a=>a.map((x,j)=>j===i?{...x,substitutes:e.target.value?[e.target.value]:[]}:x))}>
-       <option value="">Nenhum</option>{products.filter(p=>(p.status==='active'||p.id===line.substitutes[0])&&p.id!==line.productId).map(p=><option key={p.id} value={p.id} disabled={p.status!=='active'||p.id===outputProductId}>{p.name}{p.status!=='active'?' (inativo)':''}</option>)}
-      </select></label>
-      {lines.length>1&&<button type="button" onClick={()=>setLines(a=>a.filter((_,j)=>j!==i))}>Excluir ingrediente</button>}
-     </div>)}
-     <button type="button" disabled={lines.length>=12} onClick={()=>setLines(a=>[...a,{productId:'',quantity:'',substitutes:[]}])}>Adicionar ingrediente</button>
-     <button type="submit" className="stock-action-save" disabled={busy||!name.trim()||recipeOutputConflict||recipeDuplicateInputs}>{busy?'Salvando...':'Salvar ficha técnica'}</button>
-     {editRecipeId&&<button type="button" disabled={busy} onClick={archiveRecipe}>Arquivar preparação</button>}
-    </form>}
-   </details>}
   </div>
   {view==='history'&&<section className="receiving-card"><TriamicciHistory title="Histórico de produção" records={runs} loading={loading}
    getTitle={r=>r.recipeName||'Produção'} getDate={r=>r.at} getQuantity={r=>r.portions+' '+(r.outputUnit||'un')}

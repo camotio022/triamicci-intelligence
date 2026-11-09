@@ -14,7 +14,7 @@ export default function PreparationSetup({products,call,onSaved,unitId,requested
  const [confirmation,setConfirmation]=useState(null);
  const [all,setAll]=useState([]),[id,setId]=useState(''),[c,setC]=useState(empty),[step,setStep]=useState(1),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[dirty,setDirty]=useState(false);
  useEffect(()=>{onDirtyChange?.(dirty);},[dirty,onDirtyChange]);
- const load=async()=>{setLoading(true);try{const r=await call('/api/production/manage','preparationList');setAll(r.configurations||[]);return true;}catch(e){setError(e.message);return false;}finally{setLoading(false)}};
+ const load=async()=>{setLoading(true);try{const r=await call('/api/production/manage','preparationList');setAll((r.configurations||[]).filter(entry=>entry.configuration));return true;}catch(e){setError(e.message);return false;}finally{setLoading(false)}};
  useEffect(()=>{creationId.current=null;setCreated([]);setCreating(false);setAll([]);setId('');setC(empty());setStep(1);setDirty(false);setMessage('');setError('');setConfirmation(null);load();},[unitId]);
  const change=patch=>{setC(v=>({...v,...patch}));setDirty(true);setError('');setMessage('');};
  const applySelection=next=>{creationId.current=null;const old=all.find(x=>x.id===next);setId(next);setC(old?.configuration?{...old.configuration,portionMode:old.configuration.type==='portion'?(old.configuration.sourceProductId===old.configuration.outputProductId?'same':'separate'):undefined}:empty());setStep(old?.configuration?2:1);setError('');setMessage('');setDirty(false);};
@@ -49,7 +49,7 @@ export default function PreparationSetup({products,call,onSaved,unitId,requested
    creationId.current=null;
    setConfirmation(null);
    setId('');setC(empty());setStep(1);setDirty(false);
-   setMessage('Preparação arquivada. Histórico e saldos preservados.');
+   setMessage('Preparação excluída da lista. O insumo e o estoque foram preservados.');
    await load();await onSaved();setConfirmation(null);
   }catch(e){setError(e.message)}finally{setBusy(false)}
  };
@@ -58,7 +58,7 @@ export default function PreparationSetup({products,call,onSaved,unitId,requested
   <div className="prep-heading"><div><span className="prep-eyebrow">PREPARAÇÕES DA COZINHA</span><h2>Configurar preparação</h2><p>Escolha o processo. O cadastro se adapta à rotina.</p></div><span className="prep-badge">Gestão</span></div>
   <label>Preparação para revisar<select aria-label="Preparação para revisar" value={id} disabled={busy||loading} onChange={e=>select(e.target.value)}><option value="">Criar preparação</option>{all.map(r=><option key={r.id} value={r.id}>{r.configuration?.name||r.name} · {r.active?(r.available?'Ativa':'Ativa · indisponível'):'Em revisão'}{!r.configuration?' · ficha anterior':''}</option>)}</select></label>
   {selected?.active&&selected.available===false&&<aside className="prep-pending" role="status"><strong>Preparação indisponível para produzir</strong><ul>{selected.errors?.map((message,i)=><li key={i}>{message}</li>)}</ul></aside>}
-  {selected&&<button type="button" className="prep-secondary" disabled={busy} onClick={archive}>Arquivar preparação</button>}
+  {selected&&<button type="button" className="prep-secondary" disabled={busy} onClick={archive}>Excluir preparação</button>}
   {loading&&<p role="status">Carregando configurações…</p>}
   {selected&&!selected.configuration&&<aside className="prep-info"><Info size={18}/><span>Esta ficha usa o cadastro anterior. Você pode revisá-la abaixo em “Fichas anteriores”. Para adotar o novo processo, configure e revise todas as relações antes de ativar. Confira abaixo se a ficha está disponível para a operação.</span></aside>}
   <ol className="prep-steps" aria-label="Etapas do cadastro">{['Processo','Configuração','Revisão'].map((s,i)=><li key={s} aria-current={step===i+1?'step':undefined}><span>{step>i+1?<Check size={14}/>:i+1}</span>{s}</li>)}</ol>
@@ -82,6 +82,6 @@ export default function PreparationSetup({products,call,onSaved,unitId,requested
 
    <div className="prep-actions"><button type="button" className="prep-secondary" disabled={busy} onClick={()=>setStep(2)}><ArrowLeft size={16}/>Editar</button><button type="button" className="prep-secondary" disabled={busy} onClick={()=>save(false)}>{busy?'Salvando…':'Salvar rascunho'}</button><button type="button" className="prep-primary" disabled={busy||!plan.ready} onClick={()=>save(true)}>{busy?'Salvando…':'Salvar preparação'}</button></div>
   </section>}
-  <ConfirmSheet open={!!confirmation} title={confirmation?.kind==='switch'?'Descartar alterações?':'Arquivar preparação?'} description={confirmation?.kind==='switch'?'As alterações não salvas serão perdidas ao trocar de preparação.':'A preparação deixará de aparecer nas novas produções. O histórico e os saldos serão preservados.'} confirmLabel={confirmation?.kind==='switch'?'Descartar e trocar':'Arquivar preparação'} tone={confirmation?.kind==='archive'?'danger':'primary'} busy={busy} error={error} onCancel={()=>setConfirmation(null)} onConfirm={confirmAction}/>
+  <ConfirmSheet open={!!confirmation} title={confirmation?.kind==='switch'?'Descartar alterações?':'Excluir preparação?'} description={confirmation?.kind==='switch'?'As alterações não salvas serão perdidas ao trocar de preparação.':'Esta preparação sairá da lista. O insumo, o estoque e os registros já feitos serão preservados.'} confirmLabel={confirmation?.kind==='switch'?'Descartar e trocar':'Arquivar preparação'} tone={confirmation?.kind==='archive'?'danger':'primary'} busy={busy} error={error} onCancel={()=>setConfirmation(null)} onConfirm={confirmAction}/>
  </section>;
 }

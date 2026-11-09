@@ -1,0 +1,27 @@
+name: Produção - três cadastros
+on:
+  pull_request:
+    paths:
+      - 'src/Production.jsx'
+      - 'src/PreparationSetup.jsx'
+      - 'server/production/**'
+      - 'api/production/manage.js'
+      - 'tests/production-preparation-flow.test.mjs'
+      - '.github/workflows/production-preparations.yml'
+  push:
+    branches:
+      - 'fix/production-flow-mural-v1'
+jobs:
+  preparation-flows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar os três tipos de cadastro
+        run: node --test tests/production-preparation-flow.test.mjs
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund
+      - name: Compilar PWA
+        run: npm run build
