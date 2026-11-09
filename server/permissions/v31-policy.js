@@ -12,5 +12,5 @@ export function can(role,capability){
 }
 export const isManagement=role=>management.has(role);
 
-const managementPages=new Set(['catalog','people','master-registry','team','skills','shifts','schedule-planning','count']);
+const managementPages=new Set(['catalog','storages','people','master-registry','team','skills','shifts','schedule-planning','count']);
 export const canAccessPage=(role,page)=>team.has(role)&&(!managementPages.has(page)||management.has(role));

@@ -1,0 +1,24 @@
+name: Gestão de Armazenamentos - validação
+on:
+  pull_request:
+    paths:
+      - 'server/storage/**'
+      - 'api/storage/**'
+      - 'src/StorageManager.jsx'
+      - 'src/storage-manager.css'
+      - 'src/KitchenV3.jsx'
+      - 'src/App.jsx'
+      - 'tests/storage-spaces.test.mjs'
+      - '.github/workflows/storage-spaces.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --test tests/storage-spaces.test.mjs
+      - run: npm run build
