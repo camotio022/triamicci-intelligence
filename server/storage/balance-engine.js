@@ -3,6 +3,7 @@ const round=x=>Math.round(x*1000)/1000;
 const positive=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1e8;
 const id=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,60}$/.test(x);
 const sum=x=>round(Object.values(x).reduce((n,v)=>n+v,0));
+const amountToStock=(quantity,from,to)=>from===to&&positive(quantity)&&quantity>0?{ok:true,quantity}:convertPhysical({quantity,from,to});
 export function validateUnifiedBalance(b){
  if(!b||!STOCK_UNITS.includes(b.unit)||!b.byStorage||typeof b.byStorage!=='object'||Array.isArray(b.byStorage))return false;
  if(Object.entries(b.byStorage).some(([key,value])=>!id(key)||!positive(value)))return false;
@@ -26,7 +27,7 @@ export function applyStorageTransfer(current,{from,to,quantity,unit}){
 }
 export function applyStorageEntry(current,{storageId,quantity,unit,origin}){
  if(!['supplier','production'].includes(origin)||!validateUnifiedBalance(current)||!id(storageId)||!positive(quantity)||quantity<=0)return {ok:false,reason:'INVALID_ENTRY'};
- const converted=convertPhysical({quantity,from:unit,to:current.unit});
+ const converted=amountToStock(quantity,unit,current.unit);
  if(!converted.ok)return {ok:false,reason:'UNIT_CONVERSION_REQUIRED'};
  const value=converted.quantity,byStorage={...current.byStorage,[storageId]:round((current.byStorage[storageId]||0)+value)};
  const next={...current,byStorage,total:sum(byStorage)};
@@ -34,7 +35,7 @@ export function applyStorageEntry(current,{storageId,quantity,unit,origin}){
 }
 export function applyStorageConsumption(current,{storageId,quantity,unit}){
  if(!validateUnifiedBalance(current)||!id(storageId)||!positive(quantity)||quantity<=0)return {ok:false,reason:'INVALID_CONSUMPTION'};
- const converted=convertPhysical({quantity,from:unit,to:current.unit});
+ const converted=amountToStock(quantity,unit,current.unit);
  if(!converted.ok)return {ok:false,reason:'UNIT_CONVERSION_REQUIRED'};
  if((current.byStorage[storageId]||0)<converted.quantity)return {ok:false,reason:'INSUFFICIENT'};
  const byStorage={...current.byStorage,[storageId]:round(current.byStorage[storageId]-converted.quantity)};
