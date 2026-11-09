@@ -1,4 +1,5 @@
 import {sendQuotaError} from '../quota-error.js';
+import {CATALOG_56_UNITS} from '../operations/unit-engine.js';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {matchesCatalogProduct,operationalProfileFor,OPERATIONAL_CATALOG_VERSION} from '../operations/catalog-identity.js';
@@ -6,7 +7,7 @@ import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const draft=JSON.parse(readFileSync(new URL('../../data/triamicci-product-catalog-56.staging.json',import.meta.url),'utf8')).products;
 const byId=new Map(draft.map(p=>[p.id,p]));
-const units=new Set(['kg','L','un']);
+const units=new Set(CATALOG_56_UNITS);
 const hash=name=>createHash('sha256').update(name.trim().toLocaleLowerCase('pt-BR')).digest('hex').slice(0,40);
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;

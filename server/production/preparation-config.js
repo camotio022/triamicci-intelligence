@@ -1,4 +1,4 @@
-import {convertPhysical} from '../operations/unit-engine.js';
+import {convertPhysical,MASS_UNITS,RECIPE_RESULT_UNITS,INGREDIENT_UNITS} from '../operations/unit-engine.js';
 import {countUnit,validQuantity} from '../operations/logic.js';
 export const preparationTypes=[
  {id:'portion',label:'Dividir em porções',description:'Mesmo insumo, separado em porções de peso definido.'},
@@ -11,15 +11,15 @@ export function validatePreparation(c){
  if(!c||!preparationTypes.some(t=>t.id===c.type)||typeof c.name!=='string'||c.name.trim().length<3||c.name.length>100)return 'Informe o nome e o processo da preparação.';
  if(!pid.test(c.outputProductId||''))return 'Selecione o produto preparado do catálogo.';
  if(typeof c.method!=='string'||c.method.length>2000)return 'Revise o modo de preparo.';
- if(!['un','porcao','balde','kg','L'].includes(c.resultUnit))return 'Revise a unidade de saída.';
+ if(!RECIPE_RESULT_UNITS.includes(c.resultUnit))return 'Revise a unidade de saída.';
  if(!validQuantity(c.batchYield)||c.batchYield>10000)return 'Informe um rendimento válido.';
  if(c.type!=='recipe'&&c.batchYield!==1)return 'O padrão de porcionamento deve representar uma porção.';
  if(c.type!=='recipe'&&!['porcao','un'].includes(c.resultUnit))return 'Selecione unidades ou porções para o resultado.';
- if(c.type!=='recipe'&&(!pid.test(c.sourceProductId||'')||!validQuantity(c.portionWeight)||!['g','kg'].includes(c.weightUnit)))return 'Selecione o insumo e o peso da porção pronta.';
+ if(c.type!=='recipe'&&(!pid.test(c.sourceProductId||'')||!validQuantity(c.portionWeight)||!MASS_UNITS.includes(c.weightUnit)))return 'Selecione o insumo e o peso da porção pronta.';
  if(c.type==='transform'&&c.sourceProductId===c.outputProductId)return 'A origem e o produto preparado devem ser diferentes.';
- if(!Array.isArray(c.ingredients)||c.ingredients.length>12||c.ingredients.some(i=>!i||typeof i.name!=='string'||!i.name.trim()||i.name.length>100||typeof i.amount!=='string'||!i.amount.trim()||i.amount.length>80||typeof i.tracked!=='boolean'||!['g','kg','L','ml','un','orientacao'].includes(i.unit)||i.tracked&&(!pid.test(i.productId||'')||!validQuantity(Number(i.amount))||i.unit==='orientacao')))return 'Revise os ingredientes e as quantidades.';
+ if(!Array.isArray(c.ingredients)||c.ingredients.length>12||c.ingredients.some(i=>!i||typeof i.name!=='string'||!i.name.trim()||i.name.length>100||typeof i.amount!=='string'||!i.amount.trim()||i.amount.length>80||typeof i.tracked!=='boolean'||![...INGREDIENT_UNITS,'orientacao'].includes(i.unit)||i.tracked&&(!pid.test(i.productId||'')||!validQuantity(Number(i.amount))||i.unit==='orientacao')))return 'Revise os ingredientes e as quantidades.';
  if(c.type==='recipe'&&!c.ingredients.length)return 'Adicione os ingredientes da receita.';
- if(!['g','kg'].includes(c.weightUnit))return 'Revise a unidade de peso.';
+ if(!MASS_UNITS.includes(c.weightUnit))return 'Revise a unidade de peso.';
  if(c.outputPerBatch!==null&&(!validQuantity(c.outputPerBatch)||c.outputPerBatch>10000))return 'Revise a entrada no estoque por receita.';
  if(!['reserva','giro'].includes(c.location))return 'Selecione o local de origem.';
  return null;

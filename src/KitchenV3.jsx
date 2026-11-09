@@ -24,7 +24,7 @@ const kinds=[['availability','Disponibilidade'],['quantitative','Contagem quanti
 const productName=p=>p?.profile?.displayName?.trim()||p?.name||'';
 const controlLabel=mode=>kinds.find(([value])=>value===mode)?.[1]||'Não configurado';
 const sources=[['supplier','Fornecedor'],['internal','Produção interna'],['both','Fornecedor ou produção']];
-const units=['kg','g','L','mL','un','porcao','pacote','duzia'];
+const units=STOCK_UNITS;
 const status={reported:'A verificar',requested:'Pedido feito',confirmed:'Confirmado pelo fornecedor',overdue:'Atrasado',partially_received:'Recebido parcialmente',received:'Recebido',cancelled:'Cancelado'};
 const date=iso=>iso?new Date(iso+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const longDate=x=>x?new Date(x).toLocaleString('pt-BR'):'—';

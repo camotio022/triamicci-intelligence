@@ -1,9 +1,10 @@
 import {apiFetch} from './api-fetch.js';
+import {CATALOG_56_UNITS} from '../server/operations/unit-engine.js';
 import React,{useEffect,useMemo,useState} from 'react';
 import {auth} from './firebase.js';
 import draft from '../data/triamicci-product-catalog-56.staging.json';
 import './operational-catalog-mobile.css';
-const units=['kg','L','un'];
+const units=CATALOG_56_UNITS;
 const configLabels={stockUnit:'Estoque',receivingUnit:'Recebimento',operationalUnit:'Contagem',source:'Origem',trackExpiry:'Validade',minStock:'Estoque mínimo',countFrequency:'Frequência',critical:'Produto crítico'};
 const configValue=(key,value)=>typeof value==='boolean'?(value?'Sim':'Não'):({supplier:'Fornecedor',internal:'Cozinha',daily:'Diária',weekly:'Semanal',on_demand:'Sob demanda'})[value]||value||'Não informado';
 async function request(action,payload={}){

@@ -1,8 +1,9 @@
 import {apiFetch} from './api-fetch.js';
+import {PACKAGE_CONTENT_UNITS} from '../server/operations/unit-engine.js';
 import React,{useEffect,useState} from 'react';
 import {auth} from './firebase.js';
 import {PRESENTATIONS} from '../server/operations/unit-engine.js';
-const units=['kg','g','L','mL','un','duzia'];
+const units=PACKAGE_CONTENT_UNITS;
 async function request(action,data){
  const token=await auth.currentUser?.getIdToken();
  if(!token)throw Error('Entre novamente na sua conta.');

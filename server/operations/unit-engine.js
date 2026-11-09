@@ -1,10 +1,28 @@
 // Motor puro de unidades. Não grava dados nem altera saldos legados.
 // Quantidades físicas são sempre associadas à unidade e à origem da conversão.
+// Fonte única: os módulos escolhem subconjuntos por contexto, nunca inventam códigos.
+export const MASS_UNITS=Object.freeze(['kg','g']);
+export const VOLUME_UNITS=Object.freeze(['L','mL','ml']); // ml preserva registros antigos.
+export const COUNT_UNITS=Object.freeze(['un','duzia','porcao','pacote']);
+export const STOCK_UNITS=Object.freeze([...MASS_UNITS,...VOLUME_UNITS,...COUNT_UNITS]);
+export const RECEIVING_UNITS=Object.freeze([...STOCK_UNITS,'caixa','fardo']);
+// O catálogo homologado de 56 itens mantém suas restrições até migração explícita.
+export const CATALOG_56_UNITS=Object.freeze(['kg','L','un']);
+export const PRODUCT_BASIC_UNITS=Object.freeze(['kg','g','L','ml','un']);
+export const PACKAGE_CONTENT_UNITS=Object.freeze(['kg','g','L','mL','ml','un','duzia']);
+export const PREPARED_OUTPUT_UNITS=Object.freeze(['porcao','un','kg','g','L','ml']);
+export const RECIPE_RESULT_UNITS=Object.freeze(['balde','porcao','un','kg','L']);
+export const INGREDIENT_UNITS=Object.freeze(['g','kg','L','ml','un']);
+export const UNIT_LABELS=Object.freeze({kg:'Quilogramas',g:'Gramas',L:'Litros',mL:'Mililitros',ml:'Mililitros',un:'Unidades',duzia:'Dúzias',porcao:'Porções',pacote:'Pacotes',caixa:'Caixas',fardo:'Fardos'});
+export const normalizeUnit=unit=>unit==='ml'?'mL':unit;
+export const isStockUnit=unit=>STOCK_UNITS.includes(unit);
+export const isReceivingUnit=unit=>RECEIVING_UNITS.includes(unit);
 const UNITS=Object.freeze({
  kg:{dimension:'mass',factor:1000,precision:3},
  g:{dimension:'mass',factor:1,precision:0},
  L:{dimension:'volume',factor:1000,precision:3},
  mL:{dimension:'volume',factor:1,precision:0},
+ ml:{dimension:'volume',factor:1,precision:0},
  un:{dimension:'count',factor:1,precision:0},
  duzia:{dimension:'count',factor:12,precision:0}
 });
