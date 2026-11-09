@@ -8,7 +8,7 @@ export function countUnit(product,catalog){
 }
 export function validQuantity(x,{allowZero=false,unit='kg'}={}){
  if(typeof x!=='number'||!Number.isFinite(x)||x<0||(!allowZero&&x===0)||x>100000)return false;
- if(['un','porcao','pacote','duzia'].includes(unit))return Number.isInteger(x);
+ if(['un','porcao','pacote','duzia','caixa','fardo'].includes(unit))return Number.isInteger(x);
  return Math.abs(Math.round(x*1000)-x*1000)<1e-7;
 }
 export function reconcile({previousTotal,currentTotal,entries,allUnitsCompatible,historyComplete}){

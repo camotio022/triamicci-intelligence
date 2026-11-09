@@ -16,12 +16,12 @@ import {redactFinancial} from '../permissions/v31-redaction.js';
 import {restaurantDay} from '../schedules/restaurant-today.js';
 const roles=MANAGEMENT_ROLES;
 const locations=['reserva','giro'];
-const unitNames=['kg','g','L','mL','un','porcao','pacote','duzia'];
+const unitNames=['kg','g','L','ml','mL','un','porcao','pacote','duzia','caixa','fardo'];
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
 const obj=s=>({id:s.id,...s.data()});
 const now=()=>new Date();
 const dateOk=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(x+'T12:00:00Z'))&&new Date(x+'T12:00:00Z').toISOString().slice(0,10)===x;
-const quantity=(v,unit,zero=false)=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&(zero||v>0)&&v<=100000&&(!['un','porcao','pacote','duzia'].includes(unit)||Number.isInteger(v))&&Math.abs(Math.round(v*1000)-v*1000)<1e-7;
+const quantity=(v,unit,zero=false)=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&(zero||v>0)&&v<=100000&&(!['un','porcao','pacote','duzia','caixa','fardo'].includes(unit)||Number.isInteger(v))&&Math.abs(Math.round(v*1000)-v*1000)<1e-7;
 const newAudit=(tx,db,event,unitId,actorUid,details)=>{signalUnitChange(tx,db,unitId,['stock', 'catalog']);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid,details,at:now()});};
 const verify=(a,unitId,allowed)=>a.exists&&a.data().status==='active'&&a.data().unitId===unitId&&allowed.includes(a.data().role);
 const productPath=(unit,id)=>unit.collection('products').doc(id);
@@ -86,10 +86,11 @@ export default async function kitchenV3(req,res){
     // Test-phase reconfiguration replaces current experimental balances; historical records remain unchanged.
     const next={displayName:profile.displayName.trim(),aliases:(profile.aliases||[]).map(x=>x.trim()),controlMode:profile.controlMode,origin:profile.origin,
       countUnit:profile.countUnit||null,locations:profile.locations,receivingPresentation:profile.receivingPresentation||null,
+      receivingModel:profile.receivingModel||null,
       sourceProductIds:profile.sourceProductIds||[],alternativeProductIds:profile.alternativeProductIds||[],
       trackingNote:(profile.trackingNote||'').slice(0,240),version:(prior.data()?.version||p.data().profile?.version||0)+1,updatedAt:now(),updatedBy:user.uid};
     version=next.version;tx.set(ref,next);
-    tx.update(pref,{name:next.displayName,aliases:[...new Set([...(p.data().aliases||[]),...(next.aliases||[]),p.data().name].filter(Boolean))],profile:next,unit:targetUnit,operationalUnitOverride:targetUnit,receivingUnitOverride:[...unitNames,'ml'].includes(profile.receivingPresentation)?profile.receivingPresentation:unitChanged?targetUnit:p.data().receivingUnitOverride||null,...(unitChanged?{quantity:0,minStock:0}:{}),updatedAt:now()});
+    tx.update(pref,{name:next.displayName,aliases:[...new Set([...(p.data().aliases||[]),...(next.aliases||[]),p.data().name].filter(Boolean))],profile:next,unit:targetUnit,operationalUnitOverride:targetUnit,receivingUnitOverride:profile.receivingModel?.receivingUnit||([...unitNames,'ml'].includes(profile.receivingPresentation)?profile.receivingPresentation:unitChanged?targetUnit:p.data().receivingUnitOverride||null),...(unitChanged?{quantity:0,minStock:0}:{}),updatedAt:now()});
     if(unitChanged){
      tx.set(balances.doc(productId),{productId,unit:targetUnit,reserve:0,rotation:0,total:0,quality:'CONFIGURATION_RESET',at:null,countedTotal:null,countSessions:{},lastCountAtByArea:{},entriesSinceCount:0,exitsSinceCount:0,updatedAt:now(),configurationVersion:next.version});
      if(legacy?.exists)tx.set(legacy.ref,{productId,unit:targetUnit,reserva:0,giro:0,total:0,quality:'CONFIGURATION_RESET',updatedAt:now()});

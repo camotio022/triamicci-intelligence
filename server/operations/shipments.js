@@ -1,3 +1,4 @@
+import {RECEIVING_UNITS} from './receiving-model.js';
 import {queuePush,tryDrainPush} from '../push/delivery.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct,usesPhysicalLots} from './catalog-identity.js';
@@ -61,7 +62,8 @@ export default async function shipments(req,res){
     const p=products.get(line.productId),profile=profiles.get(line.productId);
     if(!p?.exists||!isOperationalProduct(p.data())||!profile?.exists||!['supplier','both'].includes(profile.data().origin))throw Error('PRODUCT');
     const cfg=profile.data(),quantitative=cfg.controlMode==='quantitative';
-    if(!['kg','g','L','ml','mL','un','porcao','pacote','duzia'].includes(line.commercialUnit)||!validQuantity(line.commercialQuantity,{unit:line.commercialUnit})||quantitative&&(!cfg.locations.includes(line.location)||!validQuantity(line.stockQuantity,{unit:cfg.countUnit}))||!quantitative&&line.stockQuantity!==0)throw Error('QUANTITY');
+    if(action==='shipmentApprove'&&line.measurementSnapshot&&line.measurementSnapshot.configurationVersion!==(cfg.version||0))throw Error('CONFIGURATION_CHANGED');
+    if(!RECEIVING_UNITS.includes(line.commercialUnit)||!validQuantity(line.commercialQuantity,{unit:line.commercialUnit})||quantitative&&(!cfg.locations.includes(line.location)||!validQuantity(line.stockQuantity,{unit:cfg.countUnit}))||!quantitative&&line.stockQuantity!==0)throw Error('QUANTITY');
     const receivingError=receivingConflict(p.data(),cfg,line);if(receivingError)throw Error(receivingError);
     const expected=order?.data()?.items.find(x=>x.productId===line.productId);
     if(orderRef&&(!expected||expected.unit!==line.commercialUnit))throw Error('ORDER');
@@ -81,7 +83,7 @@ export default async function shipments(req,res){
       change.data[line.location]=Math.round((change.data[line.location]+line.stockQuantity)*1000)/1000;change.data.availableQuantity=change.data.reserva+change.data.giro;lotUpdates.set(lotRef.path,change);
      }
     }
-    normalized.push({...line,productName:p.data().name,stockUnit:quantitative?cfg.countUnit:null});
+    normalized.push({...line,productName:p.data().name,stockUnit:quantitative?cfg.countUnit:null,measurementSnapshot:action==='shipmentInspect'?{configurationVersion:cfg.version||0,receivingUnit:line.commercialUnit,stockUnit:cfg.countUnit||null,receivingModel:cfg.receivingModel||null}:line.measurementSnapshot||null});
    }
    const now=new Date();
    if(action==='shipmentInspect')queuePush(tx,db,m.unitId,'receipt_pending_'+requestId,{audience:'managers',title:'Recebimento aguardando aprovação',page:'kitchen-v3'});
@@ -90,7 +92,7 @@ export default async function shipments(req,res){
    else{
     for(const [p,b] of stock)writeOperationalBalance(tx,unit.collection('physicalBalances').doc(p),{...b,updatedAt:now,quality:'ESTIMATED_BY_MOVEMENTS'},{},balances.get(p).data()||{});
     for(const change of lotUpdates.values())tx.set(change.ref,{...change.data,updatedAt:now},{merge:true});
-    for(const [i,line] of normalized.entries())if(line.stockUnit)tx.create(unit.collection('physicalReceipts').doc(requestId+'_'+i),{productId:line.productId,productName:line.productName,physicalQuantity:line.stockQuantity,unit:line.stockUnit,location:line.location,lot:line.lot,expiryDate:line.expiryDate,supplier:data.supplier,orderId:data.orderId,shipmentId:requestId,commercialQuantity:line.commercialQuantity,commercialUnit:line.commercialUnit,actorUid:actor.uid,unitId:m.unitId,at:now});
+    for(const [i,line] of normalized.entries())if(line.stockUnit)tx.create(unit.collection('physicalReceipts').doc(requestId+'_'+i),{productId:line.productId,productName:line.productName,physicalQuantity:line.stockQuantity,unit:line.stockUnit,location:line.location,lot:line.lot,expiryDate:line.expiryDate,supplier:data.supplier,orderId:data.orderId,shipmentId:requestId,commercialQuantity:line.commercialQuantity,commercialUnit:line.commercialUnit,measurementSnapshot:line.measurementSnapshot||null,actorUid:actor.uid,unitId:m.unitId,at:now});
     if(orderRef){const received={...(order.data().received||{})};for(const [p,q] of totals)received[p]=Math.round(((received[p]||0)+q)*1000)/1000;tx.update(orderRef,{received,status:order.data().items.every(i=>(received[i.productId]||0)>=i.quantity)?'received':'partially_received',updatedAt:now});}
     tx.update(ref,{status:'approved',decidedBy:actor.uid,decidedAt:now});
    }
@@ -98,5 +100,5 @@ export default async function shipments(req,res){
   });
   await tryDrainPush(m.unitId);
   return send(res,200,duplicate?'Conferência já processada.':action==='shipmentInspect'?'Conferência enviada para aprovação.':action==='shipmentApprove'?'Entrega aprovada e estoque atualizado.':'Entrega recusada sem alterar o estoque.',{duplicate});
- }catch(e){const messages={RECEIVING_UNIT:'A unidade recebida difere da configuração do produto. Revise o cadastro antes de conferir.',RECEIVING_QUANTITY:'Na mesma unidade, a quantidade recebida e a quantidade física devem coincidir.',UNAUTHENTICATED:'Faça login.',FORBIDDEN:'Sem permissão.',NOT_FOUND:'Conferência indisponível.',CONFLICT:'A conferência mudou. Atualize antes de decidir.',ORDER:'Pedido encerrado, item ou unidade incompatível.',PRODUCT:'Produto ou perfil indisponível.',QUANTITY:'Quantidade ou local incompatível.',DIVERGENCE:'Justifique quantidades acima do pedido.',LOT:'Informe lote e validade reais.',UNIT:'Unidades de saldo e configuração divergem.',DUPLICATE_LINE:'Não repita o mesmo produto/local/lote.'};if(messages[e.message])return send(res,e.message==='UNAUTHENTICATED'?401:e.message==='FORBIDDEN'?403:409,messages[e.message]);if(sendQuotaError(res,e))return;console.error('Shipments:',e.message);return send(res,500,'Não foi possível processar a entrega.');}
+ }catch(e){const messages={RECEIVING_UNIT:'A unidade recebida difere da configuração do produto. Revise o cadastro antes de conferir.',RECEIVING_QUANTITY:'Na mesma unidade, a quantidade recebida e a quantidade física devem coincidir.',UNAUTHENTICATED:'Faça login.',FORBIDDEN:'Sem permissão.',NOT_FOUND:'Conferência indisponível.',CONFLICT:'A conferência mudou. Atualize antes de decidir.',ORDER:'Pedido encerrado, item ou unidade incompatível.',PRODUCT:'Produto ou perfil indisponível.',QUANTITY:'Quantidade ou local incompatível.',DIVERGENCE:'Justifique quantidades acima do pedido.',LOT:'Informe lote e validade reais.',UNIT:'Unidades de saldo e configuração divergem.',DUPLICATE_LINE:'Não repita o mesmo produto/local/lote.',CONFIGURATION_CHANGED:'A configuração do insumo mudou depois da conferência. Recuse e refaça o recebimento antes de aprovar.'};if(messages[e.message])return send(res,e.message==='UNAUTHENTICATED'?401:e.message==='FORBIDDEN'?403:409,messages[e.message]);if(sendQuotaError(res,e))return;console.error('Shipments:',e.message);return send(res,500,'Não foi possível processar a entrega.');}
 }
