@@ -11,7 +11,7 @@ export function validateOperationalProfile(p){
  if(!['supplier','internal','both'].includes(p.origin))errors.push('ORIGIN_INVALID');
  if(!Array.isArray(p.locations)||!p.locations.length||p.locations.some(x=>!LOCATIONS.includes(x))||new Set(p.locations).size!==p.locations.length)errors.push('LOCATIONS_INVALID');
  if(p.controlMode==='quantitative'&&!STOCK_UNITS.includes(p.countUnit))errors.push('COUNT_UNIT_REQUIRED');
- if(p.countUnit&&!UNITS.includes(p.countUnit))errors.push('COUNT_UNIT_INVALID');
+ if(p.countUnit&&!STOCK_UNITS.includes(p.countUnit))errors.push('COUNT_UNIT_INVALID');
  if(p.receivingPresentation&&!safeText(p.receivingPresentation))errors.push('RECEIVING_PRESENTATION_INVALID');
  if(p.unitConversion&&p.unitConversion.fixed!==true)errors.push('NO_ASSUMED_CONVERSION');
  if(!validUnitModel(p.receivingModel,p.countUnit))errors.push('RECEIVING_MODEL_INVALID');
