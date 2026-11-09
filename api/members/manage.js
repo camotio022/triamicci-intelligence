@@ -245,7 +245,8 @@ export default async function handler(req,res) {
        return {id:d.id,title:n.title||'Alteração profissional',message:n.message||'',read:!!n.read,
         at:asISO(n.at),readAt:asISO(n.readAt),openedAt:asISO(n.openedAt),
         deletedAt:asISO(n.deletedAt),source:n.source||n.event||'Equipe',
-        reference:n.reference||n.registryId||n.targetUid||null};
+        reference:n.reference||n.registryId||n.targetUid||null,
+        page:['my-profile','leave-requests','people','kitchen-v3','mural'].includes(n.page)?n.page:null};
       })});
     }
     if(['notificationRead','notificationOpen','notificationDelete','notificationRestore'].includes(action)){

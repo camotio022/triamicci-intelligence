@@ -1,0 +1,14 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {Workspace} from '../src/App.jsx';
+import {FeedbackProvider} from '../src/FeedbackProvider.jsx';
+import '../src/styles.css';
+import '../src/operation-focus.css';
+import '../src/responsive-system.css';
+import '../src/mobile-v42.css';
+import '../src/button-foundation.css';
+import '../src/ios-input-focus.css';
+import '../src/ios-edge-to-edge.css';
+import '../src/ui-foundation-phase1.css';
+const user={uid:'fixture-user',displayName:'Equipe de teste',email:'fixture@example.test',getIdToken:async()=>'fixture-token'};
+createRoot(document.getElementById('root')).render(<FeedbackProvider><Workspace user={user} membership={{role:'auxiliar',unitId:'Barigui',status:'active'}} logout={()=>{}}/></FeedbackProvider>);

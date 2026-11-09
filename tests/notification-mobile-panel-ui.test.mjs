@@ -2,16 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const src=readFileSync(new URL('../src/NotificationCenter.jsx',import.meta.url),'utf8');
-const css=readFileSync(new URL('../src/notifications.css',import.meta.url),'utf8');
-test('notification center: mobile close and existing message lifecycle kept',()=>{
- assert.match(src,/aria-label="Fechar notificações"/);
- assert.match(src,/notificationDelete/);
- assert.match(src,/notificationRestore/);
- assert.match(src,/notificationRead/);
- assert.match(src,/aria-expanded=\{open\}/);
+const app=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
+const css=readFileSync(new URL('../src/notification-module.css',import.meta.url),'utf8');
+test('notifications are a navigable module with message lifecycle and a shared data subscription',()=>{
+ assert.match(app,/navigate\("notifications"\)/);assert.match(app,/<NotificationsPage/);
+ assert.doesNotMatch(src,/ti-notification-panel/);
+ for(const action of ['notificationDelete','notificationRestore','notificationRead','notificationOpen'])assert.ok(src.includes(action));
+ assert.equal((src.match(/useUnitLive\(/g)||[]).length,1);
+ assert.match(src,/role="group" aria-label="Exibir notificações"/);
 });
-test('notification center: safe area and touch sizes',()=>{
- assert.match(css,/top:calc\(60px \+ env\(safe-area-inset-top,0px\)\)/);
- assert.match(css,/bottom:max\(10px,env\(safe-area-inset-bottom,0px\)\)/);
- assert.match(css,/\.ti-notification-actions button\{min-width:0;min-height:44px/);
+test('compact notification module uses safe-area spacing and touch controls',()=>{
+ assert.match(css,/env\(safe-area-inset-bottom,0px\)/);
+ assert.match(css,/min-height:44px/);
+ assert.match(css,/var\(--ti-brand/);
+ assert.match(css,/-webkit-line-clamp:2/);
 });

@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {BellRing,ChevronDown} from 'lucide-react';
 import {auth,isIndependentSession} from './firebase.js';
 import {apiFetch} from './api-fetch.js';
 export async function pushCall(action,subscription){
@@ -41,9 +42,10 @@ export default function PushSettings({unitId}){
   }catch(e){setMessage(e.message)}finally{setBusy(false)}
  };
  const run=async(action)=>{setBusy(true);try{if(action==='off'){await disableDevicePush();setActive(false);setMessage('Notificações desativadas.')}else{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(!sub)throw Error('Ative as notificações novamente.');const data=await pushCall('test',sub.toJSON());setMessage(data.message)}}catch(e){setMessage(e.message)}finally{setBusy(false)}};
- return <section className="ti-push-settings" aria-label="Notificações no dispositivo"><strong>Avisos no celular ou computador</strong>
+ const deviceStatus=isIndependentSession?'Sessão principal necessária':needsInstall?'Instale na Tela de Início':!supported?'Indisponíveis aqui':!config?(message?'Consulta indisponível':'Verificando…'):active?'Ativados':config&&!config.configured?'Em preparação':'Desativados';
+ return <details className="ti-notify-device" aria-label="Notificações no dispositivo"><summary><BellRing size={18} aria-hidden="true"/><span><strong>Avisos neste aparelho</strong><small className={active?'is-active':''}>{deviceStatus}</small></span><ChevronDown size={17} aria-hidden="true"/></summary><div className="ti-notify-device-body">
   <p>{isIndependentSession?'Use sua sessão principal para ativar os avisos neste aparelho.':needsInstall?'No iPhone, adicione o Triamicci à Tela de Início e abra pelo ícone para ativar os avisos.':!supported?'Este navegador não oferece notificações neste dispositivo.':active?'Ativadas neste dispositivo.':config&&!config.configured?'O envio de notificações ainda está sendo preparado.':'Receba avisos importantes mesmo com o app em segundo plano.'}</p>
-  {supported&&!needsInstall&&!isIndependentSession&&config?.configured&&<div className="ti-notification-actions">{active?<><button type="button" disabled={busy} onClick={()=>run('test')}>Testar aviso</button><button type="button" disabled={busy} onClick={()=>run('off')}>Desativar aqui</button></>:<button type="button" disabled={busy} onClick={enable}>Ativar notificações</button>}</div>}
+  {supported&&!needsInstall&&!isIndependentSession&&config?.configured&&<div className="ti-notify-device-actions">{active?<><button type="button" disabled={busy} onClick={()=>run('test')}>Testar aviso</button><button type="button" disabled={busy} onClick={()=>run('off')}>Desativar aqui</button></>:<button type="button" disabled={busy} onClick={enable}>Ativar notificações</button>}</div>}
   {message&&<p role="status">{message}</p>}
- </section>;
+ </div></details>;
 }
