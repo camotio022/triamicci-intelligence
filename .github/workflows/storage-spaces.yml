@@ -9,6 +9,7 @@ on:
       - 'src/KitchenV3.jsx'
       - 'src/App.jsx'
       - 'tests/storage-spaces.test.mjs'
+      - 'tests/storage-balance-engine.test.mjs'
       - '.github/workflows/storage-spaces.yml'
 jobs:
   validate:
@@ -19,5 +20,5 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
-      - run: node --test tests/storage-spaces.test.mjs
+      - run: node --test tests/storage-spaces.test.mjs tests/storage-balance-engine.test.mjs
       - run: npm run build
