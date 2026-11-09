@@ -27,9 +27,9 @@ export default async function handler(req,res){
    const all=s.docs.map(d=>({id:d.id,...d.data(),updatedAt:d.data().updatedAt?.toDate?.()?.toISOString?.()||null}));
    const bindings=l.docs.map(d=>({productId:d.id,...d.data()}));
    const counts=countsSnap.docs.map(d=>({id:d.id,...d.data(),at:d.data().at?.toDate?.()?.toISOString?.()||null}));
-   const active=new Set(bindings.map(l=>l.productId+'|'+l.primaryStorageId));
+   const active=new Set(bindings.flatMap(l=>(l.allowedStorageIds||[]).map(storageId=>l.productId+'|'+storageId)));
    const confirmed=counts.filter(x=>active.has(x.productId+'|'+x.storageId)&&x.status!=='rejected');
-   return send(res,200,'Armazenamentos configurados.',{storages:all,links:bindings,counts:confirmed,templates:STORAGE_TEMPLATES,day:today,progress:all.map(s=>({id:s.id,...progress(bindings.filter(l=>l.primaryStorageId===s.id).length,confirmed.filter(c=>c.storageId===s.id).length),scheduled:scheduled(s,today)})),countingEnabled:true,countsAffectOfficialBalance:false});
+   return send(res,200,'Armazenamentos configurados.',{storages:all,links:bindings,counts:confirmed,templates:STORAGE_TEMPLATES,day:today,progress:all.map(s=>({id:s.id,...progress(bindings.filter(l=>l.allowedStorageIds?.includes(s.id)).length,confirmed.filter(c=>c.storageId===s.id).length),scheduled:scheduled(s,today)})),countingEnabled:true,countsAffectOfficialBalance:false});
   }
   if(action==='storageCount'){
    const {storageId,productId,quantity}=req.body||{};
@@ -41,7 +41,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const [who,storage,link,product,previous]=await tx.getAll(db.doc('memberships/'+actor.uid),storageRef,linkRef,productRef,countRef);
     if(who.data()?.status!=='active'||who.data()?.unitId!==member.unitId||!TEAM_ROLES.includes(who.data()?.role))throw Error('FORBIDDEN');
-    if(!storage.exists||storage.data().active===false||link.data()?.primaryStorageId!==storageId||!product.exists||product.data().status!=='active')throw Error('STORAGE');
+    if(!storage.exists||storage.data().active===false||!link.data()?.allowedStorageIds?.includes(storageId)||!product.exists||product.data().status!=='active')throw Error('STORAGE');
     const unit=countedUnit(product.data());
     if(!unit||!validQuantity(quantity,{unit,allowZero:true}))throw Error('QUANTITY');
     if(previous.data()?.status==='approved')throw Error('CLOSED');
@@ -63,7 +63,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const [who,count,balance,link,storage,product]=await tx.getAll(db.doc('memberships/'+actor.uid),countRef,balanceRef,linkRef,storageRef,productRef);
     if(who.data()?.unitId!==member.unitId||who.data()?.status!=='active'||!isManagement(who.data()?.role))throw Error('FORBIDDEN');
-    if(!count.exists||count.data().storageId!==storageId||count.data().productId!==productId||count.data().day!==date||link.data()?.primaryStorageId!==storageId||!storage.exists||storage.data().active===false||!product.exists)throw Error('STORAGE');
+    if(!count.exists||count.data().storageId!==storageId||count.data().productId!==productId||count.data().day!==date||!link.data()?.allowedStorageIds?.includes(storageId)||!storage.exists||storage.data().active===false||!product.exists)throw Error('STORAGE');
     const prior=count.data();
     if(prior.status!=='pending'||prior.version!==expectedVersion)throw Error('CONFLICT');
     const now=new Date(),nextStatus=decision==='approve'?'approved':'rejected';
@@ -137,8 +137,8 @@ export default async function handler(req,res){
    return send(res,200,'Armazenamento salvo.',{storage:result});
   }
   if(action==='storageAssign'){
-   const {storageId,productIds}=req.body;
-   if(!idOk(storageId)||!Array.isArray(productIds)||productIds.length<1||productIds.length>60||productIds.some(x=>!productOk(x))||new Set(productIds).size!==productIds.length)return send(res,400,'Selecione até 60 insumos válidos.');
+   const {storageId,productIds,setPrimary=false}=req.body;
+   if(!idOk(storageId)||!Array.isArray(productIds)||productIds.length<1||productIds.length>60||productIds.some(x=>!productOk(x))||new Set(productIds).size!==productIds.length||typeof setPrimary!=='boolean')return send(res,400,'Selecione até 60 insumos válidos.');
    const ref=spaces.doc(storageId);
    const result={assigned:0};
    await db.runTransaction(async tx=>{
@@ -150,7 +150,7 @@ export default async function handler(req,res){
     const now=new Date();
     for(let i=0;i<productIds.length;i++){
      const id=productIds[i],old=previous[i].data()||{};
-     tx.set(links.doc(id),{productId:id,primaryStorageId:storageId,allowedStorageIds:[...new Set([...(old.allowedStorageIds||[]),storageId])],updatedAt:now,updatedBy:actor.uid},{merge:true});
+     tx.set(links.doc(id),{productId:id,primaryStorageId:old.primaryStorageId&&!setPrimary?old.primaryStorageId:storageId,allowedStorageIds:[...new Set([...(old.allowedStorageIds||[]),storageId])],updatedAt:now,updatedBy:actor.uid},{merge:true});
     }
     tx.create(db.collection('auditLogs').doc(),{event:'storage.products_assigned',unitId:member.unitId,actorUid:actor.uid,storageId,productIds,at:now});
     signalUnitChange(tx,db,member.unitId,['stock','catalog']);
