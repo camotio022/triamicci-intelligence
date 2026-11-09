@@ -1,0 +1,28 @@
+name: Unidades universais - regressao
+on:
+  pull_request:
+    paths:
+      - 'server/operations/unit-engine.js'
+      - 'server/operations/logic.js'
+      - 'server/operations/receiving-model.js'
+      - 'server/operations/v3-catalog-policy.js'
+      - 'src/Inventory.jsx'
+      - 'src/OperationalCatalogSetup.jsx'
+      - 'src/ShipmentReceiving.jsx'
+      - 'src/MeasurementEditor.jsx'
+      - 'tests/universal-units-catalog.test.mjs'
+      - '.github/workflows/universal-unit-catalog.yml'
+jobs:
+  units:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regra universal de unidades
+        run: node --test tests/universal-units-catalog.test.mjs tests/receiving-measurements.test.mjs
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Compilar aplicativo
+        run: npm run build
