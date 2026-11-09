@@ -1,6 +1,6 @@
 import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck,ClipboardList,Sun,Moon,ChevronDown,UserRound} from 'lucide-react';
+import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck,ClipboardList,CheckCircle2,Circle,Sun,Moon,ChevronDown,UserRound} from 'lucide-react';
 import {auth} from './firebase.js';
 import {useUnitLive} from './useUnitLive.js';
 import LiveStatus from './LiveStatus.jsx';
@@ -112,7 +112,17 @@ export default function TeamMural({membership,onOpenProduction}){
     {manager&&<details className="ti-mural-roster-details"><summary>Publicar comunicado</summary><form className="stock-action-form" onSubmit={publishNotice}><label>Título<input required minLength={3} maxLength={100} value={noticeForm.title} onChange={e=>setNoticeForm(x=>({...x,title:e.target.value}))}/></label><label>Prioridade<select value={noticeForm.priority} onChange={e=>setNoticeForm(x=>({...x,priority:e.target.value}))}><option value="normal">Normal</option><option value="important">Importante</option><option value="urgent">Urgente</option></select></label><label>Válido até (opcional)<input type="date" min={today} value={noticeForm.expiresOn} onChange={e=>setNoticeForm(x=>({...x,expiresOn:e.target.value}))}/></label><small>Sem data, permanece publicado até a gestão arquivar.</small><label>Mensagem<textarea required maxLength={3000} value={noticeForm.body} onChange={e=>setNoticeForm(x=>({...x,body:e.target.value}))}/></label><button type="submit" disabled={publishing}>{publishing?'Publicando…':'Revisar e publicar'}</button></form></details>}
    </section>
 
-   <section id="mural-v5-production" className="ti-mural-card ti-v4-feature ti-v4-production-mural" aria-labelledby="mural-production-title"><header className="ti-v4-section-title"><div className="ti-v4-title-left"><ClipboardList size={22} aria-hidden="true"/><div><h2 id="mural-production-title">Produção de hoje</h2><p>Planejamento compartilhado da cozinha.</p></div></div></header>{productionError?<p role="status" className="ti-mural-empty">{productionError}</p>:productionTasks.length===0?<p className="ti-mural-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-v4-mural-tasks">{productionTasks.map(task=><li key={task.id}><span><strong>{task.recipeName}</strong><small>{task.plannedQuantity?task.plannedQuantity+" "+(task.unit||"un")+" planejadas":"Quantidade livre"}</small></span><em className={task.status==="completed"?"complete":""}>{task.status==="completed"?"Concluída":task.status==="partial"?"Parcial":"Pendente"}</em>{task.status!=="completed"&&<button type="button" onClick={()=>onOpenProduction?.(task.id)} aria-label={"Registrar execução de "+task.recipeName}>Registrar execução</button>}</li>)}</ul>}</section>
+   <section id="mural-v5-production" className="ti-mural-card ti-v4-feature ti-v4-production-mural" aria-labelledby="mural-production-title">
+    <header className="ti-v4-section-title"><div className="ti-v4-title-left"><ClipboardList size={22} aria-hidden="true"/><div><h2 id="mural-production-title">Produção de hoje</h2><p>Checklist da cozinha · atualizado com os registros.</p></div></div><span className="ti-mural-prod-count">{productionTasks.filter(t=>t.status==='completed').length}/{productionTasks.length} feitas</span></header>
+    {productionError?<p role="status" className="ti-mural-empty">{productionError}</p>:productionTasks.length===0?<p className="ti-mural-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-mural-prod-mini">{productionTasks.map(task=>{
+     const done=task.status==='completed',partial=task.status==='partial',finished=Number(task.completedQuantity)||0;
+     const pct=task.plannedQuantity?Math.max(0,Math.min(100,Math.round(100*finished/task.plannedQuantity))):null;
+     return <li key={task.id} className={done?'is-complete':''}>
+      <span className="ti-mural-prod-icon" aria-hidden="true">{done?<CheckCircle2 size={19}/>:<Circle size={19}/>}</span>
+      <span className="ti-mural-prod-content"><strong>{task.recipeName}</strong><small>{done?'Concluída':partial?'Parcial':'Pendente'} · {task.plannedQuantity?finished+' de '+task.plannedQuantity+' '+(task.unit||'un'):finished?finished+' '+(task.unit||'un')+' registradas':'Quantidade livre'}</small>{pct!==null&&<span className="ti-mural-prod-track" role="progressbar" aria-label={'Progresso de '+task.recipeName} aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}><span style={{width:pct+'%'}}/></span>}</span>
+      {!done&&<button type="button" className="ti-mural-prod-action" onClick={()=>onOpenProduction?.(task.id)} aria-label={'Registrar execução de '+task.recipeName}>Registrar</button>}
+     </li>})}</ul>}
+   </section>
   </div>
  </section>;
 }
