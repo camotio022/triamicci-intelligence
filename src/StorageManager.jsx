@@ -13,12 +13,12 @@ async function call(action,extra={}){
  const data=await res.json();if(!res.ok)throw Error(data.message||'Não foi possível carregar os armazenamentos.');
  return data;
 }
-export default function StorageManager({membership}){
+export default function StorageManager({membership,initialProducts=null}){
  const [data,setData]=useState({storages:[],links:[],progress:[],countingEnabled:false}),[products,setProducts]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [editor,setEditor]=useState(null),[form,setForm]=useState(empty),[assign,setAssign]=useState(null),[selection,setSelection]=useState([]),[search,setSearch]=useState(''),[counting,setCounting]=useState(null),[countValues,setCountValues]=useState({});
  const manager=isManagement(membership.role);
- const load=async()=>{setLoading(true);setError('');try{const [s,p]=await Promise.all([call('list'),callProducts()]);setData(s);setProducts(p.products||[]);}catch(e){setError(e.message)}finally{setLoading(false)}};
- useEffect(()=>{let active=true;const go=async()=>{try{const [s,p]=await Promise.all([call('list'),callProducts()]);if(active){setData(s);setProducts(p.products||[])}}catch(e){if(active)setError(e.message)}finally{if(active)setLoading(false)}};go();return()=>{active=false}},[membership.unitId]);
+ const load=async()=>{setLoading(true);setError('');try{const [s,p]=await Promise.all([call('list'),Array.isArray(initialProducts)?Promise.resolve({products:initialProducts}):callProducts()]);setData(s);setProducts(p.products||[]);}catch(e){setError(e.message)}finally{setLoading(false)}};
+ useEffect(()=>{let active=true;const go=async()=>{try{const [s,p]=await Promise.all([call('list'),callProducts()]);if(active){setData(s);setProducts(p.products||[])}}catch(e){if(active)setError(e.message)}finally{if(active)setLoading(false)}};go();return()=>{active=false}},[membership.unitId,initialProducts]);
  const known=new Map(data.links.map(l=>[l.productId,l]));
  const unassigned=products.filter(p=>p.status==='active'&&!known.has(p.id));
  const linked=id=>data.links.filter(l=>l.primaryStorageId===id).length;
