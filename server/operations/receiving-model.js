@@ -10,7 +10,7 @@ export function inUnit(amount,from,to){
  if(!Number.isFinite(amount)||amount<0)return null;
  if(normalizeUnit(from)===normalizeUnit(to))return amount;
  if(dimension(from)!==dimension(to)||!['weight','volume'].includes(dimension(from)))return null;
- return amount*exactFactors[from]/exactFactors[normalizeUnit(to)];
+ return amount*exactFactors[normalizeUnit(from)]/exactFactors[normalizeUnit(to)];
 }
 export function validUnitModel(model,stockUnit){
  if(!model)return true;
