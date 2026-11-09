@@ -1,0 +1,23 @@
+name: Medidas e rendimentos por insumo
+on:
+  pull_request:
+    paths:
+      - 'src/KitchenV3.jsx'
+      - 'src/ShipmentReceiving.jsx'
+      - 'server/operations/**'
+      - 'tests/receiving-measurements.test.mjs'
+      - '.github/workflows/receiving-measurements.yml'
+  push:
+    branches:
+      - 'feat/insumo-conversoes-rendimento-mobile'
+jobs:
+  measurements:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/receiving-measurements.test.mjs
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
