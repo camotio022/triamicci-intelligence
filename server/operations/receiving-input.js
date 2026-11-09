@@ -1,7 +1,9 @@
+import {RECEIVING_UNITS} from './receiving-model.js';
 import {receivingConflict} from './receiving-policy.js';
 import {validQuantity} from './logic.js';
-const units=['kg','g','L','ml','mL','un','porcao','pacote','duzia'];
+const units=RECEIVING_UNITS;
 export function receivingUnit(profile,product){
+ if(units.includes(profile?.receivingModel?.receivingUnit))return profile.receivingModel.receivingUnit;
  if(units.includes(product?.receivingUnitOverride))return product.receivingUnitOverride;
  return units.includes(profile?.receivingPresentation)?profile.receivingPresentation:
   units.includes(profile?.countUnit)?profile.countUnit:'kg';
