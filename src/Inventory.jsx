@@ -1,4 +1,5 @@
 import {productMatches} from '../server/operations/configured-product.js';
+import {STOCK_UNITS} from '../server/operations/unit-engine.js';
 import {apiFetch} from './api-fetch.js';
 import {useViewState} from './useViewState.js';
 import {readViewCache,writeViewCache} from './fastCache.js';
@@ -18,7 +19,7 @@ import './catalog-admin-v41.css';
 import {isManagement} from '../server/permissions/v31-policy.js';
 
 const categories = ['Preparações','Proteínas','Hortifruti','Laticínios','Mercearia','Congelados','Bebidas','Limpeza','Descartáveis','Outros'];
-const units = ['kg','g','L','ml','un'];
+const units = STOCK_UNITS;
 const blank = {name:'',category:'Proteínas',unit:'kg',minStock:'0',trackExpiry:false,status:'active'};
 async function call(action, payload={}) {
   if (!auth.currentUser) throw new Error('Sessão expirada.');
