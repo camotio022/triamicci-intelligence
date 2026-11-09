@@ -86,10 +86,11 @@ export default async function kitchenV3(req,res){
     // Test-phase reconfiguration replaces current experimental balances; historical records remain unchanged.
     const next={displayName:profile.displayName.trim(),aliases:(profile.aliases||[]).map(x=>x.trim()),controlMode:profile.controlMode,origin:profile.origin,
       countUnit:profile.countUnit||null,locations:profile.locations,receivingPresentation:profile.receivingPresentation||null,
+      receivingModel:profile.receivingModel||null,
       sourceProductIds:profile.sourceProductIds||[],alternativeProductIds:profile.alternativeProductIds||[],
       trackingNote:(profile.trackingNote||'').slice(0,240),version:(prior.data()?.version||p.data().profile?.version||0)+1,updatedAt:now(),updatedBy:user.uid};
     version=next.version;tx.set(ref,next);
-    tx.update(pref,{name:next.displayName,aliases:[...new Set([...(p.data().aliases||[]),...(next.aliases||[]),p.data().name].filter(Boolean))],profile:next,unit:targetUnit,operationalUnitOverride:targetUnit,receivingUnitOverride:[...unitNames,'ml'].includes(profile.receivingPresentation)?profile.receivingPresentation:unitChanged?targetUnit:p.data().receivingUnitOverride||null,...(unitChanged?{quantity:0,minStock:0}:{}),updatedAt:now()});
+    tx.update(pref,{name:next.displayName,aliases:[...new Set([...(p.data().aliases||[]),...(next.aliases||[]),p.data().name].filter(Boolean))],profile:next,unit:targetUnit,operationalUnitOverride:targetUnit,receivingUnitOverride:profile.receivingModel?.receivingUnit||([...unitNames,'ml'].includes(profile.receivingPresentation)?profile.receivingPresentation:unitChanged?targetUnit:p.data().receivingUnitOverride||null),...(unitChanged?{quantity:0,minStock:0}:{}),updatedAt:now()});
     if(unitChanged){
      tx.set(balances.doc(productId),{productId,unit:targetUnit,reserve:0,rotation:0,total:0,quality:'CONFIGURATION_RESET',at:null,countedTotal:null,countSessions:{},lastCountAtByArea:{},entriesSinceCount:0,exitsSinceCount:0,updatedAt:now(),configurationVersion:next.version});
      if(legacy?.exists)tx.set(legacy.ref,{productId,unit:targetUnit,reserva:0,giro:0,total:0,quality:'CONFIGURATION_RESET',updatedAt:now()});
