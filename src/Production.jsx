@@ -121,7 +121,7 @@ export default function Production({membership,initialTaskId}){
       {(partial||done)&&<small>{task.completedQuantity||0} {task.unit||'un'} registradas</small>}
       {progress!==null&&<div className="ti-production-progress" role="progressbar" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100" aria-label={'Progresso de '+task.recipeName}><span style={{width:progress+'%'}}/></div>}
      </div>
-     {done?<span className="ti-v4-task-done"><CheckCircle2 size={14}/> Feito</span>:<button type="button" disabled={!available} title={!available?'Preparação indisponível; solicite revisão à gestão':undefined} onClick={()=>openExecution(task)}>{available?(partial?'Continuar':'Registrar feito'):'Indisponível'}</button>}
+     {done?<span className="ti-v4-task-done"><CheckCircle2 size={14}/> Feito</span>:<button type="button" disabled={!available} title={!available?'Preparação indisponível; solicite revisão à gestão':undefined} onClick={()=>openExecution(task)}>{available?(partial?'Continuar':'Registrar execução'):'Indisponível'}</button>}
     </li>})}</ul>}
   </section>}
   <div className="production-layout ti-v4-production-layout">
