@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'vite';
 import {chromium} from 'playwright';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 const root=new URL('../',import.meta.url).pathname;
 const baseItems=()=>[
  {id:'access-one',title:'Acesso atualizado',message:'Perfil de acesso: admin → auxiliar',at:new Date().toISOString(),read:false,source:'Equipe',page:'my-profile'},
@@ -9,7 +12,9 @@ const baseItems=()=>[
  {id:'old-trash',title:'Aviso anterior',message:'Registro na lixeira',at:new Date(Date.now()-86400000).toISOString(),read:true,deletedAt:new Date().toISOString()}
 ];
 test('notification module: mobile density, independent route, lifecycle and collapsed device settings',{timeout:120000},async()=>{
- const server=await createServer({root,server:{host:'127.0.0.1',port:4181,strictPort:true},plugins:[{name:'notifications-isolated-fixture',enforce:'pre',resolveId(source){if(source==='./firebase.js')return '\0fixture-firebase';if(source==='./useUnitLive.js')return '\0fixture-live'},load(id){
+ const cacheDir=await mkdtemp(join(tmpdir(),'triamicci-notifications-vite-'));
+ // Separate optimizer cache from the other Vite server running in this job.
+ const server=await createServer({root,configFile:false,cacheDir,optimizeDeps:{entries:['qa/notifications-module.html']},server:{host:'127.0.0.1',port:4181,strictPort:true},plugins:[{name:'notifications-isolated-fixture',enforce:'pre',resolveId(source){if(source==='./firebase.js')return '\0fixture-firebase';if(source==='./useUnitLive.js')return '\0fixture-live'},load(id){
   if(id==='\0fixture-firebase')return 'export const auth={currentUser:{uid:"fixture-user",getIdToken:async()=>"fixture-token"}};export const db={};export const app={};export const isIndependentSession=false;';
   if(id==='\0fixture-live')return 'import {useEffect,useRef} from "react";export function useUnitLive(unit,refresh){const latest=useRef(refresh);latest.current=refresh;useEffect(()=>{latest.current(true,null)},[unit]);return {status:"live"}}';
  }}]});
@@ -17,8 +22,8 @@ test('notification module: mobile density, independent route, lifecycle and coll
  try{
   browser=await chromium.launch({headless:true,...(process.env.NOTIFICATION_CHROMIUM_PATH?{executablePath:process.env.NOTIFICATION_CHROMIUM_PATH}:{})});
   for(const width of [320,390,430,768,1280]){
-   const context=await browser.newContext({viewport:{width,height:844}}),page=await context.newPage(),errors=[],actions=[];let items=baseItems(),loads=0;
-   page.on('pageerror',e=>errors.push(e.message));
+   const context=await browser.newContext({viewport:{width,height:844}}),page=await context.newPage(),errors=[],failedRequests=[],actions=[];let items=baseItems(),loads=0;
+   page.on('pageerror',e=>errors.push(e.message));page.on('requestfailed',r=>failedRequests.push(r.url()+' '+r.failure()?.errorText));
    await page.addInitScript(()=>{
     let current=null;const sub={endpoint:'https://web.push.apple.com/fixture',keys:{p256dh:'a'.repeat(87),auth:'b'.repeat(22)}};
     const registration={pushManager:{getSubscription:async()=>current,subscribe:async()=>{current={toJSON:()=>sub,unsubscribe:async()=>{current=null;return true}};return current}}};
@@ -35,7 +40,7 @@ test('notification module: mobile density, independent route, lifecycle and coll
     return route.fulfill({json:{message:'Operação concluída.'}});
    });
    await page.goto('http://127.0.0.1:4181/qa/notifications-module.html?page=notifications');
-   await page.getByRole('heading',{name:'Notificações',exact:true}).waitFor();
+   await page.getByRole('heading',{name:'Notificações',exact:true}).waitFor().catch(error=>{throw Error(error.message+' Browser errors: '+JSON.stringify({errors,failedRequests}))});
    await page.getByRole('button',{name:/Acesso atualizado/}).waitFor();
    assert.equal(await page.locator('.ti-notification-panel').count(),0);
    assert.equal(await page.getByRole('button',{name:'Testar aviso',exact:true}).isVisible(),false);
@@ -57,5 +62,5 @@ test('notification module: mobile density, independent route, lifecycle and coll
    await page.locator('.ti-notify-device>summary').click();await page.screenshot({path:'/tmp/triamicci-notifications-'+width+'.png',fullPage:true});
    await context.close();
   }
- }finally{if(browser)await browser.close();await server.close()}
+ }finally{if(browser)await browser.close();await server.close();await rm(cacheDir,{recursive:true,force:true})}
 });
