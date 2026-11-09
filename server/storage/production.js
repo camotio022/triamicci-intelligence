@@ -23,7 +23,7 @@ export default async function storageProduction(req,res){
   const root=getDb().collection('units').doc(m.unitId),action=req.body?.action;
   if(action==='storageProductionOptions'){
    const [shipments,runs]=await Promise.all([
-    root.collection('receiptShipments').where('status','==','pending').limit(51).get(),
+    root.collection('storageReceiptsV1').where('status','==','pending').limit(51).get(),
     root.collection('storageProductionV1').orderBy('at','desc').limit(31).get()
    ]);
    if(shipments.size>50)return send(res,409,'Muitos recebimentos pendentes; revise antes de continuar.');
@@ -36,7 +36,7 @@ export default async function storageProduction(req,res){
   const {requestId,sourceType,shipmentId=null,lineIndex=null,sourceProductId,sourceStorageId=null,sourceQuantity,outputProductId,outputStorageId,outputQuantity,notes=''}=req.body||{};
   if(!validId(requestId)||!['shipment','stored'].includes(sourceType)||!validProduct(sourceProductId)||!validProduct(outputProductId)||!validId(outputStorageId)||sourceType==='shipment'&&(!validId(shipmentId)||!Number.isInteger(lineIndex)||lineIndex<0||lineIndex>19)||sourceType==='stored'&&!validId(sourceStorageId)||typeof notes!=='string'||notes.length>240)return send(res,400,'Revise origem, insumos e quantidades.');
   const db=getDb(),runs=root.collection('storageProductionV1'),runRef=runs.doc(requestId),sourceRef=root.collection('products').doc(sourceProductId),outputRef=root.collection('products').doc(outputProductId),outputSpace=root.collection('storageSpacesV1').doc(outputStorageId),outputLink=root.collection('storageLinksV1').doc(outputProductId);
-  const shipmentRef=sourceType==='shipment'?root.collection('receiptShipments').doc(shipmentId):null;
+  const shipmentRef=sourceType==='shipment'?root.collection('storageReceiptsV1').doc(shipmentId):null;
   const sourceBalanceRef=sourceType==='stored'?root.collection('storageBalancesV1').doc(sourceProductId):null;
   const sourceLinkRef=sourceType==='stored'?root.collection('storageLinksV1').doc(sourceProductId):null;
   const allocationRef=sourceType==='shipment'?root.collection('storageReceiptAllocationsV1').doc(createHash('sha256').update(shipmentId+'|'+lineIndex).digest('hex')):null;
