@@ -42,7 +42,10 @@ export function previewStock(amount,unit,model,stockUnit){
 }
 export function previewYields(amount,unit,model){
  return (model?.yields||[]).map(y=>{
-  const source=inUnit(amount,unit,y.sourceUnit);
+  let source=inUnit(amount,unit,y.sourceUnit);
+  if(source===null&&model?.conversion?.fixed===true&&model.conversion.fromUnit===unit){
+   source=inUnit(amount*model.conversion.factor,model.conversion.toUnit,y.sourceUnit);
+  }
   if(source===null)return null;
   const value=source/y.sourceQuantity*y.resultQuantity;
   return {label:y.label,quantity:quantityUnits.has(y.resultUnit)?Math.floor(value+1e-9):Math.floor(value*1000)/1000,unit:y.resultUnit,kind:'estimate'};
