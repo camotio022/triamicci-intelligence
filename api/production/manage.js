@@ -126,7 +126,7 @@ export default async function handler(req,res){
     if(existing.data().payloadHash!==payloadHash||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');
     duplicate=true;return;
    }
-   if(!recipe.exists||recipe.data().active!==true)throw Error('RECIPE_NOT_FOUND');
+   if(!recipe.exists||recipe.data().active!==true||!recipe.data().preparationConfig)throw Error('RECIPE_NOT_FOUND');
    if(taskRef&&(!task?.exists||task.data().recipeId!==recipeId||!['pending','partial'].includes(task.data().status)))throw Error('TASK_NOT_PENDING');
    if(recipe.data().stockEffect==='portion_same_product')throw Error('INVALID_TRANSFORMATION');
    const recipeData=recipe.data(),productDocs=docs.slice(0,items.length),balanceDocs=docs.slice(items.length);
