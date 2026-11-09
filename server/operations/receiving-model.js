@@ -45,6 +45,6 @@ export function previewYields(amount,unit,model){
   const source=inUnit(amount,unit,y.sourceUnit);
   if(source===null)return null;
   const value=source/y.sourceQuantity*y.resultQuantity;
-  return {label:y.label,quantity:Math.floor(value*1000)/1000,unit:y.resultUnit,kind:'estimate'};
+  return {label:y.label,quantity:quantityUnits.has(y.resultUnit)?Math.floor(value+1e-9):Math.floor(value*1000)/1000,unit:y.resultUnit,kind:'estimate'};
  }).filter(Boolean);
 }
