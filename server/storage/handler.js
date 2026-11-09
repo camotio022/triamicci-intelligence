@@ -31,6 +31,24 @@ export default async function handler(req,res){
    const confirmed=counts.filter(x=>active.has(x.productId+'|'+x.storageId)&&x.status!=='rejected');
    return send(res,200,'Armazenamentos configurados.',{storages:all,links:bindings,counts:confirmed,templates:STORAGE_TEMPLATES,day:today,progress:all.map(s=>({id:s.id,...progress(bindings.filter(l=>l.allowedStorageIds?.includes(s.id)).length,confirmed.filter(c=>c.storageId===s.id).length),divergences:confirmed.filter(c=>c.storageId===s.id&&c.expected!==null&&c.expected!==undefined&&c.difference!==0).length,pendingReview:confirmed.filter(c=>c.storageId===s.id&&c.status==='pending').length,scheduled:scheduled(s,today)})),countingEnabled:true,countsAffectOfficialBalance:false});
   }
+  if(action==='storageHistory'){
+   const {storageId=null}=req.body||{};
+   if(storageId!==null&&!idOk(storageId))return send(res,400,'Armazenamento inválido.');
+   const [counts,transfers,receipts,preparations]=await Promise.all([
+    root.collection('storageCountsV1').orderBy('at','desc').limit(61).get(),
+    root.collection('storageOperationsV1').orderBy('at','desc').limit(41).get(),
+    root.collection('storageReceiptsV1').orderBy('createdAt','desc').limit(41).get(),
+    root.collection('storageProductionV1').orderBy('at','desc').limit(41).get()
+   ]);
+   const atOf=x=>x?.toDate?.()?.toISOString?.()||null;
+   const items=[
+    ...counts.docs.map(d=>({id:d.id,kind:'count',...d.data(),at:atOf(d.data().at)})),
+    ...transfers.docs.map(d=>({id:d.id,kind:'transfer',...d.data(),at:atOf(d.data().at)})),
+    ...receipts.docs.map(d=>({id:d.id,kind:'receipt',...d.data(),at:atOf(d.data().createdAt)})),
+    ...preparations.docs.map(d=>({id:d.id,kind:'production',...d.data(),at:atOf(d.data().at)}))
+   ].filter(e=>!storageId||e.storageId===storageId||e.from===storageId||e.to===storageId||e.sourceStorageId===storageId||e.outputStorageId===storageId||e.lines?.some(l=>l.storageId===storageId)).sort((a,b)=>String(b.at).localeCompare(String(a.at))).slice(0,70);
+   return send(res,200,'Histórico exclusivo da nova operação.',{events:items,legacyExcluded:true});
+  }
   if(action==='storageCount'){
    const {storageId,productId,quantity,observation=null}=req.body||{};
    if(!idOk(storageId)||!productOk(productId))return send(res,400,'Armazenamento ou produto inválido.');
