@@ -32,7 +32,7 @@ export default async function handler(req,res){
    return send(res,200,'Armazenamentos configurados.',{storages:all,links:bindings,counts:confirmed,templates:STORAGE_TEMPLATES,day:today,progress:all.map(s=>({id:s.id,...progress(bindings.filter(l=>l.allowedStorageIds?.includes(s.id)).length,confirmed.filter(c=>c.storageId===s.id).length),divergences:confirmed.filter(c=>c.storageId===s.id&&c.expected!==null&&c.expected!==undefined&&c.difference!==0).length,pendingReview:confirmed.filter(c=>c.storageId===s.id&&c.status==='pending').length,scheduled:scheduled(s,today)})),countingEnabled:true,countsAffectOfficialBalance:false});
   }
   if(action==='storageCount'){
-   const {storageId,productId,quantity}=req.body||{};
+   const {storageId,productId,quantity,observation=null}=req.body||{};
    if(!idOk(storageId)||!productOk(productId))return send(res,400,'Armazenamento ou produto inválido.');
    const date=dayKey(),docId=createHash('sha256').update(date+'|'+storageId+'|'+productId).digest('hex');
    const countRef=root.collection('storageCountsV1').doc(docId);
@@ -42,20 +42,22 @@ export default async function handler(req,res){
     const [who,storage,link,product,previous,balance]=await tx.getAll(db.doc('memberships/'+actor.uid),storageRef,linkRef,productRef,countRef,balanceRef);
     if(who.data()?.status!=='active'||who.data()?.unitId!==member.unitId||!TEAM_ROLES.includes(who.data()?.role))throw Error('FORBIDDEN');
     if(!storage.exists||storage.data().active===false||!link.data()?.allowedStorageIds?.includes(storageId)||!product.exists||product.data().status!=='active')throw Error('STORAGE');
-    const unit=countedUnit(product.data());
-    if(!unit||!validQuantity(quantity,{unit,allowZero:true}))throw Error('QUANTITY');
+    const policy=storage.data().countMode||'by_product';
+    const availability=policy==='availability'||policy==='by_product'&&product.data().profile?.controlMode==='availability';
+    const unit=availability?null:countedUnit(product.data());
+    if(availability?!['available','missing'].includes(observation):!unit||!validQuantity(quantity,{unit,allowZero:true}))throw Error('QUANTITY');
     if(previous.data()?.status==='approved')throw Error('CLOSED');
-    if(balance.exists&&(balance.data().unit!==unit||!validateUnifiedBalance(balance.data())))throw Error('UNIT');
-    const previousStock=balance.exists?balance.data().byStorage?.[storageId]||0:null;
+    if(!availability&&balance.exists&&(balance.data().unit!==unit||!validateUnifiedBalance(balance.data())))throw Error('UNIT');
+    const previousStock=availability?null:balance.exists?balance.data().byStorage?.[storageId]||0:null;
     const difference=previousStock===null?null:Math.round((quantity-previousStock)*1000)/1000;
     const balanceVersion=balance.exists?balance.data().version||0:0;
     const now=new Date(),version=(previous.data()?.version||0)+1;
-    tx.set(countRef,{day:date,storageId,productId,quantity,unit,version,actorUid:actor.uid,at:now,kind:'PHYSICAL_OBSERVATION',status:'pending',expected:previousStock,difference,balanceVersionAtCount:balanceVersion,affectsOfficialBalance:false});
+    tx.set(countRef,{day:date,storageId,productId,quantity,unit,version,actorUid:actor.uid,at:now,kind:availability?'AVAILABILITY_OBSERVATION':'PHYSICAL_OBSERVATION',status:availability?'approved':'pending',observation:availability?observation:null,expected:previousStock,difference,balanceVersionAtCount:balanceVersion,affectsOfficialBalance:false});
     tx.create(db.collection('auditLogs').doc(),{event:'storage.count_recorded',unitId:member.unitId,storageId,productId,actorUid:actor.uid,at:now,before:previous.data()?{quantity:previous.data().quantity,unit:previous.data().unit}:null,after:{quantity,unit,version}});
     signalUnitChange(tx,db,member.unitId,['stock']);
-    recorded={day:date,storageId,productId,quantity,unit,version,difference,expected:previousStock};
+    recorded={day:date,storageId,productId,quantity:availability?null:quantity,unit,observation:availability?observation:null,version,difference,expected:previousStock};
    });
-   return send(res,200,'Conferência registrada para revisão gerencial. O saldo oficial não foi alterado.',{count:recorded});
+   return send(res,200,recorded.observation?'Disponibilidade registrada sem alterar saldo.':'Conferência registrada para revisão gerencial. O saldo oficial não foi alterado.',{count:recorded});
   }
 
   if(action==='storageReview'){
@@ -134,8 +136,8 @@ export default async function handler(req,res){
     if(version!==expectedVersion||Boolean(storageId)!==prior.exists)throw Error('CONFLICT');
     if(existing.docs.some(x=>x.id!==ref.id&&x.data().active!==false&&x.data().name.trim().toLocaleLowerCase('pt-BR')===name.toLocaleLowerCase('pt-BR')))throw Error('DUPLICATE');
     const now=new Date();
-    tx.set(ref,{name,icon:storage.icon,area:storage.area,frequency:storage.frequency,weekdays:daySet,active:true,version:version+1,updatedAt:now,updatedBy:actor.uid,...(!prior.exists?{createdAt:now,createdBy:actor.uid}:{})},{merge:true});
-    tx.create(db.collection('auditLogs').doc(),{event:'storage.config_saved',unitId:member.unitId,actorUid:actor.uid,storageId:ref.id,at:now,before:prior.data()||null,after:{name,area:storage.area,icon:storage.icon,frequency:storage.frequency,weekdays:daySet}});
+    tx.set(ref,{name,icon:storage.icon,area:storage.area,frequency:storage.frequency,countMode:storage.countMode||'by_product',expiryPolicy:storage.expiryPolicy||'by_product',weekdays:daySet,active:true,version:version+1,updatedAt:now,updatedBy:actor.uid,...(!prior.exists?{createdAt:now,createdBy:actor.uid}:{})},{merge:true});
+    tx.create(db.collection('auditLogs').doc(),{event:'storage.config_saved',unitId:member.unitId,actorUid:actor.uid,storageId:ref.id,at:now,before:prior.data()||null,after:{name,area:storage.area,icon:storage.icon,frequency:storage.frequency,countMode:storage.countMode||'by_product',expiryPolicy:storage.expiryPolicy||'by_product',weekdays:daySet}});
     signalUnitChange(tx,db,member.unitId,['stock','catalog']);
     result={id:ref.id,version:version+1};
    });
