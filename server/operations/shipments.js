@@ -62,7 +62,7 @@ export default async function shipments(req,res){
     const p=products.get(line.productId),profile=profiles.get(line.productId);
     if(!p?.exists||!isOperationalProduct(p.data())||!profile?.exists||!['supplier','both'].includes(profile.data().origin))throw Error('PRODUCT');
     const cfg=profile.data(),quantitative=cfg.controlMode==='quantitative';
-    if(action==='shipmentApprove'&&line.measurementSnapshot&&line.measurementSnapshot.configurationVersion!==cfg.version)throw Error('CONFIGURATION_CHANGED');
+    if(action==='shipmentApprove'&&line.measurementSnapshot&&line.measurementSnapshot.configurationVersion!==(cfg.version||0))throw Error('CONFIGURATION_CHANGED');
     if(!RECEIVING_UNITS.includes(line.commercialUnit)||!validQuantity(line.commercialQuantity,{unit:line.commercialUnit})||quantitative&&(!cfg.locations.includes(line.location)||!validQuantity(line.stockQuantity,{unit:cfg.countUnit}))||!quantitative&&line.stockQuantity!==0)throw Error('QUANTITY');
     const receivingError=receivingConflict(p.data(),cfg,line);if(receivingError)throw Error(receivingError);
     const expected=order?.data()?.items.find(x=>x.productId===line.productId);
