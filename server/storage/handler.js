@@ -29,7 +29,7 @@ export default async function handler(req,res){
    const counts=countsSnap.docs.map(d=>({id:d.id,...d.data(),at:d.data().at?.toDate?.()?.toISOString?.()||null}));
    const active=new Set(bindings.flatMap(l=>(l.allowedStorageIds||[]).map(storageId=>l.productId+'|'+storageId)));
    const confirmed=counts.filter(x=>active.has(x.productId+'|'+x.storageId)&&x.status!=='rejected');
-   return send(res,200,'Armazenamentos configurados.',{storages:all,links:bindings,counts:confirmed,templates:STORAGE_TEMPLATES,day:today,progress:all.map(s=>({id:s.id,...progress(bindings.filter(l=>l.allowedStorageIds?.includes(s.id)).length,confirmed.filter(c=>c.storageId===s.id).length),scheduled:scheduled(s,today)})),countingEnabled:true,countsAffectOfficialBalance:false});
+   return send(res,200,'Armazenamentos configurados.',{storages:all,links:bindings,counts:confirmed,templates:STORAGE_TEMPLATES,day:today,progress:all.map(s=>({id:s.id,...progress(bindings.filter(l=>l.allowedStorageIds?.includes(s.id)).length,confirmed.filter(c=>c.storageId===s.id).length),divergences:confirmed.filter(c=>c.storageId===s.id&&c.expected!==null&&c.expected!==undefined&&c.difference!==0).length,pendingReview:confirmed.filter(c=>c.storageId===s.id&&c.status==='pending').length,scheduled:scheduled(s,today)})),countingEnabled:true,countsAffectOfficialBalance:false});
   }
   if(action==='storageCount'){
    const {storageId,productId,quantity}=req.body||{};
