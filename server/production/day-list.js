@@ -33,7 +33,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const [memberDoc,recipeDoc]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(recipeRef)]);
     if(!memberDoc.exists||memberDoc.data().status!=='active'||memberDoc.data().unitId!==m.unitId||!canPlan(memberDoc.data().role))throw Error('FORBIDDEN');
-    if(!recipeDoc.exists||recipeDoc.data().active!==true||!recipeDoc.data().preparationConfig)throw Error('RECIPE_NOT_FOUND');
+    if(!recipeDoc.exists||recipeDoc.data().active!==true)throw Error('RECIPE_NOT_FOUND');
     const recipe=recipeDoc.data(),ids=[...new Set([...(recipe.lines||[]).map(line=>line.productId),recipe.outputProductId].filter(Boolean))];
     const products=await Promise.all(ids.map(id=>tx.get(unit.collection('products').doc(id))));
     if(products.some(p=>!p.exists||!isOperationalProduct(p.data())))throw Error('RECIPE_NOT_FOUND');
