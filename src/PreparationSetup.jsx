@@ -14,7 +14,7 @@ export default function PreparationSetup({products,call,onSaved,unitId,requested
  const [confirmation,setConfirmation]=useState(null);
  const [all,setAll]=useState([]),[id,setId]=useState(''),[c,setC]=useState(empty),[step,setStep]=useState(1),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[dirty,setDirty]=useState(false);
  useEffect(()=>{onDirtyChange?.(dirty);},[dirty,onDirtyChange]);
- const load=async()=>{setLoading(true);try{const r=await call('/api/production/manage','preparationList');setAll(r.configurations||[]);return true;}catch(e){setError(e.message);return false;}finally{setLoading(false)}};
+ const load=async()=>{setLoading(true);try{const r=await call('/api/production/manage','preparationList');setAll((r.configurations||[]).filter(entry=>entry.configuration));return true;}catch(e){setError(e.message);return false;}finally{setLoading(false)}};
  useEffect(()=>{creationId.current=null;setCreated([]);setCreating(false);setAll([]);setId('');setC(empty());setStep(1);setDirty(false);setMessage('');setError('');setConfirmation(null);load();},[unitId]);
  const change=patch=>{setC(v=>({...v,...patch}));setDirty(true);setError('');setMessage('');};
  const applySelection=next=>{creationId.current=null;const old=all.find(x=>x.id===next);setId(next);setC(old?.configuration?{...old.configuration,portionMode:old.configuration.type==='portion'?(old.configuration.sourceProductId===old.configuration.outputProductId?'same':'separate'):undefined}:empty());setStep(old?.configuration?2:1);setError('');setMessage('');setDirty(false);};
