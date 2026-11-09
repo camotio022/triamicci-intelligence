@@ -137,11 +137,11 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       const adminGroup=sidebar.getByRole('button',{name:'Administração',exact:true});
       assert.equal(await adminGroup.count(),management?1:0,'Grupo Administração respeita perfil '+role);
       if(management&&await adminGroup.getAttribute('aria-expanded')!=='true')await adminGroup.click();
-      const adminNav=sidebar.getByRole('button',{name:'Administração · Catálogo',exact:true});
+      const adminNav=sidebar.getByRole('button',{name:'Gestão de Insumos',exact:true});
       assert.equal(await adminNav.count(),management?1:0,'Menu respeita perfil '+role);
       if(management){
        await adminNav.click();
-       await page.getByRole('heading',{name:'Administração · Catálogo',exact:true}).waitFor();
+       await page.getByRole('heading',{name:'Gestão de Insumos',exact:true}).waitFor();
        await page.getByRole('button',{name:'Configurar 56 produtos Validar e ativar insumos da nova lista',exact:true}).click();
        await page.getByRole('button',{name:'Bacon Configuração pendente · Proteínas e carnes',exact:true}).click();
        await page.getByRole('heading',{name:'Configuração da cozinha preservada',exact:true}).waitFor();
