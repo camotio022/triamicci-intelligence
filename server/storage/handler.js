@@ -52,8 +52,8 @@ export default async function handler(req,res){
     const difference=previousStock===null?null:Math.round((quantity-previousStock)*1000)/1000;
     const balanceVersion=balance.exists?balance.data().version||0:0;
     const now=new Date(),version=(previous.data()?.version||0)+1;
-    tx.set(countRef,{day:date,storageId,productId,quantity,unit,version,actorUid:actor.uid,at:now,kind:availability?'AVAILABILITY_OBSERVATION':'PHYSICAL_OBSERVATION',status:availability?'approved':'pending',observation:availability?observation:null,expected:previousStock,difference,balanceVersionAtCount:balanceVersion,affectsOfficialBalance:false});
-    tx.create(db.collection('auditLogs').doc(),{event:'storage.count_recorded',unitId:member.unitId,storageId,productId,actorUid:actor.uid,at:now,before:previous.data()?{quantity:previous.data().quantity,unit:previous.data().unit}:null,after:{quantity,unit,version}});
+    tx.set(countRef,{day:date,storageId,productId,quantity:availability?null:quantity,unit,version,actorUid:actor.uid,at:now,kind:availability?'AVAILABILITY_OBSERVATION':'PHYSICAL_OBSERVATION',status:availability?'approved':'pending',observation:availability?observation:null,expected:previousStock,difference,balanceVersionAtCount:balanceVersion,affectsOfficialBalance:false});
+    tx.create(db.collection('auditLogs').doc(),{event:'storage.count_recorded',unitId:member.unitId,storageId,productId,actorUid:actor.uid,at:now,before:previous.data()?{quantity:previous.data().quantity,unit:previous.data().unit}:null,after:{quantity:availability?null:quantity,unit,version,observation:availability?observation:null}});
     signalUnitChange(tx,db,member.unitId,['stock']);
     recorded={day:date,storageId,productId,quantity:availability?null:quantity,unit,observation:availability?observation:null,version,difference,expected:previousStock};
    });
