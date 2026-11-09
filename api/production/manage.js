@@ -40,7 +40,7 @@ export default async function handler(req,res){
    const [r,p,available]=await Promise.all([recipes.orderBy('name').limit(100).get(),runs.orderBy('at','desc').limit(30).get(),unit.collection('products').limit(201).get()]);
    if(available.size>200)return send(res,409,'Catálogo acima do limite desta consulta.');
    const products=await recipeProducts(db,unit,r.docs.filter(d=>d.data().active===true).map(d=>d.data()),available.docs);
-   const reviewed=r.docs.map(d=>({...clean(d),...recipeAvailability(d.data(),products)}));
+   const reviewed=r.docs.filter(d=>d.data().preparationConfig||d.data().configurationDraft).map(d=>({...clean(d),...recipeAvailability(d.data(),products)}));
    return send(res,200,'Produção carregada.',{recipes:reviewed.filter(r=>r.available),blockedRecipes:reviewed.filter(r=>r.active===true&&!r.available).map(r=>({id:r.id,name:r.name,errors:r.errors})),...(['admin','manager','submanager'].includes(member.role)?{reviewRecipes:reviewed}:{}),runs:p.docs.map(clean)});
   }
   if(action==='archiveRecipe'){
