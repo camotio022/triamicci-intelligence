@@ -1,7 +1,7 @@
 // Responses and bearer tokens are never stored outside memory. Keep the expensive Firestore
 // dashboards briefly reusable while live events, React rerenders and navigation settle.
 const readActions=new Set(['configuration','templates','run','photoRead','portionStatus','preparationList','status','list','v3Dashboard','v3Conference','v3Alerts','storageList','storageHistory','storageBalance','storageReceiptList','storageProductionOptions','dayList','notifications','myProfile','profiles','masterRegistryPreview','masterRegistryClaims','teamDirectory','teamToday','today','mine','publicNotices','leaveList','leaveContext','fixedOffList','dashboard','myProposals','shipmentsList','summary','lots','productActivity','v3Lots','v3LedgerHistory','v3LossPending','v3PendingReceipts','closeList','todayCounts','dailyReport','investigationGet','measurementGet','get','preview','history','policies']);
-const heavyActions=new Set(['v3Dashboard','v3Conference','v3Alerts','storageList']);
+const heavyActions=new Set(['v3Dashboard','v3Conference','v3Alerts','storageList','dayList']);
 export function createApiFetch(fetcher,{now=()=>Date.now(),cooldownMs=60000,cacheMs=12000,scope=()=>''}={}){
  const pending=new Map(),blocked=new Map(),recent=new Map();
  let generation=0;
@@ -49,5 +49,5 @@ export function createApiFetch(fetcher,{now=()=>Date.now(),cooldownMs=60000,cach
  return apiFetch;
 }
 let currentScope='';
-export function setApiScope(scope){currentScope=scope||'';apiFetch.clearCache();}
+export function setApiScope(scope){const next=scope||'';if(next!==currentScope){currentScope=next;apiFetch.clearCache();}}
 export const apiFetch=createApiFetch((...args)=>fetch(...args),{scope:()=>currentScope});
