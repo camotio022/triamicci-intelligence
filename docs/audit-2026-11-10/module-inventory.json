@@ -1,0 +1,1510 @@
+{
+  "baseline": "f39bc8e8c3cee030d0c135e1aecd9fcc9c63b158",
+  "method": "AST inventory; imports are reachability candidates, not runtime coverage; no cloud data queried",
+  "modules": [
+    {
+      "file": "api/catalog/manage.js",
+      "lines": 110,
+      "imports": 6,
+      "literalCollections": [
+        "productCatalog",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "api/catalog/sync-v2.js",
+      "lines": 38,
+      "imports": 3,
+      "literalCollections": [
+        "productCatalog"
+      ]
+    },
+    {
+      "file": "api/coverage/manage.js",
+      "lines": 206,
+      "imports": 10,
+      "literalCollections": [
+        "units",
+        "coverageProposals",
+        "coverageRequestsV31",
+        "configuration",
+        "staffRegistry",
+        "schedules",
+        "memberships",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "api/dashboard/summary.js",
+      "lines": 64,
+      "imports": 2,
+      "literalCollections": [
+        "units",
+        "products",
+        "movements",
+        "physicalBalances"
+      ]
+    },
+    {
+      "file": "api/invitations/accept.js",
+      "lines": 45,
+      "imports": 2,
+      "literalCollections": [
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "api/invitations/create.js",
+      "lines": 91,
+      "imports": 1,
+      "literalCollections": [
+        "invitationRateLimits",
+        "invitations",
+        "units",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "api/invitations/revoke.js",
+      "lines": 59,
+      "imports": 2,
+      "literalCollections": [
+        "invitations",
+        "units",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "api/members/manage.js",
+      "lines": 432,
+      "imports": 17,
+      "literalCollections": [
+        "units",
+        "staffRegistry",
+        "configuration",
+        "memberships",
+        "auditLogs",
+        "staffRegistryClaims",
+        "staffRegistryLinks",
+        "rosterEntries",
+        "memberPersonal",
+        "staffProfiles",
+        "skillReviewRequests",
+        "items",
+        "memberNotifications"
+      ]
+    },
+    {
+      "file": "api/operations/stock.js",
+      "lines": 260,
+      "imports": 25,
+      "literalCollections": [
+        "units",
+        "products",
+        "physicalReceipts",
+        "physicalCounts",
+        "physicalOutflows",
+        "physicalTransfers",
+        "productionRuns",
+        "lots",
+        "physicalLots",
+        "productCatalog",
+        "physicalBalances",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "api/production/manage.js",
+      "lines": 237,
+      "imports": 15,
+      "literalCollections": [
+        "units",
+        "productionRecipes",
+        "productionRuns",
+        "products",
+        "auditLogs",
+        "physicalBalances",
+        "productCatalog",
+        "tasks",
+        "productionDays",
+        "lots",
+        "physicalLots"
+      ]
+    },
+    {
+      "file": "api/products/manage.js",
+      "lines": 155,
+      "imports": 11,
+      "literalCollections": [
+        "products",
+        "units",
+        "physicalBalances",
+        "operationalProfiles",
+        "productCatalog",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "api/stock/movements.js",
+      "lines": 108,
+      "imports": 2,
+      "literalCollections": [
+        "units",
+        "movements",
+        "memberships",
+        "products",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "public/push-sw.js",
+      "lines": 19,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "scripts/audit-ledger-sources.mjs",
+      "lines": 20,
+      "imports": 1,
+      "literalCollections": [
+        "units",
+        "physicalBalances",
+        "v3PhysicalBalances"
+      ]
+    },
+    {
+      "file": "scripts/audit-read-cost.mjs",
+      "lines": 20,
+      "imports": 3,
+      "literalCollections": []
+    },
+    {
+      "file": "scripts/cleanup-checklist-photos.mjs",
+      "lines": 15,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "scripts/diagnose-cloudinary-preset.mjs",
+      "lines": 21,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "scripts/materialize-checklist-days.mjs",
+      "lines": 13,
+      "imports": 3,
+      "literalCollections": []
+    },
+    {
+      "file": "scripts/seed-product-catalog.mjs",
+      "lines": 49,
+      "imports": 3,
+      "literalCollections": [
+        "productCatalog"
+      ]
+    },
+    {
+      "file": "scripts/test-business-rules.mjs",
+      "lines": 7,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "scripts/test-cloudinary-private.mjs",
+      "lines": 21,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "scripts/validate-product-catalog-v2.mjs",
+      "lines": 30,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "server/_lib.js",
+      "lines": 76,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "server/catalog/activate-draft.js",
+      "lines": 103,
+      "imports": 7,
+      "literalCollections": [
+        "productCatalog",
+        "products",
+        "units",
+        "operationalProfiles",
+        "memberships",
+        "physicalBalances",
+        "v3PhysicalBalances",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/catalog/prepared-product.js",
+      "lines": 63,
+      "imports": 6,
+      "literalCollections": [
+        "units",
+        "products",
+        "physicalBalances",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/checklists/cleanup.js",
+      "lines": 15,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/checklists/cloudinary-storage.js",
+      "lines": 63,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "server/checklists/handler.js",
+      "lines": 142,
+      "imports": 9,
+      "literalCollections": [
+        "auditLogs",
+        "units",
+        "checklistTemplates",
+        "checklistRuns",
+        "checklistDays",
+        "checklistPhotos"
+      ]
+    },
+    {
+      "file": "server/checklists/photos.js",
+      "lines": 94,
+      "imports": 7,
+      "literalCollections": [
+        "checklistPhotos",
+        "checklistRuns"
+      ]
+    },
+    {
+      "file": "server/checklists/routine.js",
+      "lines": 18,
+      "imports": 3,
+      "literalCollections": [
+        "checklistTemplates",
+        "checklistRuns",
+        "checklistDays"
+      ]
+    },
+    {
+      "file": "server/checklists/rules.js",
+      "lines": 49,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/coverage/engine.js",
+      "lines": 69,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/labels/rules.js",
+      "lines": 17,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/live-signal.js",
+      "lines": 13,
+      "imports": 1,
+      "literalCollections": [
+        "live",
+        "units"
+      ]
+    },
+    {
+      "file": "server/operations/availability-check.js",
+      "lines": 35,
+      "imports": 8,
+      "literalCollections": [
+        "units",
+        "availabilityChecks",
+        "availabilityHistory",
+        "stockSignals",
+        "products",
+        "operationalProfiles",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/operations/catalog-identity.js",
+      "lines": 19,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/conference-profile.js",
+      "lines": 8,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/configured-product.js",
+      "lines": 12,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/daily-inventory.js",
+      "lines": 46,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/daily-report.js",
+      "lines": 74,
+      "imports": 5,
+      "literalCollections": [
+        "units",
+        "products",
+        "productCatalog",
+        "physicalBalances",
+        "physicalCounts",
+        "physicalReceipts",
+        "physicalOutflows",
+        "productionRuns"
+      ]
+    },
+    {
+      "file": "server/operations/dispatch.js",
+      "lines": 113,
+      "imports": 7,
+      "literalCollections": [
+        "units",
+        "products",
+        "physicalBalances",
+        "physicalOutflows",
+        "auditLogs",
+        "productCatalog",
+        "lots",
+        "physicalLots"
+      ]
+    },
+    {
+      "file": "server/operations/handlers/measurements.js",
+      "lines": 80,
+      "imports": 5,
+      "literalCollections": [
+        "units",
+        "products",
+        "measurementProfiles",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/operations/handlers/package-apply.js",
+      "lines": 80,
+      "imports": 9,
+      "literalCollections": [
+        "units",
+        "products",
+        "packageConferences",
+        "measurementProfiles",
+        "physicalBalances",
+        "packageAdjustments",
+        "productCatalog",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/operations/handlers/package-conference.js",
+      "lines": 57,
+      "imports": 4,
+      "literalCollections": [
+        "units",
+        "products",
+        "measurementProfiles",
+        "packageConferences",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/operations/handlers/package-review.js",
+      "lines": 66,
+      "imports": 8,
+      "literalCollections": [
+        "units",
+        "packageConferences",
+        "measurementProfiles",
+        "products",
+        "physicalBalances",
+        "productCatalog",
+        "lots",
+        "physicalLots"
+      ]
+    },
+    {
+      "file": "server/operations/history-names.js",
+      "lines": 20,
+      "imports": 0,
+      "literalCollections": [
+        "products",
+        "memberships"
+      ]
+    },
+    {
+      "file": "server/operations/inventory-closure-rules.js",
+      "lines": 15,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/inventory-closure.js",
+      "lines": 113,
+      "imports": 4,
+      "literalCollections": [
+        "units",
+        "inventoryClosures",
+        "products",
+        "physicalBalances",
+        "memberships",
+        "physicalCounts",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/operations/inventory-summary.js",
+      "lines": 13,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/inventory-today.js",
+      "lines": 37,
+      "imports": 5,
+      "literalCollections": [
+        "units",
+        "physicalBalances",
+        "products"
+      ]
+    },
+    {
+      "file": "server/operations/investigation-rules.js",
+      "lines": 13,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/investigation.js",
+      "lines": 57,
+      "imports": 6,
+      "literalCollections": [
+        "units",
+        "inventoryInvestigations",
+        "versions",
+        "live",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/operations/logic.js",
+      "lines": 30,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/lot-logic.js",
+      "lines": 22,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/package-adjustment-plan.js",
+      "lines": 40,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/package-commit-guards.js",
+      "lines": 17,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/package-conference.js",
+      "lines": 9,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/package-lot-allocation.js",
+      "lines": 18,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/package-reconciliation.js",
+      "lines": 20,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/package-review-rules.js",
+      "lines": 13,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/receiving-input.js",
+      "lines": 25,
+      "imports": 3,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/receiving-model.js",
+      "lines": 53,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/receiving-policy.js",
+      "lines": 14,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/reconcile-lots.js",
+      "lines": 94,
+      "imports": 6,
+      "literalCollections": [
+        "units",
+        "products",
+        "physicalBalances",
+        "physicalLotReconciliations",
+        "lots",
+        "physicalLots",
+        "productCatalog",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/operations/shared-balance.js",
+      "lines": 37,
+      "imports": 0,
+      "literalCollections": [
+        "v3PhysicalBalances"
+      ]
+    },
+    {
+      "file": "server/operations/shipment-transaction.js",
+      "lines": 11,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/shipments.js",
+      "lines": 105,
+      "imports": 11,
+      "literalCollections": [
+        "units",
+        "receiptShipments",
+        "auditLogs",
+        "purchaseOrdersV3",
+        "products",
+        "operationalProfiles",
+        "physicalBalances",
+        "lots",
+        "physicalLots",
+        "physicalReceipts"
+      ]
+    },
+    {
+      "file": "server/operations/today-count-page.js",
+      "lines": 20,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/transfer.js",
+      "lines": 91,
+      "imports": 7,
+      "literalCollections": [
+        "units",
+        "products",
+        "physicalBalances",
+        "physicalTransfers",
+        "productCatalog",
+        "lots",
+        "physicalLots",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/operations/unit-engine.js",
+      "lines": 57,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/v3-catalog-policy.js",
+      "lines": 47,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "server/operations/v3-ledger.js",
+      "lines": 447,
+      "imports": 11,
+      "literalCollections": [
+        "auditLogs",
+        "units",
+        "products",
+        "operationalProfiles",
+        "physicalBalances",
+        "physicalLots",
+        "purchaseOrdersV3",
+        "lots",
+        "v3Operations",
+        "v3LossReports",
+        "physicalOutflows",
+        "v3ReceiptInspections",
+        "physicalReceipts",
+        "physicalCounts",
+        "physicalTransfers",
+        "productionRuns"
+      ]
+    },
+    {
+      "file": "server/operations/v3-service.js",
+      "lines": 206,
+      "imports": 14,
+      "literalCollections": [
+        "auditLogs",
+        "products",
+        "units",
+        "operationalProfiles",
+        "stockSignals",
+        "purchaseOrdersV3",
+        "physicalBalances",
+        "availabilityChecks",
+        "v3PhysicalBalances",
+        "lots",
+        "physicalLots",
+        "productionRecipes"
+      ]
+    },
+    {
+      "file": "server/permissions/v31-policy.js",
+      "lines": 17,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/permissions/v31-redaction.js",
+      "lines": 10,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/production/daily-task.js",
+      "lines": 20,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/production/day-list.js",
+      "lines": 59,
+      "imports": 6,
+      "literalCollections": [
+        "units",
+        "tasks",
+        "productionDays",
+        "productionRecipes",
+        "memberships",
+        "products",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/production/logic.js",
+      "lines": 16,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/production/portioning-handler.js",
+      "lines": 66,
+      "imports": 7,
+      "literalCollections": [
+        "units",
+        "productionRecipes",
+        "portioningReviews",
+        "productionRuns",
+        "products",
+        "physicalBalances",
+        "portioningState",
+        "productCatalog",
+        "tasks",
+        "productionDays",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/production/preparation-config.js",
+      "lines": 68,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "server/production/preparation-handler.js",
+      "lines": 54,
+      "imports": 9,
+      "literalCollections": [
+        "units",
+        "productionRecipes",
+        "products",
+        "operationalProfiles",
+        "productCatalog",
+        "physicalBalances",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/production/readiness.js",
+      "lines": 39,
+      "imports": 3,
+      "literalCollections": [
+        "productCatalog",
+        "physicalBalances",
+        "operationalProfiles"
+      ]
+    },
+    {
+      "file": "server/production/recipe-graph.js",
+      "lines": 13,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/production/transformation.js",
+      "lines": 37,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/push/delivery.js",
+      "lines": 54,
+      "imports": 4,
+      "literalCollections": [
+        "pushOutbox",
+        "units",
+        "memberships",
+        "pushDevices"
+      ]
+    },
+    {
+      "file": "server/push/handler.js",
+      "lines": 40,
+      "imports": 3,
+      "literalCollections": [
+        "pushDevices"
+      ]
+    },
+    {
+      "file": "server/push/policy.js",
+      "lines": 20,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/quota-error.js",
+      "lines": 11,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/schedules/coverage-timeline.js",
+      "lines": 21,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/schedules/generator.js",
+      "lines": 20,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/schedules/mural-view.js",
+      "lines": 29,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/schedules/restaurant-today.js",
+      "lines": 49,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/schedules/rules.js",
+      "lines": 52,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/schedules/temporal-policy.js",
+      "lines": 11,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/storage/balance-engine.js",
+      "lines": 49,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/storage/handler.js",
+      "lines": 196,
+      "imports": 9,
+      "literalCollections": [
+        "units",
+        "storageSpacesV1",
+        "storageLinksV1",
+        "storageCountsV1",
+        "storageOperationsV1",
+        "storageReceiptsV1",
+        "storageProductionV1",
+        "products",
+        "storageBalancesV1",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/storage/production.js",
+      "lines": 86,
+      "imports": 6,
+      "literalCollections": [
+        "units",
+        "storageReceiptsV1",
+        "storageProductionV1",
+        "products",
+        "storageSpacesV1",
+        "storageLinksV1",
+        "storageBalancesV1",
+        "storageReceiptAllocationsV1",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/storage/receiving.js",
+      "lines": 89,
+      "imports": 7,
+      "literalCollections": [
+        "units",
+        "storageReceiptsV1",
+        "purchaseOrdersV3",
+        "products",
+        "storageLinksV1",
+        "storageSpacesV1",
+        "auditLogs",
+        "storageReceiptAllocationsV1"
+      ]
+    },
+    {
+      "file": "server/storage/storage-model.js",
+      "lines": 10,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/team/invitation-view.js",
+      "lines": 7,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/team/master-registry.js",
+      "lines": 34,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/team/mural-directory.js",
+      "lines": 6,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/team/personal-rules.js",
+      "lines": 19,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/team/profile-avatar.js",
+      "lines": 15,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/team/profile-rules.js",
+      "lines": 46,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/team/roster-rules.js",
+      "lines": 14,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/team/ux-rules.js",
+      "lines": 13,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "server/workflows/attendance-v31.js",
+      "lines": 98,
+      "imports": 6,
+      "literalCollections": [
+        "units",
+        "attendanceV31",
+        "staffRegistry",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/workflows/labels.js",
+      "lines": 138,
+      "imports": 4,
+      "literalCollections": [
+        "units",
+        "labels",
+        "labelPolicies",
+        "events",
+        "memberships",
+        "auditLogs",
+        "products",
+        "staffProfiles"
+      ]
+    },
+    {
+      "file": "server/workflows/mural.js",
+      "lines": 107,
+      "imports": 5,
+      "literalCollections": [
+        "units",
+        "muralItems",
+        "items",
+        "muralReads",
+        "auditLogs"
+      ]
+    },
+    {
+      "file": "server/workflows/notice-policy.js",
+      "lines": 10,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "server/workflows/schedules.js",
+      "lines": 254,
+      "imports": 8,
+      "literalCollections": [
+        "units",
+        "schedules",
+        "configuration",
+        "fixedOffDays",
+        "auditLogs",
+        "memberships",
+        "staffRegistry",
+        "schedulePublicationState",
+        "leaveRequests",
+        "items",
+        "memberNotifications",
+        "staffProfiles"
+      ]
+    },
+    {
+      "file": "src/App.jsx",
+      "lines": 158,
+      "imports": 36,
+      "literalCollections": []
+    },
+    {
+      "file": "src/AuthGate.jsx",
+      "lines": 152,
+      "imports": 11,
+      "literalCollections": []
+    },
+    {
+      "file": "src/CatalogPicker.jsx",
+      "lines": 98,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/CatalogV2Review.jsx",
+      "lines": 67,
+      "imports": 5,
+      "literalCollections": []
+    },
+    {
+      "file": "src/ChecklistCamera.jsx",
+      "lines": 65,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/ChecklistEditor.jsx",
+      "lines": 39,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "src/ChecklistEvidence.jsx",
+      "lines": 28,
+      "imports": 3,
+      "literalCollections": []
+    },
+    {
+      "file": "src/Checklists.jsx",
+      "lines": 93,
+      "imports": 12,
+      "literalCollections": []
+    },
+    {
+      "file": "src/ConferenceHistory.jsx",
+      "lines": 62,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/ConfirmSheet.jsx",
+      "lines": 39,
+      "imports": 3,
+      "literalCollections": []
+    },
+    {
+      "file": "src/CoverageConsole.jsx",
+      "lines": 71,
+      "imports": 7,
+      "literalCollections": []
+    },
+    {
+      "file": "src/DailyInventory.jsx",
+      "lines": 120,
+      "imports": 9,
+      "literalCollections": []
+    },
+    {
+      "file": "src/Dashboard.jsx",
+      "lines": 62,
+      "imports": 6,
+      "literalCollections": []
+    },
+    {
+      "file": "src/FeedbackProvider.jsx",
+      "lines": 31,
+      "imports": 3,
+      "literalCollections": []
+    },
+    {
+      "file": "src/HistoryPeriod.jsx",
+      "lines": 5,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "src/Inventory.jsx",
+      "lines": 146,
+      "imports": 20,
+      "literalCollections": []
+    },
+    {
+      "file": "src/KitchenHome.jsx",
+      "lines": 67,
+      "imports": 8,
+      "literalCollections": []
+    },
+    {
+      "file": "src/KitchenV3.jsx",
+      "lines": 171,
+      "imports": 17,
+      "literalCollections": []
+    },
+    {
+      "file": "src/KitchenV3History.jsx",
+      "lines": 27,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/KitchenV3Loss.jsx",
+      "lines": 52,
+      "imports": 5,
+      "literalCollections": []
+    },
+    {
+      "file": "src/KitchenV3Workflows.jsx",
+      "lines": 150,
+      "imports": 7,
+      "literalCollections": []
+    },
+    {
+      "file": "src/LabelsManager.jsx",
+      "lines": 39,
+      "imports": 8,
+      "literalCollections": []
+    },
+    {
+      "file": "src/LeaveRequests.jsx",
+      "lines": 122,
+      "imports": 9,
+      "literalCollections": []
+    },
+    {
+      "file": "src/LiveStatus.jsx",
+      "lines": 11,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "src/ManagerPackageReview.jsx",
+      "lines": 41,
+      "imports": 3,
+      "literalCollections": []
+    },
+    {
+      "file": "src/MasterRegistry.jsx",
+      "lines": 87,
+      "imports": 7,
+      "literalCollections": []
+    },
+    {
+      "file": "src/MeasurementEditor.jsx",
+      "lines": 62,
+      "imports": 5,
+      "literalCollections": []
+    },
+    {
+      "file": "src/MemberDirectory.jsx",
+      "lines": 120,
+      "imports": 8,
+      "literalCollections": []
+    },
+    {
+      "file": "src/MyAttendanceV31.jsx",
+      "lines": 90,
+      "imports": 7,
+      "literalCollections": []
+    },
+    {
+      "file": "src/MyCoverageProposals.jsx",
+      "lines": 30,
+      "imports": 6,
+      "literalCollections": []
+    },
+    {
+      "file": "src/MyProfessionalProfile.jsx",
+      "lines": 112,
+      "imports": 10,
+      "literalCollections": []
+    },
+    {
+      "file": "src/NotificationCenter.jsx",
+      "lines": 85,
+      "imports": 12,
+      "literalCollections": []
+    },
+    {
+      "file": "src/OperationalCatalogSetup.jsx",
+      "lines": 64,
+      "imports": 6,
+      "literalCollections": []
+    },
+    {
+      "file": "src/PackageConference.jsx",
+      "lines": 76,
+      "imports": 6,
+      "literalCollections": []
+    },
+    {
+      "file": "src/PeopleHub.jsx",
+      "lines": 33,
+      "imports": 10,
+      "literalCollections": []
+    },
+    {
+      "file": "src/PhotoCropDialog.jsx",
+      "lines": 50,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "src/PhysicalStock.jsx",
+      "lines": 186,
+      "imports": 10,
+      "literalCollections": []
+    },
+    {
+      "file": "src/PreparationSetup.jsx",
+      "lines": 89,
+      "imports": 8,
+      "literalCollections": []
+    },
+    {
+      "file": "src/PreparedProductForm.jsx",
+      "lines": 43,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/PrintableLabel.jsx",
+      "lines": 22,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "src/ProductDetails.jsx",
+      "lines": 65,
+      "imports": 9,
+      "literalCollections": []
+    },
+    {
+      "file": "src/Production.jsx",
+      "lines": 170,
+      "imports": 13,
+      "literalCollections": []
+    },
+    {
+      "file": "src/ProfileAvatar.jsx",
+      "lines": 7,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "src/PublishedRoster.jsx",
+      "lines": 51,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/PushSettings.jsx",
+      "lines": 52,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/Receiving.jsx",
+      "lines": 52,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "src/SameProductPortioning.jsx",
+      "lines": 14,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "src/SchedulePlanner.jsx",
+      "lines": 114,
+      "imports": 12,
+      "literalCollections": []
+    },
+    {
+      "file": "src/ShipmentReceiving.jsx",
+      "lines": 66,
+      "imports": 14,
+      "literalCollections": []
+    },
+    {
+      "file": "src/SidebarPremium.jsx",
+      "lines": 89,
+      "imports": 5,
+      "literalCollections": []
+    },
+    {
+      "file": "src/StockActions.jsx",
+      "lines": 108,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/StockConference.jsx",
+      "lines": 102,
+      "imports": 13,
+      "literalCollections": []
+    },
+    {
+      "file": "src/StockMovements.jsx",
+      "lines": 121,
+      "imports": 7,
+      "literalCollections": []
+    },
+    {
+      "file": "src/StorageManager.jsx",
+      "lines": 67,
+      "imports": 9,
+      "literalCollections": []
+    },
+    {
+      "file": "src/StoragePreparation.jsx",
+      "lines": 38,
+      "imports": 5,
+      "literalCollections": []
+    },
+    {
+      "file": "src/StorageReceiving.jsx",
+      "lines": 43,
+      "imports": 6,
+      "literalCollections": []
+    },
+    {
+      "file": "src/TeamManagement.jsx",
+      "lines": 156,
+      "imports": 13,
+      "literalCollections": []
+    },
+    {
+      "file": "src/TeamMural.jsx",
+      "lines": 129,
+      "imports": 11,
+      "literalCollections": []
+    },
+    {
+      "file": "src/TeamPreRegister.jsx",
+      "lines": 35,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/TeamProfiles.jsx",
+      "lines": 109,
+      "imports": 8,
+      "literalCollections": []
+    },
+    {
+      "file": "src/TeamTodayV31.jsx",
+      "lines": 70,
+      "imports": 6,
+      "literalCollections": []
+    },
+    {
+      "file": "src/TriamicciHistory.jsx",
+      "lines": 21,
+      "imports": 6,
+      "literalCollections": []
+    },
+    {
+      "file": "src/TriamicciLogo.jsx",
+      "lines": 22,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "src/TriamicciMentor.jsx",
+      "lines": 32,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/UnitCorrection.jsx",
+      "lines": 45,
+      "imports": 5,
+      "literalCollections": []
+    },
+    {
+      "file": "src/api-fetch.js",
+      "lines": 54,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "src/auth-session.js",
+      "lines": 7,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "src/fastCache.js",
+      "lines": 33,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "src/firebase.js",
+      "lines": 37,
+      "imports": 4,
+      "literalCollections": []
+    },
+    {
+      "file": "src/live-hub.js",
+      "lines": 22,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "src/main.jsx",
+      "lines": 18,
+      "imports": 11,
+      "literalCollections": []
+    },
+    {
+      "file": "src/mentor-lessons.js",
+      "lines": 40,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "src/notifications-model.js",
+      "lines": 31,
+      "imports": 0,
+      "literalCollections": []
+    },
+    {
+      "file": "src/operation-time.js",
+      "lines": 20,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "src/stock-conference-model.js",
+      "lines": 25,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "src/useDialogFocus.js",
+      "lines": 14,
+      "imports": 1,
+      "literalCollections": []
+    },
+    {
+      "file": "src/useOperationDay.js",
+      "lines": 8,
+      "imports": 2,
+      "literalCollections": []
+    },
+    {
+      "file": "src/useUnitLive.js",
+      "lines": 50,
+      "imports": 5,
+      "literalCollections": []
+    },
+    {
+      "file": "src/useViewState.js",
+      "lines": 10,
+      "imports": 2,
+      "literalCollections": []
+    }
+  ]
+}
