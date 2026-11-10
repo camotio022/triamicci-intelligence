@@ -19,12 +19,13 @@ test('catálogo usa nome configurado na lista, no título e após salvar e reabr
    await page.goto('http://127.0.0.1:4194/qa/v4-mobile.html');
    await page.getByRole('navigation',{name:'Telas de teste'}).getByRole('button',{name:'Contagem',exact:true}).click();
    await page.getByRole('button',{name:'Consultas e gestão',exact:true}).click();
-   await page.getByRole('button',{name:'Configurar catálogo',exact:true}).click();
-   const tile=page.locator('.v3-tile');
+   await page.getByRole('button',{name:'Gestão de Insumos',exact:true}).click();
+   const tile=page.locator('.ti-insumos-item');
    await tile.getByText('Farinha de Rosca',{exact:true}).waitFor();
    assert.match(await tile.innerText(),/Disponibilidade/);
    assert.doesNotMatch(await tile.innerText(),/Farinha para empanar|availability/);
-   await tile.getByRole('button',{name:'Configurar',exact:true}).click();
+   await tile.locator('summary').click();
+    await tile.getByRole('button',{name:'Configurar insumo',exact:true}).click();
    const dialog=page.getByRole('dialog',{name:'Configuração do insumo'});
    await dialog.getByRole('heading',{name:'Farinha de Rosca',exact:true}).waitFor();
    await dialog.getByLabel('Nome claro e único que será exibido').fill('Farinha de Rosca fina');
@@ -36,7 +37,8 @@ test('catálogo usa nome configurado na lista, no título e após salvar e reabr
    assert.equal(product.name,'Farinha para empanar / mistura para empanar');
    await page.getByRole('button',{name:'Atualizar',exact:true}).click();
    await tile.getByText('Farinha de Rosca fina',{exact:true}).waitFor();
-   await tile.getByRole('button',{name:'Configurar',exact:true}).click();
+   await tile.locator('summary').click();
+    await tile.getByRole('button',{name:'Configurar insumo',exact:true}).click();
    await dialog.getByRole('heading',{name:'Farinha de Rosca fina',exact:true}).waitFor();
    assert.equal(await dialog.getByLabel('Nome claro e único que será exibido').inputValue(),'Farinha de Rosca fina');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);

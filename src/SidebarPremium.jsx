@@ -12,11 +12,12 @@ const sections=[
   {id:'mural',label:'Mural da equipe',icon:Users,mentor:'mentor-mural'}
  ]},
  {id:'operations',title:'Mais operações',icon:Boxes,items:[
-  {id:'daily-inventory',label:'Inventário inteligente',icon:ClipboardList},
+  {id:'storages',label:'Conferência por armazenamento',icon:Boxes},
+   {id:'daily-inventory',label:'Inventário inteligente',icon:ClipboardList},
   {id:'history',label:'Histórico',icon:History,mentor:'mentor-history'}
  ]},
  {id:'management',title:'Administração',icon:Settings,management:true,items:[
-  {id:'catalog',label:'Administração · Catálogo',icon:Package},
+  {id:'catalog',label:'Gestão de Insumos',icon:Package},
   {id:'people',label:'Gestão de pessoas',icon:Users,mentor:'mentor-people'}
  ]},
  {id:'learning',title:'Aprendizagem',icon:BookOpen,items:[
