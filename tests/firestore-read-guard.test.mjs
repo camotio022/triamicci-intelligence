@@ -55,3 +55,35 @@ test('in-flight reads started before a mutation cannot repopulate cache',async()
  assert.equal(fresh.status,200);
  assert.equal(hits,3);
 });
+
+
+test('list and dayList reuse short-lived reads but remain scoped by URL, payload and actor',async()=>{
+ let hits=0,clock=1000;
+ const api=createApiFetch(async()=>new Response(JSON.stringify({seq:++hits}),{status:200}),{now:()=>clock,cacheMs:12000});
+ const req=(url,action,actor='Bearer a',more={})=>[url,{method:'POST',headers:{Authorization:actor},body:JSON.stringify({action,...more})}];
+ const prod=req('/api/products/manage','list');
+ const recipes=req('/api/production/manage','list');
+ assert.equal((await (await api(...prod)).json()).seq,1);
+ assert.equal((await (await api(...prod)).json()).seq,1);
+ assert.equal((await (await api(...recipes)).json()).seq,2);
+ assert.equal((await (await api(...recipes)).json()).seq,2);
+ assert.equal((await (await api(...req('/api/products/manage','list','Bearer b'))).json()).seq,3);
+ assert.equal((await (await api(...req('/api/production/manage','dayList'))).json()).seq,4);
+ assert.equal((await (await api(...req('/api/production/manage','dayList'))).json()).seq,4);
+ assert.equal((await (await api(...req('/api/products/manage','list','Bearer a',{preview:true}))).json()).seq,5);
+ assert.equal(hits,5);
+ clock+=12001;
+ assert.equal((await (await api(...prod)).json()).seq,6);
+});
+
+test('notification cache is invalidated immediately after a successful mutation',async()=>{
+ let hits=0;
+ const api=createApiFetch(async()=>new Response(JSON.stringify({seq:++hits}),{status:200}),{cacheMs:12000});
+ const req=action=>['/api/members/manage',{method:'POST',headers:{Authorization:'Bearer a'},body:JSON.stringify({action})}];
+ await api(...req('notifications'));
+ await api(...req('notifications'));
+ assert.equal(hits,1);
+ await api(...req('notificationRead'));
+ assert.equal(hits,2);
+ assert.equal((await (await api(...req('notifications'))).json()).seq,3);
+});
