@@ -54,7 +54,7 @@ function PhysicalOperations({membership,mode='receive',initialProductId=null}){
    .then(data=>{if(active)setLots(data.lots||[])})
    .catch(err=>{if(active)setStatus(err.message)});
   return ()=>{active=false};
- },[productId]);
+ },[productId,history]);
  const loadMore=async()=>{
   const types=['receipts','counts','outflows','transfers','productions'];
   if(loadingMore||!types.some(k=>more[k]))return;
