@@ -1,3 +1,58 @@
 .ti-terminal-page{min-height:90vh;display:grid;place-items:center;padding:24px;background:#f5f7fb;color:#172033}.ti-terminal-card{width:min(100%,520px);padding:28px;border:1px solid #dce2ec;border-radius:18px;background:white;box-shadow:0 12px 35px #1720330d;overflow-wrap:anywhere}.ti-terminal-card h1{font-size:28px;margin:12px 0}.ti-terminal-card p{line-height:1.6}.ti-terminal-card button,.ti-terminal-panel button,.ti-access-options button,.ti-terminal-personal>button,.ti-terminal-banner button,.ti-terminal-escape{min-height:44px;padding:10px 16px;border:1px solid #a71916;border-radius:10px;background:#a71916;color:white;cursor:pointer;font:inherit}.ti-terminal-card button{display:block;width:100%;margin-top:12px}.ti-terminal-card .secondary{background:white;color:#7c1816}.ti-terminal-card button:disabled,.ti-terminal-panel button:disabled{opacity:.5;cursor:wait}.ti-terminal-card img{display:block;margin:12px auto;max-width:100%;height:auto}.ti-terminal-code{display:block;font-size:32px;letter-spacing:.15em;text-align:center}.ti-terminal-card dl{display:grid;grid-template-columns:90px 1fr;gap:8px}.ti-terminal-card dd{margin:0;font-weight:600}.ti-terminal-card input,.ti-terminal-panel input{min-height:44px;width:100%;box-sizing:border-box;border:1px solid #bac3d1;border-radius:8px;padding:10px}.ti-terminal-card [role=alert],.ti-terminal-panel [role=alert]{color:#a71916}.ti-access-options,.ti-terminal-personal,.ti-terminal-banner{padding:10px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fff;border-bottom:1px solid #dce2ec}.ti-access-options{justify-content:space-between}.ti-terminal-panel{padding:20px;border:1px solid #dce2ec;border-radius:12px;width:100%;max-height:70vh;overflow:auto}.ti-terminal-panel header{display:flex;justify-content:space-between;gap:12px}.ti-terminal-panel form{max-width:480px}.ti-terminal-panel label{display:block;margin-bottom:12px}.ti-terminal-notice{padding:12px 20px;background:#fff3dc;margin:0}.ti-terminal-escape{margin:12px 20px;background:white;color:#7c1816}.ti-terminal-banner span{flex:1}.ti-terminal-card button:focus-visible,.ti-terminal-panel button:focus-visible,.ti-access-options button:focus-visible{outline:3px solid #315a9f;outline-offset:3px}
 .ti-terminal-page,.ti-terminal-card,.ti-terminal-panel{box-sizing:border-box}
 @media(min-width:901px){.ti-terminal-personal,.ti-terminal-banner{margin-left:248px}.ti-terminal-escape{margin-left:268px}}
+/* Terminal settings live in the profile menu; they never take space above a page. */
+.ti-terminal-settings-trigger,.ti-profile-terminals{display:flex;align-items:center;gap:9px;min-height:44px;padding:10px 12px;background:#fff;border:1px solid #e4e7ec;border-radius:10px;color:#344054;font:inherit;cursor:pointer}
+.profile-popover .ti-profile-terminals{width:100%;margin:12px 0 4px;text-align:left;font-size:13px;font-weight:600;background:#f8fafc}
+.ti-terminal-login-option{display:flex;justify-content:center;align-items:center;gap:9px;width:100%;margin-top:10px}
+.ti-tm-overlay{position:fixed;inset:0;z-index:1500;display:grid;place-items:center;padding:24px;background:#17203380;backdrop-filter:blur(4px);isolation:isolate}
+.ti-tm-overlay *{box-sizing:border-box}
+.ti-tm-dialog{width:min(760px,100%);max-height:calc(100dvh - 48px);display:flex;flex-direction:column;overflow:hidden;border:1px solid #ffffff80;border-radius:22px;background:#fff;color:#172033;box-shadow:0 24px 80px #10182840;font-family:inherit}
+.ti-tm-header{display:flex;align-items:flex-start;gap:14px;padding:26px 28px 22px;flex:none}
+.ti-tm-icon{display:grid;place-items:center;flex:none;width:48px;height:48px;border:1px solid #eededb;border-radius:14px;background:#fbf2ef;color:#a71916}
+.ti-tm-header>div{min-width:0;flex:1}
+.ti-tm-eyebrow{font-size:10px;letter-spacing:.1em;line-height:1.5;font-weight:700;color:#667085;text-transform:uppercase}
+.ti-tm-header h2{margin:5px 0 7px;font-size:24px;line-height:1.2;letter-spacing:-.035em;font-weight:750;color:#172033}
+.ti-tm-header p{margin:0;color:#667085;font-size:13px;line-height:1.5}
+.ti-tm-close{display:grid;place-items:center;width:36px;height:36px;min-height:36px;flex:none;padding:0;border:1px solid #eaecf0;border-radius:10px;background:#fff;color:#667085;cursor:pointer}
+.ti-tm-tabs{display:flex;gap:24px;padding:0 28px;border-bottom:1px solid #eaecf0;flex:none}
+.ti-tm-tabs button{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 0 15px;min-height:48px;white-space:nowrap;background:none;border:0;font:inherit;font-size:13px;font-weight:600;color:#667085;cursor:pointer}
+.ti-tm-tabs button[aria-selected=true]{color:#9f201c}
+.ti-tm-tabs button[aria-selected=true]::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:#a71916;border-radius:2px}
+.ti-tm-body{padding:24px 28px 28px;overflow-y:auto;overscroll-behavior:contain;min-height:0}
+.ti-tm-body h3{margin:0 0 7px;font-size:15px;font-weight:700;letter-spacing:-.015em}
+.ti-tm-description{margin:0 0 18px;color:#667085;font-size:12px;line-height:1.6}
+.ti-tm-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;padding:26px 20px;border:1px dashed #dce2e9;border-radius:14px;background:#fafbfc;color:#98a2b3}
+.ti-tm-empty strong{font-size:13px;font-weight:600;color:#475467}
+.ti-tm-empty p{max-width:360px;margin:0;font-size:12px;line-height:1.6;color:#667085}
+.ti-tm-setup{display:flex;gap:12px;align-items:center;margin-top:20px;padding:18px;border:1px solid #e7eaf0;border-radius:14px;background:#fff}
+.ti-tm-setup>div{flex:1;min-width:0}
+.ti-tm-setup h3{font-size:13px;margin:0 0 6px}
+.ti-tm-setup>div p{font-size:12px;color:#667085;line-height:1.6;margin:0}
+.ti-tm-setup-icon{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#f2f4f7;color:#667085}
+.ti-tm-secondary,.ti-tm-primary{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:10px 14px;border:1px solid #dfe3e9;border-radius:10px;background:#fff;color:#344054;font:inherit;font-size:12px;font-weight:600;cursor:pointer;line-height:1.4;text-align:center}
+.ti-tm-primary{background:#a71916;border-color:#a71916;color:#fff}
+.ti-tm-setup>button{flex:none}
+.ti-tm-setup form{width:100%;min-width:0}
+.ti-tm-setup label{display:block;color:#475467;font-size:12px;font-weight:600;margin:18px 0 8px}
+.ti-tm-setup input{width:100%;min-height:46px;border:1px solid #d0d5dd;border-radius:10px;padding:11px 12px;font:inherit;font-size:14px;color:#172033;background:#fff}
+.ti-tm-note{display:flex;align-items:flex-start;gap:8px;color:#667085;font-size:11px;line-height:1.6;margin:12px 0 18px}
+.ti-tm-note svg{flex:none;margin-top:1px}
+.ti-tm-form-actions{display:flex;justify-content:flex-end;gap:9px}
+.ti-tm-footer{display:flex;align-items:center;gap:9px;padding:15px 28px;background:#fafbfc;border-top:1px solid #edf0f4;color:#667085;font-size:11px;line-height:1.6;flex:none}
+.ti-tm-footer svg{flex:none}
+.ti-tm-list{display:grid;gap:10px}
+.ti-tm-row{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #e7eaf0;border-radius:12px}
+.ti-tm-row-icon{display:grid;place-items:center;width:38px;height:38px;flex:none;border-radius:11px;background:#f2f4f7;color:#667085}
+.ti-tm-row>div{min-width:0;flex:1;display:grid;gap:6px}
+.ti-tm-row strong{font-size:13px;overflow-wrap:anywhere}
+.ti-tm-row span{font-size:11px;color:#667085}
+.ti-tm-row i{display:inline-block;width:6px;height:6px;border-radius:50%;background:#35a86d}
+.ti-tm-text-action{display:flex;align-items:center;justify-content:center;gap:7px;min-height:40px;max-width:200px;background:#fff;border:0;border-radius:8px;color:#a12a26;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.ti-tm-error{padding:12px;background:#fff3f2;color:#a71916;border-radius:10px;font-size:13px}
+.ti-tm-loading{font-size:12px;color:#667085}
+.ti-tm-dialog button:disabled{opacity:.5;cursor:wait}
+.ti-tm-dialog :is(button,input):focus-visible{outline:3px solid #bbd5f1;outline-offset:2px}
+@media(max-width:600px){.ti-tm-overlay{padding:12px}.ti-tm-dialog{max-height:calc(100dvh - 24px);border-radius:18px}.ti-tm-header{padding:20px 18px 18px;gap:10px}.ti-tm-icon{width:40px;height:40px;border-radius:12px}.ti-tm-eyebrow{font-size:9px}.ti-tm-header h2{font-size:21px}.ti-tm-header p{font-size:12px}.ti-tm-tabs{padding:0 18px;gap:18px}.ti-tm-tabs button{font-size:12px;gap:6px}.ti-tm-body{padding:20px 18px}.ti-tm-empty{padding:22px 14px}.ti-tm-setup{flex-wrap:wrap;padding:14px}.ti-tm-setup>div{flex-basis:calc(100% - 46px)}.ti-tm-setup>button{width:100%;margin-top:5px}.ti-tm-form-actions{flex-wrap:wrap}.ti-tm-form-actions button{flex:1}.ti-tm-form-actions .ti-tm-primary{flex-basis:100%}.ti-tm-footer{padding:13px 18px;font-size:10px}.ti-tm-row{flex-wrap:wrap}.ti-tm-row .ti-tm-text-action{margin-left:50px;justify-content:flex-start}.ti-tm-setup input{font-size:16px}}
+
+.ti-tm-setup.is-registering{margin-top:0}
