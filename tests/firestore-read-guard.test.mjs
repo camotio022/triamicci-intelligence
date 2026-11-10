@@ -36,3 +36,22 @@ test('memory cache is isolated by bearer authorization and can be invalidated',a
  await api(...request('v3Alerts','Bearer a'));assert.equal(hits,2);
  api.clearCache();await api(...request('v3Alerts','Bearer a'));assert.equal(hits,3);
 });
+
+test('in-flight reads started before a mutation cannot repopulate cache',async()=>{
+ let release;let hits=0;
+ const api=createApiFetch(async(_url,init)=>{
+  hits++;
+  if(JSON.parse(init.body).action==='storageList'&&hits===1){
+   await new Promise(resolve=>{release=resolve});
+  }
+  return new Response(JSON.stringify({seq:hits}),{status:200});
+ },{cacheMs:30000});
+ const old=api(...request('storageList'));
+ await Promise.resolve();
+ await api(...request('storageCount'));
+ release();
+ await old;
+ const fresh=await api(...request('storageList'));
+ assert.equal(fresh.status,200);
+ assert.equal(hits,3);
+});
