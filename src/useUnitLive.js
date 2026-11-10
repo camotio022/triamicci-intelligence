@@ -12,7 +12,7 @@ export function useUnitLive(unitId,refresh,{domains=['all'],refreshKey=''}={}){
  const [state,setState]=useState({status:'connecting',updatedAt:null});
  useEffect(()=>{
   if(!unitId||!uid)return;
-  let alive=true,running=false,queued=false,connected=false,started=false,revision,previous,queuedDomains,timer=null,scheduledDomains=undefined;
+  let alive=true,running=false,queued=false,connected=false,started=false,revision,previous,queuedDomains,timer=null,scheduledDomains=undefined,lastLiveRefresh=0;
   setState({status:'connecting',updatedAt:null});
   const load=async(changes=null)=>{
    if(!alive)return;if(running){queued=true;queuedDomains=changes===null||queuedDomains===null?null:[...new Set([...(queuedDomains||[]),...changes])];return;}running=true;let first=!started;started=true;
@@ -27,7 +27,9 @@ export function useUnitLive(unitId,refresh,{domains=['all'],refreshKey=''}={}){
    if(changes===null||scheduledDomains===null)scheduledDomains=null;
    else scheduledDomains=[...new Set([...(scheduledDomains||[]),...(changes||[])])];
    if(timer!==null)return;
-   timer=setTimeout(()=>{timer=null;const domains=scheduledDomains;scheduledDomains=undefined;load(domains);},8000);
+   const delay=Math.max(0,lastLiveRefresh+8000-Date.now());
+   const flush=()=>{timer=null;lastLiveRefresh=Date.now();const domains=scheduledDomains;scheduledDomains=undefined;load(domains);};
+   if(delay===0)flush();else timer=setTimeout(flush,delay);
   };
   const unsubscribe=hub.subscribe(uid+':'+unitId,unitId,event=>{
    if(!alive)return;
