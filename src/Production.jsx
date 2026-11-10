@@ -45,7 +45,7 @@ export default function Production({membership,initialTaskId}){
  },[membership?.unitId]);
  useEffect(()=>{setProducts([]);setRecipes([]);setBlockedRecipes([]);setReviewRecipes([]);setRuns([]);setDailyTasks([]);setRecipeId('');setActiveTaskId(null);setView('today');setSetupRecipe(null);setEditRecipeId('');setStatus('');setPlannedRecipe('');setPlannedQuantity('');},[membership?.unitId]);
 
- const live=useUnitLive(membership?.unitId,initial=>Promise.all([load(!initial),loadTasks()]),{domains:['stock','catalog','production']});
+ const live=useUnitLive(membership?.unitId,(initial,changes)=>Promise.all([!changes||changes.some(domain=>['stock','catalog','production'].includes(domain))?load(!initial):true,!changes||changes.includes('production')?loadTasks():true]),{domains:['stock','catalog','production']});
  useEffect(()=>{const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
  const openExecution=(task)=>{choose(task.recipeId,task);setActiveTaskId(task.id);requestAnimationFrame(()=>document.querySelector('.production-page .ti-v4-production-layout')?.scrollIntoView({behavior:'smooth',block:'start'}));};
  useEffect(()=>{
