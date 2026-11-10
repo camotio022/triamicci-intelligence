@@ -12,7 +12,7 @@ const sections=[
   {id:'mural',label:'Mural da equipe',icon:Users,mentor:'mentor-mural'}
  ]},
  {id:'operations',title:'Mais operações',icon:Boxes,items:[
-  {id:'storages',label:'Conferência por armazenamento',icon:Boxes},
+  {id:'storages',label:'Gestão de Estoques',icon:Boxes},
    {id:'daily-inventory',label:'Inventário inteligente',icon:ClipboardList},
   {id:'history',label:'Histórico',icon:History,mentor:'mentor-history'}
  ]},

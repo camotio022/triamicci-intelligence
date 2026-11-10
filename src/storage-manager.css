@@ -10,3 +10,87 @@
 .ti-storage-not-scheduled{margin:0;color:#7b879a;font-size:.72rem;padding:5px 0}
 
 .ti-storage-primary-choice{display:flex!important;flex-direction:row!important;align-items:center;gap:9px;font-size:.76rem!important;font-weight:600!important;line-height:1.35;color:#374151}.ti-storage-primary-choice input{accent-color:#a71919;width:17px;height:17px;flex-shrink:0}
+
+
+/* Gestão de Estoques · refinamento mobile-first, sem compactação excessiva */
+.ti-storage{width:min(100%,1140px);max-width:1140px;margin-inline:auto;padding:clamp(16px,2.5vw,28px);gap:clamp(18px,2.5vw,26px);min-width:0}
+.ti-storage-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:nowrap;min-width:0}
+.ti-storage-title{display:grid;gap:5px;min-width:0;flex:1}
+.ti-storage-title h1{font:800 clamp(1.5rem,3vw,2rem)/1.16 Manrope,'DM Sans',sans-serif;letter-spacing:-.035em;margin:0}
+.ti-storage-title p{font-size:clamp(.82rem,1.6vw,.95rem);line-height:1.45;max-width:55ch;color:#67758a;margin:0}
+.ti-storage-head .ti-storage-create{min-height:44px;width:auto;flex:none;border-radius:12px;padding:10px 15px;font-size:.85rem}
+.ti-storage-stats{gap:clamp(8px,2vw,14px)}
+.ti-storage-stats>div{padding:clamp(12px,2vw,16px);border-radius:13px;gap:3px}
+.ti-storage-stats strong{font:800 clamp(1.25rem,2.8vw,1.65rem)/1.1 Manrope,'DM Sans',sans-serif}
+.ti-storage-stats small{font-size:clamp(.7rem,1.4vw,.8rem)}
+.ti-storage-empty{padding:clamp(16px,2.5vw,24px);gap:17px;text-align:left;justify-items:stretch;background:#fff;border:1px solid #dfe5ed}
+.ti-storage-empty-heading{display:flex;align-items:center;gap:13px;min-width:0}
+.ti-storage-empty-icon{width:48px;height:48px;display:grid;place-items:center;flex:none;border-radius:13px;background:#f9eff0;color:#9b1e23}
+.ti-storage-empty-heading>div{display:grid;gap:5px;min-width:0}
+.ti-storage-empty-heading strong{font-size:clamp(.93rem,2vw,1.1rem);color:#192338}
+.ti-storage-empty-heading span:not(.ti-storage-empty-icon){font-size:.79rem;color:#68758a;max-width:52ch;line-height:1.4}
+.ti-storage-quick-templates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ti-storage-quick-templates button{min-height:75px;border:1px solid #dfe5ed;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:12px 10px;color:#334155;font-size:.81rem;font-weight:750;transition:background .15s,border-color .15s}
+.ti-storage-quick-templates button:hover{background:#fff7f7;border-color:#c99191}
+.ti-storage-quick-templates button svg{color:#a31e21;flex-shrink:0}
+.ti-storage-quick-templates button:last-child{grid-column:1/-1;min-height:52px;color:#9a2020;background:#fff9f9}
+.ti-storage-operations{display:grid;gap:10px}
+.ti-storage-operations-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.ti-storage-operations-head h2{margin:0;font-size:clamp(.95rem,1.8vw,1.05rem);font-weight:800}
+.ti-storage-operations-head span{font-size:.74rem;color:#718096}
+.ti-storage-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ti-storage-shortcuts button{min-width:0;min-height:74px;display:flex;align-items:center;justify-content:center;gap:7px;flex-direction:column;padding:12px 7px;border-radius:12px;font-size:.77rem;line-height:1.3;text-align:center;white-space:normal;overflow-wrap:anywhere}
+.ti-storage-shortcuts button svg{flex:none}
+.ti-storage-unassigned{font-size:.82rem}
+.ti-storage-grid{gap:clamp(10px,2vw,16px);grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr))}
+.ti-storage-card{padding:clamp(14px,2vw,19px);gap:14px;border-radius:15px}
+.ti-storage-card-top strong{font-size:.94rem}
+.ti-storage-card-top small,.ti-storage-meter{font-size:.78rem}
+.ti-storage-card-top>button,.ti-storage-actions button{min-height:40px;font-size:.77rem;padding:8px 12px}
+.ti-storage-actions span{font-size:.72rem}
+.ti-storage-presets{padding:15px}
+.ti-storage-presets>summary{font-size:.85rem;min-height:24px}
+.ti-storage-presets-grid{grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px}
+.ti-storage-presets-grid button{min-height:82px;font-size:.76rem}
+.ti-storage-sheet{max-width:610px;gap:16px;padding:20px 18px max(24px,env(safe-area-inset-bottom));border-radius:19px 19px 0 0}
+.ti-storage-sheet h2{font-size:1.16rem;line-height:1.25}
+.ti-storage-sheet label{font-size:.84rem;gap:8px}
+.ti-storage-sheet input:not([type=checkbox]),.ti-storage-sheet select{min-height:47px;border-radius:11px;font-size:16px}
+.ti-storage-field-note{font-size:.76rem;color:#64748b;font-weight:400;line-height:1.4}
+.ti-storage-icons{grid-template-columns:repeat(auto-fit,minmax(44px,1fr));gap:8px}
+.ti-storage-icons button{min-height:47px}
+.ti-storage-sheet .ti-storage-primary{min-height:47px}
+.ti-storage button:focus-visible{outline:3px solid #ba3030;outline-offset:2px}
+@media (min-width:700px){
+ .ti-storage{gap:22px}
+ .ti-storage-quick-templates{grid-template-columns:repeat(5,minmax(0,1fr))}
+ .ti-storage-quick-templates button{min-height:90px;flex-direction:column}
+ .ti-storage-quick-templates button:last-child{grid-column:auto;min-height:90px}
+ .ti-storage-shortcuts button{min-height:58px;flex-direction:row;gap:11px}
+ .ti-storage-backdrop{padding:20px;align-items:center}
+ .ti-storage-sheet{border-radius:18px;max-height:90dvh;padding:24px}
+}
+@media (max-width:480px){
+ .ti-storage{padding:16px 14px 24px;gap:18px}
+ .ti-storage-head{align-items:flex-start;gap:9px}
+ .ti-storage-kicker{font-size:.62rem}
+ .ti-storage-title h1{font-size:1.48rem}
+ .ti-storage-title p{font-size:.78rem}
+ .ti-storage-create-desktop{display:none}
+ .ti-storage-head .ti-storage-create{width:auto;min-width:88px;padding:9px 12px;font-size:.8rem}
+ .ti-storage-empty{padding:16px;gap:15px}
+ .ti-storage-empty-heading{align-items:flex-start;gap:11px}
+ .ti-storage-empty-icon{width:42px;height:42px}
+ .ti-storage-quick-templates button{min-height:73px;flex-direction:column;gap:6px}
+ .ti-storage-quick-templates button:last-child{min-height:50px;flex-direction:row}
+ .ti-storage-stats>div{padding:11px 9px}
+ .ti-storage-stats small{font-size:.68rem}
+ .ti-storage-shortcuts button{font-size:.7rem}
+ .ti-storage-sheet{width:100%;max-height:93dvh;padding:20px 16px max(26px,env(safe-area-inset-bottom))}
+}
+@media (max-width:355px){
+ .ti-storage-title h1{font-size:1.32rem}
+ .ti-storage-head .ti-storage-create{min-width:77px;padding:8px}
+ .ti-storage-shortcuts{gap:7px}
+ .ti-storage-shortcuts button{font-size:.66rem}
+}

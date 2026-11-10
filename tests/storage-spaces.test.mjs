@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {STORAGE_TEMPLATES,STORAGE_ICONS,validateStorage,scheduled,progress} from '../server/storage/storage-model.js';
+import {STORAGE_TEMPLATES,STORAGE_ICONS,validateStorage,scheduled,progress,storageDueDate} from '../server/storage/storage-model.js';
 const base={name:'Carnes',icon:'beef',area:'reserva',frequency:'daily',weekdays:[]};
 test('modelos comuns possuem identificadores e ícones permitidos',()=>{
  assert.ok(STORAGE_TEMPLATES.length>=8);
@@ -27,4 +27,16 @@ test('frequência respeita dia e não trata demanda como pendente',()=>{
 test('progresso não divide por zero e não inventa contagens',()=>{
  assert.deepEqual(progress(0,0),{total:0,done:0,pending:0,percent:0});
  assert.deepEqual(progress(24,18),{total:24,done:18,pending:6,percent:75});
+});
+
+test('validade por armazenamento é opcional, não vem do insumo',()=>{
+ const none={...base,expiryPolicy:'none',expiryDays:null};
+ const days={...base,expiryPolicy:'days',expiryDays:10};
+ assert.equal(validateStorage(none),null);
+ assert.equal(storageDueDate('2026-11-09T12:00:00.000Z',none),null);
+ assert.equal(validateStorage(days),null);
+ assert.equal(storageDueDate('2026-11-09T12:00:00.000Z',days),'2026-11-19');
+ assert.equal(storageDueDate('2026-12-28T12:00:00.000Z',{...days,expiryDays:7}),'2027-01-04');
+ for(const expiryDays of [0,-1,1.5,3651,'10',null])assert.notEqual(validateStorage({...days,expiryDays}),null);
+ assert.notEqual(validateStorage({...none,expiryDays:10}),null);
 });
