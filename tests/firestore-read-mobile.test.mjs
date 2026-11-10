@@ -47,10 +47,11 @@ test('real live hook preserves storage UI and reuses production navigation reads
    return route.fulfill({json:{products:[]}});
   });
   const address=server.httpServer.address();const url=`http://127.0.0.1:${address.port}/read-fixture.html`;
+  // Keep the eight-hour shift inside one restaurant day, independent of CI time.
+  await page.clock.install({time:new Date('2026-11-10T12:00:00Z')});
   await page.goto(url);await page.locator('.ti-storage-stats').waitFor();
   assert.equal(await page.locator('.ti-storage-stats strong').first().textContent(),'1');
   assert.equal(await page.evaluate(()=>window.fixtureListeners.size),1,'provider and page share one physical listener');
-  await page.clock.install();
   for(let i=0;i<4;i++){
    await page.getByRole('button',{name:'Production fixture',exact:true}).click();await page.locator('.production-page').waitFor();
    await page.clock.fastForward(30000);
