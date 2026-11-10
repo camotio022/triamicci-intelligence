@@ -23,7 +23,7 @@ export async function readOperationalCatalog(db,unit){
  });
  const products=contextProducts.filter(p=>belongsToOperationalCatalog(p)).map(d=>{
   const b=d.physicalBalance;
-  const view={id:d.id,name:d.name,profile:d.profile||null,aliases:d.aliases||[],category:d.category,unit:d.unit,minStock:d.minStock,
+  const view={id:d.id,operationalCatalogVersion:d.operationalCatalogVersion,name:d.name,profile:d.profile||null,aliases:d.aliases||[],category:d.category,unit:d.unit,minStock:d.minStock,
    lotTrackingMode:usesPhysicalLots(d)?'per_lot':d.lotTrackingMode||null,trackExpiry:d.trackExpiry===true,status:d.status,quantity:d.quantity??0,catalogId:d.catalogId||null,
    portionWeight:d.portionWeight??null,weightUnit:d.weightUnit||null,source:d.source||null,labelCategory:d.labelCategory||null,operationalUnitOverride:d.operationalUnitOverride||null,receivingUnitOverride:d.receivingUnitOverride||null,
    createdAt:d.createdAt?.toDate?.()?.toISOString?.()||null};

@@ -1,3 +1,4 @@
+import {restaurantDay} from '../../shared/operation-day.js';
 import {recipeAvailability,recipeProducts} from './readiness.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from '../operations/catalog-identity.js';
@@ -6,7 +7,7 @@ import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const recipePattern=/^[a-z0-9-]{3,64}$/;
 const datePattern=/^\d{4}-\d{2}-\d{2}$/;
-const formatDay=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const formatDay=restaurantDay;
 const canPlan=role=>['admin','manager','submanager','cook','auxiliar'].includes(role);
 const view=d=>({id:d.id,recipeId:d.data().recipeId,recipeName:d.data().recipeName,unit:d.data().unit||'un',plannedQuantity:d.data().plannedQuantity??null,status:d.data().status||'pending',completedQuantity:d.data().completedQuantity??null,createdBy:d.data().createdBy,createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,completedAt:d.data().completedAt?.toDate?.()?.toISOString?.()||null});
 export default async function handler(req,res){

@@ -1,3 +1,4 @@
+import {MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
 import {historyActor} from './history-names.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from './catalog-identity.js';
@@ -17,7 +18,7 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
-  if(!m?.unitId||!['admin','manager','submanager'].includes(m.role))return send(res,403,'Somente gerente ou administrador pode registrar saídas e ajustes.');
+  if(!m?.unitId||!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerente ou administrador pode registrar saídas e ajustes.');
   const {productId,requestId,quantity,location,reason,notes=''}=req.body||{};
   if(req.body?.action!=='dispatch'||!idPattern.test(productId||'')||
     !requestPattern.test(requestId||'')||!locations.has(location)||!reasons.has(reason)||
@@ -37,7 +38,7 @@ export default async function handler(req,res){
     tx.get(actorRef),tx.get(productRef),tx.get(balanceRef),tx.get(movementRef)
    ]);
    const a=member.data();
-   if(!a||a.status!=='active'||a.unitId!==m.unitId||!['admin','manager','submanager'].includes(a.role))throw Error('FORBIDDEN');
+   if(!a||a.status!=='active'||a.unitId!==m.unitId||!MANAGEMENT_ROLES.includes(a.role))throw Error('FORBIDDEN');
    if(!product.exists)throw Error('NOT_FOUND');
    const p=product.data();if(!isOperationalProduct(p))throw Error('INACTIVE');
    if(previous.exists){

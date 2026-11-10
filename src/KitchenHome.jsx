@@ -1,3 +1,6 @@
+import DataState from './ui/DataState.jsx';
+import PageHeading from './ui/PageHeading.jsx';
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import {recordDay,hasPhysicalCount} from './operation-time.js';
 import {useOperationDay} from './useOperationDay.js';
@@ -32,11 +35,10 @@ export default function KitchenHome({membership,navigate}){
   {name:'Conferência de estoque',description:'Contar por área e conferir disponibilidade',page:'count',Icon:ClipboardCheck},
   {name:'Estoque físico',description:'Consultar produtos da cozinha',page:'inventory',Icon:Boxes},
   {name:'Histórico',description:'Consultar operações registradas',page:'history',Icon:History}];
- if(!hasData)return <section className="inventory-page"><h1>Operação da cozinha</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>{apiFetch.clearCache();load()}}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
+ if(!hasData)return <DataState title="Operação da cozinha" error={error} onRetry={()=>{apiFetch.clearCache();load()}}/>;
  return <section className="kitchen-home">
-  <p className="eyebrow">TRIAMICCI INTELLIGENCE · UNIDADE {membership.unitId.toUpperCase()}</p>
-  <div className="kitchen-header"><div><h1>Operação da cozinha</h1><p>Recebimentos, contagens e estoque físico da unidade em um só lugar.</p></div><button type="button" onClick={()=>{apiFetch.clearCache();load()}} disabled={loading}><RefreshCw size={16}/> Atualizar</button></div>
-  <div className="kitchen-actions">{actions.filter(action=>action.page!=='count'||['admin','manager','submanager'].includes(membership.role)).map(({name,description,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong><span>{description}</span></button>)}</div>
+  <PageHeading className="kitchen-header" eyebrow={"TRIAMICCI INTELLIGENCE · UNIDADE "+membership.unitId.toUpperCase()} title="Operação da cozinha" description="Recebimentos, contagens e estoque físico da unidade em um só lugar." actions={<button type="button" onClick={()=>{apiFetch.clearCache();load()}} disabled={loading}><RefreshCw size={16}/> Atualizar</button>}/>
+  <div className="kitchen-actions">{actions.filter(action=>action.page!=='count'||MANAGEMENT_ROLES.includes(membership.role)).map(({name,description,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong><span>{description}</span></button>)}</div>
   {error&&<p role="alert" className="receiving-notice"><AlertCircle size={16}/> Falha na atualização. Os dados da última consulta podem estar desatualizados. {error}</p>}
   <section className="ti-operations-overview" aria-label="Resumo operacional">
    <h2>Resumo operacional</h2>

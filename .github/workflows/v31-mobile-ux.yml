@@ -15,10 +15,10 @@ jobs:
         with:
           node-version: '24'
       - name: Instalar dependências
-        run: npm install --no-audit --no-fund && npm install --no-save playwright@1.56.0
+        run: npm ci --no-audit --no-fund
       - name: Compilar frontend mobile-first de produção
         run: npm run build
       - name: Instalar navegador
         run: npx playwright install chromium
       - name: Verificar fluxos e responsividade
-        run: node --test tests/v31-mobile-ux.test.mjs tests/notifications-module-mobile.test.mjs tests/firestore-read-mobile.test.mjs
+        run: npm run test:browser

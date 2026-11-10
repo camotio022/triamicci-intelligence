@@ -1,3 +1,7 @@
+import {validQuantity} from '../../server/operations/logic.js';
+import {belongsToOperationalCatalog} from '../../server/operations/catalog-identity.js';
+import {signalUnitChange} from '../../server/live-signal.js';
+import {MANAGEMENT_ROLES} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
 
@@ -40,7 +44,7 @@ export default async function handler(req,res) {
         !isQuantity(amount) || typeof note !== 'string' || note.trim().length < 3 ||
         note.trim().length > 240 || !requestPattern.test(requestId || ''))
       return send(res,400,'Informe produto, tipo, quantidade (até 3 casas), motivo e identificador válidos.');
-    if (type === 'entry' && !['admin','manager','submanager'].includes(m.role))
+    if (type === 'entry' && !MANAGEMENT_ROLES.includes(m.role))
       return send(res,403,'Somente administrador ou gerente pode registrar entradas.');
 
     const productRef = unit.collection('products').doc(productId);
@@ -57,7 +61,7 @@ export default async function handler(req,res) {
       const current = actorSnap.data();
       if (!current || current.status !== 'active' || current.unitId !== m.unitId)
         throw new Error('FORBIDDEN');
-      if (type === 'entry' && !['admin','manager','submanager'].includes(current.role))
+      if (type === 'entry' && !MANAGEMENT_ROLES.includes(current.role))
         throw new Error('FORBIDDEN');
       if (existing.exists) {
         const old = existing.data();
@@ -70,6 +74,8 @@ export default async function handler(req,res) {
       if (!productSnap.exists) throw new Error('NOT_FOUND');
       const product = productSnap.data();
       if (product.status !== 'active') throw new Error('INACTIVE_PRODUCT');
+      if(belongsToOperationalCatalog(product))throw Error('LEGACY_READ_ONLY');
+      if(!validQuantity(amount,{unit:product.unit}))throw Error('INVALID_QUANTITY');
       // Não movimentar perecíveis sem controlar o lote; a etapa seguinte implementa isso.
       if (product.trackExpiry === true) throw new Error('LOT_REQUIRED');
       const beforeMilli = asMilli(product.quantity ?? 0);
@@ -86,6 +92,7 @@ export default async function handler(req,res) {
       };
       tx.update(productRef,{quantity:after,updatedAt:now,updatedBy:actor.uid});
       tx.create(movementRef,record);
+      signalUnitChange(tx,db,m.unitId,['stock','catalog']);
       tx.create(auditRef,{event:'stock.movement',unitId:m.unitId,productId,actorUid:actor.uid,
         movementId:requestId,type,amount,before,after,at:now});
       result = {id:requestId,before,after,duplicate:false};
@@ -95,6 +102,8 @@ export default async function handler(req,res) {
     if (e.message === 'UNAUTHENTICATED') return send(res,401,'Faça login.');
     if (e.message === 'FORBIDDEN') return send(res,403,'Sem permissão para movimentar este estoque.');
     if (e.message === 'NOT_FOUND') return send(res,404,'Insumo não encontrado na unidade.');
+    if(e.message==='LEGACY_READ_ONLY')return send(res,409,'O catálogo operacional usa o estoque físico. Registre entradas em Recebimento e saídas nas operações de estoque. O histórico antigo permanece disponível.');
+    if(e.message==='INVALID_QUANTITY')return send(res,400,'Quantidade incompatível com a unidade do produto.');
     if (e.message === 'INACTIVE_PRODUCT') return send(res,409,'O insumo está inativo.');
     if (e.message === 'LOT_REQUIRED') return send(res,409,'Este insumo exige controle de lote e validade. Aguarde a etapa de lotes para movimentá-lo com segurança.');
     if (e.message === 'INVALID_BALANCE') return send(res,409,'Saldo cadastrado inconsistente. Solicite verificação.');

@@ -1,5 +1,5 @@
 import {queuePush,tryDrainPush} from '../push/delivery.js';
-import {isManagement} from '../permissions/v31-policy.js';
+import {MANAGEMENT_ROLES,isManagement} from '../permissions/v31-policy.js';
 import {sendQuotaError} from '../quota-error.js';
 import {coverageTimeline} from '../schedules/coverage-timeline.js';
 import {unitDay,publicationWindow} from '../schedules/temporal-policy.js';
@@ -20,18 +20,18 @@ export default async function handler(req,res){
   const config=await unit.collection('configuration').doc('staffRegistry').get();const masterActive=config.data()?.active===true;
   const action=req.body?.action;
   if(action==='fixedOffList'){
-   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Apenas a gerência consulta o planejamento de folgas.');
+   if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Apenas a gerência consulta o planejamento de folgas.');
    const snap=await unit.collection('fixedOffDays').limit(200).get();
    return send(res,200,'Folgas habituais carregadas.',{fixedOffDays:Object.fromEntries(snap.docs.map(d=>[d.id,d.data().weekday]))});
   }
   if(action==='fixedOffSet'){
-   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Apenas a gerência altera folgas habituais.');
+   if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Apenas a gerência altera folgas habituais.');
    const {uid,weekday}=req.body||{};
    if(!idOk(uid)||!Number.isInteger(weekday)||weekday<1||weekday>4)return send(res,400,'Selecione um dia entre segunda e quinta.');
    const ref=unit.collection('fixedOffDays').doc(uid),now=new Date();
    await db.runTransaction(async tx=>{
     const [actorSnap,target,prior]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(db.doc('memberships/'+uid)),tx.get(ref)]);
-    if(!actorSnap.exists||actorSnap.data().status!=='active'||actorSnap.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(actorSnap.data().role))throw Error('FORBIDDEN');
+    if(!actorSnap.exists||actorSnap.data().status!=='active'||actorSnap.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(actorSnap.data().role))throw Error('FORBIDDEN');
     if(!target.exists||target.data().unitId!==m.unitId||target.data().status!=='active')throw Error('FORBIDDEN');
     tx.set(ref,{weekday,unitId:m.unitId,updatedAt:now,updatedBy:actor.uid});
     signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
@@ -41,7 +41,7 @@ export default async function handler(req,res){
   }
   if(action==='list'){
    const snap=await schedules.limit(120).get();
-   const manager=['admin','manager','submanager'].includes(m.role);
+   const manager=MANAGEMENT_ROLES.includes(m.role);
    const records=snap.docs.filter(x=>manager||x.data().status==='published').map(clean).sort((a,b)=>String(b.period).localeCompare(String(a.period)));
    const assigned=[...new Set(records.flatMap(r=>(r.entries||[]).map(e=>e.uid)))].slice(0,200);
    const memberships=assigned.length?await db.getAll(...assigned.map(uid=>db.collection('memberships').doc(uid))):[];
@@ -100,17 +100,17 @@ export default async function handler(req,res){
    return send(res,201,'Solicitação enviada. A folga depende de aprovação.',{id:ref.id});
   }
   if(action==='leaveList'){
-   const manager=['admin','manager','submanager'].includes(m.role),snap=await unit.collection('leaveRequests').orderBy('createdAt','desc').limit(100).get();
+   const manager=MANAGEMENT_ROLES.includes(m.role),snap=await unit.collection('leaveRequests').orderBy('createdAt','desc').limit(100).get();
    return send(res,200,'Solicitações carregadas.',{requests:snap.docs.filter(d=>manager||d.data().uid===actor.uid).map(d=>({id:d.id,...d.data(),createdAt:iso(d.data().createdAt),decidedAt:iso(d.data().decidedAt)}))});
   }
   if(action==='leaveDecision'){
-   if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Somente gerência decide solicitações.');
+   if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerência decide solicitações.');
    const {id,decision,note}=req.body||{};
    if(!idOk(id)||!['approved','rejected'].includes(decision)||typeof note!=='string'||note.trim().length<8||note.length>400)return send(res,400,'Decisão e justificativa obrigatórias.');
    const ref=unit.collection('leaveRequests').doc(id),now=new Date();
    await db.runTransaction(async tx=>{
     const [current,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!current.exists||current.data().status!=='active'||current.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(current.data().role))throw Error('FORBIDDEN');
+    if(!current.exists||current.data().status!=='active'||current.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(current.data().role))throw Error('FORBIDDEN');
     if(!old.exists||old.data().status!=='pending'||old.data().uid===actor.uid)throw Error('CONFLICT');
     if(decision==='approved'&&old.data().date<unitDay())throw Error('PAST_LEAVE');
     tx.update(ref,{status:decision,note:note.trim(),decidedAt:now,decidedBy:actor.uid});
@@ -122,7 +122,7 @@ export default async function handler(req,res){
    await tryDrainPush(m.unitId);
    return send(res,200,'Decisão registrada. A escala oficial precisa ser atualizada e publicada separadamente.');
   }
-  if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Somente gerência pode administrar escalas.');
+  if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerência pode administrar escalas.');
   if(action==='scheduleArchive'||action==='scheduleRestore'){
    const id=req.body?.id;if(!idOk(id))return send(res,400,'Identificador de escala inválido.');
    const ref=schedules.doc(id),now=new Date();
@@ -165,7 +165,7 @@ export default async function handler(req,res){
    const now=new Date();let revision;
    await db.runTransaction(async tx=>{
     const [actorSnap,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!actorSnap.exists||actorSnap.data().unitId!==m.unitId||actorSnap.data().status!=='active'||!['admin','manager','submanager'].includes(actorSnap.data().role))throw Error('FORBIDDEN');
+    if(!actorSnap.exists||actorSnap.data().unitId!==m.unitId||actorSnap.data().status!=='active'||!MANAGEMENT_ROLES.includes(actorSnap.data().role))throw Error('FORBIDDEN');
     if(old.exists&&(old.data().status!=='draft'||old.data().archivedAt))throw Error('LOCKED');
     if(old.exists&&old.data().revision!==expectedRevision)throw Error('CONFLICT');
     revision=(old.data()?.revision||0)+1;
@@ -214,7 +214,7 @@ export default async function handler(req,res){
     const currentPeople=masterActive?livePeople.docs.map(d=>({uid:d.id,...d.data(),professional:{sector:d.data().sector,availability:d.data().availability||[],certifications:d.data().certifications||[]}})):members.map(p=>({...p,professional:livePeople.docs.find(d=>d.id===p.uid)?.data()?.profile||null}));
     if(validateRosterSchedule({entries:current.data()?.entries||[],members:currentPeople.filter(p=>p.status==='active'),period:current.data()?.period,complete:true,enforceCoverage:!masterActive}).length)throw Error('CONFLICT');
     if([...new Set((current.data()?.entries||[]).map(e=>e.date))].some(date=>coverageTimeline({date,entries:current.data()?.entries||[],people:currentPeople,requirements}).some(r=>r.deficit>0)))throw Error('CONFLICT');
-    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
+    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(member.data().role))throw Error('FORBIDDEN');
     if(['approve','publish'].includes(action)&&!isManagement(member.data().role))throw Error('FORBIDDEN');
     const expected={submit:'draft',approve:'in_review',publish:'approved'}[action];
     if(!current.exists||current.data().status!==expected||current.data().revision!==snap.data().revision)throw Error('CONFLICT');

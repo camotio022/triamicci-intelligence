@@ -1,3 +1,4 @@
+import PageHeading from './ui/PageHeading.jsx';
 import {useViewState} from './useViewState.js';
 import React,{useState} from 'react';
 import MasterRegistry from './MasterRegistry.jsx';
@@ -22,7 +23,7 @@ export default function PeopleHub({user,membership}){
  const [section,setSection]=useViewState('PeopleHub.jsx:section',membership.unitId,'staff');
  if(!isManagement(membership.role))return <p>Esta área é reservada à gerência.</p>;
  return <section className={"ti-people-hub"+(section==='access'?' ti-people-access':'')}>
-  <header className="ti-people-hero"><span>TRIAMICCI · GESTÃO</span><h1>Gestão de pessoas</h1><p>Equipe real, competências, jornadas e acessos em um único lugar. Contas de teste não representam automaticamente funcionários.</p></header>
+  <PageHeading className="ti-people-hero" eyebrow="TRIAMICCI · GESTÃO" title="Gestão de pessoas" description="Equipe real, competências, jornadas e acessos em um único lugar. Contas de teste não representam automaticamente funcionários."/>
   <nav className="ti-people-nav" aria-label="Áreas de gestão de pessoas">{sections.map(item=><button key={item.id} type="button" aria-current={section===item.id?'page':undefined} className={section===item.id?'active':''} onClick={()=>setSection(item.id)}><small aria-hidden="true">{item.icon}</small><strong>{item.title}</strong><span>{item.subtitle}</span></button>)}</nav>
   <div className="ti-people-selected" aria-live="polite"><strong>{sections.find(item=>item.id===section)?.title||'Colaboradores'}</strong><span>{sections.find(item=>item.id===section)?.subtitle||''}</span></div>
   <div className="ti-people-content">

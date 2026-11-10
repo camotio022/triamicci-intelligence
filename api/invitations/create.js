@@ -1,10 +1,11 @@
+import {MANAGEMENT_ROLES} from '../../server/permissions/v31-policy.js';
 import { getDb, getAuth, authenticate, membership, normalizeEmail, emailPattern, roles, newToken, hashToken, deliverInvite, checkRequest, send } from '../../server/_lib.js';
 export default async function handler(req,res) {
   if (!checkRequest(req,res)) return;
   try {
     const actor = await authenticate(req);
     const member = await membership(actor.uid);
-    if (!member || !['admin','manager','submanager'].includes(member.role)) return send(res,403,'Sem permissão para convidar.');
+    if (!member || !MANAGEMENT_ROLES.includes(member.role)) return send(res,403,'Sem permissão para convidar.');
     const { unitId, role, deliveryMethod = 'email' } = req.body || {};
     if (!['email','link'].includes(deliveryMethod)) return send(res,400,'Modo de convite inválido.');
     const email = normalizeEmail(req.body?.email);

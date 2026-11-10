@@ -1,4 +1,4 @@
-import {isManagement} from '../permissions/v31-policy.js';
+import {MANAGEMENT_ROLES,isManagement} from '../permissions/v31-policy.js';
 import {sendQuotaError} from '../quota-error.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
@@ -40,16 +40,16 @@ export default async function handler(req,res){
   }
   if(action==='list'){
    const docs=await items.limit(150).get();
-   const manager=['admin','manager','submanager'].includes(m.role);
+   const manager=MANAGEMENT_ROLES.includes(m.role);
    return send(res,200,'Mural consultado.',{items:docs.docs.filter(d=>manager||d.data().status==='published').map(serialize).sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'))});
   }
-  if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Sem permissão para administrar publicações.');
+  if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Sem permissão para administrar publicações.');
   if(action==='archive'){
    const id=req.body?.id;if(!idOk(id))return send(res,400,'Comunicado inválido.');
    await db.runTransaction(async tx=>{
     const ref=items.doc(id),now=new Date();
     const [member,item]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
+    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(member.data().role))throw Error('FORBIDDEN');
     if(!item.exists||item.data().kind!=='notice'||!['published','archived'].includes(item.data().status))throw Error('LOCKED');
     if(item.data().status==='archived')return;
     tx.update(ref,{status:'archived',archivedAt:now,archivedBy:actor.uid});
@@ -65,7 +65,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const priorRef=supersedesId?items.doc(supersedesId):null;
     const [member,old,prior]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref),priorRef?tx.get(priorRef):Promise.resolve(null)]);
-    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
+    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(member.data().role))throw Error('FORBIDDEN');
     if(old.exists&&old.data().status!=='draft')throw Error('LOCKED');
     if(supersedesId&&(!prior?.exists||prior.data().status!=='published'||prior.data().kind!==normalized.kind))throw Error('LOCKED');
     tx.set(ref,{...normalized,supersedesId:supersedesId||old.data()?.supersedesId||null,status:'draft',version:(old.data()?.version||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
@@ -79,7 +79,7 @@ export default async function handler(req,res){
    const ref=items.doc(id),now=new Date();
    await db.runTransaction(async tx=>{
     const [member,old]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
-    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
+    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(member.data().role))throw Error('FORBIDDEN');
     if(!old.exists||old.data().status!=='draft')throw Error('LOCKED');
     if(noticeExpired(old.data()))throw Error('EXPIRED_NOTICE');
     const priorRef=old.data().supersedesId?items.doc(old.data().supersedesId):null;

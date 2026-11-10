@@ -1,12 +1,9 @@
+import {requestJson} from './api-client.js';
 import React,{useEffect,useMemo,useState} from 'react';
 import {X,ChefHat} from 'lucide-react';
-import {auth} from './firebase.js';
-import {apiFetch} from './api-fetch.js';
 import './storage-manager.css';
 async function api(action,extra={}){
- const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');
- const res=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
- const body=await res.json();if(!res.ok)throw Error(body.message||'Operação indisponível.');return body;
+ return requestJson('/api/operations/stock',{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Operação indisponível.'});
 }
 export default function StoragePreparation({storages,links,products,onClose,onChange}){
  const [origin,setOrigin]=useState('shipment'),[options,setOptions]=useState({shipments:[],runs:[]}),[shipment,setShipment]=useState(''),[lineIndex,setLineIndex]=useState(''),[sourceProduct,setSourceProduct]=useState(''),[sourceStorage,setSourceStorage]=useState(''),[outputProduct,setOutputProduct]=useState(''),[outputStorage,setOutputStorage]=useState(''),[sourceQuantity,setSourceQuantity]=useState(''),[outputQuantity,setOutputQuantity]=useState(''),[note,setNote]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);

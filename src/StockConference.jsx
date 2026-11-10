@@ -1,7 +1,8 @@
+import {requestJson} from './api-client.js';
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {productMatches} from '../server/operations/configured-product.js';
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft,ArrowRight,Check,CheckCircle2,ChevronDown,ClipboardCheck,Package,Search,Trash2} from 'lucide-react';
-import {apiFetch} from './api-fetch.js';
 import {auth} from './firebase.js';
 import {useUnitLive} from './useUnitLive.js';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -15,14 +16,12 @@ const areaName=area=>area==='giro'?'Giro':'Reserva';
 const fmt=n=>Number(n).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const date=value=>timestamp(value)?.toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})||'Sem registro';
 async function request(action,extra={}){
- const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');
- const res=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
- const data=await res.json();if(!res.ok)throw Error(data.message||'Não foi possível concluir.');return data;
+ return requestJson('/api/operations/stock',{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Não foi possível concluir.'});
 }
 function roundSession(key){try{const value=sessionStorage.getItem(key);if(/^[a-f0-9-]{36}$/i.test(value||''))return value;}catch{}const id=crypto.randomUUID();try{sessionStorage.setItem(key,id)}catch{}return id;}
 export default function StockConference(props){return <Conference key={auth.currentUser?.uid+':'+props.membership.unitId} {...props}/>;}
 function Conference({membership,initialProductId=null}){
- const manager=['admin','manager','submanager'].includes(membership.role),{notify}=useFeedback();
+ const manager=MANAGEMENT_ROLES.includes(membership.role),{notify}=useFeedback();
  const today=restaurantDay(),sessionKey='ti:count-round:'+auth.currentUser?.uid+':'+membership.unitId+':'+today;
  const [sessionId,setSessionId]=useState(()=>roundSession(sessionKey)),[data,setData]=useState({products:[],signals:[],availability:[]});
  const [ready,setReady]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');

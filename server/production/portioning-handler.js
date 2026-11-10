@@ -1,3 +1,5 @@
+import {restaurantDay} from '../../shared/operation-day.js';
+import {MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {sendQuotaError} from '../quota-error.js';
@@ -6,7 +8,7 @@ import {isOperationalProduct} from '../operations/catalog-identity.js';
 import {countUnit,validQuantity} from '../operations/logic.js';
 import {progressAfterProduction} from './daily-task.js';
 const round=x=>Math.round(x*1000)/1000;
-const manager=m=>['admin','manager','submanager'].includes(m?.role);
+const manager=m=>MANAGEMENT_ROLES.includes(m?.role);
 const stamp=s=>s.updateTime?`${s.updateTime.seconds}:${s.updateTime.nanoseconds}`:null;
 export function portionStatus(balance,state,area,basis){
  const total=balance?.[area==='reserva'?'reserve':'rotation'];
@@ -52,7 +54,7 @@ export default async function portioningHandler(req,res){
    }else{
     if(!status.ready)throw Error('REVIEW');
     const weight=round(portions*recipe.portionSize);if(!validQuantity(weight,{unit})||weight>status.unmarkedWeight)throw Error('INSUFFICIENT');
-    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(now),taskRef=taskId?root.collection('productionDays').doc(today).collection('tasks').doc(taskId):null,task=taskRef?await tx.get(taskRef):null;
+    const today=restaurantDay(now),taskRef=taskId?root.collection('productionDays').doc(today).collection('tasks').doc(taskId):null,task=taskRef?await tx.get(taskRef):null;
     if(taskRef&&(!task.exists||task.data().recipeId!==recipeId||!['pending','partial'].includes(task.data().status)))throw Error('TASK');
     tx.set(sRef,{productId,location:area,unit,basis,weight:round(status.portionedWeight+weight),updatedAt:now,lastRunId:requestId},{merge:true});
     tx.create(recordRef,{recipeId,recipeName:recipe.name,recipeVersion:recipe.version,stockEffect:'portion_same_product',outputUnit:'porcao',portions,portionWeight:cfg.portionWeight,weightUnit:cfg.weightUnit,portionedWeight:weight,stockUnit:unit,productId,sourceArea:area,destinationArea:area,items:[],notes,actorUid:actor.uid,actorName:a.data().displayName||a.data().name||actor.name||actor.uid,payloadHash:hash,unitId:m.unitId,at:now});

@@ -1,7 +1,8 @@
+import {TEAM_ROLES} from './permissions/v31-policy.js';
 import admin from 'firebase-admin';
 import { createHash, randomBytes } from 'node:crypto';
 
-export const roles = ['admin','manager','submanager','cook','auxiliar'];
+export const roles=TEAM_ROLES;
 export const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const normalizeEmail = email => typeof email === 'string' ? email.trim().toLowerCase() : '';
 export const hashToken = token => createHash('sha256').update(token).digest('hex');

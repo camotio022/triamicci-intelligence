@@ -15,7 +15,7 @@ jobs:
           node-version: '24'
       - name: Instalar dependências
         run: |
-          if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
+          npm ci --no-audit --no-fund
       - name: Testes do motor de unidades
         run: node --test tests/unit-engine.test.js tests/measurement-profiles.test.js tests/package-conference.test.js tests/package-reconciliation.test.js tests/package-review-rules.test.js tests/package-lot-allocation.test.js tests/package-commit-guards.test.js tests/package-adjustment-plan.test.js tests/v3-catalog-policy.test.js
       - name: Regressões de operações e produção

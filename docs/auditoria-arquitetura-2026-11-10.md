@@ -1,7 +1,9 @@
 # Auditoria de arquitetura e consolidação — Triamicci Intelligence
 
 Data: 10/11/2026, horário de São Paulo. Base auditada: **main `f39bc8e8c3cee030d0c135e1aecd9fcc9c63b158`**.
-Os PRs #193 e #194 são propostas separadas, não comportamento integrado da main.
+Este documento é o diagnóstico histórico da base acima. A implementação posterior está
+em [refatoração da auditoria](refatoracao-auditoria-2026-11-10.md) e os contratos atuais
+em [arquitetura](architecture.md).
 
 ## Parecer executivo
 
@@ -227,7 +229,7 @@ leituras por operação; não usar apenas quantidade de testes como indicador de
 
 `src/App.jsx:31,38–60` mantém import de Dashboard, séries demonstrativas e Metric
 que não compõem a rota atual. `src/Receiving.jsx:4–29` é uma demonstração em memória;
-não é o recebimento operacional atual, mas aparece em fixtures de QA.
+não é o recebimento operacional atual, e não possui consumidor operacional nas entradas auditadas.
 
 O grafo apontou `server/checklists/cleanup.js` fora das raízes HTTP, porém ele é usado
 por script de manutenção: **não é arquivo morto**. Essa distinção impede apagar jobs

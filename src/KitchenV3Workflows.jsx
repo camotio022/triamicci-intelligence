@@ -1,15 +1,12 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
 import {usesPhysicalLots} from '../server/operations/catalog-identity.js';
 import ShipmentReceiving from './ShipmentReceiving.jsx';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import React,{useEffect,useMemo,useState} from 'react';
-import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 const listUnits=['kg','g','L','mL','un','porcao','pacote','duzia'];
 async function invoke(action,payload={}){
- const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');
- const r=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
- const d=await r.json();if(!r.ok)throw Error(d.message||'Operação não realizada.');return d;
+ return requestJson('/api/operations/stock',{action,...payload},{sessionMessage:'Sessão expirada.',formatError:data=>data.message||'Operação não realizada.'});
 }
 function Field({name,children}){return <label>{name}{children}</label>}
 export default function KitchenV3Workflows({kind,approvedReceipts=[],products,orders,membership,onChange,onConfigure,initialProductId=null}){

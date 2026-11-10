@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {chromium} from 'playwright';
+import {chromium} from './helpers/browser.mjs';
 import {runProgress} from '../server/checklists/rules.js';
 import {checklistPhotoBase64} from './fixtures/checklist-photo.js';
 

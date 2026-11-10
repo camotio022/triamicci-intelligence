@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {generateKeyPairSync,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {createServer} from 'node:http';
-import {chromium} from 'playwright';
+import {chromium} from './helpers/browser.mjs';
 
 test('checklist completo: navegador → API real → Firestore/Storage → outra sessão',{timeout:90000},async()=>{
  const project='demo-triamicci-v31',unitId='fullstack-'+randomUUID(),{privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});

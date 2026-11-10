@@ -1,3 +1,4 @@
+import {MANAGEMENT_ROLES} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import { getDb, authenticate, membership, normalizeEmail, hashToken, checkRequest, send } from '../../server/_lib.js';
 export default async function handler(req,res) {
@@ -25,7 +26,7 @@ export default async function handler(req,res) {
       const inviterSnap = await tx.get(db.doc('memberships/' + invitation.createdBy));
       const inviter = inviterSnap.data();
       if (!inviter || inviter.status !== 'active' || inviter.unitId !== unitId ||
-          !['admin','manager','submanager'].includes(inviter.role) ||
+          !MANAGEMENT_ROLES.includes(inviter.role) ||
           (['manager','submanager'].includes(inviter.role) && !['cook','auxiliar'].includes(invitation.role)))
         throw new Error('INVALID_INVITATION');
       // Admin SDK só escreve após validar identidade e token em transação.

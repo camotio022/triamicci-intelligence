@@ -1,3 +1,4 @@
+import {MANAGEMENT_ROLES} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import { getDb, authenticate, membership, checkRequest, send } from '../../server/_lib.js';
 
@@ -7,7 +8,7 @@ export default async function handler(req, res) {
   try {
     const actor = await authenticate(req);
     const member = await membership(actor.uid);
-    if (!member || !['admin','manager','submanager'].includes(member.role))
+    if (!member || !MANAGEMENT_ROLES.includes(member.role))
       return send(res,403,'Sem permissão para revogar convites.');
     // Consultas de convites passam pela API: Rules públicas não precisam expor a coleção.
     // Devolver somente os campos necessários à interface, nunca tokenHash.
@@ -36,7 +37,7 @@ export default async function handler(req, res) {
     await db.runTransaction(async tx => {
       const [snap,currentMemberSnap] = await Promise.all([tx.get(ref),tx.get(db.doc('memberships/'+actor.uid))]);
       const currentMember=currentMemberSnap.data();
-      if(!currentMember||currentMember.status!=='active'||currentMember.unitId!==unitId||!['admin','manager','submanager'].includes(currentMember.role))throw new Error('FORBIDDEN');
+      if(!currentMember||currentMember.status!=='active'||currentMember.unitId!==unitId||!MANAGEMENT_ROLES.includes(currentMember.role))throw new Error('FORBIDDEN');
       const invitation = snap.data();
       if (!invitation) throw new Error('NOT_FOUND');
       if (currentMember.role !== 'admin' && invitation.createdBy !== actor.uid)

@@ -1,20 +1,13 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
 import {CATALOG_56_UNITS} from '../server/operations/unit-engine.js';
 import React,{useEffect,useMemo,useState} from 'react';
-import {auth} from './firebase.js';
 import draft from '../data/triamicci-product-catalog-56.staging.json';
 import './operational-catalog-mobile.css';
 const units=CATALOG_56_UNITS;
 const configLabels={stockUnit:'Estoque',receivingUnit:'Recebimento',operationalUnit:'Contagem',source:'Origem',trackExpiry:'Validade',minStock:'Estoque mínimo',countFrequency:'Frequência',critical:'Produto crítico'};
 const configValue=(key,value)=>typeof value==='boolean'?(value?'Sim':'Não'):({supplier:'Fornecedor',internal:'Cozinha',daily:'Diária',weekly:'Semanal',on_demand:'Sob demanda'})[value]||value||'Não informado';
 async function request(action,payload={}){
- const user=auth.currentUser;
- if(!user)throw Error('Faça login novamente.');
- const token=await user.getIdToken();
- const response=await apiFetch('/api/catalog/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'operationalCatalog',action,...payload})});
- const data=await response.json();
- if(!response.ok)throw Error(data.message||'Não foi possível consultar o catálogo.');
- return data;
+ return requestJson('/api/catalog/manage',{module:'operationalCatalog',action,...payload},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Não foi possível consultar o catálogo.'});
 }
 export default function OperationalCatalogSetup({onActivated}){
  const [entries,setEntries]=useState([]);

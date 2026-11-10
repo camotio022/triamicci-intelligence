@@ -1,3 +1,4 @@
+import {restaurantDay} from '../../shared/operation-day.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {isManagement,TEAM_ROLES} from '../permissions/v31-policy.js';
 import {validQuantity} from '../operations/logic.js';
@@ -10,7 +11,7 @@ import {sendQuotaError} from '../quota-error.js';
 
 const idOk=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,60}$/.test(x);
 const productOk=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
-const dayKey=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const dayKey=restaurantDay;
 const countedUnit=p=>[p.operationalUnitOverride,p.profile?.countUnit,p.operationalUnit,p.unit].find(u=>STOCK_UNITS.includes(u))||null;
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;

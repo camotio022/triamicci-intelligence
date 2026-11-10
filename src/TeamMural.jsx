@@ -1,3 +1,6 @@
+import {restaurantDay} from '../shared/operation-day.js';
+import {requestJson} from './api-client.js';
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck,ClipboardList,CheckCircle2,Circle,Sun,Moon,ChevronDown,UserRound} from 'lucide-react';
@@ -11,21 +14,16 @@ import './operations-planning.css';
 import './mural-v5.css';
 
 async function read(module,action,payload={}){
- const token=await auth.currentUser?.getIdToken();
- if(!token)throw Error('Faça login novamente.');
- const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...payload})});
- const data=await response.json();
- if(!response.ok)throw Error(data.message||'Não foi possível atualizar o mural.');
- return data;
+ return requestJson('/api/members/manage',{module,action,...payload},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Não foi possível atualizar o mural.'});
 }
 const monthLabel=period=>new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(period+'-01T12:00:00Z'));
-const todayInSaoPaulo=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const todayInSaoPaulo=()=>restaurantDay(new Date());
 
 export default function TeamMural({membership,onOpenProduction}){
  const [schedules,setSchedules]=useState([]),[notices,setNotices]=useState([]),[presence,setPresence]=useState({}),[today,setToday]=useState(todayInSaoPaulo),[productionTasks,setProductionTasks]=useState([]),[productionError,setProductionError]=useState('');
  const [loading,setLoading]=useState(true),[error,setError]=useState(''),[expanded,setExpanded]=useState(null),[staff,setStaff]=useState([]),[clock,setClock]=useState('00:00');
  const [noticeCursor,setNoticeCursor]=useState(null),[presenceError,setPresenceError]=useState(''),[showNoticeHistory,setShowNoticeHistory]=useState(false);
- const manager=['admin','manager','submanager'].includes(membership.role);
+ const manager=MANAGEMENT_ROLES.includes(membership.role);
  const refresh=useCallback(async()=>{
   try{
    const [roster,board,people]=await Promise.all([read('schedules','list'),read('mural','publicNotices'),read('attendanceV31','teamDirectory')]);

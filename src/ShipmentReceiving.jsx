@@ -1,5 +1,6 @@
+import {requestJson} from './api-client.js';
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {RECEIVING_UNITS,previewStock,previewYields} from '../server/operations/receiving-model.js';
-import {apiFetch} from './api-fetch.js';
 import {useOperationDay} from './useOperationDay.js';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import ConfirmSheet from './ConfirmSheet.jsx';
@@ -8,16 +9,17 @@ import './shipment-receiving-v2.css';
 import {usesPhysicalLots} from '../server/operations/catalog-identity.js';
 import React,{useEffect,useState} from 'react';
 import './v3-kitchen.css';
-import {auth} from './firebase.js';
 import {useUnitLive} from './useUnitLive.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {receivingUnit, receivingLineError} from '../server/operations/receiving-input.js';
 const blank=()=>({productId:'',commercialQuantity:'',commercialUnit:'kg',stockQuantity:'',location:'reserva',lot:'',expiryDate:''});
-async function api(action,payload={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login.');const r=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
+async function api(action,payload={}){
+ return requestJson('/api/operations/stock',{action,...payload},{sessionMessage:'Faça login.',formatError:data=>data.message});
+}
 export default function ShipmentReceiving({approvedReceipts=[],products,orders,membership,onChange,onConfigure}){
  const {notify}=useFeedback(),[step,setStep]=useState(1),[showWizard,setShowWizard]=useState(false),[orderId,setOrderId]=useState(''),[supplier,setSupplier]=useState(''),[notes,setNotes]=useState(''),[lines,setLines]=useState([blank()]),[requestId,setRequestId]=useState(()=>crypto.randomUUID()),[busy,setBusy]=useState(false),[error,setError]=useState(''),[shipments,setShipments]=useState([]),[cursor,setCursor]=useState(null),[reasons,setReasons]=useState({}),[decision,setDecision]=useState(null),[pendingShipments,setPendingShipments]=useState([]),[pendingComplete,setPendingComplete]=useState(null);
  const [hasData,setHasData]=useState(false);
- const management=['admin','manager','submanager'].includes(membership.role);
+ const management=MANAGEMENT_ROLES.includes(membership.role);
  const load=async(more=false)=>{const d=await api('shipmentsList',more&&cursor?{before:cursor}:{});setError('');setShipments(a=>more?[...a,...d.shipments]:d.shipments||[]);setPendingShipments(d.pendingShipments||(d.shipments||[]).filter(s=>s.status==='pending'));setPendingComplete(d.pendingComplete??null);setCursor(d.nextCursor||null);setHasData(true);};
  useUnitLive(membership.unitId,()=>load().catch(e=>{setError(e.message);return false}),{domains:['stock'],refreshKey:membership.role});
  const selected=orders.find(o=>o.id===orderId);

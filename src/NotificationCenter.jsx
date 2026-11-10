@@ -1,3 +1,4 @@
+import {requestJson} from './api-client.js';
 import React,{createContext,useCallback,useContext,useMemo,useRef,useState} from 'react';
 import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
@@ -12,10 +13,7 @@ import './notifications.css';
 import './notification-module.css';
 const NotificationContext=createContext(null);
 async function call(action,payload={}){
- const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
- const token=await user.getIdToken();
- const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
- const data=await response.json();if(!response.ok)throw Error(data.message||'Não foi possível consultar os avisos.');return data;
+ return requestJson('/api/members/manage',{action,...payload},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Não foi possível consultar os avisos.'});
 }
 export function NotificationProvider({unitId,children}){
  const {notify}=useFeedback(),mutation=useRef(false);

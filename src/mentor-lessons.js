@@ -1,13 +1,14 @@
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 export const LESSONS=[
  {id:'first-access',title:'Primeiros passos',roles:['admin','manager','submanager','cook','auxiliar'],description:'Conheça a navegação sem alterar dados reais.',steps:[
   {title:'Conheça o painel',body:'A Operação da cozinha reúne os atalhos principais. Abra essa área para conhecer as informações disponíveis.',page:'kitchen',target:'mentor-kitchen'},
   {title:'Encontre sua ficha',body:'Na Minha ficha profissional, consulte seu cargo, jornada e competências. Consulte primeiro: não é preciso fazer nenhuma alteração.',page:'my-profile',target:'mentor-profile'},
   {title:'Veja o mural',body:'O Mural da equipe exibe comunicados e informações publicadas. Consulte as informações da sua unidade.',page:'mural',target:'mentor-mural'}]},
- {id:'manage-people',title:'Conhecendo a equipe',roles:['admin','manager','submanager'],description:'Cadastros, habilidades e escalas em um único lugar.',steps:[
+ {id:'manage-people',title:'Conhecendo a equipe',roles:MANAGEMENT_ROLES,description:'Cadastros, habilidades e escalas em um único lugar.',steps:[
   {title:'Entre em Gestão de Pessoas',body:'Clique em Gestão de pessoas no menu lateral. O mentor destacará o botão correspondente.',page:'people',target:'mentor-people'},
   {title:'Entenda as áreas',body:'Em Colaboradores ficam as fichas reais. Em Habilidades você consulta competências; em Jornadas, turnos e intervalos.',page:'people',target:'mentor-people-tabs'},
   {title:'Encontre as escalas',body:'Abra a opção Escalas dentro de Gestão de Pessoas. Antes de publicar, revise os registros e as folgas.',page:'people',target:'mentor-people-tabs'}]},
- {id:'double-shifts',title:'Cobertura e dobras',roles:['admin','manager','submanager'],description:'Aprenda a simular reforços sem modificar a escala oficial.',steps:[
+ {id:'double-shifts',title:'Cobertura e dobras',roles:MANAGEMENT_ROLES,description:'Aprenda a simular reforços sem modificar a escala oficial.',steps:[
   {title:'Localize Cobertura',body:'Abra Gestão de Pessoas e selecione Cobertura. É aqui que você simula faltas e propostas de dobra.',page:'people',target:'mentor-people-tabs'},
   {title:'Faça uma simulação segura',body:'Selecione uma escala, uma data, um setor, uma faixa de horário e o mínimo de pessoas. Use Analisar cobertura, que não altera a escala.',page:'people',target:'mentor-people-tabs'},
   {title:'Entenda valores e aprovações',body:'Os valores de R$ 100, R$ 120 e R$ 150 são pagamentos atualmente praticados, não cálculo trabalhista. Propostas exigem conferência humana, aceite e aprovação.',page:'people',target:'mentor-people-tabs'}]},
@@ -23,7 +24,7 @@ export const LESSONS=[
   {title:'Conheça a operação',body:'A Operação da cozinha reúne as tarefas de rotina da equipe.',page:'kitchen',target:'mentor-kitchen'},
   {title:'Explore produção',body:'Consulte os produtos e a área de produção. Registrar uma produção real pode afetar dados operacionais: não confirme operações durante o treinamento.',page:'production',target:'mentor-production'},
   {title:'Consulte as informações do estoque',body:'Verifique o histórico e as quantidades registradas antes de tomar decisões.',page:'inventory',target:'mentor-inventory'}]},
- {id:'people-schedule',title:'Escalas, folgas e jornada',roles:['admin','manager','submanager'],description:'Entenda planejamento, publicação e solicitações de folga.',steps:[
+ {id:'people-schedule',title:'Escalas, folgas e jornada',roles:MANAGEMENT_ROLES,description:'Entenda planejamento, publicação e solicitações de folga.',steps:[
   {title:'Gestão de pessoas',body:'Acesse Gestão de pessoas para consultar perfis e áreas administrativas conforme sua permissão.',page:'people',target:'mentor-people'},
   {title:'Escalas e planejamento',body:'A publicação de escalas é uma operação real. Confira datas e funcionários antes de confirmar.',page:'schedule-planning',target:'mentor-schedule'},
   {title:'Solicitações de folga',body:'Consulte pedidos de folga e o fluxo de aprovação. O Mentor não aprova nem altera solicitações.',page:'leave-requests',target:'mentor-leave'}]},

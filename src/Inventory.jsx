@@ -1,3 +1,6 @@
+import DataState from './ui/DataState.jsx';
+import PageHeading from './ui/PageHeading.jsx';
+import {requestJson} from './api-client.js';
 import {productMatches} from '../server/operations/configured-product.js';
 import {PRODUCT_BASIC_UNITS} from '../server/operations/unit-engine.js';
 import {apiFetch} from './api-fetch.js';
@@ -22,14 +25,7 @@ const categories = ['Preparações','Proteínas','Hortifruti','Laticínios','Mer
 const units = PRODUCT_BASIC_UNITS;
 const blank = {name:'',category:'Proteínas',unit:'kg',minStock:'0',trackExpiry:false,status:'active'};
 async function call(action, payload={}) {
-  if (!auth.currentUser) throw new Error('Sessão expirada.');
-  const token = await auth.currentUser.getIdToken();
-  const res = await apiFetch('/api/products/manage',{method:'POST',
-    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({action,...payload})});
-  const data = await res.json();
-  if (!res.ok) throw Object.assign(new Error(data.message || 'Erro ao consultar catálogo.'),{data});
-  return data;
+ return requestJson('/api/products/manage',{action,...payload},{sessionMessage:'Sessão expirada.',formatError:data=>data.message || 'Erro ao consultar catálogo.'});
 }
 import {balancePresentation} from './operation-time.js';
 export default function Inventory({membership,mode='stock',onAction}) {
@@ -87,11 +83,9 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const set = (field,value) => setForm(old=>({...old,[field]:value}));
   const detail=products.find(p=>p.id===detailId);
   useEffect(()=>{if(!detailId)return;const previous=document.activeElement;const handle=e=>{if(e.key==='Escape')setDetailId(null)};document.addEventListener('keydown',handle);return()=>{document.removeEventListener('keydown',handle);previous?.focus?.()}},[detailId]);
-  if(!hasData)return <section className="inventory-page"><h1>Catálogo e estoque</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>{apiFetch.clearCache();load()}}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
+  if(!hasData)return <DataState title="Catálogo e estoque" error={error} onRetry={()=>{apiFetch.clearCache();load()}}/>;
  return <section className="inventory-page">
-    <p className="eyebrow">OPERAÇÃO · UNIDADE {membership.unitId.toUpperCase()}</p>
-    <h1>{administration?'Gestão de Insumos':'Estoque físico da cozinha'}</h1>
-    <p>{administration?'Revise cadastros, aprovações e configurações sem misturar essas tarefas com a rotina de estoque.':'Consulte a última contagem de reserva e giro. Produtos sem primeira contagem aparecem como não conferidos.'}</p>
+    <PageHeading eyebrow={"OPERAÇÃO · UNIDADE "+membership.unitId.toUpperCase()} title={administration?'Gestão de Insumos':'Estoque físico da cozinha'} description={administration?'Revise cadastros, aprovações e configurações sem misturar essas tarefas com a rotina de estoque.':'Consulte a última contagem de reserva e giro. Produtos sem primeira contagem aparecem como não conferidos.'}/>
     {!administration&&<nav className="inventory-actions" aria-label="Ações do estoque"><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent('ti-navigate',{detail:'kitchen-v3'}))}>Registrar movimentação</button><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent('ti-navigate',{detail:'daily-inventory'}))}>Investigar diferenças</button></nav>}
     {administration&&<div className="inventory-summary"><strong>{products.length} insumos cadastrados</strong><span>{products.filter(p=>p.status==='active').length} ativos</span><span>{products.filter(p=>p.trackExpiry).length} com controle de validade</span></div>}
     {!administration&&<div className="ti-stock-overview" aria-label="Resumo do estoque"><button type="button" aria-pressed={countFilter==='all'} onClick={()=>setCountFilter('all')}><strong>{products.length}</strong><span>Insumos</span></button><button type="button" aria-pressed={countFilter==='today'} onClick={()=>setCountFilter('today')}><strong>{todays.length}</strong><span>Contados hoje</span></button><button type="button" aria-pressed={countFilter==='uncounted'} onClick={()=>setCountFilter('uncounted')}><strong>{products.filter(p=>!p.physicalBalance?.at).length}</strong><span>Sem contagem</span></button></div>}

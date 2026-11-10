@@ -1,4 +1,5 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {useUnitLive} from './useUnitLive.js';
 import {investigationReasons} from '../server/operations/investigation-rules.js';
 import React,{useEffect,useState} from 'react';
@@ -10,13 +11,7 @@ import ConfirmSheet from './ConfirmSheet.jsx';
 const fmt=n=>typeof n==='number'?n.toLocaleString('pt-BR',{maximumFractionDigits:3}):'—';
 const date=x=>x?new Date(x).toLocaleString('pt-BR'):'—';
 async function request(path,action,extra={}){
- if(!auth.currentUser)throw Error('Faça login novamente.');
- const token=await auth.currentUser.getIdToken();
- const res=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',
-  Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
- const data=await res.json();
- if(!res.ok)throw Error(data.message||'Erro ao carregar inventário.');
- return data;
+ return requestJson(path,{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Erro ao carregar inventário.'});
 }
 export default function DailyInventory({membership}){
  const {notify}=useFeedback();
@@ -30,7 +25,7 @@ export default function DailyInventory({membership}){
  const [revision,setRevision]=useState(null);
  const [reviewAction,setReviewAction]=useState(null),[rejectDraft,setRejectDraft]=useState(null);
  useUnitLive(membership.unitId,()=>setRevision(x=>(x??-1)+1),{domains:['stock','production','catalog']});
- const isManager=['admin','manager','submanager'].includes(membership.role);
+ const isManager=MANAGEMENT_ROLES.includes(membership.role);
  useEffect(()=>{if(revision===null)return;let active=true;setTodayLoading(true);setTodayCountError('');setTodayCountComplete(false);request('/api/operations/stock','todayCounts').then(data=>{if(active){setTodayCounts(data.products||[]);setTodayCountComplete(!!data.complete);setTodayCursor(data.nextCursor||null)}}).catch(e=>{if(active){setTodayCountError(e.message);setTodayCountComplete(false)}}).finally(()=>{if(active)setTodayLoading(false)});return()=>{active=false}},[membership.unitId,revision]);
  const loadTodayMore=async()=>{if(busy||!todayCursor)return;setBusy(true);try{const d=await request('/api/operations/stock','todayCounts',{before:todayCursor});setTodayCounts(a=>[...a,...(d.products||[])]);setTodayCursor(d.nextCursor||null);setTodayCountError('')}catch(e){setTodayCountError(e.message)}finally{setBusy(false)}};
  const [closureFilter,setClosureFilter]=useState('pending');

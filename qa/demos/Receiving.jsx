@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import TriamicciHistory from './TriamicciHistory.jsx';
+import TriamicciHistory from '../../src/TriamicciHistory.jsx';
 
 const initial = [
   { id: 'PED-001', product: 'Peito de frango', unit: 'kg', ordered: 12, received: '', note: '' },

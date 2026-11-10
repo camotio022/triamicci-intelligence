@@ -1,5 +1,7 @@
+import {hasArchiveStock} from './stock-scope.js';
 import {configuredProduct} from './configured-product.js';
-import {countUnit} from './logic.js';
+import {countUnit,validQuantity} from './logic.js';
+import {RECEIVING_UNITS} from './unit-engine.js';
 import {conferenceProfile} from './conference-profile.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct,belongsToOperationalCatalog} from './catalog-identity.js';
@@ -16,12 +18,12 @@ import {redactFinancial} from '../permissions/v31-redaction.js';
 import {restaurantDay} from '../schedules/restaurant-today.js';
 const roles=MANAGEMENT_ROLES;
 const locations=['reserva','giro'];
-const unitNames=['kg','g','L','ml','mL','un','porcao','pacote','duzia','caixa','fardo'];
+const unitNames=RECEIVING_UNITS;
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
 const obj=s=>({id:s.id,...s.data()});
 const now=()=>new Date();
 const dateOk=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(x+'T12:00:00Z'))&&new Date(x+'T12:00:00Z').toISOString().slice(0,10)===x;
-const quantity=(v,unit,zero=false)=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&(zero||v>0)&&v<=100000&&(!['un','porcao','pacote','duzia','caixa','fardo'].includes(unit)||Number.isInteger(v))&&Math.abs(Math.round(v*1000)-v*1000)<1e-7;
+const quantity=(v,unit,zero=false)=>validQuantity(v,{unit,allowZero:zero});
 const newAudit=(tx,db,event,unitId,actorUid,details)=>{signalUnitChange(tx,db,unitId,['stock', 'catalog']);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid,details,at:now()});};
 const verify=(a,unitId,allowed)=>a.exists&&a.data().status==='active'&&a.data().unitId===unitId&&allowed.includes(a.data().role);
 const productPath=(unit,id)=>unit.collection('products').doc(id);
@@ -40,7 +42,7 @@ export default async function kitchenV3(req,res){
   if(action==='v3Alerts'){
    const [s,o]=await Promise.all([issues.limit(201).get(),orders.limit(201).get()]);
    if(s.size>200||o.size>200)return send(res,409,'Há muitos avisos. Paginação necessária.');
-   const today=new Date().toISOString().slice(0,10);
+   const today=restaurantDay();
    return send(res,200,'Alertas operacionais carregados.',{signals:s.docs.map(obj).filter(x=>x.status!=='resolved'),
     deliveries:o.docs.map(obj).filter(x=>!['received','cancelled'].includes(x.status)).sort((a,b)=>a.etaDate.localeCompare(b.etaDate)),today});
   }
@@ -112,16 +114,16 @@ export default async function kitchenV3(req,res){
    if(!roles.includes(member.role))return send(res,403,'Somente gerência administra o catálogo.');
    const {productId,active:restore}=req.body||{};
    if(!idOk(productId)||typeof restore!=='boolean')return send(res,400,'Selecione produto e ação.');
-   const pref=products.doc(productId),physical=unit.collection('physicalBalances').doc(productId),v3=balances.doc(productId);
+   const pref=products.doc(productId),physical=balances.doc(productId),legacy=unit.collection('v3PhysicalBalances').doc(productId),stored=unit.collection('storageBalancesV1').doc(productId);
    await db.runTransaction(async tx=>{
-    const [a,p,oldPhysical,newPhysical,pendingOrders,openSignals]=await Promise.all([
-     tx.get(actorRef),tx.get(pref),tx.get(physical),tx.get(v3),tx.get(orders.limit(201)),tx.get(issues.limit(201))]);
+    const [a,p,currentBalance,legacyBalance,storedBalance,pendingOrders,openSignals]=await Promise.all([
+     tx.get(actorRef),tx.get(pref),tx.get(physical),tx.get(legacy),tx.get(stored),tx.get(orders.limit(201)),tx.get(issues.limit(201))]);
     if(!verify(a,unitId,roles))throw Error('FORBIDDEN');
     if(!p.exists)throw Error('NOT_FOUND');
     if(restore&&!belongsToOperationalCatalog(p.data()))throw Error('NOT_FOUND');
     if(!restore){
      if(pendingOrders.size>200||openSignals.size>200)throw Error('TOO_MANY');
-     if((p.data().quantity||0)>0||(oldPhysical.data()?.total||0)>0||(newPhysical.data()?.total||0)>0)throw Error('PRODUCT_HAS_STOCK');
+     if(hasArchiveStock(p.data(),currentBalance,legacyBalance,storedBalance))throw Error('PRODUCT_HAS_STOCK');
      if(pendingOrders.docs.some(d=>!['received','cancelled'].includes(d.data().status)&&d.data().items?.some(i=>i.productId===productId))||
        openSignals.docs.some(d=>d.data().productId===productId&&d.data().status!=='resolved'))throw Error('PRODUCT_HAS_PENDING');
     }

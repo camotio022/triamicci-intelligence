@@ -1,3 +1,4 @@
+import {MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
 import {configuredProduct} from '../operations/configured-product.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {sendQuotaError} from '../quota-error.js';
@@ -7,7 +8,7 @@ import {countUnit} from '../operations/logic.js';
 import {hasRecipeCycle} from './recipe-graph.js';
 import {preparationPlan,validatePreparation} from './preparation-config.js';
 import {recipeAvailability,recipeProducts} from './readiness.js';
-const management=m=>m?.status==='active'&&['admin','manager','submanager'].includes(m.role);
+const management=m=>m?.status==='active'&&MANAGEMENT_ROLES.includes(m.role);
 export default async function preparationHandler(req,res){
  if(!checkRequest(req,res))return;res.setHeader('Cache-Control','no-store');
  let plan;

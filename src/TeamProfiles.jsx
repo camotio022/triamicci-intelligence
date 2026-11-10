@@ -1,8 +1,7 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
 import {useViewState} from './useViewState.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState,useRef} from 'react';
-import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {DEFAULT_DAY,defaultAvailability} from '../server/team/ux-rules.js';
 import {validateProfessionalProfile,eligibleSkills} from '../server/team/profile-rules.js';
@@ -12,10 +11,7 @@ const shifts={manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variav
 const days={seg:'Segunda',ter:'Terça',qua:'Quarta',qui:'Quinta',sex:'Sexta',sab:'Sábado',dom:'Domingo'};
 const blank=()=>({sector:'cozinha',jobTitle:'Auxiliar de cozinha',skills:[],certifications:[],sectorExceptions:[],shift:'manha',availability:defaultAvailability(),notes:''});
 async function api(action,extra={}){
- const user=auth.currentUser;if(!user)throw Error('Sessão expirada.');
- const token=await user.getIdToken();
- const res=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
- const data=await res.json();if(!res.ok)throw Error(data.message||'Não foi possível carregar equipe.');return data;
+ return requestJson('/api/members/manage',{action,...extra},{sessionMessage:'Sessão expirada.',formatError:data=>data.message||'Não foi possível carregar equipe.'});
 }
 export default function TeamProfiles({membership,initialTab='profiles'}){
  const {notify}=useFeedback();

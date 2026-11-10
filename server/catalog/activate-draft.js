@@ -1,3 +1,4 @@
+import {MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
 import {sendQuotaError} from '../quota-error.js';
 import {CATALOG_56_UNITS} from '../operations/unit-engine.js';
 import {readFileSync} from 'node:fs';
@@ -14,7 +15,7 @@ export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
-  if(!m?.unitId||!['admin','manager','submanager'].includes(m.role))return send(res,403,'Acesso restrito à gestão.');
+  if(!m?.unitId||!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Acesso restrito à gestão.');
   const db=getDb(),catalog=db.collection('productCatalog'),unitProducts=db.collection('units').doc(m.unitId).collection('products');
   if(req.body?.action==='status'){
    const [all,profiles]=await Promise.all([unitProducts.limit(201).get(),db.collection('units').doc(m.unitId).collection('operationalProfiles').limit(201).get()]);
@@ -34,7 +35,7 @@ export default async function handler(req,res){
    })});
   }
   if(req.body?.action!=='activate')return send(res,400,'Ação inválida.');
-  if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Sem permissão.');
+  if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Sem permissão.');
   const {id,name,category,stockUnit,operationalUnit,receivingUnit,source,trackExpiry,minStock,countFrequency,critical,reviewConfirmed,existingProductId=null}=req.body;
   const candidate=byId.get(id);
   if(existingProductId!==null&&!/^[a-f0-9]{40}$/.test(existingProductId))return send(res,400,'Vínculo de produto inválido.');
@@ -53,7 +54,7 @@ export default async function handler(req,res){
    if(all.size>200||allProfiles.size>200)throw Error('CATALOG_LIMIT');
    if(all.docs.some(doc=>doc.id!==ref.id&&(matchesCatalogProduct({...doc.data(),profile:profileMap.get(doc.id)},candidate))))throw Error('CATALOG_CONFLICT');
    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||
-      !['admin','manager','submanager'].includes(member.data().role))throw Error('FORBIDDEN');
+      !MANAGEMENT_ROLES.includes(member.data().role))throw Error('FORBIDDEN');
    if(existing.exists&&existing.data().catalogId===id&&existing.data().status==='active'&&existing.data().operationalCatalogVersion===OPERATIONAL_CATALOG_VERSION&&profile.exists)throw Error('ALREADY_ACTIVE');
    if(existing.exists&&existing.data().operationalCatalogVersion!==OPERATIONAL_CATALOG_VERSION&&!existingProductId)throw Error('RECONCILIATION_REQUIRED');
    if(existingProductId&&(!existing.exists||!matchesCatalogProduct({...existing.data(),profile:profile.data()},candidate)))throw Error('CATALOG_CONFLICT');

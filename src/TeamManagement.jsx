@@ -1,3 +1,4 @@
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import {createPortal} from 'react-dom';
 import {useDialogFocus} from './useDialogFocus.js';
@@ -39,7 +40,7 @@ export default function TeamManagement({ user, membership, accessOnly = false })
   const [shareInvite, setShareInvite] = useState(null);
   const [revokingId, setRevokingId] = useState('');
  const [pendingRevoke, setPendingRevoke] = useState(null);
-  const allowed = ['admin','manager','submanager'].includes(membership.role);
+  const allowed = MANAGEMENT_ROLES.includes(membership.role);
   const roles = membership.role === 'admin' ? roleOptions : roleOptions.filter(item => ['auxiliar', 'cook'].includes(item.value));
 
   const sendInvitation = async event => {

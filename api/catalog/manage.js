@@ -1,3 +1,4 @@
+import {MANAGEMENT_ROLES} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {CATALOG_56_UNITS} from '../../server/operations/unit-engine.js';
 import operationalCatalog from '../../server/catalog/activate-draft.js';
@@ -93,7 +94,7 @@ export default async function handler(req,res){
       return send(res,200,'Produto aprovado no catálogo central.');
     }
     if(req.body?.action!=='attach')return send(res,400,'Ação inválida.');
-    if(!['admin','manager','submanager'].includes(m.role))return send(res,403,'Acesso restrito à gestão.');
+    if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Acesso restrito à gestão.');
     return send(res,409,'Vincule o produto em Configurar 56 produtos, com revisão de identidade e saldo.');
   }catch(e){
     if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
