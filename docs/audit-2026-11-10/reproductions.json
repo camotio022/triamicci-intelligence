@@ -1,0 +1,30 @@
+[
+  {
+    "test": "legacy stock entry in a memory-only database",
+    "http": 200,
+    "legacyQuantity": 11.5,
+    "canonicalPhysicalTotal": 5,
+    "storageTotal": 7,
+    "liveSignalWritten": false,
+    "legacyAcceptsFractionOfUn": true,
+    "canonicalValidQuantityForSameInput": false,
+    "calendarExample": {
+      "at": "2026-11-10T01:00:00.000Z",
+      "utcDay": "2026-11-10",
+      "restaurantDay": "2026-11-09"
+    },
+    "writes": [
+      "units/isolated/products/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "units/isolated/movements/11111111-1111-4111-8111-111111111111",
+      "auditLogs/11111111-1111-4111-8111-111111111111"
+    ]
+  },
+  {
+    "test": "archive product with no canonical balance and nonzero supported legacy balance",
+    "http": 200,
+    "resultingStatus": "inactive",
+    "legacyBalanceTotal": 5,
+    "canonicalBalanceExists": false,
+    "message": "Insumo arquivado sem apagar o histórico."
+  }
+]
