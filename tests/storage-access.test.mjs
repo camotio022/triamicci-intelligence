@@ -11,7 +11,9 @@ test('equipe pode conferir, apenas gestão altera configurações',()=>{
 test('tipos de conferência e controle de validade são configuráveis',()=>{
  const base={name:'Carnes e congelados',icon:'snowflake',area:'reserva',frequency:'daily',weekdays:[]};
  for(const mode of ['by_product','quantitative','availability'])assert.equal(validateStorage({...base,countMode:mode}),null);
- for(const policy of ['by_product','required','optional'])assert.equal(validateStorage({...base,expiryPolicy:policy}),null);
+ assert.equal(validateStorage({...base,expiryPolicy:'none',expiryDays:null}),null);
+ assert.equal(validateStorage({...base,expiryPolicy:'days',expiryDays:10}),null);
+ assert.ok(validateStorage({...base,expiryPolicy:'days',expiryDays:null}));
  assert.ok(validateStorage({...base,countMode:'invented'}));
  assert.ok(validateStorage({...base,expiryPolicy:'invented'}));
 });
