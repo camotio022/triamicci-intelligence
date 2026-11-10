@@ -141,7 +141,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       assert.equal(await adminNav.count(),management?1:0,'Menu respeita perfil '+role);
       if(management){
        await adminNav.click();
-       await page.getByRole('heading',{name:'Gestão de Insumos',exact:true}).waitFor();
+       await page.locator('section.inventory-page').getByRole('heading',{name:'Gestão de Insumos',exact:true}).waitFor();
        await page.getByRole('button',{name:'Configurar 56 produtos Validar e ativar insumos da nova lista',exact:true}).click();
        await page.getByRole('button',{name:'Bacon Configuração pendente · Proteínas e carnes',exact:true}).click();
        await page.getByRole('heading',{name:'Configuração da cozinha preservada',exact:true}).waitFor();
