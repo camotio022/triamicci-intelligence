@@ -49,7 +49,13 @@ export default async function kitchenV3(req,res){
    if(checks.size>400)return send(res,409,'Muitas conferências: paginação necessária.');
    if([a,b,c,d,e].some(s=>s.size>200))return send(res,409,'Limite de consulta atingido. Paginação necessária.');
    const pm=new Map(b.docs.map(obj).map(p=>[p.id,p]));
-   const legacy=await unit.collection('v3PhysicalBalances').limit(201).get();if(legacy.size>200)return send(res,409,'Limite de consulta atingido.');
+   // Only read the legacy collection if an operational product has no current balance.
+   // Current balances always override legacy data; reading legacy when all are present
+   // cannot affect the response and wastes a full collection query on every refresh.
+   const currentIds=new Set(e.docs.map(doc=>doc.id));
+   const needsLegacy=a.docs.some(doc=>isOperationalProduct(doc.data())&&!currentIds.has(doc.id));
+   const legacy=needsLegacy?await unit.collection('v3PhysicalBalances').limit(201).get():{docs:[],size:0};
+   if(legacy.size>200)return send(res,409,'Limite de consulta atingido.');
    const bm=new Map(legacy.docs.map(obj).map(p=>[p.id,operationalView(p)]));for(const doc of e.docs)bm.set(doc.id,operationalView(obj(doc)));
    return send(res,200,'Painel operacional carregado.',{
     products:a.docs.filter(s=>isOperationalProduct(s.data())).map(s=>{const data={...configuredProduct(obj(s),pm.get(s.id)),profile:conferenceProfile(s.data(),pm.get(s.id)),v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
