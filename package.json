@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test:rules": "node scripts/test-business-rules.mjs",
     "test:push": "node --test tests/push-notifications.test.mjs",
-    "test:browser": "node --test tests/v31-mobile-ux.test.mjs tests/notifications-module-mobile.test.mjs tests/firestore-read-mobile.test.mjs",
+    "test:browser": "node --test tests/v31-mobile-ux.test.mjs tests/notifications-module-mobile.test.mjs tests/firestore-read-mobile.test.mjs tests/terminal-controls-mobile.test.mjs",
     "test:emulator": "node scripts/test-emulator.mjs"
   },
   "dependencies": {
