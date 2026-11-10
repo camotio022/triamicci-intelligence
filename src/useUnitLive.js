@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {doc,onSnapshot} from 'firebase/firestore';
 import {auth,db} from './firebase.js';
 import {apiFetch} from './api-fetch.js';
-import {createLiveHub,liveRevision,changedLiveDomains} from './live-hub.js';
+import {createLiveHub,liveRevision,changedLiveDomains,invalidateOncePerDelivery} from './live-hub.js';
 const hub=createLiveHub((unitId,emit)=>onSnapshot(doc(db,'units',unitId,'live','attendance'),{includeMetadataChanges:true},
  snapshot=>emit({data:snapshot.data()||{},connected:!snapshot.metadata.fromCache}),error=>emit({error})));
 // The listener owns initial loading; callers must not also fetch on mount.
@@ -39,7 +39,7 @@ export function useUnitLive(unitId,refresh,{domains=['all'],refreshKey=''}={}){
    const next=liveRevision(event.data,domainKey.split(','));
    const changes=wasConnected?changedLiveDomains(previous,event.data,domainKey.split(',')):null;
    previous=event.data;
-   if(revision!==next||!wasConnected){revision=next;if(started){apiFetch.clearCache();schedule(changes);}else load(changes);}
+   if(revision!==next||!wasConnected){revision=next;if(started){invalidateOncePerDelivery(event,apiFetch.clearCache);schedule(changes);}else load(changes);}
   });
   const offline=()=>{connected=false;setState(s=>({...s,status:'reconnecting'}))};
   window.addEventListener('offline',offline);
