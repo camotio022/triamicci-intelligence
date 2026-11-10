@@ -1,3 +1,4 @@
+import {readOperationalCatalog} from '../../server/operations/read-catalog.js';
 import {balanceProblem,recipeAvailability,recipeProducts} from '../../server/production/readiness.js';
 import portioningHandler from '../../server/production/portioning-handler.js';
 import preparationHandler from '../../server/production/preparation-handler.js';
@@ -37,11 +38,12 @@ export default async function handler(req,res){
   const recipes=unit.collection('productionRecipes'),runs=unit.collection('productionRuns');
   const action=req.body?.action;
   if(action==='list'){
-   const [r,p,available]=await Promise.all([recipes.orderBy('name').limit(100).get(),runs.orderBy('at','desc').limit(30).get(),unit.collection('products').limit(201).get()]);
-   if(available.size>200)return send(res,409,'Catálogo acima do limite desta consulta.');
-   const products=await recipeProducts(db,unit,r.docs.filter(d=>d.data().active===true).map(d=>d.data()),available.docs);
+   const includeProducts=req.body?.includeProducts===true;
+   const [r,p,available]=await Promise.all([recipes.orderBy('name').limit(100).get(),runs.orderBy('at','desc').limit(30).get(),includeProducts?readOperationalCatalog(db,unit):unit.collection('products').limit(201).get()]);
+   if(available.tooLarge||available.size>200)return send(res,409,'Catálogo acima do limite desta consulta.');
+   const products=includeProducts?available.contextProducts:await recipeProducts(db,unit,r.docs.filter(d=>d.data().active===true).map(d=>d.data()),available.docs);
    const reviewed=r.docs.filter(d=>d.data().preparationConfig||d.data().configurationDraft).map(d=>({...clean(d),...recipeAvailability(d.data(),products)}));
-   return send(res,200,'Produção carregada.',{recipes:reviewed.filter(r=>r.available&&r.preparationConfig),blockedRecipes:reviewed.filter(r=>r.active===true&&(!r.available||!r.preparationConfig)).map(r=>({id:r.id,name:r.name,errors:r.errors})),...(['admin','manager','submanager'].includes(member.role)?{reviewRecipes:reviewed}:{}),runs:p.docs.map(clean)});
+   return send(res,200,'Produção carregada.',{...(includeProducts?{products:available.products}:{}),recipes:reviewed.filter(r=>r.available&&r.preparationConfig),blockedRecipes:reviewed.filter(r=>r.active===true&&(!r.available||!r.preparationConfig)).map(r=>({id:r.id,name:r.name,errors:r.errors})),...(['admin','manager','submanager'].includes(member.role)?{reviewRecipes:reviewed}:{}),runs:p.docs.map(clean)});
   }
   if(action==='archiveRecipe'){
    if(!['admin','manager','submanager'].includes(member.role))return send(res,403,'Somente gestão pode arquivar fichas.');

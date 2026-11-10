@@ -39,7 +39,8 @@ export default function Production({membership,initialTaskId}){
  const addDailyTask=async e=>{e.preventDefault();if(taskLoading||!plannedRecipe)return;setTaskLoading(true);try{await call('/api/production/manage','dayAdd',{recipeId:plannedRecipe,plannedQuantity:plannedQuantity?Number(plannedQuantity):null});setPlannedRecipe('');setPlannedQuantity('');await loadTasks();notify('Preparação adicionada à lista.','success')}catch(e){notify(e.message,'error')}finally{setTaskLoading(false)}};
  const load=useCallback(async(silent=false)=>{
   if(!silent)setLoading(true);try{
-   const [p,r]=await Promise.all([call('/api/products/manage','list'),call('/api/production/manage','list')]);
+   const r=await call('/api/production/manage','list',{includeProducts:true});
+   const p=Array.isArray(r.products)?r:await call('/api/products/manage','list');
    setProducts(p.products||[]);setRecipes(r.recipes||[]);setBlockedRecipes(r.blockedRecipes||[]);setReviewRecipes(r.reviewRecipes||[]);setRuns(r.runs||[]);return true;
   }catch(e){setStatus(e.message);return false}finally{setLoading(false)}
  },[membership?.unitId]);

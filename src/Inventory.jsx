@@ -87,7 +87,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
   const set = (field,value) => setForm(old=>({...old,[field]:value}));
   const detail=products.find(p=>p.id===detailId);
   useEffect(()=>{if(!detailId)return;const previous=document.activeElement;const handle=e=>{if(e.key==='Escape')setDetailId(null)};document.addEventListener('keydown',handle);return()=>{document.removeEventListener('keydown',handle);previous?.focus?.()}},[detailId]);
-  if(!hasData)return <section className="inventory-page"><h1>Catálogo e estoque</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>load()}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
+  if(!hasData)return <section className="inventory-page"><h1>Catálogo e estoque</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>{apiFetch.clearCache();load()}}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
  return <section className="inventory-page">
     <p className="eyebrow">OPERAÇÃO · UNIDADE {membership.unitId.toUpperCase()}</p>
     <h1>{administration?'Gestão de Insumos':'Estoque físico da cozinha'}</h1>
@@ -114,7 +114,7 @@ export default function Inventory({membership,mode='stock',onAction}) {
       <div className="inventory-actions"><button type="submit" disabled={saving}>{saving?'Salvando...':editing?'Salvar alterações':'Cadastrar insumo'}</button>{editing && <button type="button" className="inventory-cancel" onClick={cancel} disabled={saving}>Cancelar</button>}</div>
       {notice && <p role="status">{notice}</p>}
     </form>}
-    <div className="inventory-list-header"><h2>{administration?'Produtos vinculados à unidade':'Produtos da cozinha'}</h2><button type="button" onClick={load} disabled={loading}>{loading?'Carregando...':'Atualizar'}</button></div>
+    <div className="inventory-list-header"><h2>{administration?'Produtos vinculados à unidade':'Produtos da cozinha'}</h2><button type="button" onClick={()=>{apiFetch.clearCache();load()}} disabled={loading}>{loading?'Carregando...':'Atualizar'}</button></div>
     <label className="inventory-search">Buscar insumo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome ou categoria"/></label>
     {!administration&&<div className="ti-stock-filters" role="group" aria-label="Filtrar contagens">{[["all","Todos"],["today","Contados hoje"],["previous","Contados antes"],["uncounted","Sem contagem"]].map(([id,label])=><button key={id} type="button" className={countFilter===id?"active":""} aria-pressed={countFilter===id} onClick={()=>setCountFilter(id)}>{label}</button>)}</div>}
     {error && <p role="alert">{error}</p>}

@@ -1,7 +1,8 @@
-import React,{useEffect,useMemo,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {Plus,Warehouse,Check,ChevronDown,Search,Package,Leaf,Snowflake,Beef,Refrigerator,Wheat,GlassWater,SprayCan,ChefHat,Boxes,Archive,ThermometerSnowflake,X} from 'lucide-react';
 import {auth} from './firebase.js';
 import {apiFetch} from './api-fetch.js';
+import {useUnitLive} from './useUnitLive.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import {STORAGE_TEMPLATES,STORAGE_ICONS} from '../server/storage/storage-model.js';
 import './storage-manager.css';
@@ -18,9 +19,19 @@ async function call(action,extra={}){
 export default function StorageManager({membership,initialProducts=null}){
  const [data,setData]=useState({storages:[],links:[],progress:[],countingEnabled:false}),[products,setProducts]=useState([]),[hasLoaded,setHasLoaded]=useState(false),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [editor,setEditor]=useState(null),[form,setForm]=useState(empty),[assign,setAssign]=useState(null),[selection,setSelection]=useState([]),[setDefaultStorage,setSetDefaultStorage]=useState(false),[search,setSearch]=useState(''),[counting,setCounting]=useState(null),[countValues,setCountValues]=useState({}),[transfer,setTransfer]=useState(null),[balance,setBalance]=useState(null),[transferQuantity,setTransferQuantity]=useState(''),[transferTarget,setTransferTarget]=useState(''),[preparing,setPreparing]=useState(false),[receiving,setReceiving]=useState(false),[historyOpen,setHistoryOpen]=useState(false),[history,setHistory]=useState([]),[historyLoading,setHistoryLoading]=useState(false);
+ const currentUnit=useRef(membership.unitId),loadVersion=useRef(0);currentUnit.current=membership.unitId;
+ useEffect(()=>()=>{loadVersion.current++},[membership.unitId]);
  const manager=isManagement(membership.role);
- const load=async()=>{setLoading(true);setError('');try{const [s,p]=await Promise.all([call('list'),Array.isArray(initialProducts)?Promise.resolve({products:initialProducts}):callProducts()]);setData(s);setProducts(p.products||[]);setHasLoaded(true);}catch(e){setError(e.message)}finally{setLoading(false)}};
- useEffect(()=>{let active=true;const go=async()=>{try{const [s,p]=await Promise.all([call('list'),Array.isArray(initialProducts)?Promise.resolve({products:initialProducts}):callProducts()]);if(active){setData(s);setProducts(p.products||[])}}catch(e){if(active)setError(e.message)}finally{if(active)setLoading(false)}};go();return()=>{active=false}},[membership.unitId]);
+ const load=async()=>{
+  const version=++loadVersion.current,unitId=membership.unitId;
+  const current=()=>version===loadVersion.current&&unitId===currentUnit.current;
+  setLoading(true);setError('');
+  try{
+   const [s,p]=await Promise.all([call('list'),Array.isArray(initialProducts)?Promise.resolve({products:initialProducts}):callProducts()]);
+   if(current()){setData(s);setProducts(p.products||[]);setHasLoaded(true)}
+  }catch(e){if(current())setError(e.message);return false}finally{if(current())setLoading(false)}
+ };
+ const live=useUnitLive(membership.unitId,()=>load(),{domains:['stock','catalog','production']});
  useEffect(()=>{if(Array.isArray(initialProducts))setProducts(initialProducts)},[initialProducts]);
  const known=new Map(data.links.map(l=>[l.productId,l]));
  const unassigned=products.filter(p=>p.status==='active'&&!known.has(p.id));
@@ -42,6 +53,7 @@ export default function StorageManager({membership,initialProducts=null}){
  return <section className="ti-storage">
   <header className="ti-storage-head"><div className="ti-storage-title"><span className="ti-storage-kicker">ESTOQUES · {membership.unitId.toUpperCase()}</span><h1>Armazenamentos</h1><p>Organize os locais e acompanhe as conferências da unidade.</p></div>{manager&&<button type="button" className="ti-storage-primary ti-storage-create" onClick={()=>openCreate(null)}><Plus size={18}/> Novo <span className="ti-storage-create-desktop">armazenamento</span></button>}</header>
   {!loading&&hasLoaded&&<div className="ti-storage-stats" aria-label="Resumo dos armazenamentos"><div><strong>{data.storages.length}</strong><small>Locais</small></div><div><strong>{data.links.length}</strong><small>Vinculados</small></div><div><strong>{unassigned.length}</strong><small>Sem local</small></div></div>}
+  {hasLoaded&&['error','reconnecting'].includes(live.status)&&<p role="status">A atualização em tempo real está indisponível. Os dados da última consulta podem estar desatualizados.</p>}
   {notice&&<p role="status" className="ti-storage-notice">{notice}</p>}{error&&<div role="alert" className="ti-storage-error">{error}<button onClick={load}>Tentar novamente</button></div>}
   {loading?<p role="status">Carregando configurações…</p>:!hasLoaded?<p role="status" className="ti-storage-not-scheduled">Não foi possível confirmar os armazenamentos. Os dados não foram considerados zerados.</p>:<>{!data.storages.length&&<div className="ti-storage-empty"><div className="ti-storage-empty-heading"><span className="ti-storage-empty-icon"><Warehouse size={24}/></span><div><strong>Vamos organizar a loja</strong><span>Comece com um modelo ou crie um local personalizado.</span></div></div>{manager&&<div className="ti-storage-quick-templates">{STORAGE_TEMPLATES.filter(t=>['carnes','secos','hortifruti','congelados'].includes(t.id)).map(t=>{const Icon=icons[t.icon]||Warehouse;return <button type="button" key={t.id} onClick={()=>openCreate(t.id)}><Icon size={21}/><span>{t.label}</span></button>})}<button type="button" onClick={()=>openCreate(null)}><Plus size={21}/><span>Personalizado</span></button></div>}</div>}
    <div className="ti-storage-grid">{data.storages.map(s=>{const Icon=icons[s.icon]||Warehouse;const p=data.progress.find(x=>x.id===s.id);return <article key={s.id} className="ti-storage-card"><div className="ti-storage-card-top"><span className="ti-storage-icon"><Icon size={20}/></span><div><strong>{s.name}</strong><small>{s.area==='reserva'?'Reserva':'Giro'} · {({daily:'Diária',weekly:'Semanal',monthly:'Mensal',custom:'Dias definidos',on_demand:'Sob demanda'})[s.frequency]}</small></div>{manager&&<button type="button" onClick={()=>edit(s)} aria-label={'Configurar '+s.name}>Editar</button>}</div>{(p?.scheduled||p?.done>0)?<><div className="ti-storage-meter"><span>{p?.done||0}/{p?.total||0} conferidos</span><strong>{p?.percent||0}%</strong></div><div className="ti-storage-track"><span style={{width:(p?.percent||0)+'%'}}/></div></>:<p className="ti-storage-not-scheduled">{p?.total===0?'Nenhum insumo vinculado':'Sem conferência programada para hoje'}</p>}<div className="ti-storage-actions"><button onClick={()=>{setCounting(s.id);setCountValues({})}}>Conferir itens</button>{manager&&<button onClick={()=>{setAssign(s.id);setSearch('');setSelection([]);setSetDefaultStorage(false)}}>Vincular insumos</button>}<span>{p?.pendingReview?`${p.pendingReview} aguardando gerente · `:''}{p?.divergences?`${p.divergences} divergência(s) · `:''}{p?.scheduled?'Conferência programada':'Sob demanda'}</span></div></article>})}</div>

@@ -87,9 +87,9 @@ export default function KitchenV3({membership}){
   const ok=await update('v3OrderCreate',{requestId:crypto.randomUUID(),supplier,etaDate:eta,items,notes:orderNote},'Pedido incluído na agenda.');
   if(ok){setSupplier('');setEta('');setOrderLines([{productId:'',quantity:'',unit:'kg'}]);setOrderNote('');}
  };
- if(!hasData)return <section className="inventory-page"><h1>Estoque e insumos</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>load()}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
+ if(!hasData)return <section className="inventory-page"><h1>Estoque e insumos</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>{apiFetch.clearCache();load()}}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
  return <section className="v3-page">
-  <header className="v3-head"><div><p className="eyebrow">OPERAÇÃO · ESTOQUE E INSUMOS</p><h1>Estoque e insumos</h1><p>O que temos, o que falta e o que está previsto para chegar.</p></div><button type="button" className="v3-secondary" onClick={load} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></header>
+  <header className="v3-head"><div><p className="eyebrow">OPERAÇÃO · ESTOQUE E INSUMOS</p><h1>Estoque e insumos</h1><p>O que temos, o que falta e o que está previsto para chegar.</p></div><button type="button" className="v3-secondary" onClick={()=>{apiFetch.clearCache();load()}} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></header>
   <nav className="ti-v4-stock-nav" aria-label="Seções de estoque e insumos">
    {[
     {id:'today',name:'Hoje',items:[['overview','Visão geral']]},
