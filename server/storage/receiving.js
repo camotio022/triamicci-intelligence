@@ -2,6 +2,7 @@ import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {sendQuotaError} from '../quota-error.js';
 import {signalUnitChange} from '../live-signal.js';
 import {isManagement} from '../permissions/v31-policy.js';
+import {storageDueDate} from './storage-model.js';
 import {STOCK_UNITS} from '../operations/unit-engine.js';
 import {createHash} from 'node:crypto';
 const identity=x=>typeof x==='string'&&/^[a-zA-Z0-9_-]{1,60}$/.test(x);
@@ -41,12 +42,13 @@ export default async function storageReceiving(req,res){
      const l=lines[i],p=docs[i*3],link=docs[i*3+1],space=docs[i*3+2];
      if(!p.exists||p.data().status!=='active'||!link.exists||link.data().primaryStorageId!==l.storageId||!space.exists||space.data().active===false)throw Error('CONFIGURATION');
      if(currentUnit(p.data())!==l.stockUnit)throw Error('UNIT');
-     if((p.data().trackExpiry||space.data().expiryPolicy==='required')&&(!l.lot.trim()||!dateValid(l.expiryDate)))throw Error('LOT');
+     // O prazo operacional é configurado por armazenamento; validade do fornecedor é metadado independente e opcional.
+     const operationalExpiryDate=storageDueDate(new Date(),space.data());
      const unique=l.productId+'|'+l.lot+'|'+l.expiryDate;
      if(seen.has(unique))throw Error('DUPLICATE');seen.add(unique);
      const expected=order?.data()?.items?.find(item=>item.productId===l.productId);
      if(orderId&&!expected&&notes.trim().length<8)throw Error('ORDER');
-     normalized.push({...l,productName:p.data().name});
+     normalized.push({...l,productName:p.data().name,operationalExpiryDate,storageExpiryDays:space.data().expiryPolicy==='days'?space.data().expiryDays:null});
     }
     const now=new Date();
     tx.create(ref,{unitId:m.unitId,supplier:supplier.trim(),orderId,lines:normalized,notes:notes.trim(),status:'pending',createdBy:actor.uid,createdAt:now});
