@@ -2,6 +2,7 @@ import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Monitor,Smartphone,ShieldCheck,X,Plus,LogOut} from 'lucide-react';
 import {useDialogFocus} from './useDialogFocus.js';
+import {useFeedback} from './FeedbackProvider.jsx';
 import {auth,sessionAuth} from './firebase.js';
 import AuthGate from './AuthGate.jsx';
 import {setApiScope} from './api-fetch.js';
@@ -105,20 +106,21 @@ export function TerminalSession({credential,onEnd,children}){
  return <><aside className="ti-terminal-banner"><strong>{state.user.displayName||state.user.email} · {state.membership.role}</strong><span>{state.terminal.name} · {state.terminal.unitId}</span><button onClick={()=>end()}>Bloquear / trocar operador</button></aside>{children({user:state.user,membership:state.membership,logout:()=>end()})}</>;
 }
 export default function TerminalAccess({children}){
- const [device,setDevice]=useState(storedDevice),[credential,setCredential]=useState(()=>{try{return sessionStorage.getItem(SESSION_KEY)||''}catch{return ''}}),[notice,setNotice]=useState(''),[chooseTerminal,setChooseTerminal]=useState(false);
+ const {notify}=useFeedback();
+ const [device,setDevice]=useState(storedDevice),[credential,setCredential]=useState(()=>{try{return sessionStorage.getItem(SESSION_KEY)||''}catch{return ''}}),[chooseTerminal,setChooseTerminal]=useState(false);
  const [approval]=useState(()=>{try{const match=/^#terminalApprove=([A-Za-z0-9_-]{32,64})\.([A-Za-z0-9_-]{32,64})$/.exec(window.location.hash);return match?{requestId:match[1],scanSecret:match[2]}:null}catch{return null}});
  useEffect(()=>{if(approval)window.history.replaceState(null,'',window.location.pathname+window.location.search)},[approval]);
- const ended=useCallback(message=>{setCredential('');setNotice(message)},[]);
+ const ended=useCallback(message=>{setCredential('');notify(message,'info')},[notify]);
  const forget=async()=>{
   // Always provide a local escape even when Firebase or the network is unavailable.
   if(device)terminalCall('forgetDevice',{terminalId:device.id,deviceSecret:device.secret}).catch(()=>{});
   if(credential)terminalCall('sessionEnd',{},credential).catch(()=>{});
-  clearViewCache(sessionAuth.currentUser?.uid);clearTerminalState();setApiScope(null);try{localStorage.removeItem(DEVICE_KEY);sessionStorage.removeItem(SESSION_KEY)}catch{}setCredential('');setDevice(null);setChooseTerminal(false);setNotice('Este navegador saiu do modo caixa.');
+  clearViewCache(sessionAuth.currentUser?.uid);clearTerminalState();setApiScope(null);try{localStorage.removeItem(DEVICE_KEY);sessionStorage.removeItem(SESSION_KEY)}catch{}setCredential('');setDevice(null);setChooseTerminal(false);notify('Este navegador saiu do modo caixa.','success');
  };
  useEffect(()=>{const changed=e=>{if(e.key===DEVICE_KEY){clearTerminalState();setApiScope(null);try{sessionStorage.removeItem(SESSION_KEY)}catch{}setCredential('');setDevice(storedDevice())}};window.addEventListener('storage',changed);return()=>window.removeEventListener('storage',changed)},[]);
  if(approval)return <AuthGate>{({membership})=><TerminalApproval approval={approval} membership={membership} onClose={()=>window.location.reload()}/>}</AuthGate>;
  if(device&&credential)return <><TerminalSession credential={credential} onEnd={ended}>{children}</TerminalSession><button className="ti-terminal-escape" onClick={forget}>Desvincular este navegador</button></>;
- if(device)return <>{notice&&<p className="ti-terminal-notice" role="status">{notice}</p>}<TerminalPortal device={device} onSession={s=>{sessionStorage.setItem(SESSION_KEY,s.credential);setCredential(s.credential)}} onForget={forget}/></>;
+ if(device)return <><TerminalPortal device={device} onSession={s=>{sessionStorage.setItem(SESSION_KEY,s.credential);setCredential(s.credential)}} onForget={forget}/></>;
  if(chooseTerminal)return <Frame title="Entrar pelo caixa"><p>Este navegador ainda não está cadastrado como terminal. Um gerente deve entrar com sua conta e abrir “Terminais e minhas sessões” para configurar o caixa desta unidade.</p><button onClick={()=>setChooseTerminal(false)}>Entrar com minha conta para configurar</button></Frame>;
- return <>{notice&&<p className="ti-terminal-notice" role="status">{notice}</p>}<AuthGate loginOptions={<button type="button" className="ti-auth-secondary ti-terminal-login-option" onClick={()=>setChooseTerminal(true)}><Monitor size={18}/>Entrar pelo caixa</button>}>{session=><TerminalManagement key={session.user.uid+':'+session.membership.unitId+':'+session.membership.role} membership={session.membership} onRegistered={async d=>{localStorage.setItem(DEVICE_KEY,JSON.stringify(d));await session.logout();setDevice(d)}}>{show=>children({...session,openTerminals:show})}</TerminalManagement>}</AuthGate></>;
+ return <><AuthGate loginOptions={<button type="button" className="ti-auth-secondary ti-terminal-login-option" onClick={()=>setChooseTerminal(true)}><Monitor size={18}/>Entrar pelo caixa</button>}>{session=><TerminalManagement key={session.user.uid+':'+session.membership.unitId+':'+session.membership.role} membership={session.membership} onRegistered={async d=>{localStorage.setItem(DEVICE_KEY,JSON.stringify(d));await session.logout();setDevice(d)}}>{show=>children({...session,openTerminals:show})}</TerminalManagement>}</AuthGate></>;
 }
