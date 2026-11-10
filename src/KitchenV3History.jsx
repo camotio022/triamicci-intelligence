@@ -1,7 +1,7 @@
 import {apiFetch} from './api-fetch.js';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import React,{useEffect,useState} from 'react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 export default function KitchenV3History({products}){
  const [items,setItems]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const load=async()=>{setLoading(true);setError('');

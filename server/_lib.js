@@ -1,4 +1,5 @@
 import {TEAM_ROLES} from './permissions/v31-policy.js';
+import {verifyTerminalCredential} from './terminals/policy.js';
 import admin from 'firebase-admin';
 import { createHash, randomBytes } from 'node:crypto';
 
@@ -52,6 +53,18 @@ export function checkRequest(req, res) {
 export async function authenticate(req) {
   const match = /^Bearer (.+)$/.exec(req.headers.authorization || '');
   if (!match) throw new Error('UNAUTHENTICATED');
+  if(match[1].startsWith('ts1.')){
+    const {session,member}=await verifyTerminalCredential(match[1],getDb());
+    let account;
+    try{account=await getAuth().getUser(session.uid)}catch(e){if(e.code==='auth/user-not-found')throw Error('UNAUTHENTICATED');throw e}
+    if(account.disabled||(account.tokensValidAfterTime&&Date.parse(account.tokensValidAfterTime)>session.createdAt.toMillis())){
+      await getDb().doc('terminalSessions/'+session.id).update({state:'ended',endedAt:new Date(),endReason:'account-revoked'});
+      throw Error('UNAUTHENTICATED');
+    }
+    req.terminalIdentity={terminalId:session.terminalId,sessionId:session.id,uid:session.uid};
+    await getDb().collection('auditLogs').add({event:'terminal.request_authorized',at:new Date(),unitId:member.unitId,actorUid:session.uid,terminalId:session.terminalId,sessionId:session.id,action:String(req.body?.action||'').slice(0,80),module:String(req.body?.module||'').slice(0,80),path:String(req.url||'').split('?')[0].slice(0,150)});
+    return {uid:session.uid,email:member.email||'',terminalId:session.terminalId,terminalSessionId:session.id};
+  }
   try{return await getAuth().verifyIdToken(match[1], true)}catch(error){
     if(['auth/argument-error','auth/invalid-id-token','auth/id-token-expired','auth/id-token-revoked','auth/user-disabled','auth/user-not-found'].includes(error.code))throw new Error('UNAUTHENTICATED');
     throw error;

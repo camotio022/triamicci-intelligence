@@ -14,7 +14,7 @@ test('real live hook preserves storage UI and reuses production navigation reads
   configureServer(server){server.middlewares.use((req,res,next)=>{if(req.url?.split('?')[0]!=='/read-fixture.html')return next();res.setHeader('Content-Type','text/html');res.end('<div id="root"></div><script type="module" src="/@read-fixture"></script>')})},
   resolveId(s){if(s==='/@read-fixture')return '\0read-fixture';if(s==='./firebase.js')return '\0read-firebase';if(s==='firebase/firestore')return '\0read-firestore'},
   load(id){
-   if(id==='\0read-firebase')return 'export const auth={currentUser:{uid:"fixture-user",getIdToken:async()=>"fixture-token"}};export const db={};export const app={};export const isIndependentSession=false;';
+   if(id==='\0read-firebase')return 'export const auth={currentUser:{uid:"fixture-user",getIdToken:async()=>"fixture-token"}};export const sessionAuth=auth;export const db={};export const app={};export const isIndependentSession=false;';
    if(id==='\0read-firestore')return `export const doc=(...args)=>args;export function onSnapshot(_doc,_opts,next){const listener=data=>next({data:()=>data,metadata:{fromCache:false}});window.fixtureListeners??=new Set();window.fixtureListeners.add(listener);queueMicrotask(()=>listener(window.fixtureLive));return()=>window.fixtureListeners.delete(listener)}`;
    if(id==='\0read-fixture')return `
     import React,{useState} from 'react';import {createRoot} from 'react-dom/client';

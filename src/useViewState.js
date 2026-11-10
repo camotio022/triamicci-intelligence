@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 // Only UI preferences, scoped to this account and unit; never persists business data.
 export function useViewState(name,unitId,initial){
  const key='triamicci-view:'+auth.currentUser?.uid+':'+unitId+':'+name;

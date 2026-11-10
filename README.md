@@ -40,6 +40,7 @@ O CI usa o navegador correspondente à versão fixada do Playwright.
 ## Documentação
 
 - [Arquitetura e contratos atuais](docs/architecture.md)
+- [Acesso pelo caixa, autorização no celular e desvinculação](docs/terminal-access.md)
 - [Implementação da auditoria e critérios de aceite](docs/refatoracao-auditoria-2026-11-10.md)
 - [Auditoria histórica da arquitetura](docs/auditoria-arquitetura-2026-11-10.md)
 - [Redução de leituras e limites das medições](docs/firestore-read-reduction-192.md)

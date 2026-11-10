@@ -5,7 +5,7 @@ import {coverageTimeline} from '../server/schedules/coverage-timeline.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {generateMonthlyRoster,weekdayOccurrences,weekdayOf,WEEKDAY_LABELS} from '../server/schedules/generator.js';
-import {auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';import './roster-mobile-day.css';
+import {sessionAuth as auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';import './roster-mobile-day.css';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 async function call(action,extra={}){
  return requestJson('/api/members/manage',{module:'schedules',action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>[data.message,...(data.issues||[]).slice(0,5)].join(' · ')});

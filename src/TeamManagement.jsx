@@ -5,7 +5,7 @@ import {useDialogFocus} from './useDialogFocus.js';
 import {invitationLabels,invitationState,invitationPending} from '../server/team/invitation-view.js';
 import './access-management.css';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { auth } from './firebase.js';
+import { sessionAuth as auth } from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import MemberDirectory from './MemberDirectory.jsx';
 import TeamProfiles from './TeamProfiles.jsx';

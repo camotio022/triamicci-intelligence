@@ -3,7 +3,7 @@ import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {productMatches} from '../server/operations/configured-product.js';
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowLeft,ArrowRight,Check,CheckCircle2,ChevronDown,ClipboardCheck,Package,Search,Trash2} from 'lucide-react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {useUnitLive} from './useUnitLive.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {usesPhysicalLots} from '../server/operations/catalog-identity.js';

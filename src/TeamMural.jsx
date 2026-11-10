@@ -4,7 +4,7 @@ import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {Megaphone,CalendarDays,Clock3,RefreshCw,ChevronRight,Users,ShieldCheck,ClipboardList,CheckCircle2,Circle,Sun,Moon,ChevronDown,UserRound} from 'lucide-react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {useUnitLive} from './useUnitLive.js';
 import LiveStatus from './LiveStatus.jsx';
 import {noticeExpired,noticeHistorical} from '../server/workflows/notice-policy.js';

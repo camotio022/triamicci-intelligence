@@ -1,4 +1,5 @@
 import notifications from '../../server/team/notifications-handler.js';
+import terminals from '../../server/terminals/handler.js';
 import {MANAGEMENT_ROLES} from '../../server/permissions/v31-policy.js';
 import {queuePush,tryDrainPush} from '../../server/push/delivery.js';
 import pushWorkflow from '../../server/push/handler.js';
@@ -33,6 +34,7 @@ const cleanMember = (doc) => {
 };
 
 export default async function handler(req,res) {
+  if(req.body?.module==='terminals')return terminals(req,res);
   if(['pushConfiguration','pushSubscribe','pushUnsubscribe','pushTest'].includes(req.body?.action))return pushWorkflow(req,res);
   if(req.body?.module==='checklists')return checklistsWorkflow(req,res);
   if(req.body?.module==='schedules')return schedulesWorkflow(req,res);

@@ -15,7 +15,7 @@ test('notification module: mobile density, independent route, lifecycle and coll
  const cacheDir=await mkdtemp(join(tmpdir(),'triamicci-notifications-vite-'));
  // Separate optimizer cache from the other Vite server running in this job.
  const server=await createServer({root,configFile:false,cacheDir,optimizeDeps:{entries:['qa/notifications-module.html']},server:{host:'127.0.0.1',port:4181,strictPort:true},plugins:[{name:'notifications-isolated-fixture',enforce:'pre',resolveId(source){if(source==='./firebase.js')return '\0fixture-firebase';if(source==='./useUnitLive.js')return '\0fixture-live'},load(id){
-  if(id==='\0fixture-firebase')return 'export const auth={currentUser:{uid:"fixture-user",getIdToken:async()=>"fixture-token"}};export const db={};export const app={};export const isIndependentSession=false;';
+  if(id==='\0fixture-firebase')return 'export const auth={currentUser:{uid:"fixture-user",getIdToken:async()=>"fixture-token"}};export const sessionAuth=auth;export const db={};export const app={};export const isIndependentSession=false;';
   if(id==='\0fixture-live')return 'import {useEffect,useRef} from "react";export function useUnitLive(unit,refresh){const latest=useRef(refresh);latest.current=refresh;useEffect(()=>{latest.current(true,null)},[unit]);return {status:"live"}}';
  }}]});
  await server.listen();let browser;

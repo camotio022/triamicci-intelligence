@@ -1,7 +1,7 @@
 import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useEffect,useState} from 'react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {pastProposal} from './operation-time.js';
 import {useOperationDay} from './useOperationDay.js';
 export default function MyCoverageProposals({unitId}){

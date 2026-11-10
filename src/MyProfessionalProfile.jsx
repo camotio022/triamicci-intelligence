@@ -1,7 +1,7 @@
 import {requestJson} from './api-client.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {Award,Star,Sparkles,Clock3,CheckCircle2,UserRound,Pencil,Target,Send,ShieldCheck,Camera,CalendarDays,Building2,ChefHat} from 'lucide-react';
 import {useFeedback} from './FeedbackProvider.jsx';
 import './profile-premium.css';

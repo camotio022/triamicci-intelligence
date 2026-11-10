@@ -2,6 +2,7 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth,initializeAuth,browserSessionPersistence,browserPopupRedirectResolver } from 'firebase/auth';
 import {authSession} from './auth-session.js';
+import {terminalUser} from './terminal-state.js';
 
 // Configuração pública do aplicativo Web Firebase.
 // A autorização real de leitura/escrita depende das regras do Firestore.
@@ -34,3 +35,4 @@ export const isIndependentSession=session.independent;
 export const app=getApps().find(app=>app.name===session.appName)||initializeApp(firebaseConfig,session.appName);
 export const auth=session.independent?initializeAuth(app,{persistence:browserSessionPersistence,popupRedirectResolver:browserPopupRedirectResolver}):getAuth(app);
 export const db=getFirestore(app);
+export const sessionAuth={get currentUser(){return terminalUser()||auth.currentUser}};

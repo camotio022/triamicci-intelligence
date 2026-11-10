@@ -4,7 +4,7 @@ import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import {liveShiftState} from '../server/schedules/restaurant-today.js';
 import React,{useCallback,useEffect,useState} from 'react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import './my-journey-v41.css';
 import './my-journey-v5.css';
 const actions={not_started:['clock_in','Registrar entrada'],working:['break_start','Iniciar intervalo'],on_break:['break_end','Retornar do intervalo'],finished:[]};

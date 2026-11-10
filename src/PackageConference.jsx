@@ -1,6 +1,6 @@
 import {apiFetch} from './api-fetch.js';
 import React,{useEffect,useState} from 'react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {convertPackage,packageState} from '../server/operations/unit-engine.js';
 import {reconcilePackageCount} from '../server/operations/package-reconciliation.js';
 import ManagerPackageReview from './ManagerPackageReview.jsx';

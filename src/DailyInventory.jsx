@@ -5,7 +5,7 @@ import {investigationReasons} from '../server/operations/investigation-rules.js'
 import React,{useEffect,useState} from 'react';
 import {Search,ClipboardCheck,AlertTriangle,CheckCircle2,Clock3,ChevronDown} from 'lucide-react';
 import './daily-inventory-v4.css';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import ConfirmSheet from './ConfirmSheet.jsx';
 const fmt=n=>typeof n==='number'?n.toLocaleString('pt-BR',{maximumFractionDigits:3}):'—';
