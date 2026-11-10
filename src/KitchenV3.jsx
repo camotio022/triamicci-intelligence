@@ -1,3 +1,6 @@
+import PageHeading from './ui/PageHeading.jsx';
+import DataState from './ui/DataState.jsx';
+import {requestJson} from './api-client.js';
 import StockConference from './StockConference.jsx';
 import StorageManager from './StorageManager.jsx';
 import {RECEIVING_UNITS,STOCK_UNITS,validUnitModel} from '../server/operations/receiving-model.js';
@@ -16,10 +19,7 @@ import './receiving-experience.css';
 import './v4-stock-nav.css';
 import './v4-stock-overview.css';
 async function api(action,payload={}){
- const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
- const token=await user.getIdToken();
- const response=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
- const data=await response.json();if(!response.ok)throw Error(data.message||'Falha na operação.');return data;
+ return requestJson('/api/operations/stock',{action,...payload},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Falha na operação.'});
 }
 const kinds=[['availability','Disponibilidade'],['quantitative','Contagem quantitativa'],['on_demand','Conferir quando necessário']];
 const productName=p=>p?.profile?.displayName?.trim()||p?.name||'';
@@ -87,9 +87,9 @@ export default function KitchenV3({membership}){
   const ok=await update('v3OrderCreate',{requestId:crypto.randomUUID(),supplier,etaDate:eta,items,notes:orderNote},'Pedido incluído na agenda.');
   if(ok){setSupplier('');setEta('');setOrderLines([{productId:'',quantity:'',unit:'kg'}]);setOrderNote('');}
  };
- if(!hasData)return <section className="inventory-page"><h1>Estoque e insumos</h1>{error?<><p role="alert">Dados indisponíveis. {error} Nenhum saldo zero foi confirmado.</p><button type="button" onClick={()=>load()}>Tentar novamente</button></>:<p role="status">Consultando dados…</p>}</section>;
+ if(!hasData)return <DataState title="Estoque e insumos" error={error} onRetry={()=>{apiFetch.clearCache();load()}}/>;
  return <section className="v3-page">
-  <header className="v3-head"><div><p className="eyebrow">OPERAÇÃO · ESTOQUE E INSUMOS</p><h1>Estoque e insumos</h1><p>O que temos, o que falta e o que está previsto para chegar.</p></div><button type="button" className="v3-secondary" onClick={load} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></header>
+  <PageHeading className="v3-head" eyebrow="OPERAÇÃO · ESTOQUE E INSUMOS" title="Estoque e insumos" description="O que temos, o que falta e o que está previsto para chegar." actions={<button type="button" className="v3-secondary" onClick={()=>{apiFetch.clearCache();load()}} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button>}/>
   <nav className="ti-v4-stock-nav" aria-label="Seções de estoque e insumos">
    {[
     {id:'today',name:'Hoje',items:[['overview','Visão geral']]},

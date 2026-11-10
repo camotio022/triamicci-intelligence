@@ -1,5 +1,5 @@
 import {queuePush,tryDrainPush} from '../../server/push/delivery.js';
-import {isManagement} from '../../server/permissions/v31-policy.js';
+import {MANAGEMENT_ROLES,isManagement} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {pastProposal} from '../../src/operation-time.js';
 import {coverageTimeline} from '../../server/schedules/coverage-timeline.js';
@@ -9,7 +9,7 @@ import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib
 import {evaluateCoverage,paymentFor,rateRoleFor,checkDoubleShift,approvalGate,DEFAULT_RATES} from '../../server/coverage/engine.js';
 import {validDate} from '../../server/schedules/rules.js';
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
-const roles=new Set(['admin','manager','submanager']);
+const roles=new Set(MANAGEMENT_ROLES);
 const validTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 const clean=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,updatedAt:d.data().updatedAt?.toDate?.()?.toISOString?.()||null});
 const rateKeys=Object.keys(DEFAULT_RATES);

@@ -1,13 +1,9 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
 import React,{useCallback,useEffect,useState} from 'react';
-import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 const blank={name:'',email:'',sector:'cozinha',jobTitle:'Auxiliar de cozinha',role:'auxiliar'};
 async function call(action,extra={}){
- const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
- const token=await user.getIdToken();
- const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
- const data=await response.json();if(!response.ok)throw Error(data.message||'Operação indisponível.');return data;
+ return requestJson('/api/members/manage',{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Operação indisponível.'});
 }
 export default function TeamPreRegister({membership,onInvite}){
  const {notify}=useFeedback();const [form,setForm]=useState(blank),[items,setItems]=useState([]),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true);

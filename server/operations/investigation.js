@@ -1,10 +1,11 @@
+import {MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
 import {sendQuotaError} from '../quota-error.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {signalUnitChange} from '../live-signal.js';
 import dailyReport from './daily-report.js';
 import {validateInvestigation} from './investigation-rules.js';
-const manager=role=>['admin','manager','submanager'].includes(role);
+const manager=role=>MANAGEMENT_ROLES.includes(role);
 const fingerprint=r=>createHash('sha256').update(JSON.stringify(r)).digest('hex');
 export default async function investigation(req,res){
  if(!checkRequest(req,res))return;

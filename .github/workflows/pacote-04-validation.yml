@@ -15,7 +15,7 @@ jobs:
           node-version: '24'
       - name: Instalar dependências de forma reprodutível
         run: |
-          if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
+          npm ci --no-audit --no-fund
       - name: Testar regras de inventário
         run: node --test tests/daily-inventory.test.js tests/inventory-closure.test.js
       - name: Checar sintaxe do backend

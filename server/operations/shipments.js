@@ -1,3 +1,5 @@
+import {restaurantDay} from '../../shared/operation-day.js';
+import {MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
 import {RECEIVING_UNITS} from './receiving-model.js';
 import {queuePush,tryDrainPush} from '../push/delivery.js';
 import {sendQuotaError} from '../quota-error.js';
@@ -9,11 +11,11 @@ import {operationalBalances,writeOperationalBalance} from './shared-balance.js';
 import {shipmentTransaction} from './shipment-transaction.js';
 import {validQuantity} from './logic.js';
 import {receivingConflict} from './receiving-policy.js';
-const manager=r=>['admin','manager','submanager'].includes(r);
+const manager=r=>MANAGEMENT_ROLES.includes(r);
 const id=x=>typeof x==='string'&&/^[a-f0-9-]{36}$/i.test(x);
 const product=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
-const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());
+const day=()=>restaurantDay(new Date());
 const date=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&Number.isFinite(Date.parse(x+'T12:00:00Z'))&&new Date(x+'T12:00:00Z').toISOString().slice(0,10)===x;
 export default async function shipments(req,res){
  if(!checkRequest(req,res))return;res.setHeader('Cache-Control','no-store');

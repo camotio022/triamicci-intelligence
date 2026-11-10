@@ -1,14 +1,10 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
 import {PACKAGE_CONTENT_UNITS} from '../server/operations/unit-engine.js';
 import React,{useEffect,useState} from 'react';
-import {auth} from './firebase.js';
 import {PRESENTATIONS} from '../server/operations/unit-engine.js';
 const units=PACKAGE_CONTENT_UNITS;
 async function request(action,data){
- const token=await auth.currentUser?.getIdToken();
- if(!token)throw Error('Entre novamente na sua conta.');
- const res=await apiFetch('/api/products/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:action==='get'?'measurementGet':'measurementSave',...data})});
- const body=await res.json();if(!res.ok)throw Error(body.message||'Não foi possível consultar as apresentações.');return body;
+ return requestJson('/api/products/manage',{action:action==='get'?'measurementGet':'measurementSave',...data},{sessionMessage:'Entre novamente na sua conta.',formatError:data=>data.message||'Não foi possível consultar as apresentações.'});
 }
 export default function MeasurementEditor({products}){
  const [countingMethod,setCountingMethod]=useState({kind:'base'});

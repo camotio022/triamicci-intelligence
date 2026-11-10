@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
-const src=readFileSync(new URL('../src/Dashboard.jsx',import.meta.url),'utf8'),css=readFileSync(new URL('../src/dashboard-mobile.css',import.meta.url),'utf8');
+const src=readFileSync(new URL('../qa/demos/Dashboard.jsx',import.meta.url),'utf8'),css=readFileSync(new URL('../qa/demos/dashboard-mobile.css',import.meta.url),'utf8');
 test('dashboard low-stock cards and desktop table use identical returned records',()=>{
  assert.match(src,/className="ti-dashboard-low-cards"/);
  assert.match(src,/className="table-wrap ti-dashboard-low-table"/);

@@ -19,7 +19,7 @@ jobs:
           node --test tests/*-ui.test.mjs tests/ui-foundation-phase1.test.mjs
       - name: Instalar dependências
         run: |
-          if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
+          npm ci --no-audit --no-fund
       - name: Validar notificações push
         run: npm run test:push
       - name: Compilar interface

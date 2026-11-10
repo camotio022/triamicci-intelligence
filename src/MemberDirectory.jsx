@@ -1,10 +1,9 @@
+import {requestJson} from './api-client.js';
 import ProfileAvatar from './ProfileAvatar.jsx';
-import {apiFetch} from './api-fetch.js';
 import {useDialogFocus} from './useDialogFocus.js';
 import {useUnitLive} from './useUnitLive.js';
 import {useViewState} from './useViewState.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { auth } from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 
 const roleLabels = {admin:'Administrador',manager:'Gerente',submanager:'Subgerente',cook:'Cozinheiro',auxiliar:'Auxiliar'};
@@ -12,17 +11,7 @@ const roles = Object.entries(roleLabels);
 const statuses = {active:'Ativo',inactive:'Desativado'};
 
 async function request(action, payload = {}) {
-  const user = auth.currentUser;
-  if (!user) throw new Error('Sessão expirada. Entre novamente.');
-  const token = await user.getIdToken();
-  const response = await apiFetch('/api/members/manage', {
-    method:'POST',
-    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({action,...payload})
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'Não foi possível realizar a operação.');
-  return data;
+ return requestJson('/api/members/manage',{action,...payload},{sessionMessage:'Sessão expirada. Entre novamente.',formatError:data=>data.message || 'Não foi possível realizar a operação.'});
 }
 
 export default function MemberDirectory({user,membership,filterStatus=null,onCounts}) {

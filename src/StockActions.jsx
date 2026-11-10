@@ -1,17 +1,9 @@
+import {requestJson} from './api-client.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
-import {apiFetch} from './api-fetch.js';
 import React,{useEffect,useState} from 'react';
-import {auth} from './firebase.js';
 
 async function api(path,action,payload){
- const user=auth.currentUser;
- if(!user)throw Error('Sessão expirada.');
- const token=await user.getIdToken();
- const res=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-  body:JSON.stringify({action,...payload})});
- const data=await res.json();
- if(!res.ok)throw Error(data.message||'Falha na operação.');
- return data;
+ return requestJson(path,{action,...payload},{sessionMessage:'Sessão expirada.',formatError:data=>data.message||'Falha na operação.'});
 }
 
 export default function StockActions({product,lots,membership,onUpdated}){

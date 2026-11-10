@@ -1,3 +1,4 @@
+import {restaurantDay} from '../../shared/operation-day.js';
 import {sendQuotaError} from '../../server/quota-error.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 
@@ -33,14 +34,14 @@ export default async function handler(req,res) {
     const movements=movementsSnap.docs.map(doc=>doc.data());
     const days=Array.from({length:7},(_,i)=>{
       const date=new Date(start.getTime()+(i+1)*86400000);
-      const key=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
+      const key=restaurantDay(date);
       return {key,day:new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit'}).format(date),entry:0,exit:0};
     });
     const byDay=new Map(days.map(d=>[d.key,d]));
     for(const movement of movements){
       const date=movement.at?.toDate?.();
       if(!date)continue;
-      const key=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
+      const key=restaurantDay(date);
       const day=byDay.get(key);
       if(day && movement.type==='entry')day.entry++;
       if(day && movement.type==='exit')day.exit++;

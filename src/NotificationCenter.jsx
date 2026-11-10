@@ -1,3 +1,4 @@
+import {requestJson} from './api-client.js';
 import React,{createContext,useCallback,useContext,useMemo,useRef,useState} from 'react';
 import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
@@ -12,10 +13,7 @@ import './notifications.css';
 import './notification-module.css';
 const NotificationContext=createContext(null);
 async function call(action,payload={}){
- const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
- const token=await user.getIdToken();
- const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...payload})});
- const data=await response.json();if(!response.ok)throw Error(data.message||'Não foi possível consultar os avisos.');return data;
+ return requestJson('/api/members/manage',{action,...payload},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Não foi possível consultar os avisos.'});
 }
 export function NotificationProvider({unitId,children}){
  const {notify}=useFeedback(),mutation=useRef(false);
@@ -29,7 +27,7 @@ export function NotificationProvider({unitId,children}){
   if(!response.ok)throw Error('Consulta indisponível');const data=await response.json();setSupplyAlerts({signals:data.signals||[],deliveries:data.deliveries||[]});setSupplyReady(true);return true;
  }catch{setSupplyReady(false);return false}},[]);
  useUnitLive(unitId,(_initial,changes)=>Promise.all([!changes||changes.includes('notifications')?load():true,!changes||changes.includes('stock')?loadSupply():true]),{domains:['notifications','stock']});
- const refresh=async()=>{if(refreshing)return;setRefreshing(true);try{await Promise.all([load(),loadSupply()])}finally{setRefreshing(false)}};
+ const refresh=async()=>{if(refreshing)return;apiFetch.clearCache();setRefreshing(true);try{await Promise.all([load(),loadSupply()])}finally{setRefreshing(false)}};
  const mutate=async(id,action)=>{
   if(mutation.current)return false;mutation.current=true;setBusy(id);
   try{await call(action,{id});await load();if(action!=='notificationOpen')notify(action==='notificationDelete'?'Aviso enviado à lixeira.':action==='notificationRestore'?'Aviso restaurado.':'Aviso marcado como lido.','success');return true}

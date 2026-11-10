@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {chromium} from 'playwright';
+import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {chromium} from './helpers/browser.mjs';
 test('duas contas no mesmo navegador: login, reload e logout independentes preservando a conta principal',{timeout:90000},async()=>{
  const env={...process.env,VITE_APP_ENV:'staging',VITE_FIREBASE_API_KEY:'local-test',VITE_FIREBASE_PROJECT_ID:'demo-triamicci-v31',VITE_FIREBASE_APP_ID:'local-test',VITE_FIREBASE_AUTH_DOMAIN:'localhost'};
  const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4185','--strictPort'],{env,stdio:'pipe'});let browser;

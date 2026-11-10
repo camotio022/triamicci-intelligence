@@ -1,6 +1,6 @@
-import {apiFetch} from './api-fetch.js';
+import {apiFetch} from '../../src/api-fetch.js';
 import React,{useCallback,useEffect,useState} from 'react';
-import {auth} from './firebase.js';
+import {auth} from '../../src/firebase.js';
 import {AreaChart,Area,CartesianGrid,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell} from 'recharts';
 import {Package,ArrowDownRight,ArrowUpRight,AlertTriangle,RefreshCcw} from 'lucide-react';
 import './dashboard-mobile.css';

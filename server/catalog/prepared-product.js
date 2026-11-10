@@ -1,10 +1,11 @@
+import {MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
 import {createHash} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {countUnit} from '../operations/logic.js';
 import {sendQuotaError} from '../quota-error.js';
 import {signalUnitChange} from '../live-signal.js';
 import {normalizeProductName,OPERATIONAL_CATALOG_VERSION,operationalProfileFor} from '../operations/catalog-identity.js';
-const management=m=>m?.status==='active'&&['admin','manager','submanager'].includes(m.role);
+const management=m=>m?.status==='active'&&MANAGEMENT_ROLES.includes(m.role);
 export function validatePreparedProduct(p){
  if(!p||typeof p.name!=='string'||p.name.trim().length<3||p.name.length>100||typeof p.category!=='string'||p.category.trim().length<2||p.category.length>60)return 'Informe nome e categoria do insumo preparado.';
  if(!['porcao','un','kg','g','L','ml'].includes(p.unit)||typeof p.minStock!=='number'||!Number.isFinite(p.minStock)||p.minStock<0||p.minStock>100000||(['porcao','un'].includes(p.unit)&&!Number.isInteger(p.minStock)))return 'Revise a unidade de contagem e o estoque mínimo.';

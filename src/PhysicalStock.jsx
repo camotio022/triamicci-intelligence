@@ -1,20 +1,16 @@
+import {requestJson} from './api-client.js';
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import StockConference from './StockConference.jsx';
-import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import React,{useCallback,useEffect,useState} from 'react';
-import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import './receiving-experience.css';
 import KitchenV3Workflows from './KitchenV3Workflows.jsx';
 import PackageConference from './PackageConference.jsx';
 
 async function api(path,action,extra={}){
- const user=auth.currentUser;if(!user)throw Error('Sessão expirada.');
- const token=await user.getIdToken();
- const response=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-  body:JSON.stringify({action,...extra})});
- const data=await response.json();if(!response.ok)throw Error(data.message||'Erro de comunicação.');return data;
+ return requestJson(path,{action,...extra},{sessionMessage:'Sessão expirada.',formatError:data=>data.message||'Erro de comunicação.'});
 }
 const fmt=at=>at?new Date(at).toLocaleString('pt-BR'):'—';
 const qty=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:3});
@@ -32,7 +28,7 @@ function PhysicalOperations({membership,mode='receive',initialProductId=null}){
  const [summary,setSummary]=useState(null);
  const [lots,setLots]=useState([]);
  const [more,setMore]=useState({receipts:false,counts:false,outflows:false,transfers:false}),[loadingMore,setLoadingMore]=useState(false);
- const canReceive=['admin','manager','submanager'].includes(membership.role);
+ const canReceive=MANAGEMENT_ROLES.includes(membership.role);
  const load=useCallback(async()=>{
   try{
    const [p,h,c]=await Promise.all([api('/api/products/manage','list'),api('/api/operations/stock','list'),api('/api/catalog/manage','list')]);

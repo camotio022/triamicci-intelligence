@@ -1,3 +1,4 @@
+import {belongsToOperationalCatalog} from '../server/operations/catalog-identity.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import React, {useCallback,useEffect,useState} from 'react';
@@ -38,7 +39,7 @@ export default function StockMovements({products,membership,onUpdated}) {
   const [requestId,setRequestId]=useState(()=>crypto.randomUUID());
   const canEnter=isManagement(membership.role);
   const selected=products.find(p=>p.id===productId);
-  const eligible=products.filter(p=>p.status==='active');
+  const eligible=products.filter(p=>p.status==='active'&&!belongsToOperationalCatalog(p));
   const load=useCallback(async()=>{
     setLoading(true);setError('');
     try{const result=await api('list');setHistory(result.movements||[]);}
@@ -74,7 +75,7 @@ export default function StockMovements({products,membership,onUpdated}) {
   return <section className="inventory-movements">
     <h2>Movimentações de estoque</h2>
     <p>Entradas e saídas reais com saldo atualizado em transação e histórico de quem registrou.</p>
-    <form className="inventory-form" onSubmit={submit}>
+    {eligible.length>0?<form className="inventory-form" onSubmit={submit}>
       <div className="inventory-fields">
         <label>Insumo
           <select required value={productId} onChange={e=>{setProductId(e.target.value);resetRequest();}}>
@@ -102,7 +103,7 @@ export default function StockMovements({products,membership,onUpdated}) {
       </p>}
       <div className="inventory-actions"><button type="submit" disabled={saving||!selected||selected.trackExpiry}>{saving?'Registrando...':'Confirmar movimentação'}</button></div>
       {notice&&<p role="status">{notice}</p>}
-    </form>
+    </form>:<p role="status">O catálogo operacional usa Recebimento e as operações de estoque físico. Este painel preserva o histórico antigo.</p>}
     <div className="inventory-list-header"><h2>Últimas 50 movimentações</h2><button type="button" disabled={loading} onClick={load}>{loading?'Carregando...':'Atualizar histórico'}</button></div>
     {error&&<p role="alert">{error}</p>}
     <div className="ti-movements-filters"><label className="ti-movements-search">Buscar no histórico<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Produto, responsável ou motivo"/></label><div className="ti-movements-types" role="group" aria-label="Tipo de movimentação">{[['all','Todas'],['entry','Entradas'],['exit','Saídas']].map(([value,label])=><button type="button" key={value} aria-pressed={kind===value} onClick={()=>setKind(value)}>{label}</button>)}</div></div>

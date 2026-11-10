@@ -8,18 +8,26 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:rules": "node scripts/test-business-rules.mjs",
-    "test:push": "node --test tests/push-notifications.test.mjs"
+    "test:push": "node --test tests/push-notifications.test.mjs",
+    "test:browser": "node --test tests/v31-mobile-ux.test.mjs tests/notifications-module-mobile.test.mjs tests/firestore-read-mobile.test.mjs",
+    "test:emulator": "node scripts/test-emulator.mjs"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "recharts": "latest",
-    "lucide-react": "latest",
-    "firebase": "^12.4.0",
-    "firebase-admin": "^13.5.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "vite": "8.3.7",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "recharts": "3.10.1",
+    "lucide-react": "1.70.0",
+    "firebase": "12.19.0",
+    "firebase-admin": "13.10.0",
     "web-push": "4.0.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "firebase-tools": "14.2.0",
+    "playwright": "1.56.0"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
 }

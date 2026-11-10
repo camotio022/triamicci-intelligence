@@ -1,7 +1,7 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {useUnitLive} from './useUnitLive.js';
-import {auth} from './firebase.js';
 import {ArrowLeft,PackagePlus,ClipboardCheck,History} from 'lucide-react';
 import StockActions from './StockActions.jsx';
 import './product-detail-v41.css';
@@ -10,10 +10,7 @@ import {balancePresentation} from './operation-time.js';
 const qty=x=>Number(x).toLocaleString('pt-BR',{maximumFractionDigits:3});
 const date=x=>x?new Date(x).toLocaleString('pt-BR'):'Não registrada';
 async function request(action,productId){
- const token=await auth.currentUser?.getIdToken();
- if(!token)throw Error('Sessão expirada');
- const response=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,productId})});
- const body=await response.json();if(!response.ok)throw Error(body.message||'Não foi possível consultar o produto.');return body;
+ return requestJson('/api/operations/stock',{action,productId},{sessionMessage:'Sessão expirada',formatError:data=>data.message||'Não foi possível consultar o produto.'});
 }
 export default function ProductDetails({product,onBack,onAction,membership,onRefresh}){
  const [activity,setActivity]=useState([]),[lots,setLots]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[limited,setLimited]=useState(false);
@@ -45,7 +42,7 @@ export default function ProductDetails({product,onBack,onAction,membership,onRef
   {unitMismatch&&<p className="ti-product-unit-warning" role="alert">A contagem foi registrada em {b.unit}, enquanto o cadastro usa {product.unit}. As unidades não foram convertidas automaticamente; confira a configuração antes de movimentar.</p>}
   <div className="product-detail-actions ti-product-v41-primary">
    {['admin','manager','submanager','cook','auxiliar'].includes(membership.role)&&<button type="button" onClick={()=>onAction('receiving',product.id)}><PackagePlus size={20}/> Registrar recebimento</button>}
-   {['admin','manager','submanager'].includes(membership.role)&&<button type="button" onClick={()=>onAction('count',product.id)}><ClipboardCheck size={20}/> Fazer contagem</button>}
+   {MANAGEMENT_ROLES.includes(membership.role)&&<button type="button" onClick={()=>onAction('count',product.id)}><ClipboardCheck size={20}/> Fazer contagem</button>}
 
   </div>
   {b&&b.unit!==operationUnit&&<p role="alert" className="receiving-notice">A última contagem está em {b.unit}, mas a unidade operacional foi corrigida para {operationUnit}. Faça uma nova contagem antes de movimentar este produto.</p>}

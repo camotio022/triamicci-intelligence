@@ -17,6 +17,6 @@ jobs:
         run: node --test tests/mentor-lessons.test.js
       - name: Instalar dependencias
         run: |
-          if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
+          npm ci --no-audit --no-fund
       - name: Build
         run: npm run build

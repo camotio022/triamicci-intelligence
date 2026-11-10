@@ -1,11 +1,7 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
 import React,{useEffect,useState} from 'react';
-import {auth} from './firebase.js';
 async function call(path,action,args){
- const token=await auth.currentUser?.getIdToken();
- if(!token)throw Error('Sessão expirada.');
- const r=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...args})});
- const data=await r.json();if(!r.ok)throw Error(data.message||'Falha ao consultar.');return data;
+ return requestJson(path,{action,...args},{sessionMessage:'Sessão expirada.',formatError:data=>data.message||'Falha ao consultar.'});
 }
 export default function ManagerPackageReview({productId,conferenceId,opened=0,physicalUnit}){
  const [lots,setLots]=useState([]),[allot,setAllot]=useState({}),[measurements,setMeasurements]=useState([]),[review,setReview]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);

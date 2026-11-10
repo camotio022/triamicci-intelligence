@@ -1,0 +1,23 @@
+import {mock} from 'node:test';import assert from 'node:assert/strict';import {pathToFileURL,fileURLToPath} from 'node:url';
+const root=fileURLToPath(new URL('../../',import.meta.url));const libPath=root+'/server/_lib.js',real=await import(pathToFileURL(libPath));
+const productId='a'.repeat(40),uid='fixture-user',unitId='isolated',requestId='11111111-1111-4111-8111-111111111111';const base=`units/${unitId}`;
+const docs=new Map([['memberships/'+uid,{unitId,status:'active',role:'manager'}],[base+'/products/'+productId,{name:'Fixture',status:'active',unit:'un',quantity:10,trackExpiry:false}],[base+'/physicalBalances/'+productId,{unit:'un',reserve:3,rotation:2,total:5}],[base+'/storageBalancesV1/'+productId,{unit:'un',byStorage:{one:7},total:7}]]),writes=[];
+const ref=path=>({path,id:path.split('/').at(-1),collection:k=>ref(path+'/'+k),doc:(k='fixture-audit')=>ref(path+'/'+k),limit:()=>({path,query:true})}),snap=r=>({exists:docs.has(r.path),data:()=>docs.get(r.path)});
+const db={collection:k=>ref(k),doc:k=>ref(k),async runTransaction(fn){return fn({get:async r=>r.query?{docs:[],size:0}:snap(r),set(r,data,options){writes.push(r.path);docs.set(r.path,{...(options?.merge?docs.get(r.path):{}),...data})},update(r,data){writes.push(r.path);docs.set(r.path,{...docs.get(r.path),...data})},create(r,data){writes.push(r.path);docs.set(r.path,data)}})}};
+mock.module(libPath,{namedExports:{...real,getDb:()=>db,authenticate:async()=>({uid}),membership:async()=>docs.get('memberships/'+uid),checkRequest:()=>true}});
+globalThis.fetch=()=>{throw Error('NETWORK_FORBIDDEN')};const handler=(await import(pathToFileURL(root+'/api/stock/movements.js'))).default;
+let code,body;const res={setHeader(){},status(s){code=s;return this},json(b){body=b}};
+await handler({body:{action:'create',productId,type:'entry',amount:1.5,note:'Isolated audit',requestId},headers:{},method:'POST'},res);
+assert.equal(code,200);assert.equal(docs.get(base+'/products/'+productId).quantity,11.5);assert.equal(docs.get(base+'/physicalBalances/'+productId).total,5);assert.equal(docs.get(base+'/storageBalancesV1/'+productId).total,7);assert.ok(!writes.some(p=>p.includes('/live/')));
+const {validQuantity}=await import(pathToFileURL(root+'/server/operations/logic.js'));
+const {restaurantDay}=await import(pathToFileURL(root+'/server/schedules/restaurant-today.js'));
+const at=new Date('2026-11-10T01:00:00Z');const results=[{test:'legacy stock entry in a memory-only database',http:code,legacyQuantity:docs.get(base+'/products/'+productId).quantity,canonicalPhysicalTotal:5,storageTotal:7,liveSignalWritten:false,legacyAcceptsFractionOfUn:true,canonicalValidQuantityForSameInput:validQuantity(1.5,{unit:'un'}),calendarExample:{at:at.toISOString(),utcDay:at.toISOString().slice(0,10),restaurantDay:restaurantDay(at)},writes:[...writes]}];
+
+docs.set(base+'/products/'+productId,{name:'Fixture',status:'active',operationalCatalogVersion:'56-v1',quantity:0,unit:'un'});
+docs.delete(base+'/physicalBalances/'+productId);docs.set(base+'/v3PhysicalBalances/'+productId,{unit:'un',reserva:5,giro:0,total:5});
+const v3=(await import(pathToFileURL(root+'/server/operations/v3-service.js'))).default;
+code=null;body=null;await v3({body:{action:'v3ArchiveProduct',productId,active:false},headers:{},method:'POST'},res);
+assert.equal(code,200);assert.equal(docs.get(base+'/products/'+productId).status,'inactive');
+assert.equal(docs.get(base+'/v3PhysicalBalances/'+productId).total,5);
+results.push({test:'archive product with no canonical balance and nonzero supported legacy balance',http:code,resultingStatus:docs.get(base+'/products/'+productId).status,legacyBalanceTotal:5,canonicalBalanceExists:docs.has(base+'/physicalBalances/'+productId),message:body.message});
+console.log(JSON.stringify(results,null,2));

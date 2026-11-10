@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {chromium} from 'playwright';
+import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {chromium} from './helpers/browser.mjs';
 test('V4 actual screens render and interact at mobile and desktop widths',{timeout:90000},async()=>{
  const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4179','--strictPort'],{stdio:'pipe'});let browser;
  try{
@@ -12,7 +12,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      base.recipes.push({id:'isca-medida',name:'Isca de tilápia',stockEffect:'measured_transformation',outputProductId:'f'.repeat(40),outputUnit:'un',yieldQuantity:1,lines:[{productId:'e'.repeat(40),quantity:null,location:'reserva',substitutes:[]}]});
      base.blockedRecipes=[{id:'blocked',name:'Preparação bloqueada',errors:['Matéria-prima desativada no catálogo.']}];
     }
-    if(b.action==='list'&&route.request().url().includes('/api/products/manage'))base.products.push({id:'e'.repeat(40),name:'Tilápia em kg',unit:'kg',physicalUnit:'kg',status:'active'},{id:'f'.repeat(40),name:'Isca pronta',unit:'un',physicalUnit:'un',status:'active',lotTrackingMode:'per_lot'});
+    if(b.action==='list'&&(route.request().url().includes('/api/products/manage')||b.includeProducts&&route.request().url().includes('/api/production/manage')))base.products.push({id:'e'.repeat(40),name:'Tilápia em kg',unit:'kg',physicalUnit:'kg',status:'active'},{id:'f'.repeat(40),name:'Isca pronta',unit:'un',physicalUnit:'un',status:'active',lotTrackingMode:'per_lot'});
     if(b.action==='finish')finishes.push(b);
     if(b.module==='operationalCatalog'&&b.action==='status')base.items=[{id:'bacon',active:false,reason:'missing_profile',needsReconciliation:true,matches:[{id:'e'.repeat(40),name:'Bacon',configuration:{stockUnit:'un',operationalUnit:'un',receivingUnit:'kg',source:'supplier',trackExpiry:false,minStock:5,countFrequency:'daily',critical:true}}]}];
     if(b.action==='shipmentsList'){base.shipments=[{id:'closed',status:'approved',supplier:'Entrega recente',createdAt:new Date().toISOString(),lines:[]}];base.pendingShipments=[{id:'pending-old',status:'pending',supplier:'Pendência antiga de teste',createdAt:'2020-01-01T12:00:00Z',lines:[]}];base.pendingComplete=true;}
@@ -63,12 +63,13 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      assert.equal(await page.getByRole('heading',{name:'Operação da cozinha',exact:true}).count(),1);
      assert.equal(await page.getByText('Produção da semana passada',{exact:true}).count(),0);
      const ownReads=()=>reads.slice(beforeReads).filter(r=>r.action==='list'&&['/api/products/manage','/api/operations/stock'].includes(r.path)).length;
-     assert.equal(ownReads(),2,'Uma carga de catálogo e uma do resumo, sem duplicação inicial');
+     const initialReads=ownReads();assert.ok(initialReads>=1&&initialReads<=2,'Resumo deve carregar; catálogo pode reutilizar snapshot válido');
+     assert.equal(await page.getByText('Frango grelhado',{exact:true}).count()>0,true,'Catálogo correto continua visível mesmo quando reutilizado');
      await signal('stock-initial','attendance-changed');await page.waitForTimeout(150);
-     assert.equal(ownReads(),2,'Presença não recarrega estoque nem produção da cozinha');
+     assert.equal(ownReads(),initialReads,'Presença não recarrega estoque nem produção da cozinha');
      await signal('stock-changed','attendance-changed');
-     for(let n=0;n<30&&ownReads()<4;n++)await page.waitForTimeout(100);
-     assert.equal(ownReads(),4,'Mudança de estoque atualiza a cozinha uma única vez');
+     for(let n=0;n<100&&ownReads()<initialReads+2;n++)await page.waitForTimeout(100);
+     assert.equal(ownReads(),initialReads+2,'Mudança de estoque atualiza catálogo e resumo uma única vez');
      assert.deepEqual(errors,[],errors.join('\n'));
     }
     if(['Recebimento','Recebimento pendente','Recebimento com lote'].includes(screen))await page.getByRole('button',{name:'＋ Nova conferência',exact:true}).click();

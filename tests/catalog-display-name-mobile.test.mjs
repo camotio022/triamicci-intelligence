@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {chromium} from 'playwright';
+import {chromium} from './helpers/browser.mjs';
 
 test('catálogo usa nome configurado na lista, no título e após salvar e reabrir',{timeout:90000},async()=>{
  const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4194','--strictPort'],{stdio:'pipe'});let browser;

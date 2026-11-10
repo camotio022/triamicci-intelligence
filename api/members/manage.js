@@ -1,3 +1,5 @@
+import notifications from '../../server/team/notifications-handler.js';
+import {MANAGEMENT_ROLES} from '../../server/permissions/v31-policy.js';
 import {queuePush,tryDrainPush} from '../../server/push/delivery.js';
 import pushWorkflow from '../../server/push/handler.js';
 import {attachProfileAvatars} from '../../server/team/profile-avatar.js';
@@ -48,7 +50,7 @@ export default async function handler(req,res) {
     const db = getDb();
     const writePersonal=async(ref,data)=>db.runTransaction(async tx=>{const current=await tx.get(db.doc('memberships/'+actor.uid));if(!current.exists||current.data().status!=='active'||current.data().unitId!==actingMember.unitId)throw Error('FORBIDDEN');tx.set(ref,data,{merge:true});signalUnitChange(tx,db,actingMember.unitId,['team', 'profile', 'schedules', 'notifications'])});
     if(action==='masterRegistryActivate'){
-      if(!['admin','manager','submanager'].includes(actingMember.role))return send(res,403,'Apenas gerência ativa o Cadastro Mestre.');
+      if(!MANAGEMENT_ROLES.includes(actingMember.role))return send(res,403,'Apenas gerência ativa o Cadastro Mestre.');
       if(req.body?.confirm!==true)return send(res,400,'Confirmação obrigatória.');
       const unit=db.collection('units').doc(actingMember.unitId),snap=await unit.collection('staffRegistry').limit(200).get();
       const active=snap.docs.filter(d=>d.data().status==='active');
@@ -59,7 +61,7 @@ export default async function handler(req,res) {
       const now=new Date(),ref=unit.collection('configuration').doc('staffRegistry');
       await db.runTransaction(async tx=>{
         const a=await tx.get(db.collection('memberships').doc(actor.uid));
-        if(!a.exists||a.data().status!=='active'||a.data().unitId!==actingMember.unitId||!['admin','manager','submanager'].includes(a.data().role))throw Error('FORBIDDEN');
+        if(!a.exists||a.data().status!=='active'||a.data().unitId!==actingMember.unitId||!MANAGEMENT_ROLES.includes(a.data().role))throw Error('FORBIDDEN');
         tx.set(ref,{active:true,activatedAt:now,activatedBy:actor.uid,updatedAt:now});
         signalUnitChange(tx,db,actingMember.unitId,['team', 'profile', 'schedules', 'notifications']);
         tx.create(db.collection('auditLogs').doc(),{event:'staff.registry_activated',unitId:actingMember.unitId,actorUid:actor.uid,at:now,activeCount:active.length});
@@ -78,7 +80,7 @@ export default async function handler(req,res) {
       return send(res,200,'Solicitação enviada à gerência. O vínculo ainda não foi feito.');
     }
     if(action==='masterRegistryLink'){
-      if(!['admin','manager','submanager'].includes(actingMember.role))return send(res,403,'Somente gerência confirma vínculos.');
+      if(!MANAGEMENT_ROLES.includes(actingMember.role))return send(res,403,'Somente gerência confirma vínculos.');
       const {id,uid}=req.body||{};
       if(typeof id!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(id)||typeof uid!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(uid))return send(res,400,'Identificadores inválidos.');
       const unit=db.collection('units').doc(actingMember.unitId),ref=unit.collection('staffRegistry').doc(id),claim=unit.collection('staffRegistryClaims').doc(id+'_'+uid),account=db.collection('memberships').doc(uid);
@@ -100,12 +102,12 @@ export default async function handler(req,res) {
       return send(res,200,'Vínculo confirmado sem alterar permissões de acesso.');
     }
     if(action==='masterRegistryClaims'){
-      if(!['admin','manager','submanager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
+      if(!MANAGEMENT_ROLES.includes(actingMember.role))return send(res,403,'Sem permissão.');
       const snap=await db.collection('units').doc(actingMember.unitId).collection('staffRegistryClaims').limit(200).get();
       return send(res,200,'Solicitações de vínculo carregadas.',{claims:snap.docs.filter(d=>d.data().status==='pending').map(d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null}))});
     }
     if(action==='masterRegistryUpdate'){
-      if(!['admin','manager','submanager'].includes(actingMember.role))return send(res,403,'Apenas gerência edita fichas.');
+      if(!MANAGEMENT_ROLES.includes(actingMember.role))return send(res,403,'Apenas gerência edita fichas.');
       const {id,changes}=req.body||{};
       if(typeof id!=='string'||!(/^[A-Za-z0-9_-]{1,128}$/).test(id)||!changes||typeof changes!=='object'||Array.isArray(changes))return send(res,400,'Dados inválidos.');
       const allowed=['jobTitle','sector','shift','fixedWeekday','status','skills','certifications','availability','notes'];
@@ -136,7 +138,7 @@ export default async function handler(req,res) {
       return found?send(res,200,'Ficha atualizada sem modificar conta de acesso.'):send(res,404,'Ficha não encontrada.');
     }
     if(action==='masterRegistryPreview'||action==='masterRegistryImport'){
-      if(!['admin','manager','submanager'].includes(actingMember.role))return send(res,403,'Apenas gerência pode revisar colaboradores.');
+      if(!MANAGEMENT_ROLES.includes(actingMember.role))return send(res,403,'Apenas gerência pode revisar colaboradores.');
       const unit=db.collection('units').doc(actingMember.unitId),registryRef=unit.collection('staffRegistry');
       const [staff,accounts]=await Promise.all([registryRef.limit(200).get(),db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get()]);
       if(staff.size>=200||accounts.size>200)return send(res,409,'Limite de conferência atingido; importação bloqueada.');
@@ -160,7 +162,7 @@ export default async function handler(req,res) {
       return send(res,201,'Fichas criadas sem contas de acesso. Nenhum perfil anterior foi modificado.',{created:chosen.length});
     }
     if(action==='rosterList'){
-      if(!['admin','manager','submanager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
+      if(!MANAGEMENT_ROLES.includes(actingMember.role))return send(res,403,'Sem permissão.');
       const snap=await db.collection('units').doc(actingMember.unitId).collection('rosterEntries').limit(200).get();
       const active=await db.collection('memberships').where('unitId','==',actingMember.unitId).limit(201).get();
       const connected=new Set(active.docs.filter(d=>d.data().status==='active').map(d=>String(d.data().email||'').trim().toLowerCase()));
@@ -170,7 +172,7 @@ export default async function handler(req,res) {
       }))});
     }
     if(action==='rosterCreate'){
-      if(!['admin','manager','submanager'].includes(actingMember.role))return send(res,403,'Sem permissão.');
+      if(!MANAGEMENT_ROLES.includes(actingMember.role))return send(res,403,'Sem permissão.');
       const entry=validateRosterEntry(req.body?.entry,actingMember.role);
       if(!entry)return send(res,400,'Confira nome, e-mail, cargo, setor e permissões.');
       if(!entry.email)return send(res,400,'Informe o e-mail para evitar cadastros duplicados e vincular o futuro convite.');
@@ -236,47 +238,8 @@ export default async function handler(req,res) {
       await ref.create({uid:actor.uid,unitId:actingMember.unitId,skill,reason:reason.trim(),status:'pending',createdAt:new Date()});
       return send(res,200,'Solicitação registrada para avaliação da gerência.');
     }
-    if(action==='notifications'){
-      // Per-user records only; keep original operational data and audit entries intact.
-      const snap=await db.collection('units').doc(actingMember.unitId).collection('memberNotifications').doc(actor.uid).collection('items').orderBy('at','desc').limit(100).get();
-      const asISO=value=>value?.toDate?.()?.toISOString?.()||null;
-      return send(res,200,'Notificações carregadas.',{notifications:snap.docs.map(d=>{
-       const n=d.data();
-       return {id:d.id,title:n.title||'Alteração profissional',message:n.message||'',read:!!n.read,
-        at:asISO(n.at),readAt:asISO(n.readAt),openedAt:asISO(n.openedAt),
-        deletedAt:asISO(n.deletedAt),source:n.source||n.event||'Equipe',
-        reference:n.reference||n.registryId||n.targetUid||null,
-        page:['my-profile','leave-requests','people','kitchen-v3','mural'].includes(n.page)?n.page:null};
-      })});
-    }
-    if(['notificationRead','notificationOpen','notificationDelete','notificationRestore'].includes(action)){
-      const id=req.body?.id;
-      if(typeof id!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(id))return send(res,400,'Aviso inválido.');
-      const ref=db.collection('units').doc(actingMember.unitId).collection('memberNotifications').doc(actor.uid).collection('items').doc(id);
-      const now=new Date();
-      let found=false,changed=false;
-      await db.runTransaction(async tx=>{
-       const active=await tx.get(db.doc('memberships/'+actor.uid));
-       if(!active.exists||active.data().status!=='active'||active.data().unitId!==actingMember.unitId)throw Error('FORBIDDEN');
-       const snap=await tx.get(ref);if(!snap.exists)return;
-       found=true;
-       const n=snap.data(),deleted=!!n.deletedAt;
-       if(action==='notificationRestore'&&!deleted)return;
-       if(action==='notificationDelete'&&deleted)return;
-       if(['notificationRead','notificationOpen'].includes(action)&&deleted)return;
-       const patch=action==='notificationDelete'?{deletedAt:now}:
-        action==='notificationRestore'?{deletedAt:null}:
-        action==='notificationOpen'?{openedAt:n.openedAt||now,read:true,readAt:n.readAt||now}:
-        {read:true,readAt:n.readAt||now};
-       tx.update(ref,patch);changed=true;
-       signalUnitChange(tx,db,actingMember.unitId,['notifications']);
-      });
-      if(!found)return send(res,404,'Aviso não encontrado.');
-      if(!changed)return send(res,409,'O aviso já está neste estado ou está na lixeira.');
-      return send(res,200,action==='notificationDelete'?'Aviso movido para a lixeira.':action==='notificationRestore'?'Aviso restaurado.':'Aviso atualizado.');
-    }
-    if(!['admin','manager','submanager'].includes(actingMember.role))
-      return send(res,403,'Sem permissão para gerir colaboradores.');
+    if(['notifications','notificationRead','notificationOpen','notificationDelete','notificationRestore'].includes(action))return await notifications(req,res,{db,actor,actingMember});
+    if(!MANAGEMENT_ROLES.includes(actingMember.role))return send(res,403,'Sem permissão para gerir colaboradores.');
     if(action==='skillReviewList'){
       const snap=await db.collection('units').doc(actingMember.unitId).collection('skillReviewRequests').orderBy('createdAt','desc').limit(60).get();
       return send(res,200,'Solicitações de habilidades consultadas.',{requests:snap.docs.map(d=>({
@@ -375,7 +338,7 @@ export default async function handler(req,res) {
       const currentActor = actorSnap.data();
       const target = targetSnap.data();
       if (!currentActor || currentActor.status !== 'active' ||
-          !['admin','manager','submanager'].includes(currentActor.role) ||
+          !MANAGEMENT_ROLES.includes(currentActor.role) ||
           currentActor.unitId !== actingMember.unitId)
         throw new Error('FORBIDDEN');
       if (!target || target.unitId !== currentActor.unitId) throw new Error('NOT_FOUND');

@@ -1,13 +1,10 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {auth} from './firebase.js';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import {rosterToday,liveShiftState} from '../server/schedules/restaurant-today.js';
 async function request(module,action,extra={}){
- const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');
- const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module,action,...extra})});
- const d=await r.json();if(!r.ok)throw Error(d.message||'Dados indisponíveis.');return d;
+ return requestJson('/api/members/manage',{module,action,...extra},{sessionMessage:'Sessão expirada.',formatError:data=>data.message||'Dados indisponíveis.'});
 }
 export default function TeamTodayV31({unitId}){
  const [correction,setCorrection]=useState({targetUid:'',workDay:restaurantDay(),status:'working',reason:''}),[correctionBusy,setCorrectionBusy]=useState(false),[correctionNotice,setCorrectionNotice]=useState('');

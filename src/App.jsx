@@ -1,7 +1,7 @@
-import Checklists from './Checklists.jsx';
+const Checklists=lazy(()=>import('./Checklists.jsx'));
 import {apiFetch} from './api-fetch.js';
 import {readViewCache,writeViewCache} from './fastCache.js';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {FeedbackProvider} from './FeedbackProvider.jsx';
 import NotificationCenter,{NotificationProvider,NotificationsPage} from './NotificationCenter.jsx';
 import MyProfessionalProfile from './MyProfessionalProfile.jsx';
@@ -12,13 +12,13 @@ import DailyInventory from './DailyInventory.jsx';
 import AuthGate from './AuthGate.jsx';
 import TeamManagement from './TeamManagement.jsx';
 import PeopleHub from './PeopleHub.jsx';
-import TriamicciMentor from './TriamicciMentor.jsx';
+const TriamicciMentor=lazy(()=>import('./TriamicciMentor.jsx'));
 import MasterRegistry from './MasterRegistry.jsx';
 import TeamProfiles from './TeamProfiles.jsx';
 import SchedulePlanner from './SchedulePlanner.jsx';
 import LeaveRequests from './LeaveRequests.jsx';
 import TeamMural from './TeamMural.jsx';
-import LabelsManager from './LabelsManager.jsx';
+const LabelsManager=lazy(()=>import('./LabelsManager.jsx'));
 import Inventory from './Inventory.jsx';
 import KitchenHome from './KitchenHome.jsx';
 import Production from './Production.jsx';
@@ -28,35 +28,9 @@ import './kitchen.css';
 import './v4-foundation.css';
 import {isManagement,canAccessPage} from '../server/permissions/v31-policy.js';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
-import Dashboard from './Dashboard.jsx';
-import TriamicciLogo from './TriamicciLogo.jsx';
 import SidebarPremium from './SidebarPremium.jsx';
 import {auth,isIndependentSession} from './firebase.js';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { LayoutDashboard, Package, TrendingUp, Wallet, Bell, Search, ChevronDown, ArrowUpRight, ArrowDownRight, AlertTriangle, Clock3, Boxes, CircleDollarSign, Menu, Users, X, BookOpen } from 'lucide-react';
-
-const consumption = [
-  { day: 'Seg', saida: 420, entrada: 260 }, { day: 'Ter', saida: 360, entrada: 310 },
-  { day: 'Qua', saida: 510, entrada: 280 }, { day: 'Qui', saida: 390, entrada: 350 },
-  { day: 'Sex', saida: 620, entrada: 410 }, { day: 'Sáb', saida: 720, entrada: 490 },
-  { day: 'Dom', saida: 560, entrada: 300 },
-];
-const categories = [{name:'Proteínas',value:38},{name:'Hortifruti',value:26},{name:'Laticínios',value:20},{name:'Outros',value:16}];
-const items = [
-  {name:'Peito de frango',category:'Proteínas',stock:'4,2 kg',status:'Estoque baixo',tone:'warning'},
-  {name:'Queijo mussarela',category:'Laticínios',stock:'2,8 kg',status:'Estoque baixo',tone:'warning'},
-  {name:'Tomate italiano',category:'Hortifruti',stock:'12 kg',status:'Disponível',tone:'good'},
-  {name:'Óleo de soja',category:'Mercearia',stock:'1,5 L',status:'Crítico',tone:'danger'},
-  {name:'Batata congelada',category:'Congelados',stock:'18 kg',status:'Disponível',tone:'good'},
-];
-const money = n => n.toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
-
-function Metric({icon:Icon,label,value,change,positive=true,detail}) {
-  return <article className="metric-card">
-    <div className="metric-top"><span className="metric-icon"><Icon size={19}/></span><span className={positive?'change positive':'change negative'}>{positive?<ArrowUpRight size={14}/>:<ArrowDownRight size={14}/>} {change}</span></div>
-    <p className="metric-label">{label}</p><strong className="metric-value">{value}</strong><p className="metric-detail">{detail}</p>
-  </article>;
-}
 
 export default function App() {
  return <FeedbackProvider><AuthGate>{({ user, membership, logout }) => <Workspace key={user.uid+":"+membership.unitId+":"+membership.role} user={user} membership={membership} logout={logout} />}</AuthGate></FeedbackProvider>;
@@ -150,7 +124,7 @@ function WorkspaceContent({ user, membership, logout }) {
       <button type="button" className="ti-mobile-more" onClick={()=>setMenuOpen(true)} aria-label="Ver todos os módulos">Mais módulos</button>
     </nav>
     {mentorHint&&<aside className="ti-mentor-context" role="status"><div><strong>{mentorHint.title}</strong><p>{mentorHint.body}</p></div><button type="button" onClick={()=>{navigate("mentor");setMentorHint(null)}}>Voltar ao mentor</button><button type="button" aria-label="Fechar orientação" onClick={()=>setMentorHint(null)}>×</button></aside>}
-    {page === "notifications" ? <NotificationsPage role={membership.role} onNavigate={navigate}/> : page === "checklists" ? <Checklists membership={membership}/> : page === "mentor" ? <TriamicciMentor membership={membership} user={user} onOpenStep={openMentorStep} initialPage={mentorSource}/> : page === "leave-requests" ? <LeaveRequests membership={membership}/> : page === "labels" ? <LabelsManager membership={membership} onBack={()=>navigate("mural")}/> : page === "mural" ? <TeamMural membership={membership} onLabels={()=>navigate("labels")} onOpenProduction={taskId=>{setProductionTaskId(taskId);navigate("production");}}/> : page === "schedule-planning" ? <SchedulePlanner membership={membership}/> : page === "kitchen" ? <KitchenHome membership={membership} navigate={navigate}/> : page === "production" ? <Production membership={membership} initialTaskId={productionTaskId}/> : page === "storages" ? <StorageManager membership={membership}/> : page === "kitchen-v3" ? <KitchenV3 membership={membership}/> : page === "daily-inventory" ? <DailyInventory membership={membership}/> : page === "history" ? <PhysicalStock membership={membership} mode="history" initialProductId={actionProductId}/> : page === "catalog" ? <Inventory membership={membership} mode="catalog"/> : page === "receiving" ? <PhysicalStock membership={membership} mode="receive" initialProductId={actionProductId}/> : page === "count" ? <StockConference membership={membership} initialProductId={actionProductId}/> : page === "my-profile" ? <section className="ti-my-profile-page"><MyProfessionalProfile membership={membership} attendance={<MyAttendanceV31 unitId={membership.unitId}/>} /></section> : page === "people" ? <PeopleHub user={user} membership={membership}/> : page === "master-registry" ? <MasterRegistry membership={membership}/> : page === "team" ? <TeamManagement user={user} membership={membership} /> : page === "skills" ? <TeamProfiles membership={membership} initialTab="matrix"/> : page === "shifts" ? <TeamProfiles membership={membership} initialTab="shifts"/> : page === "inventory" ? <Inventory membership={membership} onAction={openProductAction} /> : <KitchenHome membership={membership} navigate={navigate} />}
+    <Suspense fallback={<p role="status">Carregando tela…</p>}>{page === "notifications" ? <NotificationsPage role={membership.role} onNavigate={navigate}/> : page === "checklists" ? <Checklists membership={membership}/> : page === "mentor" ? <TriamicciMentor membership={membership} user={user} onOpenStep={openMentorStep} initialPage={mentorSource}/> : page === "leave-requests" ? <LeaveRequests membership={membership}/> : page === "labels" ? <LabelsManager membership={membership} onBack={()=>navigate("mural")}/> : page === "mural" ? <TeamMural membership={membership} onLabels={()=>navigate("labels")} onOpenProduction={taskId=>{setProductionTaskId(taskId);navigate("production");}}/> : page === "schedule-planning" ? <SchedulePlanner membership={membership}/> : page === "kitchen" ? <KitchenHome membership={membership} navigate={navigate}/> : page === "production" ? <Production membership={membership} initialTaskId={productionTaskId}/> : page === "storages" ? <StorageManager membership={membership}/> : page === "kitchen-v3" ? <KitchenV3 membership={membership}/> : page === "daily-inventory" ? <DailyInventory membership={membership}/> : page === "history" ? <PhysicalStock membership={membership} mode="history" initialProductId={actionProductId}/> : page === "catalog" ? <Inventory membership={membership} mode="catalog"/> : page === "receiving" ? <PhysicalStock membership={membership} mode="receive" initialProductId={actionProductId}/> : page === "count" ? <StockConference membership={membership} initialProductId={actionProductId}/> : page === "my-profile" ? <section className="ti-my-profile-page"><MyProfessionalProfile membership={membership} attendance={<MyAttendanceV31 unitId={membership.unitId}/>} /></section> : page === "people" ? <PeopleHub user={user} membership={membership}/> : page === "master-registry" ? <MasterRegistry membership={membership}/> : page === "team" ? <TeamManagement user={user} membership={membership} /> : page === "skills" ? <TeamProfiles membership={membership} initialTab="matrix"/> : page === "shifts" ? <TeamProfiles membership={membership} initialTab="shifts"/> : page === "inventory" ? <Inventory membership={membership} onAction={openProductAction} /> : <KitchenHome membership={membership} navigate={navigate} />}</Suspense>
     <footer className="footer"><span>© 2026 Triamicci Intelligence</span><span>Triamicci Intelligence · dados operacionais do Firebase</span></footer>
   </main>
  </div>;

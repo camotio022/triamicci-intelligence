@@ -1,3 +1,5 @@
+import {restaurantDay} from '../shared/operation-day.js';
+import {requestJson} from './api-client.js';
 import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import {liveShiftState} from '../server/schedules/restaurant-today.js';
@@ -7,9 +9,7 @@ import './my-journey-v41.css';
 import './my-journey-v5.css';
 const actions={not_started:['clock_in','Registrar entrada'],working:['break_start','Iniciar intervalo'],on_break:['break_end','Retornar do intervalo'],finished:[]};
 async function call(action,extra={}){
- const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');
- const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'attendanceV31',action,...extra})});
- const data=await r.json();if(!r.ok)throw Error(data.message||'Não foi possível registrar.');return data;
+ return requestJson('/api/members/manage',{module:'attendanceV31',action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Não foi possível registrar.'});
 }
 export default function MyAttendanceV31({unitId}){
  const [mySchedules,setMySchedules]=useState([]);
@@ -17,7 +17,7 @@ export default function MyAttendanceV31({unitId}){
  const [profile,setProfile]=useState(null),[clock,setClock]=useState('00:00'),[record,setRecord]=useState(null),[day,setDay]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const reload=useCallback(async()=>{try{const d=await call('today');setRecord(d.record);setDay(d.day)}catch(e){setError(e.message)}},[]);
  const refreshProfile=async()=>{try{const token=await auth.currentUser?.getIdToken();if(!token)return false;const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'myProfile'})});const d=await r.json();if(!r.ok)throw Error(d.message);setProfile(d.professional||null);return true}catch(e){setError(e.message);return false}};
- useEffect(()=>{let lastDate=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());const update=()=>{const date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());if(date!==lastDate){lastDate=date;reload();refreshSchedule().catch(e=>setError(e.message));}setClock(new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));};update();const timer=setInterval(update,30000);return()=>clearInterval(timer)},[]);
+ useEffect(()=>{let lastDate=restaurantDay(new Date());const update=()=>{const date=restaurantDay(new Date());if(date!==lastDate){lastDate=date;reload();refreshSchedule().catch(e=>setError(e.message));}setClock(new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()));};update();const timer=setInterval(update,30000);return()=>clearInterval(timer)},[]);
  const refreshSchedule=async()=>{const token=await auth.currentUser?.getIdToken();if(!token)return;const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action:'mine'})});const d=await r.json();if(!r.ok)throw Error(d.message);setMySchedules(d.schedules||[])};
  useUnitLive(unitId,(_initial,changes)=>Promise.all([!changes||changes.includes('attendance')?reload():true,!changes||changes.some(x=>['schedules','team'].includes(x))?refreshSchedule():true,!changes||changes.some(x=>['profile','team'].includes(x))?refreshProfile():true]),{domains:['attendance','schedules','team','profile']});
 
@@ -37,7 +37,7 @@ export default function MyAttendanceV31({unitId}){
  };
  const returnedFromBreak=hasEvent('break_end');
  const next=status==='working'&&returnedFromBreak?['clock_out','Encerrar jornada']:actions[status];
- const operationalDay=day||new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());
+ const operationalDay=day||restaurantDay(new Date());
  const publishedEntries=mySchedules.flatMap(s=>s.entries||[]).sort((a,b)=>a.date.localeCompare(b.date));
  const todayEntry=publishedEntries.find(e=>e.date===operationalDay);
  const nextEntry=publishedEntries.find(e=>e.date>operationalDay&&e.type==='work');
@@ -58,7 +58,7 @@ export default function MyAttendanceV31({unitId}){
  const dateLabel=date=>date?.split('-').reverse().join('/')||'—';
  const typeLabel={work:'Trabalho',off:'Folga',monthly_sunday:'Domingo de folga',leave:'Ausência'};
 
- const live=liveShiftState({day:day||new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),clock,employee:todayEntry?.type==='work'||['working','on_break'].includes(record?.status)?profile||{}:{},attendance:record});
+ const live=liveShiftState({day:day||restaurantDay(new Date()),clock,employee:todayEntry?.type==='work'||['working','on_break'].includes(record?.status)?profile||{}:{},attendance:record});
  const labels={not_started:'Entrada ainda não registrada',working:'Entrada declarada · aguardando confirmação presencial',on_break:'Intervalo declarado',finished:'Saída declarada · aguardando confirmação'};
  const submit=async(action=next?.[0])=>{if(!action||busy)return;setBusy(true);setError('');setNotice('');try{const d=await call(action,{requestId:crypto.randomUUID()});setRecord(p=>({...p,status:d.status,events:[...(p?.events||[]),{action,at:new Date().toISOString()}]}));setNotice('Declaração registrada. A confirmação da presença física depende de validação no estabelecimento.');await reload()}catch(e){setError(e.message)}finally{setBusy(false)}};
  return <section className="ti-attendance-v31 ti-attendance-v5" aria-label="Minha jornada">

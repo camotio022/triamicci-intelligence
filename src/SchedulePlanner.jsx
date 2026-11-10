@@ -1,3 +1,5 @@
+import {requestJson} from './api-client.js';
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import {coverageTimeline} from '../server/schedules/coverage-timeline.js';
 import {useUnitLive} from './useUnitLive.js';
@@ -6,12 +8,11 @@ import {generateMonthlyRoster,weekdayOccurrences,weekdayOf,WEEKDAY_LABELS} from 
 import {auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';import './roster-mobile-day.css';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 async function call(action,extra={}){
- const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
- const token=await user.getIdToken();
- const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action,...extra})});
- const d=await r.json();if(!r.ok)throw Error([d.message,...(d.issues||[]).slice(0,5)].join(' · '));return d;
+ return requestJson('/api/members/manage',{module:'schedules',action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>[data.message,...(data.issues||[]).slice(0,5)].join(' · ')});
 }
-async function coverageApi(){const token=await auth.currentUser?.getIdToken();const r=await apiFetch('/api/coverage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'dashboard'})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
+async function coverageApi(){
+ return requestJson('/api/coverage/manage',{action:'dashboard'},{sessionMessage:'Faça login novamente.',formatError:data=>data.message});
+}
 async function membersApi(){
  const token=await auth.currentUser?.getIdToken();const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'profiles'})});const d=await r.json();if(!r.ok)throw Error(d.message);const staff=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryPreview'})});const sd=await staff.json();if(!staff.ok)throw Error(sd.message||'Cadastro Mestre indisponível.');return {activated:!!sd.activated,registeredCount:(sd.registry||[]).filter(p=>p.status==='active').length,people:sd.activated?(sd.registry||[]).filter(p=>p.status==='active').map(p=>({uid:p.id,accountUid:p.accountUid||null,name:p.name,status:p.status,professional:{sector:p.sector,shift:p.shift,availability:p.availability||[],jobTitle:p.jobTitle,skills:p.skills||[],certifications:p.certifications||[]},fixedWeekday:p.fixedWeekday,registry:true})):d.members||[]};
 }
@@ -26,7 +27,7 @@ export default function SchedulePlanner({membership}){
  const [today,setToday]=useState(()=>restaurantDay());
  useEffect(()=>{const interval=setInterval(()=>setToday(restaurantDay()),60000);return()=>clearInterval(interval)},[]);
  const [uid,setUid]=useState(''),[date,setDate]=useState(''),[type,setType]=useState('work'),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
- const allowed=['admin','manager','submanager'].includes(membership.role);
+ const allowed=MANAGEMENT_ROLES.includes(membership.role);
  const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,f,l,c]=await Promise.all([call('list'),membersApi(),call('fixedOffList'),call('leaveList'),coverageApi()]);setCoverageRules(c.requirements||[]);setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})})}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useUnitLive(membership?.unitId,initial=>refresh(!initial),{domains:['schedules','team','coverage'],refreshKey:membership.role});
 

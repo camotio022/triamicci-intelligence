@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {chromium} from 'playwright';
+import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {chromium} from './helpers/browser.mjs';
 test('salvar preparação disponibiliza e seleciona a ficha na produção de hoje sem segunda aprovação',{timeout:90000},async()=>{
  const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4193','--strictPort'],{stdio:'pipe'});let browser;
  try{for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:4193/qa/v4-mobile.html')).ok)break}catch{}await new Promise(r=>setTimeout(r,100));}browser=await chromium.launch({headless:true});

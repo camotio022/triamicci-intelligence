@@ -9,7 +9,7 @@ const options=(action='list',token='user-a')=>({method:'POST',headers:{authoriza
 const response=()=>new Response(JSON.stringify({products:[{id:'test'}]}),{headers:{'content-type':'application/json'}});
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r});return {promise,resolve}};
 test('parallel read callers share transport but each can consume its Response',async()=>{
- let calls=0;const pending=deferred();const fetcher=createApiFetch(async()=>{calls++;await pending.promise;return response()});
+ let calls=0;const pending=deferred();const fetcher=createApiFetch(async()=>{calls++;await pending.promise;return response()},{cacheMs:0});
  const a=fetcher('/api/products/manage',options()),b=fetcher('/api/products/manage',options());assert.equal(calls,1);pending.resolve();
  const [r,s]=await Promise.all([a,b]);assert.deepEqual(await r.json(),await s.json());
  await fetcher('/api/products/manage',options());assert.equal(calls,2,'Settled responses are not reused as current balances');

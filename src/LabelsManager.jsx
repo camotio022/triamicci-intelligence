@@ -1,7 +1,9 @@
+import {requestJson} from './api-client.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
-import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useState} from 'react';import {auth} from './firebase.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './labels-mobile.css';import PrintableLabel from './PrintableLabel.jsx';
-async function call(module,action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada.');const r=await apiFetch(module==='products'?'/api/products/manage':'/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(module==='products'?{action,...extra}:{module,action,...extra})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
+async function call(module,action,extra={}){
+ return requestJson(module==='products'?'/api/products/manage':'/api/members/manage',module==='products'?{action,...extra}:{module,action,...extra},{sessionMessage:'Sessão expirada.',formatError:data=>data.message});
+}
 const cat={massas:'Massas',carnes:'Carnes',outros:'Outros'},locations={reserva:'Reserva',giro:'Giro'};
 export default function LabelsManager({membership,onBack}){
  const {notify}=useFeedback(),[labels,setLabels]=useState([]),[policies,setPolicies]=useState([]),[products,setProducts]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[details,setDetails]=useState(null);

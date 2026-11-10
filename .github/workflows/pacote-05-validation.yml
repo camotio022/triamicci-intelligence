@@ -15,7 +15,7 @@ jobs:
           node-version: '24'
       - name: Dependências
         run: |
-          if test -f package-lock.json; then npm ci; else npm install --no-audit --no-fund; fi
+          npm ci --no-audit --no-fund
       - name: Regras de equipe
         run: node --test tests/team-profile.test.js tests/ux-team.test.js tests/personal-profile.test.js tests/roster-entry.test.js tests/sector-skills.test.js tests/schedules-rules.test.js tests/monthly-roster-generator.test.js tests/master-registry.test.js tests/mural-view.test.js tests/labels-rules.test.js
       - name: Verificar API

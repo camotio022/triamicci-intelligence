@@ -19,3 +19,13 @@ export function createLiveHub(listen){
   return()=>{channel.subscribers.delete(callback);if(!channel.subscribers.size){channel.stop?.();channels.delete(key)}};
  }};
 }
+
+// Each delivery is shared by all subscribers of the same Firestore listener.
+// A global cache invalidation must run once per delivery, not once per mounted page.
+const invalidatedDeliveries=new WeakSet();
+export function invalidateOncePerDelivery(delivery,invalidate){
+ if(!delivery||typeof delivery!=='object'||invalidatedDeliveries.has(delivery))return false;
+ invalidatedDeliveries.add(delivery);
+ invalidate();
+ return true;
+}

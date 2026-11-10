@@ -1,4 +1,4 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {auth} from './firebase.js';
@@ -13,11 +13,7 @@ const skills={preparo:'Preparo',montagem:'Montagem',chapa:'Chapa',vitrine:'Vitri
 const shifts={manha:'Manhã',noite:'Noite',intermediario:'Intermediário',variavel:'Variável'};
 const blank={displayName:'',bio:'',developmentGoal:'',preferredShift:''};
 async function api(action,extra={}){
- const user=auth.currentUser;if(!user)throw Error('Faça login novamente.');
- const token=await user.getIdToken();
- const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
- const data=await response.json();if(!response.ok)throw Error(data.message||'Não foi possível concluir.');
- return data;
+ return requestJson('/api/members/manage',{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Não foi possível concluir.'});
 }
 export default function MyProfessionalProfile({membership,attendance=null}){
  const {notify}=useFeedback(),[profile,setProfile]=useState(null),[personal,setPersonal]=useState(blank),[recognition,setRecognition]=useState(null);

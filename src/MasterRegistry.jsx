@@ -1,17 +1,14 @@
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
 import {useDialogFocus} from './useDialogFocus.js';
 import {useUnitLive} from './useUnitLive.js';
 import {useViewState} from './useViewState.js';
 import React,{useCallback,useEffect,useState,useRef} from 'react';
-import {auth} from './firebase.js';
 import './master-registry.css';
 const skillOptions={cozinha:['preparo','montagem','chapa','recebimento','estoque','etiquetagem'],frente:['vitrine','vendas','ifood'],caixa:['caixa','vendas','ifood'],apoio:['recebimento','estoque','etiquetagem','montagem'],gestao:['lideranca','recebimento','estoque','etiquetagem']};
 const days=['Domingo','Segunda','Terça','Quarta','Quinta'];
 const states={existing:'Ficha existente',needs_review:'Possível conta existente',ambiguous:'Duplicidade',new:'Sem correspondência'};
 async function api(action,extra={}){
- const token=await auth.currentUser?.getIdToken();
- const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
- const data=await r.json();if(!r.ok)throw Error(data.message||'Erro ao consultar cadastro.');return data;
+ return requestJson('/api/members/manage',{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Erro ao consultar cadastro.'});
 }
 export default function MasterRegistry({membership={}}){
  const [query,setQuery]=useViewState('master:query',membership.unitId,''),[statusFilter,setStatusFilter]=useViewState('master:status',membership.unitId,'active');

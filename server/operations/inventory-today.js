@@ -1,10 +1,11 @@
+import {restaurantDay} from '../../shared/operation-day.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from './catalog-identity.js';
 import dailyReport from './daily-report.js';
 import {todayCountPage} from './today-count-page.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
-const dayInUnit=at=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(at));
+const dayInUnit=restaurantDay;
 // IncomingMessage expõe headers por getter herdado; espalhar req perde a autenticação.
 export function requestForReport(req,productId){return {method:req.method,headers:req.headers,body:{action:'dailyReport',productId}};}
 export default async function handler(req,res){

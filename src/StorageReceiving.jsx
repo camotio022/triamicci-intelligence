@@ -1,14 +1,11 @@
+import {requestJson} from './api-client.js';
 import React,{useEffect,useMemo,useState} from 'react';
 import {X,Truck,ClipboardCheck} from 'lucide-react';
-import {auth} from './firebase.js';
-import {apiFetch} from './api-fetch.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import './storage-manager.css';
 const codeOf=p=>p?.operationalUnitOverride||p?.profile?.countUnit||p?.operationalUnit||p?.unit||'un';
 async function api(action,extra={}){
- const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');
- const response=await apiFetch('/api/operations/stock',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});
- const data=await response.json();if(!response.ok)throw Error(data.message||'Recebimento indisponível.');return data;
+ return requestJson('/api/operations/stock',{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Recebimento indisponível.'});
 }
 export default function StorageReceiving({membership,products,storages,links,onClose,onChange}){
  const [list,setList]=useState({receipts:[],pending:[],orders:[]}),[supplier,setSupplier]=useState(''),[orderId,setOrderId]=useState(''),[productId,setProductId]=useState(''),[quantity,setQuantity]=useState(''),[lot,setLot]=useState(''),[expiry,setExpiry]=useState(''),[notes,setNotes]=useState(''),[reason,setReason]=useState({}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[loading,setLoading]=useState(true),[showForm,setShowForm]=useState(false);

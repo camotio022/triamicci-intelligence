@@ -1,3 +1,4 @@
+import {MANAGEMENT_ROLES} from '../permissions/v31-policy.js';
 import {createHash} from 'node:crypto';
 export const deviceId=endpoint=>createHash('sha256').update(endpoint).digest('hex');
 // Only browser push services may be contacted; never accept arbitrary URLs (SSRF).
@@ -11,7 +12,7 @@ export function validSubscription(value){
  }catch{return false}
 }
 export function allowedRecipient(member,unitId,audience){
- return member?.status==='active'&&member.unitId===unitId&&(audience!=='managers'||['admin','manager','submanager'].includes(member.role));
+ return member?.status==='active'&&member.unitId===unitId&&(audience!=='managers'||MANAGEMENT_ROLES.includes(member.role));
 }
 export function noticeUrl(page,unitId){
  const safe=['my-profile','leave-requests','people','kitchen-v3','mural'];

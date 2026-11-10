@@ -1,14 +1,15 @@
-import {isManagement} from '../server/permissions/v31-policy.js';
-import {apiFetch} from './api-fetch.js';
+import {requestJson} from './api-client.js';
+import {MANAGEMENT_ROLES,isManagement} from '../server/permissions/v31-policy.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {auth} from './firebase.js';
 import {rateRoleFor} from '../server/coverage/engine.js';
 import './coverage.css';
 const sectors={cozinha:'Cozinha',frente:'Frente',caixa:'Caixa',apoio:'Apoio',gestao:'Gestão'};
 const roleNames={manager:'Gerente',submanager:'Subgerente',head_cook:'Cozinheiro-chefe',cook:'Cozinheiro',other:'Outros funcionários',external:'Convocado de fora'};
 const money=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-async function request(action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');const r=await apiFetch('/api/coverage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});const d=await r.json();if(!r.ok)throw Error([d.message,...(d.issues||[])].join(' · '));return d;}
+async function request(action,extra={}){
+ return requestJson('/api/coverage/manage',{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>[data.message,...(data.issues||[])].join(' · ')});
+}
 export default function CoverageConsole({membership}){
  const [data,setData]=useState(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const [planId,setPlanId]=useState(''),[date,setDate]=useState(''),[windowStart,setWindowStart]=useState('12:00'),[windowEnd,setWindowEnd]=useState('14:00'),[sector,setSector]=useState('cozinha'),[requiredSkill,setRequiredSkill]=useState(''),[required,setRequired]=useState(4),[simulation,setSimulation]=useState(null);
@@ -22,7 +23,7 @@ export default function CoverageConsole({membership}){
  const plan=useMemo(()=>data?.plans.find(p=>p.id===planId),[data,planId]);
  const run=async(fn)=>{setBusy(true);setError('');setNotice('');try{const d=await fn();setNotice(d.message);await load();return d}catch(e){setError(e.message)}finally{setBusy(false)}};
  const simulate=async()=>{setBusy(true);setError('');try{const d=await request('simulate',{planId,date,sector,requiredSkill,required:Number(required),windowStart,windowEnd});setSimulation(d.simulation)}catch(e){setError(e.message)}finally{setBusy(false)}};
- if(!['admin','manager','submanager'].includes(membership.role))return <p>Somente a gerência consulta esta área.</p>;
+ if(!MANAGEMENT_ROLES.includes(membership.role))return <p>Somente a gerência consulta esta área.</p>;
  return <section className="ti-coverage">
  <div className="ti-cov-intro"><h2>Cobertura e dobras</h2><p>Simule reforços com habilidades confirmadas e controle o pagamento praticado. Nenhuma recomendação libera horas extras automaticamente.</p></div>
  {error&&<p role="alert" className="team-error">{error}</p>}{notice&&<p role="status" className="team-notice">{notice}</p>}

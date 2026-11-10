@@ -1,4 +1,7 @@
-import {balanceProblem,recipeAvailability,recipeProducts} from '../../server/production/readiness.js';
+import {restaurantDay} from '../../shared/operation-day.js';
+import productionWorkspace from '../../server/production/workspace.js';
+import {MANAGEMENT_ROLES} from '../../server/permissions/v31-policy.js';
+import {balanceProblem} from '../../server/production/readiness.js';
 import portioningHandler from '../../server/production/portioning-handler.js';
 import preparationHandler from '../../server/production/preparation-handler.js';
 import {sendQuotaError} from '../../server/quota-error.js';
@@ -19,7 +22,6 @@ const idPattern=/^[a-z0-9-]{3,64}$/;
 const requestPattern=/^[a-f0-9-]{36}$/i;
 const round=x=>Math.round(x*1000)/1000;
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
-const clean=d=>({id:d.id,...d.data(),at:iso(d.data().at),updatedAt:iso(d.data().updatedAt)});
 function validLine(x){
  return (x?.location===undefined||['reserva','giro'].includes(x.location))&&productIdPattern.test(x?.productId||'')&&validQuantity(x?.quantity)&&
   (x?.substitutes===undefined||Array.isArray(x.substitutes)&&x.substitutes.length<=4&&x.substitutes.every(id=>productIdPattern.test(id)));
@@ -36,22 +38,16 @@ export default async function handler(req,res){
   const db=getDb(),unit=db.collection('units').doc(member.unitId);
   const recipes=unit.collection('productionRecipes'),runs=unit.collection('productionRuns');
   const action=req.body?.action;
-  if(action==='list'){
-   const [r,p,available]=await Promise.all([recipes.orderBy('name').limit(100).get(),runs.orderBy('at','desc').limit(30).get(),unit.collection('products').limit(201).get()]);
-   if(available.size>200)return send(res,409,'Catálogo acima do limite desta consulta.');
-   const products=await recipeProducts(db,unit,r.docs.filter(d=>d.data().active===true).map(d=>d.data()),available.docs);
-   const reviewed=r.docs.filter(d=>d.data().preparationConfig||d.data().configurationDraft).map(d=>({...clean(d),...recipeAvailability(d.data(),products)}));
-   return send(res,200,'Produção carregada.',{recipes:reviewed.filter(r=>r.available&&r.preparationConfig),blockedRecipes:reviewed.filter(r=>r.active===true&&(!r.available||!r.preparationConfig)).map(r=>({id:r.id,name:r.name,errors:r.errors})),...(['admin','manager','submanager'].includes(member.role)?{reviewRecipes:reviewed}:{}),runs:p.docs.map(clean)});
-  }
+  if(action==='list')return await productionWorkspace(req,res,{db,unit,member});
   if(action==='archiveRecipe'){
-   if(!['admin','manager','submanager'].includes(member.role))return send(res,403,'Somente gestão pode arquivar fichas.');
+   if(!MANAGEMENT_ROLES.includes(member.role))return send(res,403,'Somente gestão pode arquivar fichas.');
    const {id,expectedVersion}=req.body||{};
    if(!idPattern.test(id||'')||!Number.isInteger(expectedVersion)||expectedVersion<0)return send(res,400,'Ficha ou versão inválida.');
    const ref=recipes.doc(id),actorRef=db.doc('memberships/'+actor.uid);
    await db.runTransaction(async tx=>{
     const [a,old]=await Promise.all([tx.get(actorRef),tx.get(ref)]);
     if(!a.exists||a.data().status!=='active'||a.data().unitId!==member.unitId||
-       !['admin','manager','submanager'].includes(a.data().role))throw Error('FORBIDDEN');
+       !MANAGEMENT_ROLES.includes(a.data().role))throw Error('FORBIDDEN');
     if(!old.exists)throw Error('RECIPE_NOT_FOUND');
     if((old.data().version||0)!==expectedVersion)throw Error('CONFLICT');
     if(old.data().archivedAt)throw Error('CONFLICT');
@@ -63,7 +59,7 @@ export default async function handler(req,res){
    return send(res,200,'Ficha arquivada, histórico preservado.');
   }
   if(action==='saveRecipe'){
-   if(!['admin','manager','submanager'].includes(member.role))return send(res,403,'Somente administração pode definir preparações.');
+   if(!MANAGEMENT_ROLES.includes(member.role))return send(res,403,'Somente administração pode definir preparações.');
    const {id,name,yieldQuantity,lines,outputProductId=null,method='',expectedVersion=null}=req.body||{};
    if(!idPattern.test(id||'')||typeof name!=='string'||name.trim().length<3||name.length>100||
     typeof method!=='string'||method.length>2000||!validQuantity(yieldQuantity)||yieldQuantity<=0||yieldQuantity>10000||
@@ -75,7 +71,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const [a,prev,...products]=await Promise.all([tx.get(actorRef),tx.get(ref),
      ...[...new Set(lines.flatMap(x=>[x.productId,...(x.substitutes||[])]))].map(id=>tx.get(unit.collection('products').doc(id)))]);
-    if(!a.exists||a.data().status!=='active'||!['admin','manager','submanager'].includes(a.data().role)||a.data().unitId!==member.unitId)throw Error('FORBIDDEN');
+    if(!a.exists||a.data().status!=='active'||!MANAGEMENT_ROLES.includes(a.data().role)||a.data().unitId!==member.unitId)throw Error('FORBIDDEN');
     if(products.some(x=>!x.exists||!isOperationalProduct(x.data())))throw Error('PRODUCT_NOT_FOUND');
     if(prev.exists&&(prev.data().preparationConfig||prev.data().configurationDraft))throw Error('CONFLICT');
     if(prev.exists&&expectedVersion!==prev.data().version)throw Error('CONFLICT');
@@ -116,7 +112,7 @@ export default async function handler(req,res){
    const recipeRef=recipes.doc(recipeId),actorRef=db.doc('memberships/'+actor.uid);
    const productRefs=items.map(i=>unit.collection('products').doc(i.productId));
    const balanceRefs=items.map(i=>unit.collection('physicalBalances').doc(i.productId));
-   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+   const today=restaurantDay(new Date());
    const taskRef=taskId?unit.collection('productionDays').doc(today).collection('tasks').doc(taskId):null;
    const [a,recipe,existing,task,...docs]=await Promise.all([tx.get(actorRef),tx.get(recipeRef),tx.get(ref),taskRef?tx.get(taskRef):Promise.resolve(null),
     ...productRefs.map(p=>tx.get(p)),...balanceRefs.map(b=>tx.get(b))]);

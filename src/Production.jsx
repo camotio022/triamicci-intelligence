@@ -1,22 +1,20 @@
+import {restaurantDay} from '../shared/operation-day.js';
+import PageHeading from './ui/PageHeading.jsx';
+import {requestJson} from './api-client.js';
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import SameProductPortioning from './SameProductPortioning.jsx';
 import PreparationSetup from './PreparationSetup.jsx';
-import {apiFetch} from './api-fetch.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {CheckCircle2,ClipboardList,Clock3} from 'lucide-react';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import './production-v4.css';
 import {useUnitLive} from './useUnitLive.js';
 import LiveStatus from './LiveStatus.jsx';
-import {auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {executionQuantity} from '../server/production/daily-task.js';
 import {suggestedQuantity} from '../server/production/logic.js';
 async function call(path,action,payload={}){
- const user=auth.currentUser;if(!user)throw Error('Faça login.');
- const token=await user.getIdToken();
- const res=await apiFetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-  body:JSON.stringify({action,...payload})});
- const data=await res.json();if(!res.ok)throw Object.assign(Error(data.message||'Erro na operação.'),{data});return data;
+ return requestJson(path,{action,...payload},{sessionMessage:'Faça login.',formatError:data=>data.message||'Erro na operação.'});
 }
 export default function Production({membership,initialTaskId}){
  const {notify}=useFeedback();
@@ -33,20 +31,21 @@ export default function Production({membership,initialTaskId}){
  const [requestId,setRequestId]=useState(null);
  const [confirmed,setConfirmed]=useState(false);
  const [dailyTasks,setDailyTasks]=useState([]),[plannedRecipe,setPlannedRecipe]=useState(''),[plannedQuantity,setPlannedQuantity]=useState(''),[activeTaskId,setActiveTaskId]=useState(null),[taskLoading,setTaskLoading]=useState(false);
- const admin=['admin','manager','submanager'].includes(membership.role);
+ const admin=MANAGEMENT_ROLES.includes(membership.role);
  const canPlan=['admin','manager','submanager','cook','auxiliar'].includes(membership.role);
  const loadTasks=useCallback(async()=>{try{const r=await call('/api/production/manage','dayList');setDailyTasks(r.tasks||[]);return true;}catch(e){setStatus(e.message);return false}},[notify,membership?.unitId]);
  const addDailyTask=async e=>{e.preventDefault();if(taskLoading||!plannedRecipe)return;setTaskLoading(true);try{await call('/api/production/manage','dayAdd',{recipeId:plannedRecipe,plannedQuantity:plannedQuantity?Number(plannedQuantity):null});setPlannedRecipe('');setPlannedQuantity('');await loadTasks();notify('Preparação adicionada à lista.','success')}catch(e){notify(e.message,'error')}finally{setTaskLoading(false)}};
  const load=useCallback(async(silent=false)=>{
   if(!silent)setLoading(true);try{
-   const [p,r]=await Promise.all([call('/api/products/manage','list'),call('/api/production/manage','list')]);
+   const r=await call('/api/production/manage','list',{includeProducts:true});
+   const p=Array.isArray(r.products)?r:await call('/api/products/manage','list');
    setProducts(p.products||[]);setRecipes(r.recipes||[]);setBlockedRecipes(r.blockedRecipes||[]);setReviewRecipes(r.reviewRecipes||[]);setRuns(r.runs||[]);return true;
   }catch(e){setStatus(e.message);return false}finally{setLoading(false)}
  },[membership?.unitId]);
  useEffect(()=>{setProducts([]);setRecipes([]);setBlockedRecipes([]);setReviewRecipes([]);setRuns([]);setDailyTasks([]);setRecipeId('');setActiveTaskId(null);setView('today');setSetupRecipe(null);setEditRecipeId('');setStatus('');setPlannedRecipe('');setPlannedQuantity('');},[membership?.unitId]);
 
- const live=useUnitLive(membership?.unitId,initial=>Promise.all([load(!initial),loadTasks()]),{domains:['stock','catalog','production']});
- useEffect(()=>{const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
+ const live=useUnitLive(membership?.unitId,(initial,changes)=>Promise.all([!changes||changes.some(domain=>['stock','catalog','production'].includes(domain))?load(!initial):true,!changes||changes.includes('production')?loadTasks():true]),{domains:['stock','catalog','production']});
+ useEffect(()=>{const day=()=>restaurantDay(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
  const openExecution=(task)=>{choose(task.recipeId,task);setActiveTaskId(task.id);requestAnimationFrame(()=>document.querySelector('.production-page .ti-v4-production-layout')?.scrollIntoView({behavior:'smooth',block:'start'}));};
  useEffect(()=>{
   if(!initialTaskId||openedTaskRef.current===initialTaskId||!dailyTasks.length||!recipes.length)return;
@@ -102,8 +101,7 @@ export default function Production({membership,initialTaskId}){
  const inputUnit=id=>{const p=option(id);return p?.operationalUnitOverride||p?.physicalUnit||p?.unit||'un';};
  const inputStep=id=>['un','pacote','porcao','duzia'].includes(inputUnit(id))?'1':'.001';
  return <section className="inventory-page production-page">
-  <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId.toUpperCase()}</p>
-  <h1>Produção da cozinha</h1><LiveStatus state={live}/><p>Planeje o preparo, registre a quantidade produzida e consulte o histórico.</p>
+  <PageHeading eyebrow={"OPERAÇÃO · UNIDADE "+membership.unitId.toUpperCase()} title="Produção da cozinha" description="Planeje o preparo, registre a quantidade produzida e consulte o histórico."><LiveStatus state={live}/></PageHeading>
   <nav className="production-tabs" aria-label="Seções da produção">{[['today','Hoje'],...(admin?[['preparations','Preparações']]:[]),['history','Histórico']].map(([key,label])=><button key={key} type="button" aria-pressed={view===key} onClick={()=>switchView(key)}>{label}</button>)}</nav>
   {view==='today'&&blockedRecipes.length>0&&<aside className="production-attention"><div><strong>{blockedRecipes.length} {blockedRecipes.length===1?'preparação precisa':'preparações precisam'} de revisão</strong><p>Vínculos ou unidades pendentes impedem novas produções.</p></div>{admin?<button type="button" onClick={()=>setView('preparations')}>Revisar</button>:<span>Solicite à gestão</span>}</aside>}
   {admin&&view==='preparations'&&<section className="receiving-card production-catalog"><h2>Preparações da unidade</h2><p>Configure uma vez. Depois, use a preparação na rotina de hoje.</p><div className="production-recipe-list">{reviewRecipes.filter(r=>!r.archivedAt&&(r.preparationConfig||r.configurationDraft)).map(r=><article key={r.id}><div><strong>{r.name}</strong><span className={r.available&&r.preparationConfig?'recipe-ready':'recipe-pending'}>{r.available&&r.preparationConfig?'Disponível':!r.preparationConfig?'Concluir novo cadastro':r.active?'Revisar vínculos':'Em revisão'}</span>{!r.available&&r.errors?.map((error,i)=><p key={i}>{error}</p>)}</div><button type="button" onClick={()=>{setSetupRecipe({id:r.id,nonce:Date.now()});requestAnimationFrame(()=>document.querySelector('.prep-setup')?.scrollIntoView({behavior:'smooth',block:'start'}));}}>Revisar</button></article>)}</div><button type="button" className="production-new" onClick={()=>{setSetupRecipe({id:'',nonce:Date.now()});requestAnimationFrame(()=>document.querySelector('.prep-setup')?.scrollIntoView({behavior:'smooth',block:'start'}));}}>+ Nova preparação</button></section>}

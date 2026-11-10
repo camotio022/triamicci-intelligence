@@ -1,22 +1,18 @@
-import {apiFetch} from './api-fetch.js';
+import {restaurantDay} from '../shared/operation-day.js';
+import {requestJson} from './api-client.js';
+import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import ConfirmSheet from './ConfirmSheet.jsx';
-import {auth} from './firebase.js';
 import './operations-planning.css';
 import './leave-v4.css';
 import {useOperationDay} from './useOperationDay.js';
 async function api(action,extra={}){
- const token=await auth.currentUser?.getIdToken();
- if(!token)throw Error('Sessão expirada.');
- const res=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'schedules',action,...extra})});
- const body=await res.json();
- if(!res.ok)throw Error(body.message||'Falha na solicitação.');
- return body;
+ return requestJson('/api/members/manage',{module:'schedules',action,...extra},{sessionMessage:'Sessão expirada.',formatError:data=>data.message||'Falha na solicitação.'});
 }
 const statuses={pending:'Pendente',approved:'Aprovada',rejected:'Recusada'};
-const todayInUnit=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const todayInUnit=()=>restaurantDay(new Date());
 const dateLabel=value=>{
  if(!/^\d{4}-\d{2}-\d{2}$/.test(value||''))return value||'Data indisponível';
  return new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z'));
@@ -28,7 +24,7 @@ export default function LeaveRequests({membership}){
  const [context,setContext]=useState(null);
  const [pendingAction,setPendingAction]=useState(null);
  useEffect(()=>{let active=true;setContext(null);if(date)api('leaveContext',{date}).then(d=>{if(active)setContext(d)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[date,membership.unitId]);
- const manager=['admin','manager','submanager'].includes(membership.role);
+ const manager=MANAGEMENT_ROLES.includes(membership.role);
  const load=useCallback(async(silent=false)=>{
   if(!silent)setLoading(true);
   try{const d=await api('leaveList');setRequests(d.requests||[]);setError('');}

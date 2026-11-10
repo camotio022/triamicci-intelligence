@@ -1,9 +1,5 @@
-export const RESTAURANT_TZ='America/Sao_Paulo';
-export function restaurantDay(value=new Date()){
- const d=value instanceof Date?value:new Date(value);
- if(Number.isNaN(d.getTime()))throw new Error('INVALID_DATE');
- return new Intl.DateTimeFormat('en-CA',{timeZone:RESTAURANT_TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
-}
+import {restaurantDay,RESTAURANT_TZ} from '../../shared/operation-day.js';
+export {restaurantDay,RESTAURANT_TZ} from '../../shared/operation-day.js';
 export function dayKind(day,today=restaurantDay()){
  if(day===today)return 'today';
  if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return 'invalid';

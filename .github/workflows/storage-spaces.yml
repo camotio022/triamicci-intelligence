@@ -6,8 +6,19 @@ on:
       - 'api/storage/**'
       - 'src/StorageManager.jsx'
       - 'src/api-fetch.js'
+      - 'src/read-policy.js'
+      - 'server/operations/read-catalog.js'
+      - 'api/products/manage.js'
+      - 'api/production/manage.js'
+      - 'scripts/measure-firestore-reads.mjs'
+      - 'tests/firestore-live-cache.test.mjs'
+      - 'tests/read-catalog.test.mjs'
       - 'src/useUnitLive.js'
+      - 'src/live-hub.js'
+      - 'src/Production.jsx'
+      - 'src/NotificationCenter.jsx'
       - 'tests/firestore-read-guard.test.mjs'
+      - 'tests/live-read-invalidation.test.mjs'
       - 'src/StoragePreparation.jsx'
       - 'src/StorageReceiving.jsx'
       - 'src/storage-manager.css'
@@ -24,8 +35,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - run: npm install --no-audit --no-fund
-      - run: node --test tests/storage-spaces.test.mjs tests/storage-balance-engine.test.mjs tests/storage-receipt-allocation.test.mjs tests/storage-access.test.mjs tests/firestore-read-guard.test.mjs
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - run: node --test tests/storage-spaces.test.mjs tests/storage-balance-engine.test.mjs tests/storage-receipt-allocation.test.mjs tests/storage-access.test.mjs tests/firestore-read-guard.test.mjs tests/live-read-invalidation.test.mjs tests/firestore-live-cache.test.mjs tests/read-catalog.test.mjs tests/quota-reads.test.js
+      - run: node --experimental-test-module-mocks scripts/measure-firestore-reads.mjs --session
       - run: node --check server/storage/handler.js && node --check server/storage/receiving.js && node --check server/storage/production.js && node --check api/operations/stock.js
       - run: npm run build
