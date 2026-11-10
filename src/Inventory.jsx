@@ -9,7 +9,7 @@ import {readViewCache,writeViewCache} from './fastCache.js';
 import {useUnitLive} from './useUnitLive.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
-import { auth } from './firebase.js';
+import { sessionAuth as auth } from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import StockMovements from './StockMovements.jsx';
 import PreparedProductForm from './PreparedProductForm.jsx';

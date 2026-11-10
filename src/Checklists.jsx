@@ -1,6 +1,6 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ClipboardCheck,Camera,ChevronLeft,Clock,Plus,AlertCircle,CheckCircle2} from 'lucide-react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import {isManagement} from '../server/permissions/v31-policy.js';

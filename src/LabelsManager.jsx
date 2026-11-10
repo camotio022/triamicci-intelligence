@@ -1,6 +1,6 @@
 import {requestJson} from './api-client.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
-import React,{useCallback,useEffect,useState} from 'react';import {auth} from './firebase.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './labels-mobile.css';import PrintableLabel from './PrintableLabel.jsx';
+import React,{useCallback,useEffect,useState} from 'react';import {sessionAuth as auth} from './firebase.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './labels-mobile.css';import PrintableLabel from './PrintableLabel.jsx';
 async function call(module,action,extra={}){
  return requestJson(module==='products'?'/api/products/manage':'/api/members/manage',module==='products'?{action,...extra}:{module,action,...extra},{sessionMessage:'Sessão expirada.',formatError:data=>data.message});
 }

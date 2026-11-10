@@ -9,7 +9,7 @@ import {useViewState} from './useViewState.js';
 import {useUnitLive} from './useUnitLive.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import KitchenV3Workflows from './KitchenV3Workflows.jsx';
 import KitchenV3Loss from './KitchenV3Loss.jsx';

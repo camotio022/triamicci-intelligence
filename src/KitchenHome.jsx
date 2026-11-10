@@ -6,7 +6,7 @@ import {recordDay,hasPhysicalCount} from './operation-time.js';
 import {useOperationDay} from './useOperationDay.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useCallback,useEffect,useState} from 'react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {PackageCheck,ClipboardCheck,Boxes,History,RefreshCw,AlertCircle,CookingPot,CheckCircle2,Package,ClipboardList} from 'lucide-react';
 import './triamicci-history.css';
 

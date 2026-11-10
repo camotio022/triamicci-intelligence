@@ -2,7 +2,7 @@ import {isManagement} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import {STOCK_UNITS,RECEIVING_UNITS,UNIT_LABELS} from '../server/operations/unit-engine.js';
 import React,{useState} from 'react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 const renderUnit=unit=><option key={unit} value={unit}>{unit} · {UNIT_LABELS[unit]}</option>;
 export default function UnitCorrection({product,membership,onUpdated}){
  const [open,setOpen]=useState(false);

@@ -1,6 +1,6 @@
 import {apiFetch} from './api-fetch.js';
 import React,{useMemo,useState} from 'react';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import proposal from '../data/triamicci-product-catalog-v2.proposal.json';
 

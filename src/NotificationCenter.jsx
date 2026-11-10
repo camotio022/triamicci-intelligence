@@ -3,7 +3,7 @@ import React,{createContext,useCallback,useContext,useMemo,useRef,useState} from
 import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import {useOperationDay} from './useOperationDay.js';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {Bell,Check,RefreshCw,Trash2,RotateCcw,ChevronDown,ChevronRight,AlertTriangle,Inbox,ShieldCheck,CalendarDays,UserRound,Package} from 'lucide-react';
 import {useFeedback} from './FeedbackProvider.jsx';
 import {canAccessPage} from '../server/permissions/v31-policy.js';

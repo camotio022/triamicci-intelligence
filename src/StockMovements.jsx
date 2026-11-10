@@ -4,7 +4,7 @@ import {apiFetch} from './api-fetch.js';
 import React, {useCallback,useEffect,useState} from 'react';
 import ConfirmSheet from './ConfirmSheet.jsx';
 import './stock-movements-mobile.css';
-import {auth} from './firebase.js';
+import {sessionAuth as auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 
 async function api(action,payload={}) {

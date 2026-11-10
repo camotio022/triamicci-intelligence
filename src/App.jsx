@@ -9,7 +9,7 @@ import MyAttendanceV31 from './MyAttendanceV31.jsx';
 import StockConference from './StockConference.jsx';
 import PhysicalStock from './PhysicalStock.jsx';
 import DailyInventory from './DailyInventory.jsx';
-import AuthGate from './AuthGate.jsx';
+import TerminalAccess from './TerminalAccess.jsx';
 import TeamManagement from './TeamManagement.jsx';
 import PeopleHub from './PeopleHub.jsx';
 const TriamicciMentor=lazy(()=>import('./TriamicciMentor.jsx'));
@@ -29,11 +29,11 @@ import './v4-foundation.css';
 import {isManagement,canAccessPage} from '../server/permissions/v31-policy.js';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import SidebarPremium from './SidebarPremium.jsx';
-import {auth,isIndependentSession} from './firebase.js';
+import {sessionAuth as auth,isIndependentSession} from './firebase.js';
 import { LayoutDashboard, Package, TrendingUp, Wallet, Bell, Search, ChevronDown, ArrowUpRight, ArrowDownRight, AlertTriangle, Clock3, Boxes, CircleDollarSign, Menu, Users, X, BookOpen } from 'lucide-react';
 
 export default function App() {
- return <FeedbackProvider><AuthGate>{({ user, membership, logout }) => <Workspace key={user.uid+":"+membership.unitId+":"+membership.role} user={user} membership={membership} logout={logout} />}</AuthGate></FeedbackProvider>;
+ return <FeedbackProvider><TerminalAccess>{({ user, membership, logout }) => <Workspace key={user.uid+":"+membership.unitId+":"+membership.role} user={user} membership={membership} logout={logout} />}</TerminalAccess></FeedbackProvider>;
 }
 
 export function Workspace(props) {

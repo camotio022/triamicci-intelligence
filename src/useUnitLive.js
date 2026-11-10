@@ -1,11 +1,13 @@
 import {useEffect,useRef,useState} from 'react';
 import {doc,onSnapshot} from 'firebase/firestore';
-import {auth,db} from './firebase.js';
+import {sessionAuth as auth,db} from './firebase.js';
 import {apiFetch} from './api-fetch.js';
+import {subscribeTerminalLive} from './terminal-state.js';
 import {createLiveHub,liveRevision,changedLiveDomains} from './live-hub.js';
 const hub=createLiveHub((unitId,emit)=>{
  const identity=auth.currentUser?.uid+':'+unitId;
  const deliver=event=>{apiFetch.observeLive(identity,event);emit(event)};
+ if(auth.currentUser?.terminalSessionId)return subscribeTerminalLive(deliver);
  const offline=()=>deliver({data:{},connected:false});
  window.addEventListener('offline',offline);
  const stop=onSnapshot(doc(db,'units',unitId,'live','attendance'),{includeMetadataChanges:true},

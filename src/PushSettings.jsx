@@ -1,6 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import {BellRing,ChevronDown} from 'lucide-react';
-import {auth,isIndependentSession} from './firebase.js';
+import {sessionAuth as auth,isIndependentSession} from './firebase.js';
 import {apiFetch} from './api-fetch.js';
 export async function pushCall(action,subscription){
  const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');
@@ -18,7 +18,8 @@ export async function disableDevicePush(){
 const keyBytes=value=>Uint8Array.from(atob(value.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-value.length%4)%4)),c=>c.charCodeAt(0));
 export default function PushSettings({unitId}){
  const [config,setConfig]=useState(null),[active,setActive]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
- const supported=typeof window!=='undefined'&&window.isSecureContext&&'Notification' in window&&'PushManager' in window&&'serviceWorker' in navigator;
+ const sharedTerminal=!!auth.currentUser?.terminalSessionId;
+ const supported=!sharedTerminal&&typeof window!=='undefined'&&window.isSecureContext&&'Notification' in window&&'PushManager' in window&&'serviceWorker' in navigator;
  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
  const needsInstall=ios&&!(navigator.standalone||window.matchMedia('(display-mode: standalone)').matches);
  useEffect(()=>{let cancelled=false;(async()=>{
@@ -44,7 +45,7 @@ export default function PushSettings({unitId}){
  const run=async(action)=>{setBusy(true);try{if(action==='off'){await disableDevicePush();setActive(false);setMessage('Notificações desativadas.')}else{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(!sub)throw Error('Ative as notificações novamente.');const data=await pushCall('test',sub.toJSON());setMessage(data.message)}}catch(e){setMessage(e.message)}finally{setBusy(false)}};
  const deviceStatus=isIndependentSession?'Sessão principal necessária':needsInstall?'Instale na Tela de Início':!supported?'Indisponíveis aqui':!config?(message?'Consulta indisponível':'Verificando…'):active?'Ativados':config&&!config.configured?'Em preparação':'Desativados';
  return <details className="ti-notify-device" aria-label="Notificações no dispositivo"><summary><BellRing size={18} aria-hidden="true"/><span><strong>Avisos neste aparelho</strong><small className={active?'is-active':''}>{deviceStatus}</small></span><ChevronDown size={17} aria-hidden="true"/></summary><div className="ti-notify-device-body">
-  <p>{isIndependentSession?'Use sua sessão principal para ativar os avisos neste aparelho.':needsInstall?'No iPhone, adicione o Triamicci à Tela de Início e abra pelo ícone para ativar os avisos.':!supported?'Este navegador não oferece notificações neste dispositivo.':active?'Ativadas neste dispositivo.':config&&!config.configured?'O envio de notificações ainda está sendo preparado.':'Receba avisos importantes mesmo com o app em segundo plano.'}</p>
+  <p>{sharedTerminal?'No caixa compartilhado, os avisos permanecem no aplicativo. Ative notificações persistentes apenas no seu celular.':isIndependentSession?'Use sua sessão principal para ativar os avisos neste aparelho.':needsInstall?'No iPhone, adicione o Triamicci à Tela de Início e abra pelo ícone para ativar os avisos.':!supported?'Este navegador não oferece notificações neste dispositivo.':active?'Ativadas neste dispositivo.':config&&!config.configured?'O envio de notificações ainda está sendo preparado.':'Receba avisos importantes mesmo com o app em segundo plano.'}</p>
   {supported&&!needsInstall&&!isIndependentSession&&config?.configured&&<div className="ti-notify-device-actions">{active?<><button type="button" disabled={busy} onClick={()=>run('test')}>Testar aviso</button><button type="button" disabled={busy} onClick={()=>run('off')}>Desativar aqui</button></>:<button type="button" disabled={busy} onClick={enable}>Ativar notificações</button>}</div>}
   {message&&<p role="status">{message}</p>}
  </div></details>;

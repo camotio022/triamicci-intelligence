@@ -5,6 +5,7 @@ export default async function handler(req,res){
  if(!checkRequest(req,res))return;res.setHeader('Cache-Control','no-store');
  try{
   const actor=await authenticate(req),member=await membership(actor.uid);
+  if(actor.terminalSessionId)return send(res,403,'Ative avisos somente no seu aparelho pessoal.');
   if(!member)return send(res,403,'Vínculo ativo necessário.');
   const {subscription}=req.body||{},db=getDb();
   const action=String(req.body?.action||'').slice(4).replace(/^./,s=>s.toLowerCase());
