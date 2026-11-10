@@ -155,7 +155,7 @@ export default async function handler(req,res){
     if(existing.docs.some(x=>x.id!==ref.id&&x.data().active!==false&&x.data().name.trim().toLocaleLowerCase('pt-BR')===name.toLocaleLowerCase('pt-BR')))throw Error('DUPLICATE');
     const now=new Date();
     tx.set(ref,{name,icon:storage.icon,area:storage.area,frequency:storage.frequency,countMode:storage.countMode||'by_product',expiryPolicy:storage.expiryPolicy||'none',expiryDays:storage.expiryPolicy==='days'?storage.expiryDays:null,weekdays:daySet,active:true,version:version+1,updatedAt:now,updatedBy:actor.uid,...(!prior.exists?{createdAt:now,createdBy:actor.uid}:{})},{merge:true});
-    tx.create(db.collection('auditLogs').doc(),{event:'storage.config_saved',unitId:member.unitId,actorUid:actor.uid,storageId:ref.id,at:now,before:prior.data()||null,after:{name,area:storage.area,icon:storage.icon,frequency:storage.frequency,countMode:storage.countMode||'by_product',expiryPolicy:storage.expiryPolicy||'by_product',weekdays:daySet}});
+    tx.create(db.collection('auditLogs').doc(),{event:'storage.config_saved',unitId:member.unitId,actorUid:actor.uid,storageId:ref.id,at:now,before:prior.data()||null,after:{name,area:storage.area,icon:storage.icon,frequency:storage.frequency,countMode:storage.countMode||'by_product',expiryPolicy:storage.expiryPolicy||'none',expiryDays:storage.expiryPolicy==='days'?storage.expiryDays:null,weekdays:daySet}});
     signalUnitChange(tx,db,member.unitId,['stock','catalog']);
     result={id:ref.id,version:version+1};
    });
