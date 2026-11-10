@@ -3,7 +3,8 @@
 ## Como homologar
 
 1. No computador do caixa, entre normalmente com uma conta gerencial ativa.
-2. Abra **Terminais e minhas sessões**, informe o nome e clique em
+2. No menu do perfil (avatar), abra **Terminais e sessões**. Na aba
+   **Terminais da unidade**, escolha **Configurar este navegador**, informe o nome e clique em
    **Cadastrar este navegador como caixa**. A unidade vem do vínculo autenticado.
    O cadastro encerra a sessão pessoal naquele navegador.
 3. Clique em **Gerar QR Code para entrar**. O código dura 60 segundos e não é
@@ -13,7 +14,8 @@
 5. Confirme **Autorizar entrada**. O computador recebe uma sessão própria daquela
    pessoa: auxiliar usa permissões de auxiliar; gerente usa as de gerente.
 6. Teste **Bloquear / trocar operador**. O próximo operador precisa de outro QR.
-7. No celular, abra **Terminais e minhas sessões** e encerre sua sessão no caixa.
+7. No celular, abra **Terminais e sessões** pelo menu do perfil e escolha
+   **Minhas sessões** para encerrar sua sessão no caixa.
    A gerência também pode revogar o terminal inteiro.
 8. Teste **Sair do modo caixa e desvincular navegador**, inclusive sem conexão.
    A saída local sempre volta ao acesso individual. Se estiver sem rede, a
