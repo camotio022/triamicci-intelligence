@@ -68,7 +68,7 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  assert.equal((await call(aux,'archiveRecipe',{id:draftId,expectedVersion:0})).http,403);
  assert.equal((await call(foreign,'archiveRecipe',{id:draftId,expectedVersion:0})).http,404);
  assert.equal((await call(manager,'archiveRecipe',{id:draftId,expectedVersion:0})).http,200);
- const archived=(await root.collection('productionRecipes').doc(draftId).get()).data();assert.ok(archived.archivedAt);assert.deepEqual(archived.configurationDraft.name,configuration.name);assert.equal(archived.active,false);
+ const archived=(await root.collection('productionRecipes').doc(draftId).get()).data();assert.ok(archived.archivedAt);assert.deepEqual(archived.configurationDraft.name,'Porções');assert.equal(archived.active,false);
  assert.equal((await call(manager,'preparationList')).configurations.some(r=>r.id===draftId),false,'Arquivada sai da lista operacional');
  assert.equal((await call(manager,'savePreparation',{id:draftId,configuration,expectedDraftVersion:1,expectedVersion:0,activate:true})).http,409,'Editor anterior não reativa ficha arquivada');
  assert.equal((await balance.get()).data().total,10,'Arquivar rascunho não altera estoque');
