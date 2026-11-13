@@ -47,38 +47,19 @@ export function validImportRows(rows,recipes){
  });
 }
 
-// Provider scores are heuristic. Every OCR suggestion still needs human review.
-const nameConfidence=.75;
-const quantityConfidence=.9;
-
+// The model reports legibility, not calibrated confidence. All suggestions
+// still need review, and quantities are hints until the user enters a target.
 export function reviewPhotoLines(lines=[],recipes=[]){
- const rows=[];
- let dateNote='';
- for(const words of lines){
-  const uncertainQuantity=words.some(word=>/^\d+(?:[.,]\d+)?$/.test(word.text)&&word.confidence<quantityConfidence);
-  const withoutUncertainQuantity=uncertainQuantity
-   ?words.filter((word,index)=>!(index===0||index===words.length-1)||!/^\d+(?:[.,]\d+)?$/.test(word.text)||word.confidence>=quantityConfidence)
-   :words;
-  const line=withoutUncertainQuantity.map(word=>word.text).join(' ');
-  if(!line||withoutUncertainQuantity.some(word=>word.confidence<nameConfidence))continue;
-  const normalized=normalizePreparation(line);
-  if(dayWords.test(normalized)&&normalized.split(' ').length<=4){dateNote=line;continue;}
-  const [row]=parseProductionNote(line,recipes);
-  if(!row)continue;
-  const name=normalizePreparation(row.label);
+ return lines.flatMap(({name,quantity,quantityUnclear,dateNote},index)=>{
+  const normalized=normalizePreparation(name);
+  if(!normalized)return [];
+  const recipeId=suggestRecipe(name,recipes);
   const related=recipes.some(recipe=>{
    const candidate=normalizePreparation(recipe.name);
-   return candidate===name||(name.length>=5&&(' '+candidate+' ').includes(' '+name+' '));
+   return candidate===normalized||(normalized.length>=5&&(' '+candidate+' ').includes(' '+normalized+' '));
   });
-  // An unlinked line is useful for a readable shorthand (e.g. "30 alcatra"),
-  // but only when its name is corroborated by this unit's preparations.
-  if(!related)continue;
-  const quantityUnclear=uncertainQuantity||Boolean(row.quantity&&(!row.recipeId||!validImportRows([row],recipes)));
-  rows.push({...row,id:'photo-row-'+rows.length,dateNote,quantityUnclear,
-   quantity:quantityUnclear?'':row.quantity,selected:Boolean(row.recipeId),
-   ...(quantityUnclear&&row.quantity&&!uncertainQuantity?{quantityHint:row.quantity}:{}),
-  });
-  if(rows.length===12)break;
- }
- return rows;
+  if(!related)return [];
+  return [{id:'photo-row-'+index,label:name,recipeId,selected:Boolean(recipeId),dateNote,
+   quantity:'',quantityUnclear:quantityUnclear||Boolean(quantity),quantityHint:quantity}];
+ }).slice(0,12);
 }

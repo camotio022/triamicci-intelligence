@@ -29,14 +29,14 @@ test('auditoria produção: unidades, dependências, transformação medida, lot
  const stockBefore=(await source.get()).data().total;
  const image=checklistPhotoBase64;
  const originalFetch=globalThis.fetch;
- const originalKey=process.env.PRODUCTION_VISION_API_KEY;
+ const originalKey=process.env.GEMINI_API_KEY;
  let providerCalls=0;
  try{
-  process.env.PRODUCTION_VISION_API_KEY='test-key';
+  process.env.GEMINI_API_KEY='test-key';
   globalThis.fetch=(url,options)=>{
-   if(url!=='https://vision.googleapis.com/v1/images:annotate')return originalFetch(url,options);
+   if(url!=='https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent')return originalFetch(url,options);
    providerCalls++;
-   return Promise.resolve(Response.json({responses:[{}]}));
+   return Promise.resolve(Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:'{"lines":[]}'}]}}]}));
   };
   const cashier=await user('cashier');
   assert.equal((await call({token:'invalid'},'photoRecognize',{image})).http,401);
@@ -51,8 +51,8 @@ test('auditoria produção: unidades, dependências, transformação medida, lot
   assert.equal((await source.get()).data().total,stockBefore);
  }finally{
   globalThis.fetch=originalFetch;
-  if(originalKey===undefined)delete process.env.PRODUCTION_VISION_API_KEY;
-  else process.env.PRODUCTION_VISION_API_KEY=originalKey;
+  if(originalKey===undefined)delete process.env.GEMINI_API_KEY;
+  else process.env.GEMINI_API_KEY=originalKey;
  }
  const imported=await call(aux,'dayImport',photoPayload);
  assert.equal(imported.http,200,JSON.stringify(imported));
