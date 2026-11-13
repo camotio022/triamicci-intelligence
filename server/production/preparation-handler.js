@@ -43,6 +43,10 @@ export default async function preparationHandler(req,res){
    if(activate&&!plan.ready)throw Error('NOT_READY');
    if(activate&&!plan.sameProduct&&hasRecipeCycle([...graph.docs.filter(d=>d.id!==id&&d.data().active===true).map(d=>d.data()),{outputProductId:c.outputProductId,lines:plan.lines}]))throw Error('CYCLE');
    const now=new Date();
+   // O nome da preparação é sempre o nome do produto de saída no catálogo operacional.
+   const canonicalName=products.find(p=>p.id===c.outputProductId)?.name;
+   if(!canonicalName||canonicalName.length<3)throw Error('PRODUCT');
+   c.name=canonicalName;
    const data={configurationDraft:c,draftVersion:expectedDraftVersion+1,draftUpdatedAt:now,draftUpdatedBy:actor.uid};
    if(!old.exists)Object.assign(data,{name:c.name,active:false,version:0});
    if(activate)Object.assign(data,{name:c.name,active:true,version:expectedVersion+1,preparationConfig:c,stockEffect:plan.sameProduct?'portion_same_product':plan.measured?'measured_transformation':'transformation',portionSize:plan.portionSize||null,stockUnit:plan.stockUnit||null,method:c.method,outputProductId:c.outputProductId,outputUnit:plan.outputUnit,yieldQuantity:plan.yieldQuantity,lines:plan.lines,updatedAt:now,updatedBy:actor.uid});
