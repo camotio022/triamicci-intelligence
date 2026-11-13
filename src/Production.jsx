@@ -4,8 +4,9 @@ import {requestJson} from './api-client.js';
 import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import SameProductPortioning from './SameProductPortioning.jsx';
 import PreparationSetup from './PreparationSetup.jsx';
+import ProductionPhotoImport from './ProductionPhotoImport.jsx';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
-import {CheckCircle2,ClipboardList,Clock3,Search,Plus,ArrowLeft,ChefHat,SlidersHorizontal,PackageCheck,BookOpen,ChevronDown,X,PlayCircle} from 'lucide-react';
+import {CheckCircle2,ClipboardList,Clock3,Search,Plus,ArrowLeft,ChefHat,SlidersHorizontal,PackageCheck,BookOpen,ChevronDown,X,PlayCircle,Camera} from 'lucide-react';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import './production-v4.css';
 import {useUnitLive} from './useUnitLive.js';
@@ -21,7 +22,7 @@ export default function Production({membership,initialTaskId}){
  const openedTaskRef=useRef(null);
  const [view,setView]=useState('today'),[setupRecipe,setSetupRecipe]=useState(null),[setupDirty,setSetupDirty]=useState(false);
  const [preparationEditor,setPreparationEditor]=useState(false),[preparationSearch,setPreparationSearch]=useState(''),[preparationFilter,setPreparationFilter]=useState('all');
- const switchView=next=>{if(next!==view&&setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setView(next);if(next!=='preparations')setPreparationEditor(false);if(next!=='today'){setShowExecution(false);setActiveTaskId(null);}};
+ const switchView=next=>{if(next!==view&&setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setView(next);if(next!=='preparations')setPreparationEditor(false);if(next!=='today'){setShowExecution(false);setShowPhotoImport(false);setActiveTaskId(null);}};
  const openPreparation=id=>{setSetupRecipe({id,nonce:Date.now()});setPreparationEditor(true);requestAnimationFrame(()=>document.querySelector('.production-preparation-editor')?.scrollIntoView({behavior:'smooth',block:'start'}));};
  const closePreparation=()=>{if(setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setPreparationEditor(false);setSetupRecipe(null);};
  const [blockedRecipes,setBlockedRecipes]=useState([]),[reviewRecipes,setReviewRecipes]=useState([]);
@@ -34,10 +35,11 @@ export default function Production({membership,initialTaskId}){
  const [requestId,setRequestId]=useState(null);
  const [confirmed,setConfirmed]=useState(false);
  const [dailyTasks,setDailyTasks]=useState([]),[plannedRecipe,setPlannedRecipe]=useState(''),[plannedQuantity,setPlannedQuantity]=useState(''),[activeTaskId,setActiveTaskId]=useState(null),[taskLoading,setTaskLoading]=useState(false);
- const [showPlanner,setShowPlanner]=useState(false),[showExecution,setShowExecution]=useState(false);
+ const [showPlanner,setShowPlanner]=useState(false),[showExecution,setShowExecution]=useState(false),[showPhotoImport,setShowPhotoImport]=useState(false);
  const admin=MANAGEMENT_ROLES.includes(membership.role);
  const canPlan=['admin','manager','submanager','cook','auxiliar'].includes(membership.role);
  const loadTasks=useCallback(async()=>{try{const r=await call('/api/production/manage','dayList');setDailyTasks(r.tasks||[]);return true;}catch(e){setStatus(e.message);return false}},[notify,membership?.unitId]);
+ const importPhotoTasks=async payload=>{const result=await call('/api/production/manage','dayImport',payload);await loadTasks();notify(result.message||'Planejamento importado com sucesso.','success');return result;};
  const addDailyTask=async e=>{e.preventDefault();if(taskLoading||!plannedRecipe)return;setTaskLoading(true);try{await call('/api/production/manage','dayAdd',{recipeId:plannedRecipe,plannedQuantity:plannedQuantity?Number(plannedQuantity):null});setPlannedRecipe('');setPlannedQuantity('');setShowPlanner(false);await loadTasks();notify('Preparação adicionada à lista.','success')}catch(e){notify(e.message,'error')}finally{setTaskLoading(false)}};
  const load=useCallback(async(silent=false)=>{
   if(!silent)setLoading(true);try{
@@ -46,7 +48,7 @@ export default function Production({membership,initialTaskId}){
    setProducts(p.products||[]);setRecipes(r.recipes||[]);setBlockedRecipes(r.blockedRecipes||[]);setReviewRecipes(r.reviewRecipes||[]);setRuns(r.runs||[]);return true;
   }catch(e){setStatus(e.message);return false}finally{setLoading(false)}
  },[membership?.unitId]);
- useEffect(()=>{setProducts([]);setRecipes([]);setBlockedRecipes([]);setReviewRecipes([]);setRuns([]);setDailyTasks([]);setRecipeId('');setActiveTaskId(null);setView('today');setSetupRecipe(null);setEditRecipeId('');setStatus('');setPlannedRecipe('');setPlannedQuantity('');setPreparationEditor(false);setPreparationSearch('');setPreparationFilter('all');setShowPlanner(false);setShowExecution(false);},[membership?.unitId]);
+ useEffect(()=>{setProducts([]);setRecipes([]);setBlockedRecipes([]);setReviewRecipes([]);setRuns([]);setDailyTasks([]);setRecipeId('');setActiveTaskId(null);setView('today');setSetupRecipe(null);setEditRecipeId('');setStatus('');setPlannedRecipe('');setPlannedQuantity('');setPreparationEditor(false);setPreparationSearch('');setPreparationFilter('all');setShowPlanner(false);setShowExecution(false);setShowPhotoImport(false);},[membership?.unitId]);
 
  const live=useUnitLive(membership?.unitId,(initial,changes)=>Promise.all([!changes||changes.some(domain=>['stock','catalog','production'].includes(domain))?load(!initial):true,!changes||changes.includes('production')?loadTasks():true]),{domains:['stock','catalog','production']});
  useEffect(()=>{const day=()=>restaurantDay(new Date());let previous=day();const timer=setInterval(()=>{const current=day();if(current!==previous){previous=current;loadTasks();}},30000);return()=>clearInterval(timer)},[loadTasks]);
@@ -123,7 +125,9 @@ export default function Production({membership,initialTaskId}){
   </section>}
   {status&&<p role="status" className="receiving-notice">{status}</p>}
   {view==='today'&&<section className="receiving-card ti-v4-daily-tasks" aria-label="Central de produção do dia">
-   <div className="ti-production-command-heading"><div><span className="ti-production-eyebrow">COZINHA · HOJE</span><h2>Produção do dia</h2><p>Acompanhe tarefas e registre o que foi realmente preparado.</p></div>{canPlan&&recipes.length>0&&<button type="button" className="ti-production-plan-trigger" aria-expanded={showPlanner} onClick={()=>setShowPlanner(x=>!x)}>{showPlanner?<><X size={16}/> Fechar</>:<><Plus size={17}/> Planejar preparação</>}</button>}</div>
+   <div className="ti-production-command-heading"><div><span className="ti-production-eyebrow">COZINHA · HOJE</span><h2>Produção do dia</h2><p>Acompanhe tarefas e registre o que foi realmente preparado.</p></div>{canPlan&&recipes.length>0&&<button type="button" className="ti-production-plan-trigger" aria-expanded={showPlanner} onClick={()=>{setShowPlanner(x=>!x);setShowPhotoImport(false)}}>{showPlanner?<><X size={16}/> Fechar</>:<><Plus size={17}/> Planejar preparação</>}</button>}</div>
+   {canPlan&&recipes.length>0&&<button type="button" className="ti-production-photo-trigger" aria-expanded={showPhotoImport} onClick={()=>{setShowPhotoImport(v=>!v);setShowPlanner(false)}}><Camera size={17}/>{showPhotoImport?'Fechar importação por foto':'Importar planejamento por foto'}</button>}
+   {showPhotoImport&&canPlan&&recipes.length>0&&<ProductionPhotoImport recipes={recipes} onImport={importPhotoTasks} onClose={()=>setShowPhotoImport(false)}/>}
    <div className="ti-production-pulse" aria-label="Resumo do dia"><div><small>Planejadas</small><strong>{dailyTasks.length}</strong></div><div><small>Concluídas</small><strong>{dailyTasks.filter(t=>t.status==='completed').length}</strong></div><div><small>Pendentes</small><strong>{dailyTasks.filter(t=>t.status!=='completed').length}</strong></div></div>
    {!loading&&recipes.length===0&&<p className="production-empty">Ainda não há preparações disponíveis. {admin?'Abra Preparações para revisar e ativar o cadastro.':'A gestão precisa revisar e ativar as preparações.'}</p>}
    {canPlan&&recipes.length>0&&showPlanner&&<form className="ti-v4-daily-task-form ti-production-planner" onSubmit={addDailyTask}><div className="ti-production-planner-heading"><strong>Planejar preparação</strong><small>O planejamento não movimenta estoque.</small></div><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional ({recipes.find(r=>r.id===plannedRecipe)?.outputUnit||'un'})<input type="number" min="0.001" max="10000" step="0.001" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading||loading}>{taskLoading?'Adicionando…':'Adicionar à lista'}</button></form>}
