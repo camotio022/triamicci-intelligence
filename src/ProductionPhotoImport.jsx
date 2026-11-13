@@ -17,7 +17,7 @@ function loadOcr(){
  return ocrScriptPromise;
 }
 
-async function prepareOcrImage(file,mode='center'){
+async function prepareOcrImage(file,mode='center',enhance=false){
  const objectUrl=URL.createObjectURL(file);
  try{
   const img=new Image();img.src=objectUrl;await img.decode();
@@ -32,6 +32,17 @@ async function prepareOcrImage(file,mode='center'){
   if(!ctx)throw Error('Imagem indisponível neste aparelho.');
   ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  if(enhance){
+   const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);
+   const data=pixels.data;
+   // Aumenta contraste de tinta azul/preta sobre papel amarelado sem binarizar letras finas.
+   for(let i=0;i<data.length;i+=4){
+    const gray=.2126*data[i]+.7152*data[i+1]+.0722*data[i+2];
+    const adjusted=Math.max(0,Math.min(255,(gray-128)*1.65+151));
+    data[i]=data[i+1]=data[i+2]=adjusted;
+   }
+   ctx.putImageData(pixels,0,0);
+  }
   return canvas.toDataURL('image/png');
  }finally{URL.revokeObjectURL(objectUrl)}
 }
@@ -56,11 +67,29 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
   try{
    const engine=await loadOcr();
    worker=await engine.createWorker('por',1,{logger:m=>{if(m?.status==='recognizing text')setProgress(Math.round((m.progress||0)*100));}});
-   const scanImage=await prepareOcrImage(file,scanArea).catch(()=>file);
-   const result=await worker.recognize(scanImage);
-   const value=(result.data?.text||'').trim();
-   const assessment=evaluatePhotoRecognition(value,recipes,result.data?.confidence);
-   setText(assessment.reliable?value.slice(0,1600):'');setRows(assessment.rows);setUncertain(!assessment.reliable);setShowManual(false);setStage('review');
+   // Primeiro tenta a foto recortada; em caso de baixa confiança, repete
+   // com contraste ampliado e, por último, com a foto inteira.
+   // Nunca converte OCR em tarefa sem revisão explícita do usuário.
+   const attempts=[
+    {mode:scanArea,enhance:false},
+    {mode:scanArea,enhance:true},
+    ...(scanArea==='center'?[{mode:'full',enhance:true}]:[])
+   ];
+   let best=null;
+   for(const attempt of attempts){
+    const scanImage=await prepareOcrImage(file,attempt.mode,attempt.enhance).catch(()=>file);
+    const result=await worker.recognize(scanImage);
+    const value=(result.data?.text||'').trim();
+    const assessment=evaluatePhotoRecognition(value,recipes,result.data?.confidence);
+    const rank=assessment.recognized*100+(assessment.reliable?50:0)+(assessment.confidence||0)/10;
+    if(!best||rank>best.rank)best={value,assessment,rank};
+    if(assessment.reliable&&assessment.recognized>=3)break;
+   }
+   const assessment=best?.assessment||{reliable:false,rows:[]};
+   setText(assessment.reliable?best.value.slice(0,1600):'');
+   setRows(assessment.rows);
+   setUncertain(!assessment.reliable);
+   setShowManual(false);setStage('review');
    if(!assessment.reliable)setError('');
   }catch(e){setRows([]);setUncertain(true);setStage('review');setError('');}
   finally{try{await worker?.terminate()}catch{}setBusy(false);}
@@ -94,7 +123,7 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
    <button type="button" className="photo-import-primary" disabled={!file||busy} onClick={scan}><ScanText size={17}/>{busy?'Reconhecendo '+progress+'%':'Reconhecer escrita'}</button>
    {busy&&<progress aria-label="Progresso do reconhecimento" max="100" value={progress}/>}
    <button type="button" className="photo-import-textlink" disabled={busy} onClick={()=>{setStage('review');setShowManual(true);setError('');}}>Digitar lista manualmente</button>
-   <p className="photo-import-footnote">Reconhecimento gratuito no celular, sem cobrança por imagem. Requer internet para carregar o motor de OCR; manuscritos podem não ser reconhecidos corretamente.</p>
+   <p className="photo-import-footnote">Reconhecimento gratuito no celular, com até três tentativas de leitura e sem cobrança por imagem. Requer internet para carregar o motor de OCR; manuscritos podem não ser reconhecidos corretamente.</p>
   </div>}
   {stage==='review'&&<div className="photo-import-review">
    {preview&&<details open={uncertain?true:undefined}><summary>Consultar foto original</summary><img className="photo-import-preview" src={preview} alt="Lista para conferência"/></details>}
