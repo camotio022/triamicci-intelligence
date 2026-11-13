@@ -10,3 +10,11 @@ test('frango recebido cortado é porcionado no mesmo insumo, sem baixa ou crédi
 
 test('transformação do próprio insumo registra porções sem dar baixa e crédito no mesmo estoque',()=>{const p=preparationPlan({...base,type:'transform',name:'Frango a passarinho',sourceProductId:a,outputProductId:a,portionWeight:500},products);assert.equal(p.ready,true,p.errors.join('; '));assert.equal(p.sameProduct,true);assert.equal(p.measured,false);assert.equal(p.portionSize,.5);assert.deepEqual(p.lines,[]);assert.equal(p.outputUnit,'porcao');});
 test('receita com próprio produto como ingrediente controlado impede duplicação de saldo',()=>{const p=preparationPlan({...base,type:'recipe',outputProductId:c,resultUnit:'L',ingredients:[{name:'Próprio molho',amount:'1',unit:'L',tracked:true,productId:c}]},products);assert.equal(p.ready,false);assert.match(p.errors.join(' '),/próprio produto preparado/);});
+
+test('método de contagem é opcional, validado e não muda o efeito no estoque',()=>{
+ const same={...base,sourceProductId:a,outputProductId:a,portionWeight:500,countMode:'both'};
+ const plan=preparationPlan(same,products);
+ assert.equal(plan.ready,true,plan.errors.join('; '));assert.equal(plan.sameProduct,true);assert.deepEqual(plan.lines,[]);
+ assert.equal(validatePreparation({...same,countMode:'arbitrary'}),'Escolha um método de contagem válido.');
+ assert.equal(validatePreparation({...same,countMode:'portions'}),null);
+});
