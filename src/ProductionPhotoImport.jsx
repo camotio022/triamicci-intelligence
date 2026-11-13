@@ -77,9 +77,9 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
     const dataUrl=await prepareOcrImage(file,scanArea);
     const image=dataUrl.split(',')[1];
     if(image.length>4_000_000)throw Error('Imagem muito grande para leitura remota.');
-    const response=await apiFetch('/api/production/photo-recognize',{
+    const response=await apiFetch('/api/operations/stock',{
      method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-     body:JSON.stringify({image,mimeType:'image/jpeg'}),cache:'no-store'
+     body:JSON.stringify({action:'photoRecognize',image,mimeType:'image/jpeg'}),cache:'no-store'
     });
     const data=await response.json();
     if(!response.ok)throw Error(data.message||'Serviço de manuscritos indisponível.');
