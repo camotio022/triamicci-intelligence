@@ -19,8 +19,10 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  assert.equal((await call(manager,'savePreparation',{id:'invalid-recipe',configuration:{...configuration,ingredients:[null]}})).http,400);
  const finished=await call(aux,'finish',{recipeId:id,requestId:randomUUID(),portions:4,items:[{productId:a,quantity:1}],notes:''});assert.equal(finished.http,200,JSON.stringify(finished));assert.equal((await balance.get()).data().total,9);assert.equal((await root.collection('physicalBalances').doc(b).get()).data().total,4);
 
- const same={...configuration,name:'Frango a passarinho',sourceProductId:a,outputProductId:a,portionWeight:500},sameId='frango-'+randomUUID();
+ const same={...configuration,name:'Frango a passarinho',sourceProductId:a,outputProductId:a,portionWeight:500,countMode:'both'},sameId='frango-'+randomUUID();
  assert.equal((await call(manager,'savePreparation',{id:sameId,configuration:same,activate:true})).http,200);
+ const countGuide=await call(manager,'preparationCountGuide',{productId:a});assert.equal(countGuide.http,200);assert.equal(countGuide.guides.some(g=>g.id===sameId&&g.portionSize===.5&&g.stockUnit==='kg'&&g.countMode==='both'),true);
+ assert.equal((await call(aux,'preparationCountGuide',{productId:a})).http,403);
  const before=(await balance.get()).data();const runId=randomUUID();
  const portioned=await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,portions:10});assert.equal(portioned.http,200,JSON.stringify(portioned));assert.deepEqual((await balance.get()).data(),before,'Porcionamento não altera saldos físicos');
  const status=await call(aux,'portionStatus',{recipeId:sameId});assert.equal(status.portionedWeight,5);assert.equal(status.unmarkedWeight,4);assert.equal(status.total,9);
