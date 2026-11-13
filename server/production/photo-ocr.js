@@ -50,7 +50,7 @@ export async function readPhoto(base64,{key,fetcher=fetch}){
     maxOutputTokens:2048,thinkingConfig:{thinkingLevel:'MINIMAL'}
    }
   }),
-  signal:AbortSignal.timeout(10000)
+  signal:AbortSignal.timeout(30000)
  });
  if(!response.ok)throw Error('GEMINI_HTTP_'+response.status);
  try{
