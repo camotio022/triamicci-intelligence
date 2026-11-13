@@ -77,7 +77,7 @@ export default function ProductionPhotoImport({recipes=[],onImport,onRecognize,o
   }finally{setBusy(false);setProgress(100);}
  };
 
- const rebuild=()=>{setRows(parseProductionNote(text,recipes).slice(0,12));setUncertain(false);setReviewed(false);setError('');};
+ const rebuild=()=>{setRows(parseProductionNote(text,recipes).slice(0,12).map(row=>({...row,selected:Boolean(row.recipeId)})));setUncertain(false);setReviewed(false);setError('');};
  const change=(id,patch)=>{setRows(old=>old.map(row=>row.id===id?{...row,...patch}:row));setReviewed(false);};
  const selected=rows.filter(r=>r.selected);
  const hasDateNotes=selected.some(r=>r.dateNote);
