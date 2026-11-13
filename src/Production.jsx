@@ -39,7 +39,7 @@ export default function Production({membership,initialTaskId}){
  const admin=MANAGEMENT_ROLES.includes(membership.role);
  const canPlan=['admin','manager','submanager','cook','auxiliar'].includes(membership.role);
  const loadTasks=useCallback(async()=>{try{const r=await call('/api/production/manage','dayList');setDailyTasks(r.tasks||[]);return true;}catch(e){setStatus(e.message);return false}},[notify,membership?.unitId]);
- const recognizePhoto=async payload=>call('/api/production/recognize-photo','recognizePhoto',payload);
+ const recognizePhoto=async payload=>call('/api/production/manage','recognizePhoto',payload);
  const importPhotoTasks=async payload=>{const result=await call('/api/production/manage','dayImport',payload);await loadTasks();notify(result.message||'Planejamento importado com sucesso.','success');return result;};
  const addDailyTask=async e=>{e.preventDefault();if(taskLoading||!plannedRecipe)return;setTaskLoading(true);try{await call('/api/production/manage','dayAdd',{recipeId:plannedRecipe,plannedQuantity:plannedQuantity?Number(plannedQuantity):null});setPlannedRecipe('');setPlannedQuantity('');setShowPlanner(false);await loadTasks();notify('Preparação adicionada à lista.','success')}catch(e){notify(e.message,'error')}finally{setTaskLoading(false)}};
  const load=useCallback(async(silent=false)=>{
