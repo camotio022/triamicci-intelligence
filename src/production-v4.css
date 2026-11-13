@@ -35,3 +35,66 @@
 .ti-production-progress{margin-top:6px;background:#e9edf1;height:4px;overflow:hidden;border-radius:999px}
 .ti-production-progress>span{display:block;height:100%;background:#a71916;border-radius:999px}
 @media(max-width:600px){.ti-v4-daily-task-list.ti-production-checklist button{width:auto;max-width:110px}.ti-production-today-heading>small{font-size:10px}.ti-production-check-info strong{font-size:12px}}
+
+
+/* Preparações: biblioteca operacional compacta, sem novo cadastro nem novas leituras. */
+.production-page .production-tabs{position:relative;top:auto;z-index:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;width:100%;min-width:0;overflow:hidden}
+.production-page .production-tabs button{min-width:0;width:100%;padding:9px 5px;white-space:nowrap;overflow:hidden;text-overflow:clip;font-size:clamp(11px,3.3vw,14px);line-height:1.15;min-height:46px;overflow-wrap:normal;word-break:normal}
+.production-page .production-catalog{min-width:0}
+.production-library-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.production-library-head>div{min-width:0;flex:1 1 240px}
+.production-library-eyebrow{font-size:11px;font-weight:800;letter-spacing:.1em;color:#a71916}
+.production-library-head h2{font-size:21px;margin:6px 0!important;line-height:1.25}
+.production-library-head p{font-size:13px;line-height:1.5;color:#63748a;margin:0}
+.production-page .production-library-create{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;border-radius:11px;border:1px solid #ad1917;background:#ad1917;color:#fff;padding:10px 13px;cursor:pointer;font-size:13px;font-weight:750}
+.production-library-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0}
+.production-library-summary>div{display:grid;gap:5px;min-width:0;border:1px solid #e5e9f0;border-radius:12px;padding:12px 10px;background:#f9fafc}
+.production-library-summary span{font-size:11px;color:#63748a;line-height:1.2}
+.production-library-summary strong{font-size:24px;font-weight:800;line-height:1.1;color:#19273d;font-variant-numeric:tabular-nums}
+.production-library-tools{display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,190px);gap:9px}
+.production-library-search,.production-library-filter{min-width:0;position:relative;display:flex;align-items:center;gap:7px;border:1px solid #d8e0e9;border-radius:11px;padding:0 10px;background:#fff;color:#63748a}
+.production-page .production-library-tools :is(input,select){min-width:0;width:100%;border:0;background:transparent;box-shadow:none;outline:0;min-height:43px;padding:8px 0;color:#25344b;font-size:13px!important}
+.production-library-search:focus-within,.production-library-filter:focus-within{outline:2px solid #ad19176b;outline-offset:2px}
+.production-library-tools svg{flex:0 0 auto}
+.production-page .production-recipe-list{gap:10px;margin:15px 0 0}
+.production-page .production-recipe-list .production-library-item{display:grid;gap:11px;padding:13px;border:1px solid #e2e7ef;border-radius:14px;background:#fff;min-width:0}
+.production-library-item-main{display:flex;gap:11px;align-items:center;min-width:0}
+.production-library-image{display:grid;place-items:center;flex:0 0 54px;height:54px;width:54px;overflow:hidden;border-radius:12px;background:#edf1f5;color:#526579}
+.production-library-image img{display:block;width:100%;height:100%;object-fit:cover}
+.production-library-item-copy{flex:1;min-width:0;display:grid;gap:5px}
+.production-page .production-library-item-copy>strong{font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+.production-library-item-copy>small{font-size:12px;line-height:1.45;color:#65748a}
+.production-library-labels{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.production-page .production-library-labels span{margin:0;padding:4px 8px;font-size:11px;line-height:1.2}
+.production-page .production-library-labels .production-library-type{background:#edf1f5;color:#40536c}
+.production-library-item-bottom{border-top:1px solid #edf0f5;padding-top:10px;display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap}
+.production-library-count{color:#65748a;font-size:11px;line-height:1.35;flex:1 1 160px}
+.production-library-buttons{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.production-page .production-recipe-list .production-library-buttons button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:8px 11px;font-size:12px;border-radius:10px}
+.production-page .production-library-buttons .production-library-plan{background:#ad1917;border-color:#ad1917;color:#fff}
+.production-page .production-library-issue{font-size:11px;line-height:1.4;color:#8b5c12}
+.production-library-empty{text-align:center;display:grid;justify-items:center;gap:7px;padding:25px 12px;border:1px dashed #d5dce5;border-radius:13px;color:#63748a;margin-top:14px}
+.production-library-empty strong{font-size:14px;color:#25344b}
+.production-library-empty p{font-size:12px;margin:0}
+.production-preparation-editor{min-width:0}
+.production-preparation-editor-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.production-preparation-editor-top button{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid #e0c7c7;border-radius:10px;min-height:42px;padding:8px 11px;color:#a71916;font-size:13px;font-weight:700}
+.production-preparation-editor-top span{font-size:12px;color:#63748a}
+@media(max-width:600px){
+ .production-page .production-tabs{margin:12px 0;gap:4px;padding:4px}
+ .production-page .production-tabs button{padding:8px 3px;letter-spacing:-.02em}
+ .production-page .production-catalog{padding:14px}
+ .production-library-head{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+ .production-page .production-library-create{width:100%}
+ .production-library-summary{margin:13px 0}
+ .production-library-summary>div{padding:10px 8px}
+ .production-library-summary strong{font-size:22px}
+ .production-library-summary span{font-size:10px}
+ .production-library-tools{grid-template-columns:minmax(0,1fr)}
+ .production-library-item-bottom{display:grid;grid-template-columns:minmax(0,1fr)}
+ .production-library-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+ .production-page .production-recipe-list .production-library-buttons button{width:100%;min-width:0}
+ .production-page .production-recipe-list .production-library-item{padding:12px}
+ .production-preparation-editor-top{padding:0 3px}
+}
+@media(max-width:359px){.production-page .production-tabs button{font-size:10px}.production-library-image{width:44px;height:44px;flex-basis:44px}}
