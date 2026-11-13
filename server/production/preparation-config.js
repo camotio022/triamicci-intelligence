@@ -22,6 +22,7 @@ export function validatePreparation(c){
  if(!MASS_UNITS.includes(c.weightUnit))return 'Revise a unidade de peso.';
  if(c.outputPerBatch!==null&&(!validQuantity(c.outputPerBatch)||c.outputPerBatch>10000))return 'Revise a entrada no estoque por receita.';
  if(!['reserva','giro'].includes(c.location))return 'Selecione o local de origem.';
+ if(c.countMode!==undefined&&!['weight','portions','both'].includes(c.countMode))return 'Escolha um método de contagem válido.';
  return null;
 }
 export function preparationPlan(c,products){
