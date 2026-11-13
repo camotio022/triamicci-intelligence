@@ -15,6 +15,16 @@ export default async function preparationHandler(req,res){
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);if(!management(m)||!m.unitId)return send(res,403,'Somente gestão pode configurar preparações.');
   const db=getDb(),root=db.collection('units').doc(m.unitId),recipes=root.collection('productionRecipes');
+  if(req.body.action==='preparationCountGuide'){
+   const productId=req.body.productId;
+   if(!/^[a-f0-9]{40}$/.test(productId||''))return send(res,400,'Produto inválido.');
+   // Consulta por produto somente ao abrir a contagem, sem listeners adicionais.
+   const snap=await recipes.where('outputProductId','==',productId).limit(21).get();
+   if(snap.size>20)return send(res,409,'Muitas preparações para o mesmo produto.');
+   const matches=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>!r.archivedAt&&r.active===true&&r.stockEffect==='portion_same_product'&&r.preparationConfig?.sourceProductId===productId&&r.preparationConfig?.outputProductId===productId&&Number.isFinite(r.portionSize)&&r.portionSize>0&&['kg','g'].includes(r.stockUnit));
+   // Múltiplos padrões exigem escolha explícita em vez de conversão ambígua.
+   return send(res,200,'Padrão de contagem consultado.',{guides:matches.map(r=>({id:r.id,name:r.name,portionSize:r.portionSize,stockUnit:r.stockUnit,countMode:r.preparationConfig.countMode||'weight'}))});
+  }
   if(req.body.action==='preparationList'){
    const snap=await recipes.orderBy('name').limit(101).get();if(snap.size>100)return send(res,409,'Limite de cem preparações atingido.');
    const catalog=await root.collection('products').limit(201).get();if(catalog.size>200)return send(res,409,'Catálogo acima do limite desta consulta.');
@@ -24,7 +34,7 @@ export default async function preparationHandler(req,res){
   const {id,configuration,expectedDraftVersion=0,expectedVersion=0,activate=false}=req.body;
   if(!/^[a-z0-9-]{3,64}$/.test(id||'')||!Number.isInteger(expectedDraftVersion)||!Number.isInteger(expectedVersion)||typeof activate!=='boolean')return send(res,400,'Identificador ou versão inválida.');
   const invalid=validatePreparation(configuration);if(invalid)return send(res,400,invalid);
-  const c={type:configuration.type,name:configuration.name.trim(),sourceProductId:configuration.type==='recipe'?'':configuration.sourceProductId,outputProductId:configuration.outputProductId,resultUnit:configuration.resultUnit,batchYield:configuration.batchYield,portionWeight:configuration.type==='recipe'?null:configuration.portionWeight,weightUnit:configuration.weightUnit,method:configuration.method,location:configuration.location,outputPerBatch:configuration.outputPerBatch,ingredients:configuration.ingredients.map(i=>({name:i.name.trim(),amount:i.amount.trim(),unit:i.unit,productId:i.productId||'',tracked:i.tracked}))};
+  const c={type:configuration.type,name:configuration.name.trim(),sourceProductId:configuration.type==='recipe'?'':configuration.sourceProductId,outputProductId:configuration.outputProductId,resultUnit:configuration.resultUnit,batchYield:configuration.batchYield,portionWeight:configuration.type==='recipe'?null:configuration.portionWeight,weightUnit:configuration.weightUnit,method:configuration.method,location:configuration.location,outputPerBatch:configuration.outputPerBatch,countMode:configuration.countMode||'weight',ingredients:configuration.ingredients.map(i=>({name:i.name.trim(),amount:i.amount.trim(),unit:i.unit,productId:i.productId||'',tracked:i.tracked}))};
   const ref=recipes.doc(id);
   await db.runTransaction(async tx=>{
    const [a,old,catalog,graph,profiles]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref),tx.get(root.collection('products').limit(201)),tx.get(recipes.limit(101)),tx.get(root.collection('operationalProfiles').limit(201))]);
