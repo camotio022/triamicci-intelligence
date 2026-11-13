@@ -1,4 +1,5 @@
 import {restaurantDay} from '../../shared/operation-day.js';
+import {createHash} from 'node:crypto';
 import {recipeAvailability,recipeProducts} from './readiness.js';
 import {sendQuotaError} from '../quota-error.js';
 import {isOperationalProduct} from '../operations/catalog-identity.js';
@@ -23,6 +24,46 @@ export default async function handler(req,res){
   if(action==='dayList'){
    const snap=await ref.orderBy('createdAt','asc').limit(100).get();
    return send(res,200,'Lista de produção consultada.',{day,tasks:snap.docs.map(view),hasMore:snap.size===100});
+  }
+  if(action==='dayImport'){
+   if(!canPlan(m.role))return send(res,403,'Sem permissão para planejar produção.');
+   const {requestId,items}=req.body||{};
+   if(typeof requestId!=='string'||!/^[a-f0-9-]{36}$/i.test(requestId)||!Array.isArray(items)||!items.length||items.length>12||
+      items.some(i=>!recipePattern.test(i?.recipeId||'')||i.plannedQuantity!==null&&
+       (!Number.isFinite(i.plannedQuantity)||i.plannedQuantity<=0||i.plannedQuantity>10000))||
+      new Set(items.map(i=>i.recipeId)).size!==items.length)
+    return send(res,400,'Revise os itens e quantidades da lista.');
+   // IDs determinísticos e estáveis em qualquer tentativa de reenvio, inclusive após queda da conexão.
+   const ids=items.map((_,i)=>createHash('sha256').update('photo:'+m.unitId+':'+day+':'+requestId+':'+i).digest('hex').slice(0,20));
+   const hash=createHash('sha256').update(JSON.stringify(items)).digest('hex');
+   let already=false;
+   await db.runTransaction(async tx=>{
+    const memberRef=db.collection('memberships').doc(actor.uid);
+    const recipeRefs=items.map(i=>unit.collection('productionRecipes').doc(i.recipeId));
+    const taskRefs=ids.map(id=>ref.doc(id));
+    const [memberDoc,...docs]=await Promise.all([tx.get(memberRef),...recipeRefs.map(x=>tx.get(x)),...taskRefs.map(x=>tx.get(x))]);
+    if(!memberDoc.exists||memberDoc.data().status!=='active'||memberDoc.data().unitId!==m.unitId||!canPlan(memberDoc.data().role))throw Error('FORBIDDEN');
+    const recipeDocs=docs.slice(0,items.length),taskDocs=docs.slice(items.length);
+    if(taskDocs.some(x=>x.exists)){
+     if(taskDocs.every(x=>x.exists&&x.data().photoImportHash===hash&&x.data().createdBy===actor.uid)) {already=true;return;}
+     throw Error('CONFLICT');
+    }
+    if(recipeDocs.some(x=>!x.exists||x.data().active!==true))throw Error('RECIPE_NOT_FOUND');
+    const productIds=[...new Set(recipeDocs.flatMap(x=>[...(x.data().lines||[]).map(l=>l.productId),x.data().outputProductId].filter(Boolean)))];
+    const products=await Promise.all(productIds.map(id=>tx.get(unit.collection('products').doc(id))));
+    if(products.some(p=>!p.exists||!isOperationalProduct(p.data())))throw Error('RECIPE_NOT_FOUND');
+    const available=await recipeProducts(db,unit,recipeDocs.map(x=>x.data()),products,tx);
+    recipeDocs.forEach((recipe,i)=>{
+     if(!recipeAvailability(recipe.data(),available).available)throw Error('RECIPE_NOT_FOUND');
+     const q=items[i].plannedQuantity;
+     if(q!==null&&!validQuantity(q,{unit:recipe.data().outputUnit||'un'}))throw Error('INVALID_QUANTITY');
+    });
+    const now=new Date();
+    taskRefs.forEach((taskRef,i)=>tx.create(taskRef,{recipeId:items[i].recipeId,recipeName:recipeDocs[i].data().name,unit:recipeDocs[i].data().outputUnit||'un',plannedQuantity:items[i].plannedQuantity,status:'pending',day,unitId:m.unitId,createdBy:actor.uid,createdAt:now,photoImportHash:hash}));
+    signalUnitChange(tx,db,m.unitId,['production']);
+    tx.create(db.collection('auditLogs').doc(),{event:'production.photo_import',unitId:m.unitId,day,taskIds:ids,actorUid:actor.uid,count:items.length,at:now});
+   });
+   return send(res,200,already?'Lista já importada anteriormente.':'Tarefas adicionadas à produção de hoje.',{taskIds:ids,already});
   }
   if(action==='dayAdd'){
    if(!canPlan(m.role))return send(res,403,'Sem permissão para planejar produção.');
@@ -53,6 +94,7 @@ export default async function handler(req,res){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='INVALID_QUANTITY')return send(res,400,'Meta incompatível com a unidade da preparação.');
   if(e.message==='FORBIDDEN')return send(res,403,'Sem permissão.');
+  if(e.message==='CONFLICT')return send(res,409,'Esta importação já foi utilizada com dados diferentes.');
   if(e.message==='RECIPE_NOT_FOUND')return send(res,404,'Ficha técnica não disponível.');
   if(sendQuotaError(res,e))return;console.error('Production day list:',e.message);return send(res,500,'Não foi possível consultar ou atualizar a lista de produção.');
  }
