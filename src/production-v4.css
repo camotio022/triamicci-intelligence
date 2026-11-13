@@ -146,3 +146,8 @@
  .ti-production-unplanned{display:grid;grid-template-columns:minmax(0,1fr)}
  .ti-production-unplanned button{width:100%}
 }
+
+
+.production-page .ti-production-photo-trigger{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:9px 12px;border:1px solid #cbd4df;border-radius:11px;background:#fff;color:#36495f;font-size:13px;font-weight:750;width:100%;cursor:pointer}
+.production-page .ti-production-photo-trigger[aria-expanded="true"]{border-color:#ba2220;background:#fff6f6;color:#a71916}
+@media(min-width:650px){.production-page .ti-production-photo-trigger{width:auto;justify-self:start}}
