@@ -44,3 +44,12 @@
 .photo-import .photo-import-scan-area select{width:100%;min-width:0;max-width:100%;font-size:14px;overflow:hidden;text-overflow:ellipsis}
 
 .photo-import-quick{display:grid;gap:7px;padding:12px;border:1px solid #dfe5ed;border-radius:12px;background:#f8fafc;min-width:0}.photo-import-quick strong{font-size:13px}.photo-import-quick p{margin:0;font-size:11px;line-height:1.5;color:#62738a}.photo-import-quick select{width:100%;min-width:0}.photo-import-review .photo-import-quality{padding:10px}.photo-import-review .photo-import-quality p{margin-top:3px}
+
+/* Photo framing controls stay compact on narrow iPhone screens. */
+.photo-import-crop-controls{display:grid;gap:9px;padding:12px;border:1px solid #dfe5ed;border-radius:12px;background:#f8fafc}
+.photo-import-crop-controls label{display:grid;gap:4px;font-size:12px;font-weight:700;color:#34445b}
+.photo-import-crop-controls input[type=range]{width:100%;accent-color:#b11b19;min-height:30px}
+.photo-import-crop-controls small{font-size:11px;line-height:1.4;color:#62738a}
+.photo-import-crop-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.photo-import-crop-heading strong{font-size:13px}
+.photo-import .photo-import-crop-heading .photo-import-outline{width:auto;min-height:36px;padding:6px 10px}
