@@ -65,8 +65,14 @@ export function evaluatePhotoRecognition(text,recipes=[],confidence=null){
  const raw=parseProductionNote(text,recipes);
  const matched=raw.filter(row=>Boolean(row.recipeId));
  const average=typeof confidence==='number'&&Number.isFinite(confidence)?confidence:null;
- // Alto número de linhas incompreensíveis é sinal de OCR impreciso ou foto sem lista.
- const ratio=raw.length?matched.length/raw.length:0;
- const reliable=matched.length>0&&ratio>=.35&&(average===null||average>=45);
- return {reliable,rows:reliable?matched.slice(0,12):[],recognized:matched.length,total:raw.length,confidence:average};
+ // Keep useful verified lines even when another handwritten line is unreadable.
+ // A single accidental catalog hit in a long noisy transcript is not reliable.
+ const reliable=matched.length>0&&raw.length<=20&&(matched.length>=2||raw.length<=5)&&
+  (average===null||average>=45);
+ const rows=reliable?raw.filter(row=>{
+  if(row.recipeId)return true;
+  // Unlinked candidates are displayed for human review, never selected automatically.
+  return /[a-zA-ZÀ-ÿ]{3}/.test(row.label)&&row.label.length<=60;
+ }).slice(0,12).map(row=>({...row,selected:Boolean(row.recipeId)})):[];
+ return {reliable,rows,recognized:matched.length,total:raw.length,confidence:average};
 }
