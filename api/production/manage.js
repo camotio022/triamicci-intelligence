@@ -29,7 +29,7 @@ function validLine(x){
 export default async function handler(req,res){
  if(['portionStatus','finishPortioning','reconcilePortioning'].includes(req.body?.action))return portioningHandler(req,res);
  if(['preparationList','preparationCountGuide','savePreparation'].includes(req.body?.action))return preparationHandler(req,res);
- if(['dayList','dayAdd'].includes(req.body?.action))return dayListHandler(req,res);
+ if(['dayList','dayAdd','dayImport'].includes(req.body?.action))return dayListHandler(req,res);
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
  try{
