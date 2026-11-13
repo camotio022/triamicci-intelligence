@@ -21,7 +21,7 @@ export default function Production({membership,initialTaskId}){
  const openedTaskRef=useRef(null);
  const [view,setView]=useState('today'),[setupRecipe,setSetupRecipe]=useState(null),[setupDirty,setSetupDirty]=useState(false);
  const [preparationEditor,setPreparationEditor]=useState(false),[preparationSearch,setPreparationSearch]=useState(''),[preparationFilter,setPreparationFilter]=useState('all');
- const switchView=next=>{if(next!==view&&setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setView(next);if(next!=='preparations')setPreparationEditor(false);};
+ const switchView=next=>{if(next!==view&&setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setView(next);if(next!=='preparations')setPreparationEditor(false);if(next!=='today'){setShowExecution(false);setActiveTaskId(null);}};
  const openPreparation=id=>{setSetupRecipe({id,nonce:Date.now()});setPreparationEditor(true);requestAnimationFrame(()=>document.querySelector('.production-preparation-editor')?.scrollIntoView({behavior:'smooth',block:'start'}));};
  const closePreparation=()=>{if(setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setPreparationEditor(false);setSetupRecipe(null);};
  const [blockedRecipes,setBlockedRecipes]=useState([]),[reviewRecipes,setReviewRecipes]=useState([]);
