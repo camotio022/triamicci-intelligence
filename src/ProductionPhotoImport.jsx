@@ -1,6 +1,6 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {Camera,ImagePlus,ScanText,ClipboardCheck,Trash2,Plus,X,AlertTriangle,CheckCircle2} from 'lucide-react';
-import {parseProductionNote,validImportRows} from './production-photo-parse.js';
+import {parseProductionNote,validImportRows,evaluatePhotoRecognition} from './production-photo-parse.js';
 import './ProductionPhotoImport.css';
 
 let ocrScriptPromise=null;
@@ -17,16 +17,16 @@ function loadOcr(){
  return ocrScriptPromise;
 }
 export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
- const inputRef=useRef(null),idRef=useRef(null),fileUrl=useRef(null);
+ const inputRef=useRef(null),galleryRef=useRef(null),idRef=useRef(null),fileUrl=useRef(null);
  const [file,setFile]=useState(null),[preview,setPreview]=useState(''),[text,setText]=useState(''),[rows,setRows]=useState([]);
  const [stage,setStage]=useState('photo'),[busy,setBusy]=useState(false),[progress,setProgress]=useState(0),[error,setError]=useState(''),[reviewed,setReviewed]=useState(false),[allowDay,setAllowDay]=useState(false);
- const [saved,setSaved]=useState([]),[failed,setFailed]=useState(false);
+ const [saved,setSaved]=useState([]),[failed,setFailed]=useState(false),[uncertain,setUncertain]=useState(false);
  const fileInput=e=>{
   const f=e.target.files?.[0];if(!f)return;
   if(!/^image\/(jpeg|png|webp|heic|heif)$/i.test(f.type)&&!/\.(jpg|jpeg|png|webp|heic|heif)$/i.test(f.name)){setError('Escolha uma foto JPG, PNG ou HEIC.');return;}
   if(f.size>12*1024*1024){setError('Foto acima de 12 MB. Escolha uma imagem menor.');return;}
   if(fileUrl.current)URL.revokeObjectURL(fileUrl.current);
-  fileUrl.current=URL.createObjectURL(f);setPreview(fileUrl.current);setFile(f);setText('');setRows([]);setReviewed(false);setStage('photo');setError('');setProgress(0);setSaved([]);idRef.current=null;
+  fileUrl.current=URL.createObjectURL(f);setPreview(fileUrl.current);setFile(f);setText('');setRows([]);setReviewed(false);setStage('photo');setError('');setProgress(0);setSaved([]);setUncertain(false);idRef.current=null;
  };
  useEffect(()=>()=>{if(fileUrl.current)URL.revokeObjectURL(fileUrl.current)},[]);
  const scan=async()=>{
@@ -38,12 +38,13 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
    worker=await engine.createWorker('por',1,{logger:m=>{if(m?.status==='recognizing text')setProgress(Math.round((m.progress||0)*100));}});
    const result=await worker.recognize(file);
    const value=(result.data?.text||'').trim();
-   setText(value);setRows(parseProductionNote(value,recipes));setStage('review');
-   if(!value)setError('Não foi possível identificar a escrita. Você pode transcrever a lista no campo de texto.');
-  }catch(e){setStage('review');setError('Não foi possível reconhecer automaticamente. Digite ou corrija a lista abaixo; nenhuma foto foi enviada ao servidor.');}
+   const assessment=evaluatePhotoRecognition(value,recipes,result.data?.confidence);
+   setText(value);setRows(assessment.rows);setUncertain(!assessment.reliable);setStage('review');
+   if(!assessment.reliable)setError('Leitura pouco confiável: a imagem pode não mostrar uma lista legível ou a caligrafia não foi reconhecida. Nenhuma tarefa foi sugerida. Confira a foto, tente outra imagem ou escreva os itens corretamente abaixo.');
+  }catch(e){setRows([]);setUncertain(true);setStage('review');setError('Não foi possível reconhecer automaticamente. Digite os itens abaixo ou tire outra foto; nenhuma foto foi enviada ao servidor.');}
   finally{try{await worker?.terminate()}catch{}setBusy(false);}
  };
- const rebuild=()=>{setRows(parseProductionNote(text,recipes));setReviewed(false);setError('');};
+ const rebuild=()=>{setRows(parseProductionNote(text,recipes).slice(0,12));setUncertain(false);setReviewed(false);setError('');};
  const change=(id,patch)=>{setRows(old=>old.map(row=>row.id===id?{...row,...patch}:row));setReviewed(false);};
  const selected=rows.filter(r=>r.selected);
  const hasDateNotes=selected.some(r=>r.dateNote);
@@ -64,20 +65,23 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
   <div className="photo-import-header"><div><small>PLANEJAMENTO INTELIGENTE</small><h3>Importar por foto</h3><p>Fotografe a anotação, revise o reconhecimento e crie as tarefas de hoje.</p></div><button type="button" aria-label="Fechar importação" onClick={onClose}><X size={19}/></button></div>
   <div className="photo-import-steps"><span className={stage==='photo'?'active':''}>1 · Foto</span><span className={stage==='review'?'active':''}>2 · Revisar</span><span className={stage==='done'?'active':''}>3 · Concluir</span></div>
   {stage==='photo'&&<div className="photo-import-photo">
-   <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={fileInput} aria-label="Foto da lista de produção" hidden/>
+   <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={fileInput} aria-label="Tirar foto da lista" hidden/>
+   <input ref={galleryRef} type="file" accept="image/*" onChange={fileInput} aria-label="Selecionar foto existente" hidden/>
    {preview?<img className="photo-import-preview" src={preview} alt="Foto selecionada da lista manuscrita"/>:<div className="photo-import-empty"><Camera size={30}/><strong>Fotografe a lista da cozinha</strong><span>JPG, PNG ou HEIC · até 12 MB</span></div>}
-   <button type="button" className="photo-import-outline" disabled={busy} onClick={()=>inputRef.current?.click()}><ImagePlus size={17}/> {preview?'Trocar foto':'Abrir câmera ou selecionar foto'}</button>
+   <div className="photo-import-image-actions"><button type="button" className="photo-import-outline" disabled={busy} onClick={()=>inputRef.current?.click()}><Camera size={17}/> Tirar foto agora</button><button type="button" className="photo-import-outline" disabled={busy} onClick={()=>galleryRef.current?.click()}><ImagePlus size={17}/> Escolher da galeria</button></div>
    <button type="button" className="photo-import-primary" disabled={!file||busy} onClick={scan}><ScanText size={17}/>{busy?'Reconhecendo '+progress+'%':'Reconhecer escrita'}</button>
    {busy&&<progress aria-label="Progresso do reconhecimento" max="100" value={progress}/>}
    <button type="button" className="photo-import-textlink" disabled={busy} onClick={()=>{setStage('review');setError('');}}>Digitar lista manualmente</button>
    <p className="photo-import-footnote">Reconhecimento gratuito no celular, sem cobrança por imagem. Requer internet para carregar o motor de OCR; manuscritos podem não ser reconhecidos corretamente.</p>
   </div>}
   {stage==='review'&&<div className="photo-import-review">
-   {preview&&<details><summary>Consultar foto original</summary><img className="photo-import-preview" src={preview} alt="Lista para conferência"/></details>}
+   {preview&&<details open={uncertain?true:undefined}><summary>Consultar foto original</summary><img className="photo-import-preview" src={preview} alt="Lista para conferência"/></details>}
+   {uncertain&&<div className="photo-import-quality" role="status"><AlertTriangle size={19}/><div><strong>Não conseguimos ler a lista com segurança</strong><p>Em vez de mostrar dezenas de nomes sem sentido, deixamos a revisão vazia. Para melhorar: fotografe só a folha, de frente, bem iluminada e com a escrita ocupando a imagem.</p></div></div>}
+   {uncertain&&<button type="button" className="photo-import-outline" onClick={()=>{setStage('photo');setRows([]);setError('');}}> <Camera size={17}/> Tentar outra foto</button>}
    <label className="photo-import-transcript">Texto identificado (pode corrigir)<textarea aria-label="Texto da lista" rows={4} value={text} onChange={e=>setText(e.target.value)} placeholder={'Batata purê\nBatata palha\n30 alcatra\n40 frango'}/></label>
    <button type="button" className="photo-import-outline" disabled={busy} onClick={rebuild}><ScanText size={16}/> Interpretar texto revisado</button>
    <div className="photo-import-rows-heading"><strong>Preparações encontradas</strong><small>{selected.length} selecionada(s)</small></div>
-   {!rows.length&&<p className="photo-import-footnote">Nenhuma linha identificada. Corrija o texto acima e toque em “Interpretar texto revisado”.</p>}
+   {!rows.length&&<p className="photo-import-footnote">{uncertain?'Nenhuma preparação confiável foi reconhecida. Corrija o texto acima ou escolha outra foto; depois toque em “Interpretar texto revisado”.':'Nenhuma linha identificada. Corrija o texto acima e toque em “Interpretar texto revisado”.'}</p>}
    {rows.map(r=><div className="photo-import-item" key={r.id}>
     <div className="photo-import-item-title"><label><input type="checkbox" checked={r.selected} onChange={e=>change(r.id,{selected:e.target.checked})}/> Incluir</label><button type="button" aria-label={'Remover linha '+r.label} onClick={()=>{setRows(old=>old.filter(x=>x.id!==r.id));setReviewed(false)}}><Trash2 size={16}/></button></div>
     <label>Nome lido<input type="text" maxLength={100} value={r.label} onChange={e=>change(r.id,{label:e.target.value,recipeId:''})}/></label>

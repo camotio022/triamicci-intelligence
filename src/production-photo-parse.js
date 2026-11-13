@@ -57,3 +57,16 @@ export function validImportRows(rows,recipes){
   return n>0&&n<=10000&&(!['un','porcao','pacote','duzia'].includes(item.outputUnit||'un')||Number.isInteger(n));
  });
 }
+
+/** OCR de manuscritos: só ofereça automaticamente itens cuja identidade seja verificável.
+ * Leituras ruins permanecem no texto editável, nunca geram dezenas de cards falsos.
+ */
+export function evaluatePhotoRecognition(text,recipes=[],confidence=null){
+ const raw=parseProductionNote(text,recipes);
+ const matched=raw.filter(row=>Boolean(row.recipeId));
+ const average=typeof confidence==='number'&&Number.isFinite(confidence)?confidence:null;
+ // Alto número de linhas incompreensíveis é sinal de OCR impreciso ou foto sem lista.
+ const ratio=raw.length?matched.length/raw.length:0;
+ const reliable=matched.length>0&&ratio>=.35&&(average===null||average>=45);
+ return {reliable,rows:reliable?matched.slice(0,12):[],recognized:matched.length,total:raw.length,confidence:average};
+}
