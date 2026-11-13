@@ -12,6 +12,8 @@ test('salvar preparação disponibiliza e seleciona a ficha na produção de hoj
  assert.equal(await page.getByRole('region',{name:'Importar planejamento por foto'}).isVisible(),true);
  assert.equal(await page.getByRole('button',{name:'Tirar foto agora'}).isVisible(),true);
  assert.equal(await page.getByRole('button',{name:'Escolher da galeria'}).isVisible(),true);
+ assert.equal(await page.getByRole('combobox',{name:'Região para leitura'}).inputValue(),'center');
+ await page.getByRole('combobox',{name:'Região para leitura'}).selectOption('full');
  assert.equal(await page.locator('input[aria-label="Selecionar foto existente"]').getAttribute('capture'),null);
  assert.equal(await page.locator('input[aria-label="Tirar foto da lista"]').getAttribute('capture'),'environment');
  await page.getByRole('button',{name:'Digitar lista manualmente'}).click();
