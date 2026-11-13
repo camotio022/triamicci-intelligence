@@ -17,7 +17,7 @@ function loadOcr(){
  return ocrScriptPromise;
 }
 export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
- const inputRef=useRef(null),idRef=useRef(null),fileUrl=useRef(null);
+ const inputRef=useRef(null),galleryRef=useRef(null),idRef=useRef(null),fileUrl=useRef(null);
  const [file,setFile]=useState(null),[preview,setPreview]=useState(''),[text,setText]=useState(''),[rows,setRows]=useState([]);
  const [stage,setStage]=useState('photo'),[busy,setBusy]=useState(false),[progress,setProgress]=useState(0),[error,setError]=useState(''),[reviewed,setReviewed]=useState(false),[allowDay,setAllowDay]=useState(false);
  const [saved,setSaved]=useState([]),[failed,setFailed]=useState(false),[uncertain,setUncertain]=useState(false);
@@ -65,9 +65,10 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
   <div className="photo-import-header"><div><small>PLANEJAMENTO INTELIGENTE</small><h3>Importar por foto</h3><p>Fotografe a anotação, revise o reconhecimento e crie as tarefas de hoje.</p></div><button type="button" aria-label="Fechar importação" onClick={onClose}><X size={19}/></button></div>
   <div className="photo-import-steps"><span className={stage==='photo'?'active':''}>1 · Foto</span><span className={stage==='review'?'active':''}>2 · Revisar</span><span className={stage==='done'?'active':''}>3 · Concluir</span></div>
   {stage==='photo'&&<div className="photo-import-photo">
-   <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={fileInput} aria-label="Foto da lista de produção" hidden/>
+   <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={fileInput} aria-label="Tirar foto da lista" hidden/>
+   <input ref={galleryRef} type="file" accept="image/*" onChange={fileInput} aria-label="Selecionar foto existente" hidden/>
    {preview?<img className="photo-import-preview" src={preview} alt="Foto selecionada da lista manuscrita"/>:<div className="photo-import-empty"><Camera size={30}/><strong>Fotografe a lista da cozinha</strong><span>JPG, PNG ou HEIC · até 12 MB</span></div>}
-   <button type="button" className="photo-import-outline" disabled={busy} onClick={()=>inputRef.current?.click()}><ImagePlus size={17}/> {preview?'Trocar foto':'Abrir câmera ou selecionar foto'}</button>
+   <div className="photo-import-image-actions"><button type="button" className="photo-import-outline" disabled={busy} onClick={()=>inputRef.current?.click()}><Camera size={17}/> Tirar foto agora</button><button type="button" className="photo-import-outline" disabled={busy} onClick={()=>galleryRef.current?.click()}><ImagePlus size={17}/> Escolher da galeria</button></div>
    <button type="button" className="photo-import-primary" disabled={!file||busy} onClick={scan}><ScanText size={17}/>{busy?'Reconhecendo '+progress+'%':'Reconhecer escrita'}</button>
    {busy&&<progress aria-label="Progresso do reconhecimento" max="100" value={progress}/>}
    <button type="button" className="photo-import-textlink" disabled={busy} onClick={()=>{setStage('review');setError('');}}>Digitar lista manualmente</button>
