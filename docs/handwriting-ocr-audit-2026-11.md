@@ -18,7 +18,7 @@
 
 ## Mudanças nesta branch
 
-- Endpoint autenticado `POST /api/production/photo-recognize` usando `GOOGLE_VISION_API_KEY` **apenas no servidor**, validando MIME, assinatura, tamanho, origem, login e vínculo de unidade.
+- Rota autenticada `POST /api/operations/stock` com `action: 'photoRecognize'` (handler interno em `server/production/photo-recognize.js`) usando `GOOGLE_VISION_API_KEY` **apenas no servidor**, validando MIME, assinatura, tamanho, origem, login e vínculo de unidade.
 - Controle de até 20 chamadas por usuário/dia UTC e espaçamento mínimo de 20 s por conta; sem guardar fotos ou texto no Firestore (apenas contadores).
 - Foto convertida pelo navegador para JPEG antes da transmissão; envio acontece somente após ação explícita. A imagem transita por Google Cloud Vision, sujeito às políticas da conta do provedor.
 - UI tenta serviço de manuscrito primeiro; se indisponível, informa motivo e usa Tesseract local como fallback.
@@ -55,3 +55,7 @@
 - Erros de iOS que ocultem mensagens, OCR demorado demais ou travamento no PWA.
 - Chave exposta, ausência de restrições de custo/rate limit, vazamento entre unidades.
 - Qualquer escrita de estoque pela importação de foto.
+
+## CI após criação da PR
+
+A primeira execução de `tests/catalog-56.test.mjs` detectou que a criação de uma função Vercel extra excederia o limite de 12 funções. O handler foi movido para `server/production/photo-recognize.js` e passou a usar a rota `/api/operations/stock` existente; é obrigatória nova verificação do CI antes da homologação.
