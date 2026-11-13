@@ -67,6 +67,6 @@ export function evaluatePhotoRecognition(text,recipes=[],confidence=null){
  const average=typeof confidence==='number'&&Number.isFinite(confidence)?confidence:null;
  // Alto número de linhas incompreensíveis é sinal de OCR impreciso ou foto sem lista.
  const ratio=raw.length?matched.length/raw.length:0;
- const reliable=matched.length>0&&ratio>=.35&&(average===null||average>=45);
+ const reliable=matched.length>0&&((ratio>=.35&&(average===null||average>=45))||(average!==null&&average>=70&&ratio>=.2));
  return {reliable,rows:reliable?matched.slice(0,12):[],recognized:matched.length,total:raw.length,confidence:average};
 }
