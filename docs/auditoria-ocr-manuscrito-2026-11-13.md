@@ -18,7 +18,7 @@
 | Modelo multimodal com visão | Pode interpretar contexto da lista | Custo, latência, possibilidade de invenção; exige validação rígida |
 
 ## Implementação proposta nesta branch
-- Substituir o caminho padrão do Tesseract por endpoint autenticado `/api/production/recognize-photo` (Cloud Vision, opt-in).
+- Substituir o caminho padrão do Tesseract por ação autenticada `recognizePhoto` em `/api/production/manage` (Cloud Vision, opt-in).
 - Usar o service account no servidor, sem chave no frontend. `PHOTO_OCR_PROVIDER=google-vision` habilita o recurso. O projeto precisa habilitar a Vision API, conceder permissões ao service account e configurar faturamento. Sem isso, o recurso **não está operacional**.
 - Limitar JPEG/PNG/WebP a 1,8 MB decodificados, verificar assinatura, exigir consentimento explícito e aplicar limite de 20 leituras por usuário/dia/unidade no Firestore. O aplicativo não persiste fotos de OCR; o provedor externo possui suas próprias políticas de tratamento de dados.
 - Mostrar o recorte e permitir ampliar, deslocar e girar a foto; preservar original para conferência.
