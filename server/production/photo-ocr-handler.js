@@ -15,7 +15,7 @@ export default async function photoOcrHandler(req,res){
   const bytes=Buffer.from(image,'base64');
   if(bytes.length<4||bytes[0]!==255||bytes[1]!==216||bytes[2]!==255||bytes.at(-2)!==255||bytes.at(-1)!==217)
    return send(res,400,'Envie uma imagem JPEG válida.');
-  const key=process.env.PRODUCTION_VISION_API_KEY?.trim();
+  const key=process.env.GEMINI_API_KEY?.trim();
   if(!key)return send(res,503,'A leitura automática ainda não está habilitada. Você pode revisar pelo catálogo.',{code:'PHOTO_OCR_UNAVAILABLE'});
 
   // The unit-wide window also applies across concurrent serverless instances.
@@ -35,8 +35,9 @@ export default async function photoOcrHandler(req,res){
   return send(res,200,'Leitura concluída.',{lines});
  }catch(error){
   if(error.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
+  if(error.message==='GEMINI_HTTP_429')return send(res,429,'A cota do Gemini foi atingida. Revise pelo catálogo ou tente mais tarde.',{code:'PHOTO_OCR_QUOTA'});
   if(sendQuotaError(res,error))return;
-  console.error('Production photo OCR:',error.name,error.message.match(/^VISION_[A-Z0-9_]+$/)?.[0]||'REQUEST_FAILED');
+  console.error('Production photo OCR:',error.name,error.message.match(/^GEMINI_[A-Z0-9_]+$/)?.[0]||'REQUEST_FAILED');
   return send(res,503,'O serviço de leitura está indisponível. Tente novamente ou revise pelo catálogo.',{code:'PHOTO_OCR_UNAVAILABLE'});
  }
 }

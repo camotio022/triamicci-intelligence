@@ -9,8 +9,8 @@ test('salvar preparação disponibiliza e seleciona a ficha na produção de hoj
  if(body.action==='photoRecognize'){
   scans.push(body);
   data={lines:[
-   [{text:'8',confidence:.98},...['Frango','recebido','cortado'].map(text=>({text,confidence:.97}))],
-   [{text:'Frango',confidence:.25}]
+   {name:'Frango recebido cortado',quantity:'8',dateNote:''},
+   {name:'Talheres',quantity:'',dateNote:''}
   ]};
  }
  if(body.action==='dayImport'){tasks.push(...body.items.map((item,i)=>({id:'photo-'+i,recipeId:item.recipeId,recipeName:recipes.find(r=>r.id===item.recipeId)?.name||'Produto',status:'pending',plannedQuantity:item.plannedQuantity})));data={message:'Importado',taskIds:body.items.map((_,i)=>'photo-'+i)};}
@@ -30,7 +30,9 @@ test('salvar preparação disponibiliza e seleciona a ficha na produção de hoj
   await page.getByRole('button',{name:'Reconhecer escrita'}).click();
   await page.getByText('Consultar foto original').waitFor();
   assert.match(scans[0].image,/^\/9j\//);
-  assert.equal(await page.getByRole('spinbutton',{name:/Meta para hoje/}).inputValue(),'8');
+  assert.equal(await page.getByRole('spinbutton',{name:/Meta para hoje/}).inputValue(),'');
+  await page.getByText(/Quantidade lida: 8/).waitFor();
+  await page.getByRole('spinbutton',{name:/Meta para hoje/}).fill('8');
   assert.equal(await page.getByRole('textbox',{name:'Nome lido'}).count(),1);
   assert.equal(tasks.length,1);
  }else{

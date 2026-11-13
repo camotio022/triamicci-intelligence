@@ -79,7 +79,7 @@ export default function ProductionPhotoImport({recipes=[],onRecognize,onImport,o
    <button type="button" className="photo-import-primary" disabled={!image||busy} onClick={scan}><ScanText size={17}/>{busy?'Reconhecendo…':'Reconhecer escrita'}</button>
    {busy&&<progress aria-label="Reconhecimento em andamento"/>}
    <button type="button" className="photo-import-textlink" disabled={busy} onClick={()=>{setStage('review');setShowManual(true);setError('');}}>Digitar lista manualmente</button>
-   <p className="photo-import-footnote">A área enquadrada será enviada ao Google Cloud Vision para leitura. Inclua apenas a anotação.</p>
+   <p className="photo-import-footnote">O recorte será enviado ao Gemini. Use fotos sem dados pessoais, sensíveis ou confidenciais.</p>
   </div>}
   {stage==='review'&&<div className="photo-import-review">
    {preview&&<details open={uncertain?true:undefined}><summary>Consultar foto original</summary><img className="photo-import-preview" src={preview} alt="Lista para conferência"/></details>}
