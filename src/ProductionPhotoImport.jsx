@@ -2,6 +2,8 @@ import React,{useEffect,useRef,useState} from 'react';
 import {Camera,ImagePlus,ScanText,ClipboardCheck,Trash2,Plus,X,AlertTriangle,CheckCircle2} from 'lucide-react';
 import {parseProductionNote,validImportRows,evaluatePhotoRecognition} from './production-photo-parse.js';
 import './ProductionPhotoImport.css';
+import {sessionAuth} from './firebase.js';
+import {apiFetch} from './api-fetch.js';
 
 let ocrScriptPromise=null;
 function loadOcr(){
@@ -43,7 +45,7 @@ async function prepareOcrImage(file,mode='center',enhance=false){
    }
    ctx.putImageData(pixels,0,0);
   }
-  return canvas.toDataURL('image/png');
+  return canvas.toDataURL('image/jpeg',.80);
  }finally{URL.revokeObjectURL(objectUrl)}
 }
 
@@ -51,13 +53,14 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
  const inputRef=useRef(null),galleryRef=useRef(null),idRef=useRef(null),fileUrl=useRef(null);
  const [file,setFile]=useState(null),[preview,setPreview]=useState(''),[text,setText]=useState(''),[rows,setRows]=useState([]);
  const [stage,setStage]=useState('photo'),[busy,setBusy]=useState(false),[progress,setProgress]=useState(0),[error,setError]=useState(''),[reviewed,setReviewed]=useState(false),[allowDay,setAllowDay]=useState(false);
+ const [recognitionNotice,setRecognitionNotice]=useState('');
  const [showManual,setShowManual]=useState(false); const [saved,setSaved]=useState([]),[failed,setFailed]=useState(false),[uncertain,setUncertain]=useState(false),[scanArea,setScanArea]=useState('center');
  const fileInput=e=>{
   const f=e.target.files?.[0];if(!f)return;
   if(!/^image\/(jpeg|png|webp|heic|heif)$/i.test(f.type)&&!/\.(jpg|jpeg|png|webp|heic|heif)$/i.test(f.name)){setError('Escolha uma foto JPG, PNG ou HEIC.');return;}
   if(f.size>12*1024*1024){setError('Foto acima de 12 MB. Escolha uma imagem menor.');return;}
   if(fileUrl.current)URL.revokeObjectURL(fileUrl.current);
-  fileUrl.current=URL.createObjectURL(f);setPreview(fileUrl.current);setFile(f);setText('');setRows([]);setReviewed(false);setStage('photo');setError('');setProgress(0);setSaved([]);setShowManual(false);setUncertain(false);setScanArea('center');idRef.current=null;
+  fileUrl.current=URL.createObjectURL(f);setPreview(fileUrl.current);setFile(f);setText('');setRows([]);setReviewed(false);setStage('photo');setError('');setRecognitionNotice('');setProgress(0);setSaved([]);setShowManual(false);setUncertain(false);setScanArea('center');idRef.current=null;
  };
  useEffect(()=>()=>{if(fileUrl.current)URL.revokeObjectURL(fileUrl.current)},[]);
  const scan=async()=>{
@@ -65,6 +68,27 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
   setBusy(true);setError('');setProgress(0);
   let worker;
   try{
+   // First use a dedicated handwriting service. The image is sent only after an
+   // explicit scan action, authenticated, without exposing credentials in the PWA.
+   let cloudFailure='';
+   try{
+    const token=await sessionAuth.currentUser?.getIdToken();
+    if(!token)throw Error('Sessão indisponível.');
+    const dataUrl=await prepareOcrImage(file,scanArea);
+    const image=dataUrl.split(',')[1];
+    if(image.length>4_000_000)throw Error('Imagem muito grande para leitura remota.');
+    const response=await apiFetch('/api/production/photo-recognize',{
+     method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+     body:JSON.stringify({image,mimeType:'image/jpeg'}),cache:'no-store'
+    });
+    const data=await response.json();
+    if(!response.ok)throw Error(data.message||'Serviço de manuscritos indisponível.');
+    const assessment=evaluatePhotoRecognition(data.text,recipes,data.confidence);
+    setText(data.text||'');setRows(assessment.rows);setUncertain(!assessment.reliable);
+    setShowManual(false);setStage('review');setRecognitionNotice('Leitura de manuscritos: serviço especializado. Confira os itens antes de importar.');
+    return;
+   }catch(e){cloudFailure=e.message||'Leitura especializada indisponível.';}
+   setRecognitionNotice('Leitura especializada indisponível: '+cloudFailure+' Tentando OCR local (limitado para manuscritos).');
    const engine=await loadOcr();
    worker=await engine.createWorker('por',1,{logger:m=>{if(m?.status==='recognizing text')setProgress(Math.round((m.progress||0)*100));}});
    // Primeiro tenta a foto recortada; em caso de baixa confiança, repete
@@ -91,7 +115,7 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
    setUncertain(!assessment.reliable);
    setShowManual(false);setStage('review');
    if(!assessment.reliable)setError('');
-  }catch(e){setRows([]);setUncertain(true);setStage('review');setError('');}
+  }catch(e){setRows([]);setUncertain(true);setStage('review');setError('Não foi possível executar o OCR local: '+(e.message||'erro desconhecido')+'. Você pode continuar manualmente.');}
   finally{try{await worker?.terminate()}catch{}setBusy(false);}
  };
  const rebuild=()=>{setRows(parseProductionNote(text,recipes).slice(0,12));setUncertain(false);setReviewed(false);setError('');};
@@ -123,10 +147,11 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
    <button type="button" className="photo-import-primary" disabled={!file||busy} onClick={scan}><ScanText size={17}/>{busy?'Reconhecendo '+progress+'%':'Reconhecer escrita'}</button>
    {busy&&<progress aria-label="Progresso do reconhecimento" max="100" value={progress}/>}
    <button type="button" className="photo-import-textlink" disabled={busy} onClick={()=>{setStage('review');setShowManual(true);setError('');}}>Digitar lista manualmente</button>
-   <p className="photo-import-footnote">Reconhecimento gratuito no celular, com até três tentativas de leitura e sem cobrança por imagem. Requer internet para carregar o motor de OCR; manuscritos podem não ser reconhecidos corretamente.</p>
+   <p className="photo-import-footnote">A leitura especializada usa um serviço externo configurado no servidor e pode ter custos ou limites. Se indisponível, usamos o OCR local gratuito. Nenhuma tarefa é salva sem confirmação.</p>
   </div>}
   {stage==='review'&&<div className="photo-import-review">
    {preview&&<details open={uncertain?true:undefined}><summary>Consultar foto original</summary><img className="photo-import-preview" src={preview} alt="Lista para conferência"/></details>}
+   {recognitionNotice&&<p className="photo-import-footnote" role="status">{recognitionNotice}</p>}
    {uncertain&&<div className="photo-import-quality" role="status"><AlertTriangle size={19}/><div><strong>Não conseguimos ler a lista com segurança</strong><p>Nenhuma tarefa foi sugerida. Recorte a anotação mais de perto ou confirme os itens manualmente.</p></div></div>}
    {uncertain&&<button type="button" className="photo-import-outline" onClick={()=>{setStage('photo');setRows([]);setError('');}}> <Camera size={17}/> Recortar melhor ou escolher outra foto</button>}
    {(uncertain||showManual)&&<div className="photo-import-quick"><strong>Adicionar do catálogo</strong><p>Selecione as preparações que você consegue confirmar na foto. Nada é incluído automaticamente.</p><select aria-label="Adicionar preparação do catálogo" value="" onChange={e=>{const recipe=recipes.find(r=>String(r.id)===e.target.value);if(!recipe)return;setRows(old=>old.length>=12||old.some(r=>r.recipeId===recipe.id)?old:[...old,{id:'row-manual-'+crypto.randomUUID(),label:recipe.name,recipeId:recipe.id,quantity:'',selected:true,dateNote:''}]);setReviewed(false);}}><option value="">Selecionar preparação…</option>{recipes.filter(r=>!rows.some(row=>row.recipeId===r.id)).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div>}
