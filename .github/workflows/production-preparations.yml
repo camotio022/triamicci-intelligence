@@ -8,6 +8,8 @@ on:
       - 'api/production/manage.js'
       - 'tests/production-preparation-flow.test.mjs'
       - 'tests/production-photo-parse.test.mjs'
+      - 'tests/production-photo-vision.test.mjs'
+      - 'server/production/photo-recognition-handler.js'
       - 'src/ProductionPhotoImport.jsx'
       - 'src/production-photo-parse.js'
       - '.github/workflows/production-preparations.yml'
@@ -23,7 +25,7 @@ jobs:
         with:
           node-version: '24'
       - name: Validar os três tipos de cadastro
-        run: node --test tests/production-preparation-flow.test.mjs tests/production-photo-parse.test.mjs
+        run: node --test tests/production-preparation-flow.test.mjs tests/production-photo-parse.test.mjs tests/production-photo-vision.test.mjs
       - name: Instalar dependências
         run: npm ci --no-audit --no-fund
       - name: Compilar PWA

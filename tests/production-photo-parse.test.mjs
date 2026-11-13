@@ -39,10 +39,21 @@ test('OCR ilegível não gera 20 preparações fictícias',()=>{
 test('OCR reconhecido mantém só itens vinculados ao catálogo',()=>{
  const report=evaluatePhotoRecognition('Batata purê\nBatata palha\ntexto impossível',recipes,80);
  assert.equal(report.reliable,true);
- assert.deepEqual(report.rows.map(x=>x.recipeId),['batata-pure','batata-palha']);
+ assert.deepEqual(report.rows.filter(x=>x.selected).map(x=>x.recipeId),['batata-pure','batata-palha']);
+ assert.equal(report.rows.find(x=>x.label==='texto impossível')?.selected,false);
 });
 test('OCR sem confiança suficiente impede sugestão automática',()=>{
  const report=evaluatePhotoRecognition('Batata purê',recipes,31);
  assert.equal(report.reliable,false);
  assert.equal(report.rows.length,0);
+});
+
+test('partial handwriting keeps 30 alcatra and 40 frango for human catalog review',()=>{
+ const report=evaluatePhotoRecognition('Molho branco\nBatata purê\nBatata palha\n30 alcatra\n40 frango',recipes,78);
+ assert.equal(report.reliable,true);
+ assert.equal(report.rows.length,5);
+ assert.deepEqual(report.rows.filter(x=>x.selected).map(x=>x.recipeId),['batata-pure','batata-palha']);
+ assert.equal(report.rows.find(x=>x.label==='alcatra')?.quantity,'30');
+ assert.equal(report.rows.find(x=>x.label==='alcatra')?.selected,false);
+ assert.equal(report.rows.find(x=>x.label==='frango')?.selected,false);
 });
