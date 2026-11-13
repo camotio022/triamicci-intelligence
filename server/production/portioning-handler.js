@@ -36,7 +36,7 @@ export default async function portioningHandler(req,res){
    if(action==='reconcilePortioning'&&!manager(a.data()))throw Error('FORBIDDEN');
    if(existing?.exists){if(existing.data().payloadHash!==hash||existing.data().actorUid!==actor.uid)throw Error('CONFLICT');duplicate=true;return;}
    const recipe=r.data(),cfg=recipe?.preparationConfig;
-   if(!r.exists||recipe.active!==true||recipe.stockEffect!=='portion_same_product'||!cfg||cfg.sourceProductId!==cfg.outputProductId)throw Error('RECIPE');
+   if(!r.exists||recipe.active!==true||recipe.stockEffect!=='portion_same_product'||!cfg||!['portion','transform'].includes(cfg.type)||cfg.sourceProductId!==cfg.outputProductId)throw Error('RECIPE');
    const productId=cfg.sourceProductId,area=cfg.location,pRef=root.collection('products').doc(productId),bRef=root.collection('physicalBalances').doc(productId),sRef=root.collection('portioningState').doc(productId+'-'+area);
    const [product,balance,state]=await tx.getAll(pRef,bRef,sRef);
    if(!product.exists||!isOperationalProduct(product.data())||!balance.exists||!['reserva','giro'].includes(area))throw Error('STOCK');
