@@ -39,8 +39,10 @@
 .photo-import-image-actions button{min-width:0;white-space:normal;text-align:center;line-height:1.3}
 @media(max-width:360px){.photo-import-image-actions{grid-template-columns:minmax(0,1fr)}}
 
-.photo-import-scan-area{display:grid;gap:6px;font-size:12px;font-weight:750;color:#34445b;min-width:0}
-.photo-import-scan-area small{font-size:11px;font-weight:400;color:#68788e;line-height:1.45}
-.photo-import .photo-import-scan-area select{width:100%;min-width:0;max-width:100%;font-size:14px;overflow:hidden;text-overflow:ellipsis}
 
 .photo-import-quick{display:grid;gap:7px;padding:12px;border:1px solid #dfe5ed;border-radius:12px;background:#f8fafc;min-width:0}.photo-import-quick strong{font-size:13px}.photo-import-quick p{margin:0;font-size:11px;line-height:1.5;color:#62738a}.photo-import-quick select{width:100%;min-width:0}.photo-import-review .photo-import-quality{padding:10px}.photo-import-review .photo-import-quality p{margin-top:3px}
+
+.photo-import-frame,.photo-import-edit{display:grid;gap:10px;min-width:0}
+.photo-import-edit{border:0;margin:0;padding:0}
+.photo-import-frame label{display:grid;gap:4px;font-size:12px;font-weight:700}
+.photo-import-frame input[type=range]{width:100%;min-height:32px;accent-color:#af1716}
