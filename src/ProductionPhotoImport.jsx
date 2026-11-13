@@ -40,13 +40,13 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
  const inputRef=useRef(null),galleryRef=useRef(null),idRef=useRef(null),fileUrl=useRef(null);
  const [file,setFile]=useState(null),[preview,setPreview]=useState(''),[text,setText]=useState(''),[rows,setRows]=useState([]);
  const [stage,setStage]=useState('photo'),[busy,setBusy]=useState(false),[progress,setProgress]=useState(0),[error,setError]=useState(''),[reviewed,setReviewed]=useState(false),[allowDay,setAllowDay]=useState(false);
- const [saved,setSaved]=useState([]),[failed,setFailed]=useState(false),[uncertain,setUncertain]=useState(false),[scanArea,setScanArea]=useState('center');
+ const [showManual,setShowManual]=useState(false); const [saved,setSaved]=useState([]),[failed,setFailed]=useState(false),[uncertain,setUncertain]=useState(false),[scanArea,setScanArea]=useState('center');
  const fileInput=e=>{
   const f=e.target.files?.[0];if(!f)return;
   if(!/^image\/(jpeg|png|webp|heic|heif)$/i.test(f.type)&&!/\.(jpg|jpeg|png|webp|heic|heif)$/i.test(f.name)){setError('Escolha uma foto JPG, PNG ou HEIC.');return;}
   if(f.size>12*1024*1024){setError('Foto acima de 12 MB. Escolha uma imagem menor.');return;}
   if(fileUrl.current)URL.revokeObjectURL(fileUrl.current);
-  fileUrl.current=URL.createObjectURL(f);setPreview(fileUrl.current);setFile(f);setText('');setRows([]);setReviewed(false);setStage('photo');setError('');setProgress(0);setSaved([]);setUncertain(false);setScanArea('center');idRef.current=null;
+  fileUrl.current=URL.createObjectURL(f);setPreview(fileUrl.current);setFile(f);setText('');setRows([]);setReviewed(false);setStage('photo');setError('');setProgress(0);setSaved([]);setShowManual(false);setUncertain(false);setScanArea('center');idRef.current=null;
  };
  useEffect(()=>()=>{if(fileUrl.current)URL.revokeObjectURL(fileUrl.current)},[]);
  const scan=async()=>{
@@ -60,9 +60,9 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
    const result=await worker.recognize(scanImage);
    const value=(result.data?.text||'').trim();
    const assessment=evaluatePhotoRecognition(value,recipes,result.data?.confidence);
-   setText(assessment.reliable?value.slice(0,1600):'');setRows(assessment.rows);setUncertain(!assessment.reliable);setStage('review');
-   if(!assessment.reliable)setError('Leitura pouco confiável: a imagem pode não mostrar uma lista legível ou a caligrafia não foi reconhecida. Nenhuma tarefa foi sugerida. Confira a foto, tente outra imagem ou escreva os itens corretamente abaixo.');
-  }catch(e){setRows([]);setUncertain(true);setStage('review');setError('Não foi possível reconhecer automaticamente. Digite os itens abaixo ou tire outra foto; nenhuma foto foi enviada ao servidor.');}
+   setText(assessment.reliable?value.slice(0,1600):'');setRows(assessment.rows);setUncertain(!assessment.reliable);setShowManual(false);setStage('review');
+   if(!assessment.reliable)setError('');
+  }catch(e){setRows([]);setUncertain(true);setStage('review');setError('');}
   finally{try{await worker?.terminate()}catch{}setBusy(false);}
  };
  const rebuild=()=>{setRows(parseProductionNote(text,recipes).slice(0,12));setUncertain(false);setReviewed(false);setError('');};
@@ -93,18 +93,19 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
    <label className="photo-import-scan-area">Região para leitura<select aria-label="Região para leitura" value={scanArea} onChange={e=>setScanArea(e.target.value)}><option value="center">Área central · folha no centro da foto</option><option value="full">Foto inteira · folha ocupando toda a imagem</option></select><small>O recorte é feito no seu aparelho. Para resultados melhores, fotografe a folha de frente e mais perto.</small></label>
    <button type="button" className="photo-import-primary" disabled={!file||busy} onClick={scan}><ScanText size={17}/>{busy?'Reconhecendo '+progress+'%':'Reconhecer escrita'}</button>
    {busy&&<progress aria-label="Progresso do reconhecimento" max="100" value={progress}/>}
-   <button type="button" className="photo-import-textlink" disabled={busy} onClick={()=>{setStage('review');setError('');}}>Digitar lista manualmente</button>
+   <button type="button" className="photo-import-textlink" disabled={busy} onClick={()=>{setStage('review');setShowManual(true);setError('');}}>Digitar lista manualmente</button>
    <p className="photo-import-footnote">Reconhecimento gratuito no celular, sem cobrança por imagem. Requer internet para carregar o motor de OCR; manuscritos podem não ser reconhecidos corretamente.</p>
   </div>}
   {stage==='review'&&<div className="photo-import-review">
    {preview&&<details open={uncertain?true:undefined}><summary>Consultar foto original</summary><img className="photo-import-preview" src={preview} alt="Lista para conferência"/></details>}
-   {uncertain&&<div className="photo-import-quality" role="status"><AlertTriangle size={19}/><div><strong>Não conseguimos ler a lista com segurança</strong><p>Em vez de mostrar dezenas de nomes sem sentido, deixamos a revisão vazia. Para melhorar: fotografe só a folha, de frente, bem iluminada e com a escrita ocupando a imagem.</p></div></div>}
+   {uncertain&&<div className="photo-import-quality" role="status"><AlertTriangle size={19}/><div><strong>Não conseguimos ler a lista com segurança</strong><p>Nenhuma tarefa foi sugerida. Recorte a anotação mais de perto ou confirme os itens manualmente.</p></div></div>}
    {uncertain&&<button type="button" className="photo-import-outline" onClick={()=>{setStage('photo');setRows([]);setError('');}}> <Camera size={17}/> Recortar melhor ou escolher outra foto</button>}
+   {(uncertain||showManual)&&<div className="photo-import-quick"><strong>Adicionar do catálogo</strong><p>Selecione as preparações que você consegue confirmar na foto. Nada é incluído automaticamente.</p><select aria-label="Adicionar preparação do catálogo" value="" onChange={e=>{const recipe=recipes.find(r=>String(r.id)===e.target.value);if(!recipe)return;setRows(old=>old.length>=12||old.some(r=>r.recipeId===recipe.id)?old:[...old,{id:'row-manual-'+crypto.randomUUID(),label:recipe.name,recipeId:recipe.id,quantity:'',selected:true,dateNote:''}]);setReviewed(false);}}><option value="">Selecionar preparação…</option>{recipes.filter(r=>!rows.some(row=>row.recipeId===r.id)).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div>}
    <label className="photo-import-transcript">{uncertain?'Transcreva apenas os itens legíveis':'Texto identificado (pode corrigir)'}<textarea aria-label="Texto da lista" rows={4} maxLength={1600} value={text} onChange={e=>setText(e.target.value)} placeholder={'Batata purê\nBatata palha\n30 alcatra\n40 frango'}/></label>
-   {uncertain&&<p className="photo-import-footnote">Letras manuscritas podem falhar mesmo após o recorte. Digite somente os nomes e as quantidades que puder confirmar na imagem.</p>}
-   <button type="button" className="photo-import-outline" disabled={busy} onClick={rebuild}><ScanText size={16}/> Interpretar texto revisado</button>
+   {uncertain&&<p className="photo-import-footnote">A leitura manuscrita automática é limitada. Você pode selecionar os itens acima ou transcrever as linhas abaixo.</p>}
+   <button type="button" className="photo-import-outline" disabled={busy||!text.trim()} onClick={rebuild}><ScanText size={16}/> Interpretar texto revisado</button>
    <div className="photo-import-rows-heading"><strong>Preparações encontradas</strong><small>{selected.length} selecionada(s)</small></div>
-   {!rows.length&&<p className="photo-import-footnote">{uncertain?'Nenhuma preparação confiável foi reconhecida. Corrija o texto acima ou escolha outra foto; depois toque em “Interpretar texto revisado”.':'Nenhuma linha identificada. Corrija o texto acima e toque em “Interpretar texto revisado”.'}</p>}
+   {!rows.length&&<p className="photo-import-footnote">Nenhuma preparação selecionada. Escolha no catálogo ou interprete o texto revisado.</p>}
    {rows.map(r=><div className="photo-import-item" key={r.id}>
     <div className="photo-import-item-title"><label><input type="checkbox" checked={r.selected} onChange={e=>change(r.id,{selected:e.target.checked})}/> Incluir</label><button type="button" aria-label={'Remover linha '+r.label} onClick={()=>{setRows(old=>old.filter(x=>x.id!==r.id));setReviewed(false)}}><Trash2 size={16}/></button></div>
     <label>Nome lido<input type="text" maxLength={100} value={r.label} onChange={e=>change(r.id,{label:e.target.value,recipeId:''})}/></label>
@@ -116,9 +117,9 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
    {rows.length>12&&<p className="photo-import-warning">Selecione até 12 itens por importação.</p>}
    {duplicates&&<p className="photo-import-warning">A mesma preparação foi selecionada duas vezes. Una as quantidades em uma linha antes de continuar.</p>}
    {hasDateNotes&&<label className="photo-import-consent"><input type="checkbox" checked={allowDay} onChange={e=>setAllowDay(e.target.checked)}/> Entendi que as datas da folha não serão aplicadas: esta importação cria tarefas somente para hoje.</label>}
-   <label className="photo-import-consent"><input type="checkbox" checked={reviewed} onChange={e=>setReviewed(e.target.checked)}/> Conferi cada nome, quantidade e unidade. Confirmo que todos os itens selecionados são para hoje.</label>
-   <button type="button" className="photo-import-primary" disabled={!valid} onClick={importNow}><ClipboardCheck size={17}/>{busy?'Adicionando…':'Adicionar '+selected.length+' tarefa(s) de hoje'}</button>
-   <p className="photo-import-footnote">Nada será lançado no estoque. Apenas tarefas de planejamento serão criadas após sua confirmação.</p>
+   {!!selected.length&&<label className="photo-import-consent"><input type="checkbox" checked={reviewed} onChange={e=>setReviewed(e.target.checked)}/> Conferi cada nome, quantidade e unidade. Confirmo que todos os itens selecionados são para hoje.</label>}
+   {!!selected.length&&<button type="button" className="photo-import-primary" disabled={!valid} onClick={importNow}><ClipboardCheck size={17}/>{busy?'Adicionando…':'Adicionar '+selected.length+' tarefa(s) de hoje'}</button>}
+   {!!selected.length&&<p className="photo-import-footnote">Nada será lançado no estoque. Apenas tarefas de planejamento serão criadas após sua confirmação.</p>}
   </div>}
   {stage==='done'&&<div className="photo-import-done"><CheckCircle2 size={34}/><h4>{saved.length} tarefa(s) adicionada(s)</h4><p>As preparações foram enviadas à lista de produção de hoje. O estoque permanece inalterado.</p><button type="button" className="photo-import-primary" onClick={onClose}>Voltar à produção do dia</button></div>}
   {error&&<div className="photo-import-warning" role="alert"><AlertTriangle size={16}/>{error}</div>}
