@@ -9,7 +9,7 @@ on:
       - 'tests/production-preparation-flow.test.mjs'
       - 'tests/production-photo-parse.test.mjs'
       - 'tests/production-photo-vision.test.mjs'
-      - 'api/production/recognize-photo.js'
+      - 'server/production/photo-recognition-handler.js'
       - 'src/ProductionPhotoImport.jsx'
       - 'src/production-photo-parse.js'
       - '.github/workflows/production-preparations.yml'
