@@ -1,4 +1,4 @@
-import {authenticate,membership,checkRequest,send} from '../../server/_lib.js';
+import {authenticate,membership,getDb,checkRequest,send} from '../../server/_lib.js';
 
 // Recognition only. Never writes stock, tasks or images to Firestore.
 // GOOGLE_VISION_API_KEY is a server-only Vercel environment variable.
@@ -22,6 +22,18 @@ export default async function handler(req,res){
    mimeType==='image/png'?bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):
    bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP';
   if(!signature)return send(res,400,'Formato de imagem incompatível.');
+  // Bounded provider usage: 20 attempts per user per UTC day, minimum 20s apart.
+  // Store counters only; images and recognized content are not persisted.
+  const day=new Date().toISOString().slice(0,10);
+  const limitRef=getDb().collection('photoOcrLimits').doc(actor.uid+'_'+day);
+  const allowed=await getDb().runTransaction(async tx=>{
+   const snap=await tx.get(limitRef),prior=snap.data()||{};
+   const now=Date.now();
+   if((prior.count||0)>=20||now-(prior.lastAt||0)<20_000)return false;
+   tx.set(limitRef,{count:(prior.count||0)+1,lastAt:now,unitId:member.unitId,day});
+   return true;
+  });
+  if(!allowed)return send(res,429,'Limite de leituras atingido. Aguarde ou digite manualmente.',{code:'HANDWRITING_RATE_LIMIT'});
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),15000);
   let response;
