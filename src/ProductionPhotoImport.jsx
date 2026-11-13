@@ -3,97 +3,80 @@ import {Camera,ImagePlus,ScanText,ClipboardCheck,Trash2,Plus,X,AlertTriangle,Che
 import {parseProductionNote,validImportRows,evaluatePhotoRecognition} from './production-photo-parse.js';
 import './ProductionPhotoImport.css';
 
-let ocrScriptPromise=null;
-function loadOcr(){
- if(window.Tesseract?.createWorker)return Promise.resolve(window.Tesseract);
- if(!ocrScriptPromise)ocrScriptPromise=new Promise((resolve,reject)=>{
-  const script=document.createElement('script');
-  script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-  script.async=true;script.crossOrigin='anonymous';
-  script.onload=()=>window.Tesseract?.createWorker?resolve(window.Tesseract):reject(Error('OCR não disponível.'));
-  script.onerror=()=>reject(Error('Não foi possível carregar o reconhecimento de texto. Verifique a conexão.'));
-  document.head.appendChild(script);
- }).catch(e=>{ocrScriptPromise=null;throw e});
- return ocrScriptPromise;
-}
-
-async function prepareOcrImage(file,mode='center',enhance=false){
- const objectUrl=URL.createObjectURL(file);
+// Client-side cropping is for framing only. Handwriting recognition runs on the server.
+async function prepareVisionImage(file,{zoom=1,rotation=0,offsetX=0,offsetY=0}={},maxDimension=1500){
+ const url=URL.createObjectURL(file);
  try{
-  const img=new Image();img.src=objectUrl;await img.decode();
-  const bounds=mode==='center'?{x:.18,y:.17,w:.64,h:.80}:{x:0,y:0,w:1,h:1};
-  const sx=Math.round(img.naturalWidth*bounds.x),sy=Math.round(img.naturalHeight*bounds.y);
-  const sw=Math.min(img.naturalWidth-sx,Math.round(img.naturalWidth*bounds.w));
-  const sh=Math.min(img.naturalHeight-sy,Math.round(img.naturalHeight*bounds.h));
-  const scale=Math.min(2,Math.max(1,1550/Math.max(sw,sh)));
+  const img=new Image();
+  await new Promise((resolve,reject)=>{
+   img.onload=resolve;img.onerror=()=>reject(Error('Não foi possível abrir esta foto. Tente JPG ou PNG.'));
+   img.src=url;
+  });
+  const width=img.naturalWidth,height=img.naturalHeight;
+  if(!width||!height)throw Error('Foto sem dimensões válidas.');
+  const sw=width/zoom,sh=height/zoom;
+  const sx=Math.max(0,Math.min(width-sw,(width-sw)/2+(offsetX/100)*(width-sw)/2));
+  const sy=Math.max(0,Math.min(height-sh,(height-sh)/2+(offsetY/100)*(height-sh)/2));
+  const quarter=rotation%180!==0;
+  const w=quarter?sh:sw,h=quarter?sw:sh;
+  const scale=Math.min(1,maxDimension/Math.max(w,h));
   const canvas=document.createElement('canvas');
-  canvas.width=Math.min(2800,Math.round(sw*scale));canvas.height=Math.min(2800,Math.round(sh*scale));
-  const ctx=canvas.getContext('2d',{willReadFrequently:true});
-  if(!ctx)throw Error('Imagem indisponível neste aparelho.');
+  canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));
+  const ctx=canvas.getContext('2d');
+  if(!ctx)throw Error('Não foi possível preparar a imagem.');
   ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
-  if(enhance){
-   const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);
-   const data=pixels.data;
-   // Aumenta contraste de tinta azul/preta sobre papel amarelado sem binarizar letras finas.
-   for(let i=0;i<data.length;i+=4){
-    const gray=.2126*data[i]+.7152*data[i+1]+.0722*data[i+2];
-    const adjusted=Math.max(0,Math.min(255,(gray-128)*1.65+151));
-    data[i]=data[i+1]=data[i+2]=adjusted;
-   }
-   ctx.putImageData(pixels,0,0);
-  }
-  return canvas.toDataURL('image/png');
- }finally{URL.revokeObjectURL(objectUrl)}
+  ctx.translate(canvas.width/2,canvas.height/2);
+  ctx.rotate(rotation*Math.PI/180);
+  ctx.drawImage(img,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);
+  const encoded=canvas.toDataURL('image/jpeg',0.78);
+  if(encoded.length>2400000)throw Error('Imagem muito grande. Aproxime a anotação e tente novamente.');
+  return encoded;
+ }finally{URL.revokeObjectURL(url)}
 }
 
-export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
+export default function ProductionPhotoImport({recipes=[],onImport,onRecognize,onClose}){
  const inputRef=useRef(null),galleryRef=useRef(null),idRef=useRef(null),fileUrl=useRef(null);
  const [file,setFile]=useState(null),[preview,setPreview]=useState(''),[text,setText]=useState(''),[rows,setRows]=useState([]);
  const [stage,setStage]=useState('photo'),[busy,setBusy]=useState(false),[progress,setProgress]=useState(0),[error,setError]=useState(''),[reviewed,setReviewed]=useState(false),[allowDay,setAllowDay]=useState(false);
- const [showManual,setShowManual]=useState(false); const [saved,setSaved]=useState([]),[failed,setFailed]=useState(false),[uncertain,setUncertain]=useState(false),[scanArea,setScanArea]=useState('center');
+ const [showManual,setShowManual]=useState(false); const [saved,setSaved]=useState([]),[failed,setFailed]=useState(false),[uncertain,setUncertain]=useState(false);
+ const [zoom,setZoom]=useState(1),[rotation,setRotation]=useState(0),[offsetX,setOffsetX]=useState(0),[offsetY,setOffsetY]=useState(0);
+ const [adjustedPreview,setAdjustedPreview]=useState(''),[consent,setConsent]=useState(false);
  const fileInput=e=>{
   const f=e.target.files?.[0];if(!f)return;
   if(!/^image\/(jpeg|png|webp|heic|heif)$/i.test(f.type)&&!/\.(jpg|jpeg|png|webp|heic|heif)$/i.test(f.name)){setError('Escolha uma foto JPG, PNG ou HEIC.');return;}
   if(f.size>12*1024*1024){setError('Foto acima de 12 MB. Escolha uma imagem menor.');return;}
   if(fileUrl.current)URL.revokeObjectURL(fileUrl.current);
-  fileUrl.current=URL.createObjectURL(f);setPreview(fileUrl.current);setFile(f);setText('');setRows([]);setReviewed(false);setStage('photo');setError('');setProgress(0);setSaved([]);setShowManual(false);setUncertain(false);setScanArea('center');idRef.current=null;
+  fileUrl.current=URL.createObjectURL(f);setPreview(fileUrl.current);setFile(f);setText('');setRows([]);setReviewed(false);setStage('photo');setError('');setProgress(0);setSaved([]);setShowManual(false);setUncertain(false);setZoom(1);setRotation(0);setOffsetX(0);setOffsetY(0);setConsent(false);idRef.current=null;
  };
  useEffect(()=>()=>{if(fileUrl.current)URL.revokeObjectURL(fileUrl.current)},[]);
+ useEffect(()=>{
+  if(!file){setAdjustedPreview('');return;}
+  let cancelled=false;
+  const timer=setTimeout(()=>{
+   prepareVisionImage(file,{zoom,rotation,offsetX,offsetY},600)
+    .then(image=>{if(!cancelled)setAdjustedPreview(image)})
+    .catch(()=>{if(!cancelled)setAdjustedPreview('')});
+  },100);
+  return()=>{cancelled=true;clearTimeout(timer)};
+ },[file,zoom,rotation,offsetX,offsetY]);
  const scan=async()=>{
-  if(!file)return;
-  setBusy(true);setError('');setProgress(0);
-  let worker;
+  if(!file||!consent||busy)return;
+  setBusy(true);setError('');setProgress(10);setReviewed(false);
   try{
-   const engine=await loadOcr();
-   worker=await engine.createWorker('por',1,{logger:m=>{if(m?.status==='recognizing text')setProgress(Math.round((m.progress||0)*100));}});
-   // Primeiro tenta a foto recortada; em caso de baixa confiança, repete
-   // com contraste ampliado e, por último, com a foto inteira.
-   // Nunca converte OCR em tarefa sem revisão explícita do usuário.
-   const attempts=[
-    {mode:scanArea,enhance:false},
-    {mode:scanArea,enhance:true},
-    ...(scanArea==='center'?[{mode:'full',enhance:true}]:[])
-   ];
-   let best=null;
-   for(const attempt of attempts){
-    const scanImage=await prepareOcrImage(file,attempt.mode,attempt.enhance).catch(()=>file);
-    const result=await worker.recognize(scanImage);
-    const value=(result.data?.text||'').trim();
-    const assessment=evaluatePhotoRecognition(value,recipes,result.data?.confidence);
-    const rank=assessment.recognized*100+(assessment.reliable?50:0)+(assessment.confidence||0)/10;
-    if(!best||rank>best.rank)best={value,assessment,rank};
-    if(assessment.reliable&&assessment.recognized>=3)break;
-   }
-   const assessment=best?.assessment||{reliable:false,rows:[]};
-   setText(assessment.reliable?best.value.slice(0,1600):'');
-   setRows(assessment.rows);
-   setUncertain(!assessment.reliable);
-   setShowManual(false);setStage('review');
-   if(!assessment.reliable)setError('');
-  }catch(e){setRows([]);setUncertain(true);setStage('review');setError('');}
-  finally{try{await worker?.terminate()}catch{}setBusy(false);}
+   const image=await prepareVisionImage(file,{zoom,rotation,offsetX,offsetY});
+   setProgress(35);
+   const result=await onRecognize({image,consent:true});
+   setProgress(90);
+   const value=String(result?.text||'').trim().slice(0,1600);
+   const assessment=evaluatePhotoRecognition(value,recipes,result?.confidence);
+   setText(value);setRows(assessment.rows);setUncertain(!assessment.reliable);
+   setShowManual(true);setStage('review');
+  }catch(e){
+   setRows([]);setUncertain(true);setShowManual(true);setStage('review');
+   setError(e.message||'Falha ao reconhecer a foto. Tente novamente ou escolha itens manualmente.');
+  }finally{setBusy(false);setProgress(100);}
  };
+
  const rebuild=()=>{setRows(parseProductionNote(text,recipes).slice(0,12));setUncertain(false);setReviewed(false);setError('');};
  const change=(id,patch)=>{setRows(old=>old.map(row=>row.id===id?{...row,...patch}:row));setReviewed(false);};
  const selected=rows.filter(r=>r.selected);
@@ -117,21 +100,28 @@ export default function ProductionPhotoImport({recipes=[],onImport,onClose}){
   {stage==='photo'&&<div className="photo-import-photo">
    <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={fileInput} aria-label="Tirar foto da lista" hidden/>
    <input ref={galleryRef} type="file" accept="image/*" onChange={fileInput} aria-label="Selecionar foto existente" hidden/>
-   {preview?<img className="photo-import-preview" src={preview} alt="Foto selecionada da lista manuscrita"/>:<div className="photo-import-empty"><Camera size={30}/><strong>Fotografe a lista da cozinha</strong><span>JPG, PNG ou HEIC · até 12 MB</span></div>}
+   {preview?<img className="photo-import-preview" src={adjustedPreview||preview} alt="Prévia do recorte e rotação para reconhecimento"/>:<div className="photo-import-empty"><Camera size={30}/><strong>Fotografe a lista da cozinha</strong><span>JPG, PNG ou HEIC · até 12 MB</span></div>}
    <div className="photo-import-image-actions"><button type="button" className="photo-import-outline" disabled={busy} onClick={()=>inputRef.current?.click()}><Camera size={17}/> Tirar foto agora</button><button type="button" className="photo-import-outline" disabled={busy} onClick={()=>galleryRef.current?.click()}><ImagePlus size={17}/> Escolher da galeria</button></div>
-   <label className="photo-import-scan-area">Região para leitura<select aria-label="Região para leitura" value={scanArea} onChange={e=>setScanArea(e.target.value)}><option value="center">Área central · folha no centro da foto</option><option value="full">Foto inteira · folha ocupando toda a imagem</option></select><small>O recorte é feito no seu aparelho. Para resultados melhores, fotografe a folha de frente e mais perto.</small></label>
-   <button type="button" className="photo-import-primary" disabled={!file||busy} onClick={scan}><ScanText size={17}/>{busy?'Reconhecendo '+progress+'%':'Reconhecer escrita'}</button>
+   <div className="photo-import-crop-controls" aria-label="Ajustar enquadramento">
+    <div className="photo-import-crop-heading"><strong>Enquadrar anotação</strong><button type="button" className="photo-import-outline" onClick={()=>setRotation(x=>(x+90)%360)}>Girar 90°</button></div>
+    <label>Ampliar recorte <input aria-label="Ampliar recorte" type="range" min="1" max="3" step=".1" value={zoom} onChange={e=>setZoom(Number(e.target.value))}/></label>
+    <label>Posição horizontal <input aria-label="Posição horizontal do recorte" type="range" min="-100" max="100" value={offsetX} onChange={e=>setOffsetX(Number(e.target.value))}/></label>
+    <label>Posição vertical <input aria-label="Posição vertical do recorte" type="range" min="-100" max="100" value={offsetY} onChange={e=>setOffsetY(Number(e.target.value))}/></label>
+    <small>A prévia mostra o recorte que será enviado. Mantenha apenas a anotação dentro da imagem.</small>
+   </div>
+   <label className="photo-import-consent"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> Autorizo enviar esta foto ao Google Cloud Vision para reconhecimento. A foto não será salva pelo Triamicci; revise os resultados antes de criar tarefas.</label>
+   <button type="button" className="photo-import-primary" disabled={!file||busy||!consent} onClick={scan}><ScanText size={17}/>{busy?'Reconhecendo…':'Reconhecer escrita'}</button>
    {busy&&<progress aria-label="Progresso do reconhecimento" max="100" value={progress}/>}
    <button type="button" className="photo-import-textlink" disabled={busy} onClick={()=>{setStage('review');setShowManual(true);setError('');}}>Digitar lista manualmente</button>
-   <p className="photo-import-footnote">Reconhecimento gratuito no celular, com até três tentativas de leitura e sem cobrança por imagem. Requer internet para carregar o motor de OCR; manuscritos podem não ser reconhecidos corretamente.</p>
+   <p className="photo-import-footnote">Reconhecimento de manuscrito online. Pode haver custos de serviço para a operação; nenhuma tarefa é criada sem sua confirmação.</p>
   </div>}
   {stage==='review'&&<div className="photo-import-review">
    {preview&&<details open={uncertain?true:undefined}><summary>Consultar foto original</summary><img className="photo-import-preview" src={preview} alt="Lista para conferência"/></details>}
-   {uncertain&&<div className="photo-import-quality" role="status"><AlertTriangle size={19}/><div><strong>Não conseguimos ler a lista com segurança</strong><p>Nenhuma tarefa foi sugerida. Recorte a anotação mais de perto ou confirme os itens manualmente.</p></div></div>}
-   {uncertain&&<button type="button" className="photo-import-outline" onClick={()=>{setStage('photo');setRows([]);setError('');}}> <Camera size={17}/> Recortar melhor ou escolher outra foto</button>}
+   {uncertain&&<div className="photo-import-quality" role="status"><AlertTriangle size={19}/><div><strong>Não encontramos preparações verificáveis</strong><p>A leitura não produziu correspondências seguras no catálogo. Confira o texto abaixo, ajuste a foto ou selecione preparações manualmente.</p></div></div>}
+   {uncertain&&<button type="button" className="photo-import-outline" onClick={()=>{setStage('photo');setRows([]);setError('');}}> <Camera size={17}/> Ajustar recorte ou escolher outra foto</button>}
    {(uncertain||showManual)&&<div className="photo-import-quick"><strong>Adicionar do catálogo</strong><p>Selecione as preparações que você consegue confirmar na foto. Nada é incluído automaticamente.</p><select aria-label="Adicionar preparação do catálogo" value="" onChange={e=>{const recipe=recipes.find(r=>String(r.id)===e.target.value);if(!recipe)return;setRows(old=>old.length>=12||old.some(r=>r.recipeId===recipe.id)?old:[...old,{id:'row-manual-'+crypto.randomUUID(),label:recipe.name,recipeId:recipe.id,quantity:'',selected:true,dateNote:''}]);setReviewed(false);}}><option value="">Selecionar preparação…</option>{recipes.filter(r=>!rows.some(row=>row.recipeId===r.id)).map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div>}
    <label className="photo-import-transcript">{uncertain?'Transcreva apenas os itens legíveis':'Texto identificado (pode corrigir)'}<textarea aria-label="Texto da lista" rows={4} maxLength={1600} value={text} onChange={e=>setText(e.target.value)} placeholder={'Batata purê\nBatata palha\n30 alcatra\n40 frango'}/></label>
-   {uncertain&&<p className="photo-import-footnote">A leitura manuscrita automática é limitada. Você pode selecionar os itens acima ou transcrever as linhas abaixo.</p>}
+   {uncertain&&<p className="photo-import-footnote">Confira os itens da foto. Linhas incertas não são selecionadas automaticamente.</p>}
    <button type="button" className="photo-import-outline" disabled={busy||!text.trim()} onClick={rebuild}><ScanText size={16}/> Interpretar texto revisado</button>
    <div className="photo-import-rows-heading"><strong>Preparações encontradas</strong><small>{selected.length} selecionada(s)</small></div>
    {!rows.length&&<p className="photo-import-footnote">Nenhuma preparação selecionada. Escolha no catálogo ou interprete o texto revisado.</p>}
