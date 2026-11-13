@@ -4,22 +4,11 @@ export function normalizePreparation(value=''){
 }
 const dayWords=/\b(segunda|terca|quarta|quinta|sexta|sabado|domingo|amanha|hoje|semana|dia|para|turno)\b/i;
 const STOP=new Set(['preparacao','producao','cozinha','produto','quantidade','lista','fazer','feito','molho','ingrediente']);
-function score(a,b){
- if(!a||!b)return 0;
- if(a===b)return 1;
- if(a.length>=5&&(b.includes(a)||a.includes(b)))return .91;
- const x=a.split(' ').filter(w=>w.length>2),y=b.split(' ').filter(w=>w.length>2);
- if(!x.length||!y.length)return 0;
- let overlap=0;
- for(const word of x)if(y.includes(word))overlap++;
- return overlap/Math.max(x.length,y.length);
-}
 export function suggestRecipe(label,recipes=[]){
- const a=normalizePreparation(label);
- const candidates=recipes.map(r=>({id:r.id,score:score(a,normalizePreparation(r.name))})).sort((x,y)=>y.score-x.score);
- const [best,next]=candidates;
- // Empates e nomes genéricos como "frango" não devem selecionar produto por conta própria.
- return best?.score>=.92&&best.score-(next?.score||0)>.12?best.id:'';
+ const name=normalizePreparation(label);
+ if(!name)return '';
+ const matches=recipes.filter(recipe=>normalizePreparation(recipe.name)===name);
+ return matches.length===1?matches[0].id:'';
 }
 export function parseProductionNote(text,recipes=[]){
  const rows=[];let dateNote='';
@@ -58,15 +47,38 @@ export function validImportRows(rows,recipes){
  });
 }
 
-/** OCR de manuscritos: só ofereça automaticamente itens cuja identidade seja verificável.
- * Leituras ruins permanecem no texto editável, nunca geram dezenas de cards falsos.
- */
-export function evaluatePhotoRecognition(text,recipes=[],confidence=null){
- const raw=parseProductionNote(text,recipes);
- const matched=raw.filter(row=>Boolean(row.recipeId));
- const average=typeof confidence==='number'&&Number.isFinite(confidence)?confidence:null;
- // Alto número de linhas incompreensíveis é sinal de OCR impreciso ou foto sem lista.
- const ratio=raw.length?matched.length/raw.length:0;
- const reliable=matched.length>0&&ratio>=.35&&(average===null||average>=45);
- return {reliable,rows:reliable?matched.slice(0,12):[],recognized:matched.length,total:raw.length,confidence:average};
+// Provider scores are heuristic. Every OCR suggestion still needs human review.
+const nameConfidence=.75;
+const quantityConfidence=.9;
+
+export function reviewPhotoLines(lines=[],recipes=[]){
+ const rows=[];
+ let dateNote='';
+ for(const words of lines){
+  const uncertainQuantity=words.some(word=>/^\d+(?:[.,]\d+)?$/.test(word.text)&&word.confidence<quantityConfidence);
+  const withoutUncertainQuantity=uncertainQuantity
+   ?words.filter((word,index)=>!(index===0||index===words.length-1)||!/^\d+(?:[.,]\d+)?$/.test(word.text)||word.confidence>=quantityConfidence)
+   :words;
+  const line=withoutUncertainQuantity.map(word=>word.text).join(' ');
+  if(!line||withoutUncertainQuantity.some(word=>word.confidence<nameConfidence))continue;
+  const normalized=normalizePreparation(line);
+  if(dayWords.test(normalized)&&normalized.split(' ').length<=4){dateNote=line;continue;}
+  const [row]=parseProductionNote(line,recipes);
+  if(!row)continue;
+  const name=normalizePreparation(row.label);
+  const related=recipes.some(recipe=>{
+   const candidate=normalizePreparation(recipe.name);
+   return candidate===name||(name.length>=5&&(' '+candidate+' ').includes(' '+name+' '));
+  });
+  // An unlinked line is useful for a readable shorthand (e.g. "30 alcatra"),
+  // but only when its name is corroborated by this unit's preparations.
+  if(!related)continue;
+  const quantityUnclear=uncertainQuantity||Boolean(row.quantity&&(!row.recipeId||!validImportRows([row],recipes)));
+  rows.push({...row,id:'photo-row-'+rows.length,dateNote,quantityUnclear,
+   quantity:quantityUnclear?'':row.quantity,selected:Boolean(row.recipeId),
+   ...(quantityUnclear&&row.quantity&&!uncertainQuantity?{quantityHint:row.quantity}:{}),
+  });
+  if(rows.length===12)break;
+ }
+ return rows;
 }

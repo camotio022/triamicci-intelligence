@@ -9,7 +9,7 @@ import {getDb,authenticate,membership,checkRequest,send} from '../_lib.js';
 const recipePattern=/^[a-z0-9-]{3,64}$/;
 const datePattern=/^\d{4}-\d{2}-\d{2}$/;
 const formatDay=restaurantDay;
-const canPlan=role=>['admin','manager','submanager','cook','auxiliar'].includes(role);
+import {canPlanProduction} from './planning-permissions.js';
 const view=d=>({id:d.id,recipeId:d.data().recipeId,recipeName:d.data().recipeName,unit:d.data().unit||'un',plannedQuantity:d.data().plannedQuantity??null,status:d.data().status||'pending',completedQuantity:d.data().completedQuantity??null,createdBy:d.data().createdBy,createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,completedAt:d.data().completedAt?.toDate?.()?.toISOString?.()||null});
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;
@@ -26,7 +26,7 @@ export default async function handler(req,res){
    return send(res,200,'Lista de produção consultada.',{day,tasks:snap.docs.map(view),hasMore:snap.size===100});
   }
   if(action==='dayImport'){
-   if(!canPlan(m.role))return send(res,403,'Sem permissão para planejar produção.');
+   if(!canPlanProduction(m.role))return send(res,403,'Sem permissão para planejar produção.');
    const {requestId,items}=req.body||{};
    if(typeof requestId!=='string'||!/^[a-f0-9-]{36}$/i.test(requestId)||!Array.isArray(items)||!items.length||items.length>12||
       items.some(i=>!recipePattern.test(i?.recipeId||'')||i.plannedQuantity!==null&&
@@ -42,7 +42,7 @@ export default async function handler(req,res){
     const recipeRefs=items.map(i=>unit.collection('productionRecipes').doc(i.recipeId));
     const taskRefs=ids.map(id=>ref.doc(id));
     const [memberDoc,...docs]=await Promise.all([tx.get(memberRef),...recipeRefs.map(x=>tx.get(x)),...taskRefs.map(x=>tx.get(x))]);
-    if(!memberDoc.exists||memberDoc.data().status!=='active'||memberDoc.data().unitId!==m.unitId||!canPlan(memberDoc.data().role))throw Error('FORBIDDEN');
+    if(!memberDoc.exists||memberDoc.data().status!=='active'||memberDoc.data().unitId!==m.unitId||!canPlanProduction(memberDoc.data().role))throw Error('FORBIDDEN');
     const recipeDocs=docs.slice(0,items.length),taskDocs=docs.slice(items.length);
     if(taskDocs.some(x=>x.exists)){
      if(taskDocs.every(x=>x.exists&&x.data().photoImportHash===hash&&x.data().createdBy===actor.uid)) {already=true;return;}
@@ -66,7 +66,7 @@ export default async function handler(req,res){
    return send(res,200,already?'Lista já importada anteriormente.':'Tarefas adicionadas à produção de hoje.',{taskIds:ids,already});
   }
   if(action==='dayAdd'){
-   if(!canPlan(m.role))return send(res,403,'Sem permissão para planejar produção.');
+   if(!canPlanProduction(m.role))return send(res,403,'Sem permissão para planejar produção.');
    const {recipeId,plannedQuantity=null}=req.body||{};
    if(!recipePattern.test(recipeId||'')||(plannedQuantity!==null&&(!Number.isFinite(plannedQuantity)||plannedQuantity<=0||plannedQuantity>10000)))
     return send(res,400,'Preparação ou quantidade planejada inválida.');
@@ -74,7 +74,7 @@ export default async function handler(req,res){
    const taskRef=ref.doc();
    await db.runTransaction(async tx=>{
     const [memberDoc,recipeDoc]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(recipeRef)]);
-    if(!memberDoc.exists||memberDoc.data().status!=='active'||memberDoc.data().unitId!==m.unitId||!canPlan(memberDoc.data().role))throw Error('FORBIDDEN');
+    if(!memberDoc.exists||memberDoc.data().status!=='active'||memberDoc.data().unitId!==m.unitId||!canPlanProduction(memberDoc.data().role))throw Error('FORBIDDEN');
     if(!recipeDoc.exists||recipeDoc.data().active!==true)throw Error('RECIPE_NOT_FOUND');
     const recipe=recipeDoc.data(),ids=[...new Set([...(recipe.lines||[]).map(line=>line.productId),recipe.outputProductId].filter(Boolean))];
     const products=await Promise.all(ids.map(id=>tx.get(unit.collection('products').doc(id))));

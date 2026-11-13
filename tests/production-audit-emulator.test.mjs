@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,randomUUID} from 'node:crypto';
+import {checklistPhotoBase64} from './fixtures/checklist-photo.js';
 test('auditoria produção: unidades, dependências, transformação medida, lotes, idempotência, concorrência e isolamento',{timeout:90000},async()=>{
  const project='demo-triamicci-v31',{privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});
  Object.assign(process.env,{APP_ENV:'staging',PUBLIC_APP_URL:'https://triamicci-e2e.test',FIREBASE_EXPECTED_PROJECT_ID:project,FIRESTORE_EMULATOR_HOST:'127.0.0.1:8080',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099',FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({project_id:project,client_email:'audit@'+project+'.iam.gserviceaccount.com',private_key:privateKey.export({type:'pkcs8',format:'pem'}).toString()})});
@@ -26,6 +27,33 @@ test('auditoria produção: unidades, dependências, transformação medida, lot
  assert.equal((await call(aux,'dayAdd',{recipeId:id,plannedQuantity:1.5})).http,400,'Meta de porções exige inteiro');
  const photoId=randomUUID(),photoPayload={requestId:photoId,items:[{recipeId:id,plannedQuantity:12}]};
  const stockBefore=(await source.get()).data().total;
+ const image=checklistPhotoBase64;
+ const originalFetch=globalThis.fetch;
+ const originalKey=process.env.PRODUCTION_VISION_API_KEY;
+ let providerCalls=0;
+ try{
+  process.env.PRODUCTION_VISION_API_KEY='test-key';
+  globalThis.fetch=(url,options)=>{
+   if(url!=='https://vision.googleapis.com/v1/images:annotate')return originalFetch(url,options);
+   providerCalls++;
+   return Promise.resolve(Response.json({responses:[{}]}));
+  };
+  const cashier=await user('cashier');
+  assert.equal((await call({token:'invalid'},'photoRecognize',{image})).http,401);
+  assert.equal((await call(cashier,'photoRecognize',{image})).http,403);
+  assert.equal((await call(aux,'photoRecognize',{image:'not a JPEG'})).http,400);
+  const empty=await call(aux,'photoRecognize',{image,unitId:'other-'+unitId});
+  assert.equal(empty.http,200);
+  assert.deepEqual(empty.lines,[]);
+  assert.equal(providerCalls,1);
+  assert.equal((await unit.collection('operationalLimits').doc('production-photo-ocr').get()).data().count,1);
+  assert.equal((await call(aux,'dayList')).tasks.length,1,'Reconhecer não cria tarefas');
+  assert.equal((await source.get()).data().total,stockBefore);
+ }finally{
+  globalThis.fetch=originalFetch;
+  if(originalKey===undefined)delete process.env.PRODUCTION_VISION_API_KEY;
+  else process.env.PRODUCTION_VISION_API_KEY=originalKey;
+ }
  const imported=await call(aux,'dayImport',photoPayload);
  assert.equal(imported.http,200,JSON.stringify(imported));
  assert.equal(imported.taskIds.length,1);

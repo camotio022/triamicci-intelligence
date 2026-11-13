@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizePreparation,suggestRecipe,parseProductionNote,validImportRows,evaluatePhotoRecognition} from '../src/production-photo-parse.js';
+import {normalizePreparation,suggestRecipe,parseProductionNote,validImportRows,reviewPhotoLines} from '../src/production-photo-parse.js';
 const recipes=[{id:'batata-pure',name:'Batata purê',outputUnit:'kg'},{id:'frango',name:'Frango a passarinho',outputUnit:'porcao'},{id:'alcatra',name:'Alcatra porção',outputUnit:'porcao'},{id:'batata-palha',name:'Batata palha',outputUnit:'kg'}];
 test('normalização preserva identificação sem adivinhar nomes',()=>{
  assert.equal(normalizePreparation('Batata PURÊ!'),'batata pure');
@@ -27,22 +27,35 @@ test('nunca permite pedido de produção sem produto selecionado nem quantidade 
  assert.equal(validImportRows(Array.from({length:13},()=>good[0]),recipes),false);
 });
 
-test('OCR ilegível não gera 20 preparações fictícias',()=>{
- const garbage='o ao ita : = so o\nsie ess = : E\n1a o SR\nCAES A: OS S Po ;\nà oo.\nio >\nxx xx ;';
- const report=evaluatePhotoRecognition(garbage,recipes,24);
- assert.equal(report.reliable,false);
- assert.equal(report.rows.length,0);
- const unrelated=evaluatePhotoRecognition('TRIAMICCI\nMolho ketchup\nBandeja\nEtiqueta\nTalheres',recipes,79);
- assert.equal(unrelated.reliable,false);
- assert.equal(unrelated.rows.length,0);
+const line=(text,confidence=.95)=>text.split(' ').map(word=>({text:word,confidence}));
+
+test('a confiança de cada linha preserva itens legíveis apesar do ruído',()=>{
+ const rows=reviewPhotoLines([
+  line('Molho branco',.53),line('Batata pure'),line('Batata palha'),
+  line('rA A',.3),line('texto impossível',.32),line('40 frango'),line('30 alcatra')
+ ],recipes);
+ assert.deepEqual(rows.map(({recipeId,selected,quantityHint})=>[recipeId,selected,quantityHint]),[
+  ['batata-pure',true,undefined],['batata-palha',true,undefined],['',false,'40'],['',false,'30']
+ ]);
 });
-test('OCR reconhecido mantém só itens vinculados ao catálogo',()=>{
- const report=evaluatePhotoRecognition('Batata purê\nBatata palha\ntexto impossível',recipes,80);
- assert.equal(report.reliable,true);
- assert.deepEqual(report.rows.map(x=>x.recipeId),['batata-pure','batata-palha']);
+
+test('quantidade anterior incerta não descarta nome legível nem preenche meta',()=>{
+ const rows=reviewPhotoLines([[{text:'30',confidence:.76},...line('Alcatra porção')],line('40 Frango a passarinho')],recipes);
+ assert.equal(rows[0].recipeId,'alcatra');
+ assert.equal(rows[0].quantity,'');
+ assert.equal(rows[0].quantityUnclear,true);
+ assert.equal(rows[1].quantity,'40');
 });
-test('OCR sem confiança suficiente impede sugestão automática',()=>{
- const report=evaluatePhotoRecognition('Batata purê',recipes,31);
- assert.equal(report.reliable,false);
- assert.equal(report.rows.length,0);
+
+test('foto sem lista e palavras de baixa confiança não criam sugestões',()=>{
+ assert.deepEqual(reviewPhotoLines([
+  line('Produto'),line('Talheres'),line('Batata purê',.7),line('Batata palha crocante')
+ ],recipes),[]);
+});
+
+test('nomes normalizados duplicados exigem vínculo humano',()=>{
+ const candidates=[...recipes,{id:'pure-2',name:'BATATA PURE'}];
+ const [row]=reviewPhotoLines([line('Batata purê')],candidates);
+ assert.equal(row.recipeId,'');
+ assert.equal(row.selected,false);
 });

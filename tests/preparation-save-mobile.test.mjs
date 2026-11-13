@@ -1,24 +1,43 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {chromium} from './helpers/browser.mjs';
+import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {chromium} from './helpers/browser.mjs';import {checklistPhotoBase64} from './fixtures/checklist-photo.js';
 test('salvar preparação disponibiliza e seleciona a ficha na produção de hoje sem segunda aprovação',{timeout:90000},async()=>{
  const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4193','--strictPort'],{stdio:'pipe'});let browser;
  try{for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:4193/qa/v4-mobile.html')).ok)break}catch{}await new Promise(r=>setTimeout(r,100));}browser=await chromium.launch({headless:true});
- for(const width of [320,390,768,1280]){const page=await browser.newPage({viewport:{width,height:1000}}),products=[{id:'a'.repeat(40),name:'Frango recebido cortado',status:'active',unit:'kg',physicalUnit:'kg',operationalCatalogVersion:'56-v1'}],saved=[],tasks=[];let recipes=[];
+ for(const width of [320,390,768,1280]){const page=await browser.newPage({viewport:{width,height:1000}}),products=[{id:'a'.repeat(40),name:'Frango recebido cortado',status:'active',unit:'kg',physicalUnit:'kg',operationalCatalogVersion:'56-v1'}],saved=[],tasks=[],scans=[];let recipes=[];
  await page.route('**/api/**',async route=>{const body=route.request().postDataJSON()||{};let data={products,recipes,reviewRecipes:recipes,configurations:recipes.map(r=>({...r,configuration:r.preparationConfig})),tasks,runs:[],registry:[],schedules:[],presence:[],items:[],members:[],requests:[]};
  if(body.action==='savePreparation'){saved.push(body);const c=body.configuration;recipes=[{id:body.id,name:c.name,active:body.activate,available:body.activate,version:1,draftVersion:1,preparationConfig:c,stockEffect:'portion_same_product',outputUnit:'porcao',yieldQuantity:1,portionSize:.5,stockUnit:'kg',lines:[],errors:[]}];data={message:'Salvo'};}
  if(body.action==='dayAdd'){tasks.push({id:'task',recipeId:body.recipeId,recipeName:recipes[0].name,status:'pending',plannedQuantity:body.plannedQuantity});data={message:'Adicionado'};}
+ if(body.action==='photoRecognize'){
+  scans.push(body);
+  data={lines:[
+   [{text:'8',confidence:.98},...['Frango','recebido','cortado'].map(text=>({text,confidence:.97}))],
+   [{text:'Frango',confidence:.25}]
+  ]};
+ }
  if(body.action==='dayImport'){tasks.push(...body.items.map((item,i)=>({id:'photo-'+i,recipeId:item.recipeId,recipeName:recipes.find(r=>r.id===item.recipeId)?.name||'Produto',status:'pending',plannedQuantity:item.plannedQuantity})));data={message:'Importado',taskIds:body.items.map((_,i)=>'photo-'+i)};}
  await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)});
  });await page.goto('http://127.0.0.1:4193/qa/v4-mobile.html');await page.getByRole('navigation',{name:'Telas de teste'}).getByRole('button',{name:'Produção',exact:true}).click();await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Preparações',exact:true}).click();await page.getByRole('button',{name:'Nova preparação',exact:true}).click();const setup=page.getByRole('region',{name:'Configurar preparação'});await setup.getByRole('button',{name:/Dividir em porções/}).click();await setup.getByLabel('Preparação do catálogo',{exact:true}).selectOption(products[0].id);await setup.getByLabel('Insumo de origem',{exact:true}).selectOption(products[0].id);await setup.getByLabel('Peso por porção',{exact:true}).fill('500');await setup.getByRole('button',{name:'Revisar configuração',exact:true}).click();await setup.getByRole('button',{name:'Salvar preparação',exact:true}).click();const select=page.getByRole('combobox',{name:'Preparação',exact:true});await select.getByRole('option',{name:'Frango recebido cortado',exact:true}).waitFor({state:'attached'});assert.equal(saved.length,1);assert.equal(saved[0].activate,true);assert.equal(await select.inputValue(),recipes[0].id);await page.getByRole('button',{name:'Adicionar à lista',exact:true}).click();await page.getByRole('button',{name:'Registrar produção',exact:true}).waitFor();assert.equal(tasks[0].recipeId,recipes[0].id);await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Preparações',exact:true}).click();assert.equal(await page.getByRole('heading',{name:'Preparações da unidade'}).isVisible(),true);assert.equal(await page.locator('.production-library-item').getByText('Porcionamento',{exact:true}).count(),1);assert.equal(await page.getByText('500 g/porção',{exact:false}).count(),1);await page.getByRole('searchbox',{name:'Buscar preparação'}).fill('inexistente');assert.equal(await page.getByText('Nenhuma preparação corresponde à busca.').isVisible(),true);await page.getByRole('searchbox',{name:'Buscar preparação'}).fill('Frango');await page.getByRole('combobox',{name:'Filtrar preparações'}).selectOption('ready');await page.getByRole('button',{name:'Planejar',exact:true}).click();assert.equal(await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Hoje',exact:true}).getAttribute('aria-pressed'),'true');assert.equal(await page.getByRole('heading',{name:'Produção do dia'}).isVisible(),true);assert.equal(await page.getByRole('button',{name:'Adicionar à lista',exact:true}).isVisible(),true);await page.getByRole('button',{name:'Importar planejamento por foto'}).click();
  assert.equal(await page.getByRole('region',{name:'Importar planejamento por foto'}).isVisible(),true);
  assert.equal(await page.getByRole('button',{name:'Tirar foto agora'}).isVisible(),true);
  assert.equal(await page.getByRole('button',{name:'Escolher da galeria'}).isVisible(),true);
- assert.equal(await page.getByRole('combobox',{name:'Região para leitura'}).inputValue(),'center');
- await page.getByRole('combobox',{name:'Região para leitura'}).selectOption('full');
  assert.equal(await page.locator('input[aria-label="Selecionar foto existente"]').getAttribute('capture'),null);
  assert.equal(await page.locator('input[aria-label="Tirar foto da lista"]').getAttribute('capture'),'environment');
- await page.getByRole('button',{name:'Digitar lista manualmente'}).click();
- await page.getByRole('textbox',{name:'Texto da lista'}).fill('Frango recebido cortado - 8');
- await page.getByRole('button',{name:'Interpretar texto revisado'}).click();
+ if(width===390){
+  await page.locator('input[aria-label="Selecionar foto existente"]').setInputFiles({
+   name:'lista.jpg',mimeType:'image/jpeg',buffer:Buffer.from(checklistPhotoBase64,'base64')
+  });
+  await page.getByRole('button',{name:'Girar 90°'}).click();
+  await page.getByRole('slider',{name:'Zoom do recorte'}).fill('2');
+  await page.getByRole('button',{name:'Reconhecer escrita'}).click();
+  await page.getByText('Consultar foto original').waitFor();
+  assert.match(scans[0].image,/^\/9j\//);
+  assert.equal(await page.getByRole('spinbutton',{name:/Meta para hoje/}).inputValue(),'8');
+  assert.equal(await page.getByRole('textbox',{name:'Nome lido'}).count(),1);
+  assert.equal(tasks.length,1);
+ }else{
+  await page.getByRole('button',{name:'Digitar lista manualmente'}).click();
+  await page.getByRole('textbox',{name:'Texto da lista'}).fill('Frango recebido cortado - 8');
+  await page.getByRole('button',{name:'Interpretar texto revisado'}).click();
+ }
  const importPanel=page.getByRole('region',{name:'Importar planejamento por foto'});
  await importPanel.getByRole('checkbox',{name:/Conferi cada nome/}).check();
  assert.equal(await importPanel.getByRole('button',{name:'Adicionar 1 tarefa(s) de hoje'}).isEnabled(),true);
