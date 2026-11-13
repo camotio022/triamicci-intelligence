@@ -17,7 +17,7 @@ test('salvar preparação disponibiliza e seleciona a ficha na produção de hoj
  await importPanel.getByRole('checkbox',{name:/Conferi cada nome/}).check();
  assert.equal(await importPanel.getByRole('button',{name:'Adicionar 1 tarefa(s) de hoje'}).isEnabled(),true);
  await importPanel.getByRole('button',{name:'Adicionar 1 tarefa(s) de hoje'}).click();
- assert.equal(await importPanel.getByText('1 tarefa(s) adicionada(s)').isVisible(),true);
+ await importPanel.getByText('1 tarefa(s) adicionada(s)').waitFor({state:'visible'});
  assert.equal(tasks.length,2);
  await importPanel.getByRole('button',{name:'Voltar à produção do dia'}).click();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);await page.close();}
