@@ -49,7 +49,7 @@ test('OCR sem confiança suficiente impede sugestão automática',()=>{
 });
 
 test('partial handwriting keeps 30 alcatra and 40 frango for human catalog review',()=>{
- const report=evaluatePhotoRecognition('Molho branco\\nBatata purê\\nBatata palha\\n30 alcatra\\n40 frango',recipes,78);
+ const report=evaluatePhotoRecognition('Molho branco\nBatata purê\nBatata palha\n30 alcatra\n40 frango',recipes,78);
  assert.equal(report.reliable,true);
  assert.equal(report.rows.length,5);
  assert.deepEqual(report.rows.filter(x=>x.selected).map(x=>x.recipeId),['batata-pure','batata-palha']);
