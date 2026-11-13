@@ -1,4 +1,5 @@
 import stockQueries from '../../server/operations/stock-queries.js';
+import photoRecognize from '../../server/production/photo-recognize.js';
 import {MANAGEMENT_ROLES} from '../../server/permissions/v31-policy.js';
 import {historyActor} from '../../server/operations/history-names.js';
 import storageHandler from '../../server/storage/handler.js';
@@ -41,6 +42,7 @@ function error(res,e){
  if(sendQuotaError(res,e))return;console.error('Physical operations:',e.message);return send(res,500,'Não foi possível completar a operação.');
 }
 export default async function handler(req,res){
+ if(req.body?.action==='photoRecognize')return photoRecognize(req,res);
  if(['storageProductionOptions','storagePrepare'].includes(req.body?.action))return storageProduction(req,res);
  if(['storageReceiptList','storageReceiptInspect','storageReceiptApprove','storageReceiptReject'].includes(req.body?.action))return storageReceiving(req,res);
  if(typeof req.body?.action==='string'&&req.body.action.startsWith('storage'))return storageHandler(req,res);

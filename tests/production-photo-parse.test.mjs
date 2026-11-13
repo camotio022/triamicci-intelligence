@@ -46,3 +46,14 @@ test('OCR sem confiança suficiente impede sugestão automática',()=>{
  assert.equal(report.reliable,false);
  assert.equal(report.rows.length,0);
 });
+
+test('texto parcialmente legível preserva só correspondências confiáveis',()=>{
+ const report=evaluatePhotoRecognition('Batata purê\nruído impossível\ntexto borrado\nlinhas soltas',recipes,85);
+ assert.equal(report.reliable,true);
+ assert.deepEqual(report.rows.map(row=>row.recipeId),['batata-pure']);
+});
+test('nome genérico e quantidade não associam preparação errada',()=>{
+ const report=evaluatePhotoRecognition('30 alcatra\n40 frango\nBatata pure',recipes,88);
+ assert.deepEqual(report.rows.map(row=>row.recipeId),['batata-pure']);
+ assert.equal(report.rows[0].quantity,'');
+});
