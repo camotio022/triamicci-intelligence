@@ -10,6 +10,7 @@ import {hasRecipeCycle} from '../../server/production/recipe-graph.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 import dayListHandler from '../../server/production/day-list.js';
+import photoRecognitionHandler from '../../server/production/photo-recognition-handler.js';
 import {countUnit,validQuantity} from '../../server/operations/logic.js';
 import {areaTotals,allocateFEFO} from '../../server/operations/lot-logic.js';
 import {validProductionSelection} from '../../server/production/logic.js';
@@ -29,6 +30,7 @@ function validLine(x){
 export default async function handler(req,res){
  if(['portionStatus','finishPortioning','reconcilePortioning'].includes(req.body?.action))return portioningHandler(req,res);
  if(['preparationList','preparationCountGuide','savePreparation'].includes(req.body?.action))return preparationHandler(req,res);
+ if(req.body?.action==='recognizePhoto')return photoRecognitionHandler(req,res);
  if(['dayList','dayAdd','dayImport'].includes(req.body?.action))return dayListHandler(req,res);
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
