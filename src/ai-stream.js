@@ -6,7 +6,7 @@ export async function consumeAssistantSSE(response,onDelta){
  }
  if(!response.body?.getReader)throw Error('Seu navegador não conseguiu receber a resposta em tempo real.');
  const decoder=new TextDecoder(),reader=response.body.getReader();
- let buffer='',text='',completed=false,saved=false;
+ let buffer='',text='',completed=false,saved=false,draftSaved=null;
  const process=frame=>{
   for(const row of frame.split('\n')){
    if(!row.startsWith('data:'))continue;
@@ -14,7 +14,7 @@ export async function consumeAssistantSSE(response,onDelta){
    let event;try{event=JSON.parse(raw);}catch{throw Error('Resposta interrompida.');}
    if(event.type==='delta'&&typeof event.text==='string'){
     text+=event.text;onDelta(text);
-   }else if(event.type==='done'){completed=true;saved=!!event.historySaved;}
+   }else if(event.type==='done'){completed=true;saved=!!event.historySaved;draftSaved=event.draftSaved||null;}
    else if(event.type==='error')throw Error(event.message||'A transmissão foi interrompida.');
   }
  };
@@ -29,5 +29,5 @@ export async function consumeAssistantSSE(response,onDelta){
   if(buffer.trim())process(buffer);
  }finally{reader.releaseLock();}
  if(!completed)throw Error('A resposta foi interrompida antes de terminar.');
- return {text,historySaved:saved};
+ return {text,historySaved:saved,draftSaved};
 }
