@@ -5,6 +5,7 @@ import {requestJson} from './api-client.js';
 import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import SameProductPortioning from './SameProductPortioning.jsx';
 import PreparationSetup from './PreparationSetup.jsx';
+import ConfirmSheet from './ConfirmSheet.jsx';
 import ProductionPhotoImport from './ProductionPhotoImport.jsx';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {CheckCircle2,ClipboardList,Clock3,Search,Plus,ArrowLeft,ChefHat,SlidersHorizontal,PackageCheck,BookOpen,ChevronDown,X,PlayCircle,Camera} from 'lucide-react';
@@ -20,12 +21,15 @@ async function call(path,action,payload={}){
 }
 export default function Production({membership,initialTaskId}){
  const {notify}=useFeedback();
+ const [confirmation,setConfirmation]=useState(null);
+ const confirmAction=()=>{const action=confirmation?.action;setConfirmation(null);return action?.();};
  const openedTaskRef=useRef(null);
  const [view,setView]=useState('today'),[setupRecipe,setSetupRecipe]=useState(null),[setupDirty,setSetupDirty]=useState(false);
  const [preparationEditor,setPreparationEditor]=useState(false),[preparationSearch,setPreparationSearch]=useState(''),[preparationFilter,setPreparationFilter]=useState('all');
- const switchView=next=>{if(next!==view&&setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setView(next);if(next!=='preparations')setPreparationEditor(false);if(next!=='today'){setShowExecution(false);setShowPhotoImport(false);setActiveTaskId(null);}};
+ const discardChanges=action=>setConfirmation({title:'Descartar alterações?',description:'As alterações não salvas desta preparação serão perdidas.',label:'Descartar alterações',action});
+ const switchView=(next,confirmed=false)=>{if(next!==view&&setupDirty&&!confirmed){discardChanges(()=>switchView(next,true));return;}setSetupDirty(false);setView(next);if(next!=='preparations')setPreparationEditor(false);if(next!=='today'){setShowExecution(false);setShowPhotoImport(false);setActiveTaskId(null);}};
  const openPreparation=id=>{setSetupRecipe({id,nonce:Date.now()});setPreparationEditor(true);requestAnimationFrame(()=>document.querySelector('.production-preparation-editor')?.scrollIntoView({behavior:'smooth',block:'start'}));};
- const closePreparation=()=>{if(setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setPreparationEditor(false);setSetupRecipe(null);};
+ const closePreparation=(confirmed=false)=>{if(setupDirty&&!confirmed){discardChanges(()=>closePreparation(true));return;}setSetupDirty(false);setPreparationEditor(false);setSetupRecipe(null);};
  const [blockedRecipes,setBlockedRecipes]=useState([]),[reviewRecipes,setReviewRecipes]=useState([]);
  const [recipes,setRecipes]=useState([]),[runs,setRuns]=useState([]),[products,setProducts]=useState([]);
  const [recipeId,setRecipeId]=useState(''),[name,setName]=useState(''),[yieldQuantity,setYield]=useState('1'),[outputProductId,setOutputProductId]=useState('');
@@ -83,9 +87,9 @@ export default function Production({membership,initialTaskId}){
    setEditRecipeId('');setRecipeVersion(null);setName('');setMethod('');setYield('1');setOutputProductId('');setLines([{productId:'',quantity:'',substitutes:[]}]);setStatus('Ficha técnica salva no Firebase.');notify('Ficha técnica salva com sucesso.','success');await load();
   }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
- const archiveRecipe=async()=>{
+ const archiveRecipe=async(confirmed=false)=>{
   if(!editRecipeId||!Number.isInteger(recipeVersion))return;
-  if(!window.confirm('Arquivar esta ficha? Ela não aparecerá mais para novas produções, mas o histórico será preservado.'))return;
+  if(!confirmed){setConfirmation({title:'Arquivar ficha?',description:'A ficha sairá da lista de produção. O histórico será preservado.',label:'Arquivar ficha',action:()=>archiveRecipe(true)});return;}
   setBusy(true);setStatus('');
   try{
    await call('/api/production/manage','archiveRecipe',{id:editRecipeId,expectedVersion:recipeVersion});
@@ -94,9 +98,11 @@ export default function Production({membership,initialTaskId}){
    notify('Ficha arquivada. O histórico foi preservado.','success');
   }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
- const finish=async e=>{
+ const finish=e=>{
   e.preventDefault();if(busy||!confirmed||!selected)return;
-  if(!window.confirm(selected?.outputProductId?'Confirmar a transformação? Os ingredientes sairão dos locais definidos na ficha e o produto preparado entrará na reserva.':'Confirmar a produção e descontar agora os ingredientes realmente utilizados do giro?'))return;
+  setConfirmation({title:selected.outputProductId?'Confirmar transformação?':'Confirmar produção?',description:selected.outputProductId?'Os ingredientes sairão dos locais definidos na ficha. O produto preparado entrará na Reserva.':'O estoque será atualizado com as quantidades de ingredientes informadas.',label:'Registrar produção',action:saveProduction});
+ };
+ const saveProduction=async()=>{
   setBusy(true);setStatus('');
   const id=requestId||crypto.randomUUID();setRequestId(id);
   try{
@@ -175,7 +181,7 @@ export default function Production({membership,initialTaskId}){
      </>}
     </form>}
    </section>}
-   {admin&&view==='preparations'&&preparationEditor&&<section className="production-preparation-editor" aria-label="Editor de preparação"><div className="production-preparation-editor-top"><button type="button" onClick={closePreparation}><ArrowLeft size={17}/> Voltar à biblioteca</button><span>{setupRecipe?.id?'Revisar ficha':'Nova preparação'}</span></div><PreparationSetup key={membership.unitId} unitId={membership.unitId} products={products} requestedRecipe={setupRecipe} onDirtyChange={setSetupDirty} call={call} onSaved={async saved=>{const updated=await load(true);if(saved?.available&&updated){setSetupDirty(false);setPreparationEditor(false);setSetupRecipe(null);setPlannedRecipe(saved.id);setPlannedQuantity('');setShowPlanner(true);setView('today');notify('Preparação salva. Você já pode adicioná-la à produção de hoje.','success');}return updated;}}/></section>}
+   {admin&&view==='preparations'&&preparationEditor&&<section className="production-preparation-editor" aria-label="Editor de preparação"><div className="production-preparation-editor-top"><button type="button" onClick={()=>closePreparation()}><ArrowLeft size={17}/> Voltar à biblioteca</button><span>{setupRecipe?.id?'Revisar ficha':'Nova preparação'}</span></div><PreparationSetup key={membership.unitId} unitId={membership.unitId} products={products} requestedRecipe={setupRecipe} onDirtyChange={setSetupDirty} call={call} onSaved={async saved=>{const updated=await load(true);if(saved?.available&&updated){setSetupDirty(false);setPreparationEditor(false);setSetupRecipe(null);setPlannedRecipe(saved.id);setPlannedQuantity('');setShowPlanner(true);setView('today');notify('Preparação salva. Você já pode adicioná-la à produção de hoje.','success');}return updated;}}/></section>}
 
   </div>
   {view==='history'&&<section className="receiving-card"><TriamicciHistory title="Histórico de produção" records={runs} loading={loading}
@@ -185,5 +191,6 @@ export default function Production({membership,initialTaskId}){
    renderDetails={r=><>{r.notes&&<div>Observação: {r.notes}</div>}<div>Registro: {r.id}</div></>}
    empty="Nenhuma produção registrada para o período. A lista planejada não movimenta estoque."/></section>}
 
+  <ConfirmSheet open={!!confirmation} title={confirmation?.title} description={confirmation?.description} confirmLabel={confirmation?.label} onCancel={()=>setConfirmation(null)} onConfirm={confirmAction}/>
  </section>;
 }
