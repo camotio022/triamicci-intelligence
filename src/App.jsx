@@ -1,6 +1,7 @@
 const Checklists=lazy(()=>import('./Checklists.jsx'));
 import {apiFetch} from './api-fetch.js';
 import {readViewCache,writeViewCache} from './fastCache.js';
+import {isStandalone,rememberRoute,recallRoute,selectInitialRoute} from './pwa-resume.js';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {FeedbackProvider} from './FeedbackProvider.jsx';
 import NotificationCenter,{NotificationProvider,NotificationsPage} from './NotificationCenter.jsx';
@@ -42,7 +43,9 @@ export function Workspace(props) {
 }
 function WorkspaceContent({ user, membership, logout, openTerminals }) {
  const routes=['storages','notifications','checklists','kitchen','mural','production','receiving','count','inventory','daily-inventory','history','catalog','kitchen-v3','my-profile','people','master-registry','team','skills','shifts','schedule-planning','leave-requests','labels','mentor','assistant-ai'];
- const initialRoute=()=>{const params=new URLSearchParams(window.location.search);const target=params.get('page');if(params.get('pushUnit')&&params.get('pushUnit')!==membership.unitId)return 'kitchen';return routes.includes(target)&&canAccessPage(membership.role,target)?target:'kitchen'};
+ const permittedRoute=target=>routes.includes(target)&&canAccessPage(membership.role,target);
+ const savedRoute=()=>recallRoute(window.localStorage,{uid:user.uid,unitId:membership.unitId,allowed:permittedRoute});
+ const initialRoute=()=>selectInitialRoute({params:new URLSearchParams(window.location.search),allowed:permittedRoute,stored:savedRoute(),unitId:membership.unitId,standalone:isStandalone()});
  const [requestedPage, setPage] = useState(initialRoute);
  const [productionTaskId,setProductionTaskId]=useState(null);
  const page=canAccessPage(membership.role,requestedPage)?requestedPage:'kitchen';
@@ -106,8 +109,22 @@ function WorkspaceContent({ user, membership, logout, openTerminals }) {
  },[user.uid,membership.unitId,user.photoURL]);
  useEffect(()=>{if(!profileOpen)return;const outside=e=>{if(!profileMenuRef.current?.contains(e.target))setProfileOpen(false)};const escape=e=>{if(e.key==='Escape')setProfileOpen(false)};document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape)}},[profileOpen]);
  useEffect(()=>{const go=e=>{if(['master-registry','kitchen-v3'].includes(e.detail))navigate(e.detail)};window.addEventListener('ti-navigate',go);return()=>window.removeEventListener('ti-navigate',go)},[membership.unitId,membership.role]);
- const navigate = (nextPage,productId=null,stockTab=null) => {if(!routes.includes(nextPage)||!canAccessPage(membership.role,nextPage))return;window.history.replaceState({...window.history.state,scroll:window.scrollY},'');const url=new URL(window.location.href);url.searchParams.set('page',nextPage);url.searchParams.delete('stockTab');if(nextPage==='kitchen-v3'&&stockTab)url.searchParams.set('stockTab',stockTab);window.history.pushState({page:nextPage,productId,unit:membership.unitId,scroll:0},'',url);setActionProductId(productId);setPage(nextPage);setMenuOpen(false);setProfileOpen(false);window.scrollTo(0,0);};
- useEffect(()=>{window.history.replaceState({...window.history.state,page:initialRoute(),unit:membership.unitId},'');const old=history.scrollRestoration;history.scrollRestoration='manual';const back=e=>{const state=e.state||{};setPage(routes.includes(state.page)&&canAccessPage(membership.role,state.page)?state.page:initialRoute());setActionProductId(state.unit===membership.unitId?state.productId||null:null);setMenuOpen(false);setProfileOpen(false);requestAnimationFrame(()=>window.scrollTo(0,state.scroll||0));setTimeout(()=>window.scrollTo(0,state.scroll||0),250);};window.addEventListener('popstate',back);return()=>{window.removeEventListener('popstate',back);history.scrollRestoration=old}},[membership.unitId,membership.role]);
+ useEffect(()=>{
+  if(!isStandalone())return;
+  const record=()=>rememberRoute(window.localStorage,{uid:user.uid,unitId:membership.unitId,page,scroll:window.scrollY});
+  const onVisibility=()=>{if(document.visibilityState==='hidden')record()};
+  window.addEventListener('pagehide',record);
+  document.addEventListener('visibilitychange',onVisibility);
+  return()=>{window.removeEventListener('pagehide',record);document.removeEventListener('visibilitychange',onVisibility);};
+ },[page,user.uid,membership.unitId]);
+ const navigate = (nextPage,productId=null,stockTab=null) => {if(!permittedRoute(nextPage))return;rememberRoute(window.localStorage,{uid:user.uid,unitId:membership.unitId,page:nextPage});window.history.replaceState({...window.history.state,scroll:window.scrollY},'');const url=new URL(window.location.href);url.searchParams.set('page',nextPage);url.searchParams.delete('stockTab');if(nextPage==='kitchen-v3'&&stockTab)url.searchParams.set('stockTab',stockTab);window.history.pushState({page:nextPage,productId,unit:membership.unitId,scroll:0},'',url);setActionProductId(productId);setPage(nextPage);setMenuOpen(false);setProfileOpen(false);window.scrollTo(0,0);};
+ useEffect(()=>{
+  const restored=initialRoute(),params=new URLSearchParams(window.location.search),fromSaved=!params.has('page')&&isStandalone()&&savedRoute()?.page===restored;
+  if(fromSaved){const url=new URL(window.location.href);url.searchParams.set('page',restored);window.history.replaceState({...window.history.state,page:restored,unit:membership.unitId},'',url);}
+  else window.history.replaceState({...window.history.state,page:restored,unit:membership.unitId},'');
+  if(fromSaved){const y=savedRoute()?.scroll||0;requestAnimationFrame(()=>window.scrollTo(0,y));setTimeout(()=>window.scrollTo(0,y),400);}
+  rememberRoute(window.localStorage,{uid:user.uid,unitId:membership.unitId,page:restored,scroll:fromSaved?savedRoute()?.scroll||0:0});
+  const old=history.scrollRestoration;history.scrollRestoration='manual';const back=e=>{const state=e.state||{};const route=permittedRoute(state.page)?state.page:initialRoute();setPage(route);rememberRoute(window.localStorage,{uid:user.uid,unitId:membership.unitId,page:route,scroll:state.scroll||0});setActionProductId(state.unit===membership.unitId?state.productId||null:null);setMenuOpen(false);setProfileOpen(false);requestAnimationFrame(()=>window.scrollTo(0,state.scroll||0));setTimeout(()=>window.scrollTo(0,state.scroll||0),250);};window.addEventListener('popstate',back);return()=>{window.removeEventListener('popstate',back);history.scrollRestoration=old}},[membership.unitId,membership.role]);
  const openMentorStep = item => {navigate(item.page);setMentorHint({title:item.title,body:item.body,target:item.target})};
  return <div className={"app-shell"+(page==="notifications"?" ti-notifications-active":"")} data-mentor-current={mentorHint?.target||""}>
   {menuOpen && <button type="button" className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setMenuOpen(false)} />}
