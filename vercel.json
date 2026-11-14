@@ -1,6 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/members/manage.js": { "maxDuration": 300 }
+    "api/members/manage.js": {
+      "maxDuration": 300
+    },
+    "api/production/manage.js": {
+      "maxDuration": 60
+    }
   }
 }

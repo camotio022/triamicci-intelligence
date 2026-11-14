@@ -82,8 +82,8 @@ export default async function chatHandler(req,res){
    body:JSON.stringify({
     systemInstruction:{parts:[{text:system}]},
     contents:[...cleanHistory(history),{role:'user',parts}],
-    generationConfig:{maxOutputTokens:650,temperature:0.25,thinkingConfig:{thinkingLevel:'MINIMAL'}}
-   }),signal:AbortSignal.timeout(25000)
+    generationConfig:{maxOutputTokens:420,temperature:0.25,thinkingConfig:{thinkingLevel:'MINIMAL'}}
+   }),signal:AbortSignal.timeout(45000)
   });
   if(response.status===429)return send(res,429,'Cota do provedor indisponível agora. O OCR usa a mesma cota do Gemini.',{code:'GEMINI_QUOTA'});
   if(!response.ok)throw Error('GEMINI_HTTP_'+response.status);
@@ -94,6 +94,7 @@ export default async function chatHandler(req,res){
  }catch(error){
   if(error.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
   if(error.message==='BAD_IMAGE')return send(res,400,'Anexe apenas uma imagem JPEG válida de até 1 MB.');
+  if(error.name==='TimeoutError'||error.name==='AbortError')return send(res,504,'O Gemini demorou mais que o esperado. Tente novamente com uma pergunta mais curta.',{code:'AI_PROVIDER_TIMEOUT'});
   if(sendQuotaError(res,error))return;
   console.error('AI chat:',error.message?.match(/^GEMINI_[A-Z0-9_]+$/)?.[0]||error.name);
   return send(res,503,'Assistente temporariamente indisponível. Nenhuma operação foi alterada.');
