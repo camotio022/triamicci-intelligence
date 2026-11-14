@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {AI_CAPABILITIES,AI_READS,AI_ANALYSES,AI_DRAFTS,AI_WRITES,aiAllowed,requireAiAccess,aiDraftType} from '../server/ai/permissions-v1.js';
-import {classifyAiV1,aiV1Context} from '../server/ai/context-v1.js';
+import {classifyAiV1,aiV1Context,rosterDirectory,summarizeScheduleDocs} from '../server/ai/context-v1.js';
 import {validateAiDraft} from '../server/ai/drafts-handler.js';
 import {draftIntent} from '../server/ai/draft-generation.js';
 import {draftDisplayTitle,draftPromptGuidance} from '../src/ai-draft-presentation.js';
@@ -59,4 +59,34 @@ test('draft titles are short, stable and preserve legacy records',()=>{
  assert.equal(draftDisplayTitle('unknown','Rascunho livre'),'Rascunho livre');
  assert.ok(draftPromptGuidance('planDraft').includes('## Itens planejados'));
  assert.ok(draftPromptGuidance('planDraft').includes('sem alegar que foi publicado ou executado'));
+});
+
+test('AI schedule resolves names from unit registry and never sends internal staff identifiers',()=>{
+ const day='2026-11-14',wrap=(id,data)=>({id,data:()=>data});
+ const directory=rosterDirectory([
+  wrap('staff_123',{name:'Rodolfo',status:'active',jobTitle:'Cozinheiro',sector:'cozinha',shift:'noite',availability:[{day:'sab',start:'14:00',end:'22:20'}]}),
+  wrap('staff_456',{name:'Judson',accountUid:'auth-01',status:'active',jobTitle:'Subgerente',shift:'noite',availability:[{day:'sab',start:'14:00',end:'22:20'}]})
+ ]);
+ const entries=[{uid:'staff_123',date:day,type:'work'}, {uid:'auth-01',date:day,type:'work'},{uid:'staff_999',date:day,type:'off'}];
+ const records=summarizeScheduleDocs([wrap('schedule',{status:'published',entries})],directory,day);
+ assert.equal(records[0].entries[0].name,'Rodolfo');
+ assert.equal(records[0].entries[0].role,'Cozinheiro');
+ assert.equal(records[0].entries[0].plannedStart,'14:00');
+ assert.equal(records[0].entries[0].timeSource,'disponibilidade habitual');
+ assert.equal(records[0].entries[1].name,'Judson');
+ assert.equal(records[0].entries[2].name,'Colaborador sem identificação confirmada');
+ assert.equal(records[0].entries[2].nameConfirmed,false);
+ assert.equal(JSON.stringify(records).includes('staff_123'),false);
+ assert.equal(JSON.stringify(records).includes('auth-01'),false);
+});
+test('AI schedule distinguishes unpublished schedules and explicitly scheduled hours',()=>{
+ const wrap=(data)=>({data:()=>data});
+ const directory=rosterDirectory([{id:'uid2',data:()=>({name:'Patrícia',availability:[]})}]);
+ const items=summarizeScheduleDocs([
+  wrap({status:'draft',entries:[{uid:'uid2',date:'2026-11-14',type:'work'}]}),
+  wrap({status:'published',entries:[{uid:'uid2',date:'2026-11-14',type:'work',start:'08:00',end:'16:20'}]})
+ ],directory,'2026-11-14');
+ assert.equal(items.length,1);
+ assert.equal(items[0].entries[0].timeSource,'escala');
+ assert.equal(items[0].entries[0].plannedEnd,'16:20');
 });
