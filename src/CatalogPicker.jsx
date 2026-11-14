@@ -1,3 +1,4 @@
+import useAppConfirmation from './useAppConfirmation.jsx';
 import {requestJson} from './api-client.js';
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {useFeedback} from './FeedbackProvider.jsx';
@@ -5,6 +6,7 @@ async function request(action,payload={}){
  return requestJson('/api/catalog/manage',{action,...payload},{sessionMessage:'Sessão expirada.',formatError:data=>data.message||'Falha ao consultar catálogo.'});
 }
 export default function CatalogPicker({onAttached,isAdmin=false}){
+ const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const {notify}=useFeedback();
  const [catalog,setCatalog]=useState([]);
  const [search,setSearch]=useState('');
@@ -23,7 +25,7 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
  const visible=useMemo(()=>catalog.filter(p=>(p.name+' '+p.category).toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR'))),[catalog,search]);
  const item=catalog.find(p=>p.id===selected);
  const activateAll=async()=>{
-   if(!isAdmin||busy||!window.confirm('Disponibilizar TODOS os produtos do catálogo Firebase nesta unidade? Produtos novos entram ativos com saldo 0. Saldos e contagens existentes serão preservados.'))return;
+   if(!isAdmin||busy||!await askConfirmation('Disponibilizar TODOS os produtos do catálogo Firebase nesta unidade? Produtos novos entram ativos com saldo 0. Saldos e contagens existentes serão preservados.'))return;
    setBusy(true);setError('');setNotice('');
    try{
      const data=await request('activateUnitCatalog');
@@ -34,7 +36,7 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
  const approveBatch=async()=>{
    const candidates=catalog.filter(p=>!p.active&&p.approvalEligible);
    if(!isAdmin||busy||!candidates.length)return;
-   if(!window.confirm('Solicitar aprovação dos '+candidates.length+' produtos candidatos? Produtos com revisão pendente serão recusados pelo servidor.'))return;
+   if(!await askConfirmation('Solicitar aprovação dos '+candidates.length+' produtos candidatos? Produtos com revisão pendente serão recusados pelo servidor.'))return;
    setBusy(true);setError('');setNotice('');
    try{
      const data=await request('approveBatch',{catalogIds:candidates.map(p=>p.id)});
@@ -43,7 +45,7 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
    }catch(e){setError(e.message)}finally{setBusy(false)}
  };
  const approve=async()=>{
-   if(!item||!isAdmin||busy||!window.confirm('Aprovar '+item.name+' com unidade '+item.stockUnit+' no catálogo central?'))return;
+   if(!item||!isAdmin||busy||!await askConfirmation('Aprovar '+item.name+' com unidade '+item.stockUnit+' no catálogo central?'))return;
    setBusy(true);setError('');setNotice('');
    try{const data=await request('approve',{catalogId:item.id});setNotice(data.message);notify(data.message,'success');await reload();}
    catch(e){setError(e.message);}finally{setBusy(false);}
@@ -57,7 +59,7 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
    try{const data=await request('attach',{catalogId:item.id,minStock:value});setNotice(data.message);notify(data.message,'success');setSelected('');await onAttached?.();}
    catch(e){setError(e.message);}finally{setBusy(false);}
  };
- return <form className="inventory-form catalog-picker" onSubmit={submit}>
+ return <><form className="inventory-form catalog-picker" onSubmit={submit}>
   <h2>Adicionar produto do catálogo inteligente</h2>
   <p>Para começar sem cadastros manuais, use a ativação em lote. Todos os produtos existentes no catálogo Firebase serão disponibilizados na unidade. Produtos novos começam com saldo zero; os já cadastrados mantêm seu saldo.</p>
   {isAdmin&&<div className="inventory-actions"><button type="button" onClick={activateAll} disabled={busy||loading}>Disponibilizar todo o catálogo na unidade (saldo zero)</button></div>}
@@ -87,5 +89,5 @@ export default function CatalogPicker({onAttached,isAdmin=false}){
   {notice&&<p role="status">{notice}</p>}
   {!loading&&catalog.length===0&&!error&&<p>O catálogo central ainda está vazio. Execute a importação antes de cadastrar produtos.</p>}
   <small>Vincular não movimenta saldo. Preparações relacionadas ainda não descontam matérias-primas automaticamente.</small>
- </form>;
+ </form>{confirmationSheet}</>;
 }

@@ -1,3 +1,4 @@
+import useAppConfirmation from './useAppConfirmation.jsx';
 import {requestJson} from './api-client.js';
 import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
@@ -18,6 +19,7 @@ async function membersApi(){
 }
 const labels={draft:'Rascunho',in_review:'Em análise',approved:'Aprovada',published:'Publicada',work:'Trabalho',off:'Folga',leave:'Ausência',monthly_sunday:'Domingo mensal adicional'};
 export default function SchedulePlanner({membership}){
+ const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const {notify}=useFeedback(),[plans,setPlans]=useState([]),[people,setPeople]=useState([]),[selected,setSelected]=useState(''),[title,setTitle]=useState('Escala da equipe'),[period,setPeriod]=useState(restaurantDay().slice(0,7)),[entries,setEntries]=useState([]);
  const [fixedOff,setFixedOff]=useState({}),[sundayOff,setSundayOff]=useState({}),[savingFixed,setSavingFixed]=useState(''),[selectedPerson,setSelectedPerson]=useState(''),[matrixSector,setMatrixSector]=useState('todos');
  const [coverageRules,setCoverageRules]=useState([]),[draftRevision,setDraftRevision]=useState(null);
@@ -45,8 +47,8 @@ export default function SchedulePlanner({membership}){
    notify('Folga habitual de '+(person.name||person.email)+' atualizada.','success');
   }catch(e){setError(e.message);notify(e.message,'error')}finally{setSavingFixed('')}
  };
- const generate=()=>{
-  if(entries.length&&!window.confirm('Gerar uma nova proposta substituirá os lançamentos deste rascunho. Continuar?'))return;
+ const generate=async()=>{
+  if(entries.length&&!await askConfirmation('Gerar uma nova proposta substituirá os lançamentos deste rascunho. Continuar?'))return;
   try{
    const generated=generateMonthlyRoster({period,members:people,fixedOffDays:fixedOff,sundayOffDays:sundayOff,approvedLeaves,autoSunday:true});
    setEntries(generated);setSundayOff(Object.fromEntries(generated.filter(e=>e.type==='monthly_sunday').map(e=>[e.uid,e.date])));setError('Proposta gerada. Revise a cobertura por turno e setor antes de enviar para aprovação.');
@@ -58,7 +60,7 @@ export default function SchedulePlanner({membership}){
  const archivedPlans=plans.filter(p=>!!p.archivedAt),activePlans=plans.filter(p=>!p.archivedAt);
  const changeArchive=async(p,action)=>{
   if(busy)return;
-  if(action==='scheduleArchive'&&!window.confirm('Mover esta escala para a lixeira? O histórico será preservado e a escala poderá ser restaurada.'))return;
+  if(action==='scheduleArchive'&&!await askConfirmation('Mover esta escala para a lixeira? O histórico será preservado e a escala poderá ser restaurada.'))return;
   setBusy(true);
   try{const result=await call(action,{id:p.id});notify(result.message,'success');if(selected===p.id)reset();await refresh(true)}
   catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}
@@ -110,5 +112,6 @@ export default function SchedulePlanner({membership}){
  <div className="ti-planning-entries">{entries.length?entries.map((e,i)=><div key={e.date+e.uid}><span>{e.date} · {people.find(x=>x.uid===e.uid)?.name||e.uid} · {labels[e.type]}</span>{(!chosen||chosen.status==='draft')&&<button type="button" aria-label="Retirar lançamento" onClick={()=>setEntries(old=>old.filter((_,j)=>j!==i))}>Retirar</button>}</div>):<p>Nenhum turno ou folga incluído.</p>}</div>
  <div className="ti-planning-actions">{(!chosen||chosen.status==='draft')&&<button type="button" disabled={busy||entries.length===0} onClick={save}>Salvar rascunho</button>}{chosen?.status==='draft'&&<button disabled={busy} type="button" onClick={()=>transition('submit')}>Enviar para análise</button>}{chosen?.status==='in_review'&&allowed&&<button disabled={busy} type="button" onClick={()=>transition('approve')}>Aprovar escala</button>}{chosen?.status==='approved'&&allowed&&<button disabled={busy} type="button" onClick={()=>transition('publish')}>Publicar no Mural</button>}{chosen?.status==='published'&&<p role="status">Esta versão está publicada e não pode ser alterada.</p>}</div>
  </section></div>{error&&<p role="alert" className="team-error">{error}</p>}
+  {confirmationSheet}
  </section>;
 }

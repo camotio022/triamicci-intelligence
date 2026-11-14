@@ -1,3 +1,4 @@
+import {Box, ChevronDown} from 'lucide-react';
 import PageHeading from './ui/PageHeading.jsx';
 import DataState from './ui/DataState.jsx';
 import {requestJson} from './api-client.js';
@@ -8,7 +9,7 @@ import {apiFetch} from './api-fetch.js';
 import {useViewState} from './useViewState.js';
 import {useUnitLive} from './useUnitLive.js';
 import {isManagement} from '../server/permissions/v31-policy.js';
-import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {sessionAuth as auth} from './firebase.js';
 import {useFeedback} from './FeedbackProvider.jsx';
 import KitchenV3Workflows from './KitchenV3Workflows.jsx';
@@ -29,11 +30,26 @@ const units=STOCK_UNITS;
 const status={reported:'A verificar',requested:'Pedido feito',confirmed:'Confirmado pelo fornecedor',overdue:'Atrasado',partially_received:'Recebido parcialmente',received:'Recebido',cancelled:'Cancelado'};
 const date=iso=>iso?new Date(iso+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const longDate=x=>x?new Date(x).toLocaleString('pt-BR'):'—';
-export default function KitchenV3({membership}){
+export default function KitchenV3({membership,onOpenProduction}){
  const {notify}=useFeedback();
  const [hasData,setHasData]=useState(false);
  const canManage=isManagement(membership.role);
  const [tab,setTab]=useViewState('KitchenV3.jsx:tab',membership.unitId,'overview'),[products,setProducts]=useState([]),[catalogPending,setCatalogPending]=useState([]),[signals,setSignals]=useState([]),[orders,setOrders]=useState([]);
+ const panelRef=useRef(null);
+ const focusPanel=useRef(false);
+ const selectTab=(next,focus=false)=>{
+  if(focus&&tab===next){
+   panelRef.current?.focus();
+   return;
+  }
+  focusPanel.current=focus;
+  setTab(next);
+ };
+ useEffect(()=>{
+  if(!focusPanel.current||!panelRef.current)return;
+  focusPanel.current=false;
+  panelRef.current.focus();
+ },[tab]);
  const [selected,setSelected]=useState(''),[search,setSearch]=useViewState('KitchenV3.jsx:search',membership.unitId,''),[location,setLocation]=useState('reserva'),[showArchived,setShowArchived]=useState(false),[newName,setNewName]=useState(''),[newCategory,setNewCategory]=useState('Proteínas'),[newUnit,setNewUnit]=useState('kg'),[newExpiry,setNewExpiry]=useState(false),[resolutionById,setResolutionById]=useState({});
  const [observation,setObservation]=useState('missing'),[note,setNote]=useState('');
  const [overviewFilter,setOverviewFilter]=useViewState('KitchenV3.jsx:overviewFilter',membership.unitId,'alerts'),[showAllOrders,setShowAllOrders]=useState(false);
@@ -90,7 +106,7 @@ export default function KitchenV3({membership}){
  };
  if(!hasData)return <DataState title="Estoque e insumos" error={error} onRetry={()=>{apiFetch.clearCache();load()}}/>;
  return <section className="v3-page">
-  <PageHeading className="v3-head" eyebrow="OPERAÇÃO · ESTOQUE E INSUMOS" title="Estoque e insumos" description="O que temos, o que falta e o que está previsto para chegar." actions={<button type="button" className="v3-secondary" onClick={()=>{apiFetch.clearCache();load()}} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button>}/>
+  <PageHeading className="v3-head" title="Estoque e insumos" description="O que temos, o que falta e o que está previsto para chegar." actions={<button type="button" className="v3-secondary" onClick={()=>{apiFetch.clearCache();load()}} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button>}/>
   <nav className="ti-v4-stock-nav" aria-label="Seções de estoque e insumos">
    {[
     {id:'today',name:'Hoje',items:[['overview','Visão geral']]},
@@ -98,29 +114,31 @@ export default function KitchenV3({membership}){
     {id:'management',name:'Consultas e gestão',items:[['history','Histórico'],...(canManage?[['catalog','Gestão de Insumos'],['storages','Armazenamentos']]:[])]}
    ].map(group=>{
     const activeGroup=group.items.some(([key])=>key===tab);
-    return <button type="button" key={group.id} className={activeGroup?'ti-v4-stock-group selected':'ti-v4-stock-group'} aria-current={activeGroup?'page':undefined} onClick={()=>setTab(group.items[0][0])}>{group.name}</button>;
+    return <button type="button" key={group.id} className={activeGroup?'ti-v4-stock-group selected':'ti-v4-stock-group'} aria-current={activeGroup?'page':undefined} onClick={()=>{if(!activeGroup)selectTab(group.items[0][0])}}>{group.name}</button>;
    })}
   </nav>
   {tab!=='overview'&&<nav className="ti-v4-stock-subnav" aria-label="Operações e consultas de estoque">
-   {(tab==='history'||tab==='catalog'||tab==='storages'?[['history','Histórico'],...(canManage?[['catalog','Gestão de Insumos'],['storages','Armazenamentos']]:[])]:[['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['loss','Perdas e avarias'],...(canManage?[['count','Contagem oficial']]:[])]).map(([key,label])=><button type="button" key={key} className={tab===key?'selected':''} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}
+   {(tab==='history'||tab==='catalog'||tab==='storages'?[['history','Histórico'],...(canManage?[['catalog','Gestão de Insumos'],['storages','Armazenamentos']]:[])]:[['availability','Avisar falta'],['orders','Entregas'],['receive','Recebimento'],['produce','Produção'],['transfer','Abastecer Giro'],['loss','Perdas e avarias'],...(canManage?[['count','Contagem oficial']]:[])]).map(([key,label])=><button type="button" key={key} className={tab===key?'selected':''} aria-current={tab===key?'page':undefined} onClick={()=>selectTab(key,true)}>{label}</button>)}
   </nav>}
+  <section className="ti-stock-active-panel" ref={panelRef} tabIndex={-1} aria-label="Operação selecionada">
   {error&&<p className="v3-error" role="alert">{error}</p>}
   {loading?<p role="status">Carregando dados reais da unidade…</p>:<>
    {tab==='history'&&<KitchenV3History products={products}/>}
    {tab==='loss'&&<KitchenV3Loss membership={membership} products={products} onChange={load}/>}
    {tab==='count'&&<StockConference membership={membership}/>}
    {tab==='storages'&&canManage&&<StorageManager membership={membership} initialProducts={products}/>}
-   {['receive','produce','transfer'].includes(tab)&&<KitchenV3Workflows key={tab} kind={tab} products={products} orders={orders} membership={membership} onChange={()=>load(true)} onConfigure={p=>p?begin(p):setTab('catalog')}/>}
+   {tab==='produce'&&onOpenProduction&&<section className="v3-card"><h2>Produção da cozinha</h2><button type="button" className="v3-secondary" onClick={onOpenProduction}>Abrir Produção</button><details className="ti-stock-direct-production"><summary>Transformação direta de estoque</summary><KitchenV3Workflows kind="produce" products={products} orders={orders} membership={membership} onChange={()=>load(true)}/></details></section>}
+   {(['receive','transfer'].includes(tab)||(tab==='produce'&&!onOpenProduction))&&<KitchenV3Workflows key={tab} kind={tab} products={products} orders={orders} membership={membership} onChange={()=>load(true)} onConfigure={p=>{selectTab('catalog',!p);if(p)begin(p)}}/>}
    {tab==='overview'&&<div className="ti-v4-stock-overview">
     <div className="ti-v4-stock-overview-stats" aria-label="Resumo de estoque">
      <button type="button" onClick={()=>setOverviewFilter('alerts')} aria-pressed={overviewFilter==='alerts'} className={overviewFilter==='alerts'?'selected':''}><strong>{signals.length}</strong><span>Avisos da equipe</span></button>
-     <button type="button" onClick={()=>setTab('orders')}><strong>{orders.filter(o=>o.status==='overdue').length}</strong><span>Entregas atrasadas</span></button>
+     <button type="button" onClick={()=>selectTab('orders',true)}><strong>{orders.filter(o=>o.status==='overdue').length}</strong><span>Entregas atrasadas</span></button>
      <button type="button" onClick={()=>setOverviewFilter('review')} aria-pressed={overviewFilter==='review'} className={overviewFilter==='review'?'selected':''}><strong>{active.filter(p=>!p.profile).length}</strong><span>Sem configuração</span></button>
     </div>
     <section className="v3-card ti-v4-stock-alerts"><header className="ti-v4-stock-section-head"><div><h2>Avisos da equipe</h2><p>Relatos da equipe que precisam de verificação.</p></div><span className="ti-v4-stock-pill">{signals.length}</span></header>
      {signals.length===0?<p className="ti-v4-stock-empty">Nenhum aviso em aberto.</p>:<div className="ti-v4-stock-list">{signals.map(sig=><article className="ti-v4-stock-item" key={sig.id}><div className="ti-v4-stock-item-title"><div><strong>{sig.productName}</strong><small>{sig.location==='giro'?'Giro · 1º piso':'Reserva · 2º piso'} · {sig.reports?.length||1} relato(s)</small></div><span className="ti-v4-stock-pill attention">{sig.observation==='missing'?'Possível falta':'Estoque baixo'}</span></div>{canManage&&<details className="ti-v4-stock-action"><summary>Conferir aviso</summary><form className="v3-inline-resolve" onSubmit={e=>{e.preventDefault();update('v3ResolveSignal',{productId:sig.productId,location:sig.location,resolution:resolutionById[sig.id]||''},'Aviso resolvido.')}}><label>Decisão<input required maxLength={240} value={resolutionById[sig.id]||''} onChange={e=>setResolutionById(old=>({...old,[sig.id]:e.target.value}))} placeholder="Ex.: conferido e localizado"/></label><button type="submit" disabled={busy}>Resolver</button></form></details>}</article>)}</div>}
     </section>
-    <section className="v3-card ti-v4-stock-deliveries"><header className="ti-v4-stock-section-head"><div><h2>Entregas previstas</h2><p>Atrasadas e próximas entregas da unidade.</p></div><button type="button" className="v3-secondary" onClick={()=>setTab('orders')}>Ver agenda</button></header>
+    <section className="v3-card ti-v4-stock-deliveries"><header className="ti-v4-stock-section-head"><div><h2>Entregas previstas</h2><p>Atrasadas e próximas entregas da unidade.</p></div><button type="button" className="v3-secondary" onClick={()=>selectTab('orders',true)}>Ver agenda</button></header>
      {openOrders.length===0?<p className="ti-v4-stock-empty">Não há entregas pendentes.</p>:<div className="ti-v4-stock-list">{[...openOrders].sort((a,b)=>(a.status==='overdue'?-1:0)-(b.status==='overdue'?-1:0)||String(a.etaDate||'').localeCompare(String(b.etaDate||''))).slice(0,showAllOrders?20:3).map(o=><article className="ti-v4-stock-item" key={o.id}><div className="ti-v4-stock-item-title"><div><strong>{o.supplier}</strong><small>{date(o.etaDate)} · {o.items.length} item(ns)</small></div><span className={'ti-v4-stock-pill '+(o.status==='overdue'?'attention':'')}>{status[o.status]||o.status}</span></div><details><summary>Ver itens</summary><p>{o.items.map(i=>i.name+' '+i.quantity+' '+i.unit).join(' · ')}</p></details></article>)}</div>}
      {openOrders.length>3&&<button type="button" className="ti-v4-stock-more" onClick={()=>setShowAllOrders(v=>!v)}>{showAllOrders?'Mostrar menos':'Mostrar mais entregas'}</button>}
     </section>
@@ -156,11 +174,19 @@ export default function KitchenV3({membership}){
     <section className="v3-card"><h2>Agenda compartilhada de entregas</h2>{orders.length===0?<p>Não há pedidos cadastrados.</p>:orders.map(o=><article key={o.id} className="v3-order"><div className="v3-row"><div><strong>{date(o.etaDate)} · {o.supplier}</strong><p>{status[o.status]||o.status}</p></div></div>{o.items.map((i,k)=><p key={k}>{i.name} — {i.quantity} {i.unit}</p>)}{canManage&&['requested','confirmed','overdue','partially_received'].includes(o.status)&&<label>Situação<select value={o.status} disabled={busy} onChange={e=>update('v3OrderStatus',{orderId:o.id,status:e.target.value},'Pedido atualizado.')}><option value={o.status}>{status[o.status]}</option>{({requested:['confirmed','overdue','cancelled'],confirmed:['overdue','cancelled'],overdue:['confirmed','cancelled'],partially_received:['cancelled']})[o.status]?.map(x=><option value={x} key={x}>{status[x]}</option>)}</select></label>}</article>)}</section>
    </div>}
 
-   {tab==='catalog'&&canManage&&<div className="v3-card ti-insumos-compact"><header className="ti-insumos-head"><div><small>ADMINISTRAÇÃO · CATÁLOGO ÚNICO</small><h2>Gestão de Insumos</h2><p>Um cadastro por insumo, para toda a loja.</p></div><span>{active.length} insumos</span></header><details className="ti-insumos-create"><summary>＋ Novo insumo</summary>
+   {tab==='catalog'&&canManage&&<div className="v3-card ti-insumos-compact"><header className="ti-insumos-head"><div><h2>Gestão de Insumos</h2><p>Um cadastro por insumo, para toda a loja.</p></div><span>{active.length} insumos</span></header><details className="ti-insumos-create"><summary>＋ Novo insumo</summary>
     <form className="v3-form v3-new-product" onSubmit={addProduct}><h3>Cadastrar novo insumo</h3><div className="v3-line"><label>Nome<input required minLength={2} maxLength={100} value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Ex.: Rúcula"/></label><label>Categoria<select value={newCategory} onChange={e=>setNewCategory(e.target.value)}>{['Proteínas','Preparações','Hortifruti','Laticínios','Mercearia','Congelados','Bebidas','Limpeza','Descartáveis','Outros'].map(x=><option key={x}>{x}</option>)}</select></label><label>Unidade inicial<select value={newUnit} onChange={e=>setNewUnit(e.target.value)}>{['kg','g','L','ml','un'].map(x=><option key={x}>{x}</option>)}</select></label></div><label className="v3-checkbox"><input type="checkbox" checked={newExpiry} onChange={e=>setNewExpiry(e.target.checked)}/>Exigir lote e validade</label><button disabled={busy} type="submit">Criar e depois configurar</button></form></details><label className="v3-search">Buscar insumo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome do insumo"/></label><label className="v3-checkbox"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)}/> Mostrar insumos arquivados</label>
     {!editId?<div className="ti-insumos-list">
-    {pendingMatches.length>0&&<h3>Pendentes de configuração</h3>}{pendingMatches.map(p=><div key={p.id} className="ti-insumos-item"><strong>{p.name}</strong><button type="button" className="v3-secondary" onClick={()=>begin(p)}>Configurar e ativar</button></div>)}
-    {active.map(p=><details key={p.id} className="ti-insumos-item"><summary><span className="ti-insumos-item-icon">□</span><span className="ti-insumos-item-title"><strong>{productName(p)}</strong><small>{controlLabel(p.profile?.controlMode)} · {p.profile?.countUnit||p.unit||"un"}</small></span><span className="ti-insumos-chevron">⌄</span></summary><div className="ti-insumos-item-actions"><button className="v3-secondary" type="button" onClick={()=>begin(p)} disabled={p.status!=='active'}>Configurar insumo</button><button className="v3-secondary" type="button" disabled={busy} onClick={()=>update('v3ArchiveProduct',{productId:p.id,active:p.status!=='active'},p.status==='active'?'Insumo arquivado.':'Insumo reativado.')}>{p.status==='active'?'Arquivar':'Reativar'}</button></div></details>)}</div>:
+    {pendingMatches.length>0&&<section className="ti-insumos-pending" aria-labelledby="pending-supply-title">
+     <h3 id="pending-supply-title">Aguardando configuração <span>{pendingMatches.length}</span></h3>
+     <ul>{pendingMatches.map(p=><li key={p.id}>
+      <button type="button" onClick={()=>begin(p)} aria-label={'Configurar e ativar '+p.name}>
+       <Box size={17} aria-hidden="true"/><span><strong>{p.name}</strong><small>Configurar e ativar</small></span><ChevronDown size={16} aria-hidden="true"/>
+      </button>
+     </li>)}</ul>
+    </section>}
+    {pendingMatches.length===0&&active.length===0&&<p className="v3-info">Nenhum insumo encontrado.</p>}
+    {active.map(p=><details key={p.id} className="ti-insumos-item"><summary><span className="ti-insumos-item-icon"><Box size={17} aria-hidden="true"/></span><span className="ti-insumos-item-title"><strong>{productName(p)}</strong><small>{controlLabel(p.profile?.controlMode)} · {p.profile?.countUnit||p.unit||"un"}</small></span><ChevronDown className="ti-insumos-chevron" size={17} aria-hidden="true"/></summary><div className="ti-insumos-item-actions"><button className="v3-secondary" type="button" onClick={()=>begin(p)} disabled={p.status!=='active'}>Configurar insumo</button><button className="v3-secondary" type="button" disabled={busy} onClick={()=>update('v3ArchiveProduct',{productId:p.id,active:p.status!=='active'},p.status==='active'?'Insumo arquivado.':'Insumo reativado.')}>{p.status==='active'?'Arquivar':'Reativar'}</button></div></details>)}</div>:
     <div className="ti-unified-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setEditId('')}}><div className="ti-unified-modal" role="dialog" aria-modal="true" aria-label="Configuração do insumo"><div className="v3-wizard"><div className="v3-row"><h3>{productName(current)}</h3><button type="button" className="v3-secondary" onClick={()=>setEditId('')}>Voltar</button></div><p className="v3-info">Etapa {step+1} de 4 · Alteração versionada e auditável</p>
      {step===0&&<div className="v3-form"><label>Nome claro e único que será exibido<input required maxLength={100} value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Ex.: Tilápia grelhada"/></label><label>Sinônimos usados na cozinha (separe por vírgula)<input maxLength={240} value={aliases} onChange={e=>setAliases(e.target.value)} placeholder="Ex.: Filé para grelha"/></label><label>Como o insumo entra na cozinha?<select value={origin} onChange={e=>setOrigin(e.target.value)}>{sources.map(([value,title])=><option key={value} value={value}>{title}</option>)}</select></label><label>Como chega? (embalagem ou apresentação)<input maxLength={80} value={presentation} onChange={e=>setPresentation(e.target.value)} placeholder="Ex.: fardo pesado em kg"/></label></div>}
      {step===1&&<div className="v3-form ti-insumo-measures"><label>Como controlar?<select value={mode} onChange={e=>setMode(e.target.value)}>{kinds.map(([value,title])=><option key={value} value={value}>{title}</option>)}</select></label>{mode==='quantitative'&&<div className="ti-insumo-measure-grid"><label>Recebo em<select value={receivingUnitValue} onChange={e=>{setReceivingUnitValue(e.target.value);setConversionFactor('')}}>{RECEIVING_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></label><label>Conto no estoque em<select value={countUnit} onChange={e=>{setCountUnit(e.target.value);setConversionFactor('')}}>{STOCK_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></label></div>}{mode==='quantitative'&&<details className="ti-insumo-compact-detail"><summary>Conversão fixa de embalagem <small>Opcional</small></summary><p>Use para equivalências exatas: 1 caixa = 12 unidades. Não utilize para previsão de cortes.</p><label>1 {receivingUnitValue} corresponde a quantos {countUnit}?<input type="number" min="0.001" step="any" placeholder="Sem conversão fixa" disabled={receivingUnitValue===countUnit} value={conversionFactor} onChange={e=>setConversionFactor(e.target.value)}/></label><small>O sistema apresenta uma sugestão, mas a quantidade física deve ser confirmada.</small></details>}{mode==='quantitative'&&<details className="ti-insumo-compact-detail"><summary>Rendimentos estimados <small>{yieldRules.length?yieldRules.length+' opção(ões)':'Opcional'}</small></summary><p>Ex.: 120 g de alcatra rendem 1 bife. É só previsão, sem mexer no estoque.</p>{yieldRules.map((y,i)=><div className="ti-insumo-yield-card" key={i}><label>Nome<input maxLength={80} placeholder="Ex.: Bife de 120 g" value={y.label} onChange={e=>setYieldRules(old=>old.map((r,k)=>k===i?{...r,label:e.target.value}:r))}/></label><div className="ti-insumo-measure-grid"><label>Quantidade usada<input type="number" min="0.001" step="any" value={y.sourceQuantity} onChange={e=>setYieldRules(old=>old.map((r,k)=>k===i?{...r,sourceQuantity:e.target.value}:r))}/></label><label>Unidade<select value={y.sourceUnit} onChange={e=>setYieldRules(old=>old.map((r,k)=>k===i?{...r,sourceUnit:e.target.value}:r))}>{STOCK_UNITS.map(u=><option key={u}>{u}</option>)}</select></label><label>Rende<input type="number" min="0.001" step="any" value={y.resultQuantity} onChange={e=>setYieldRules(old=>old.map((r,k)=>k===i?{...r,resultQuantity:e.target.value}:r))}/></label><label>Resultado<select value={y.resultUnit} onChange={e=>setYieldRules(old=>old.map((r,k)=>k===i?{...r,resultUnit:e.target.value}:r))}>{STOCK_UNITS.map(u=><option key={u}>{u}</option>)}</select></label></div><button type="button" className="v3-secondary" onClick={()=>setYieldRules(old=>old.filter((_,k)=>k!==i))}>Remover</button></div>)}<button type="button" className="v3-secondary" disabled={yieldRules.length>=8} onClick={()=>setYieldRules(old=>[...old,{label:'',sourceUnit:['kg','g'].includes(countUnit)?'g':countUnit||'kg',sourceQuantity:'120',resultUnit:'porcao',resultQuantity:'1'}])}>＋ Adicionar rendimento</button></details>}</div>}
@@ -169,5 +195,6 @@ export default function KitchenV3({membership}){
      <div className="v3-actions"><button type="button" className="v3-secondary" onClick={()=>setStep(x=>Math.max(0,x-1))} disabled={step===0}>Anterior</button>{step<3?<button type="button" disabled={step===2&&locs.length===0} onClick={()=>setStep(x=>x+1)}>Próximo</button>:<button type="button" disabled={busy} onClick={saveProfile}>{busy?'Salvando…':'Confirmar configuração'}</button>}</div>
     </div></div></div>}</div>}
   </>}
+  </section>
  </section>;
 }

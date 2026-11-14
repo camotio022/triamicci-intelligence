@@ -12,20 +12,15 @@
 .app-shell :where(input,select,textarea){min-width:0;max-width:100%}
 .app-shell :where(.conference-card,.receiving-card,.ti-planning-card,.ti-premium-card,.panel){min-width:0}
 .app-shell :where(.ti-unified-modal,.ti-profile-dialog,.access-sheet){max-width:calc(100vw - 24px);max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 24px);overflow-y:auto;overscroll-behavior:contain}
-.ti-mobile-page-label{display:none}
 @media(max-width:760px){
  .main-content{min-width:0}
  .main-content>.topbar{position:sticky;z-index:20;top:0;background:var(--ti-canvas);border-bottom:1px solid var(--ti-line)}
  .topbar .breadcrumb{min-width:0;max-width:100%;overflow:hidden}
  .topbar .breadcrumb .ti-mobile-brand{white-space:nowrap}
- /* The toolbar has two icon actions; the page title lives on its own line. */
  .topbar .breadcrumb>b{display:none}
- .ti-mobile-page-label{display:block;margin:6px 0 3px;min-width:0;font-weight:800;color:var(--ti-ink);font-size:clamp(19px,5vw,23px);line-height:1.24;letter-spacing:-.025em;overflow-wrap:anywhere}
  .ti-mobile-context{padding:4px 1px 5px;min-height:0}
  .ti-mobile-context span:first-child{min-width:0;max-width:70%}
  .ti-mobile-context span:last-child{min-width:0;max-width:45%}
- .ti-mobile-quicknav{gap:7px;margin-bottom:10px;padding-block:5px}
- .ti-mobile-quicknav>button{min-height:44px;border-radius:11px;flex:0 0 auto}
  .app-shell :where(.ti-unified-modal,.ti-profile-dialog,.access-sheet){width:min(100%,480px)}
  .app-shell :where(.ti-unified-modal-backdrop,.ti-profile-backdrop,.access-sheet-backdrop){padding:12px max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px))}
  .ti-sidebar-premium.sidebar-open{height:100dvh}
@@ -35,3 +30,62 @@
  .ti-mobile-context{gap:6px;font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.app-shell :where(.ti-sidebar-premium,.ti-unified-modal,.access-sheet){scroll-behavior:auto;transition-duration:.01ms}}
+
+/* Keep the field's built-in picker and give its closed state the app's style. */
+html body #root .app-shell main select:not([multiple]):not([size]) {
+ appearance:none;
+ -webkit-appearance:none;
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234b5a70' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+ background-repeat:no-repeat;
+ background-position:right 12px center;
+ padding-inline-end:36px;
+}
+
+.ti-stock-active-panel {display:grid;min-width:0;gap:12px}
+.ti-insumos-pending {background:#fff8ed;border-bottom:1px solid #eadcc6}
+.ti-insumos-pending h3 {display:flex;align-items:center;gap:8px;margin:0;padding:10px 12px;font-size:.875rem;color:#76501d}
+.ti-insumos-pending h3 span {min-width:24px;padding:2px 6px;border-radius:99px;background:#f4e7d0;text-align:center}
+.ti-insumos-pending ul {list-style:none;margin:0;padding:0}
+.ti-insumos-pending li+li {border-top:1px solid #eadcc6}
+.ti-insumos-pending li button {display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;background:transparent;color:var(--ti-ink);text-align:left}
+.ti-insumos-pending li button:focus-visible {outline-offset:-3px}
+.ti-insumos-pending li button strong,.ti-insumos-pending li button small {display:block;overflow-wrap:anywhere}
+.ti-insumos-pending li button small {margin-top:2px;color:#76501d}
+.ti-insumos-item[open] .ti-insumos-chevron {transform:rotate(180deg)}
+.ti-form-error {padding:10px 12px;border:1px solid #e8b5b3;border-radius:10px;background:#fff1ef;color:#8d211d}
+.ti-inventory-investigate-link {display:inline-flex;align-items:center;justify-self:start;min-height:44px;padding:8px 12px;border:1px solid var(--ti-line);border-radius:10px;background:var(--ti-surface);color:var(--ti-brand);font-weight:700;text-decoration:none}
+.ti-stock-active-panel,.ti-shipment-wizard h3,#inventory-report-title {scroll-margin-top:calc(80px + env(safe-area-inset-top,0px))}
+
+@media(max-width:760px){
+ .main-content>.ti-mobile-context {padding-block:3px;margin-block:4px 10px}
+ .main-content>.v3-page,.receiving-page>.ti-shipment {gap:10px}
+ .main-content>.v3-page>.v3-head {margin-bottom:0;padding-block:0}
+ .main-content .ti-v4-stock-nav {margin:0;gap:4px}
+ .main-content .ti-v4-stock-subnav {margin:0;gap:5px}
+ .main-content .ti-v4-stock-subnav button {min-height:44px;padding:6px 8px}
+ .main-content>.receiving-page {padding-top:6px}
+ .main-content .ti-shipment-start {min-height:44px;padding:8px 12px}
+ .main-content .ti-shipment-stats>div {padding:8px 10px;gap:3px}
+ .main-content .ti-shipment-stats strong {font-size:20px}
+ .main-content .ti-mentor {gap:10px}
+ .main-content .ti-mentor-hero {padding:14px}
+ .main-content .ti-mentor-hero h1 {margin:0;font-size:23px}
+ .main-content .ti-mentor-hero p {margin:5px 0 9px}
+ .main-content .ti-mentor-grid {gap:8px}
+ .main-content .ti-mentor-card {padding:12px;gap:5px}
+ .main-content .ti-mentor-card h2 {font-size:17px}
+ .main-content .ti-mentor-card p {font-size:13px;line-height:1.4}
+ .main-content .ti-mentor-card button {min-height:44px;padding:7px 12px}
+}
+
+.ti-stock-direct-production {margin-top:8px}
+.ti-stock-direct-production>summary {display:flex;align-items:center;min-height:44px;color:var(--ti-muted);cursor:pointer}
+.ti-stock-direct-production>summary::before {content:'›';margin-inline-end:8px}
+.ti-stock-direct-production[open]>summary::before {transform:rotate(90deg)}
+
+@media(max-width:760px){
+ .main-content .ti-mural-v5-hero {padding:14px;margin-bottom:10px}
+ .main-content .ti-mural-v5-hero h1 {margin:0 0 5px}
+ .main-content .ti-mural-v5-stats>div {padding:8px;gap:3px}
+ .main-content .ti-mural-v4-sections {gap:10px;margin-top:10px}
+}

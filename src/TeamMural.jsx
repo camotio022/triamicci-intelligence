@@ -1,3 +1,4 @@
+import useAppConfirmation from './useAppConfirmation.jsx';
 import {restaurantDay} from '../shared/operation-day.js';
 import {requestJson} from './api-client.js';
 import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
@@ -20,6 +21,7 @@ const monthLabel=period=>new Intl.DateTimeFormat('pt-BR',{month:'long',year:'num
 const todayInSaoPaulo=()=>restaurantDay(new Date());
 
 export default function TeamMural({membership,onOpenProduction}){
+ const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const [schedules,setSchedules]=useState([]),[notices,setNotices]=useState([]),[presence,setPresence]=useState({}),[today,setToday]=useState(todayInSaoPaulo),[productionTasks,setProductionTasks]=useState([]),[productionError,setProductionError]=useState('');
  const [loading,setLoading]=useState(true),[error,setError]=useState(''),[expanded,setExpanded]=useState(null),[staff,setStaff]=useState([]),[clock,setClock]=useState('00:00');
  const [noticeCursor,setNoticeCursor]=useState(null),[presenceError,setPresenceError]=useState(''),[showNoticeHistory,setShowNoticeHistory]=useState(false);
@@ -68,10 +70,10 @@ export default function TeamMural({membership,onOpenProduction}){
  const endedTeam=roster.filter(x=>x.start&&!x.ongoing&&!x.upcoming);
  const visibleTeam=teamFilter==='now'?nowTeam:teamFilter==='next'?nextTeam:teamFilter==='ended'?endedTeam:roster;
  const [noticeForm,setNoticeForm]=useState({title:'',body:'',priority:'normal',expiresOn:''}),[publishing,setPublishing]=useState(false);
- const publishNotice=async e=>{e.preventDefault();if(publishing||!window.confirm('Publicar este comunicado para a unidade?'))return;setPublishing(true);try{const token=await auth.currentUser.getIdToken();const write=async(action,payload)=>{const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'mural',action,...payload})});const d=await response.json();if(!response.ok)throw Error(d.message);return d};const draft=await write('saveDraft',{item:{kind:'notice',...noticeForm}});await write('publish',{id:draft.id});setNoticeForm({title:'',body:'',priority:'normal',expiresOn:''});await refresh()}catch(e){setError(e.message)}finally{setPublishing(false)}};
+ const publishNotice=async e=>{e.preventDefault();if(publishing||!await askConfirmation('Publicar este comunicado para a unidade?'))return;setPublishing(true);try{const token=await auth.currentUser.getIdToken();const write=async(action,payload)=>{const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'mural',action,...payload})});const d=await response.json();if(!response.ok)throw Error(d.message);return d};const draft=await write('saveDraft',{item:{kind:'notice',...noticeForm}});await write('publish',{id:draft.id});setNoticeForm({title:'',body:'',priority:'normal',expiresOn:''});await refresh()}catch(e){setError(e.message)}finally{setPublishing(false)}};
  const [showAllNotices,setShowAllNotices]=useState(false);
  const historicalNotices=notices.filter(item=>noticeHistorical(item,today));
- const archiveNotice=async id=>{if(!window.confirm('Arquivar este comunicado? Ele continuará no histórico da unidade.'))return;try{await read('mural','archive',{id});await refresh()}catch(e){setError(e.message)}};
+ const archiveNotice=async id=>{if(!await askConfirmation('Arquivar este comunicado? Ele continuará no histórico da unidade.'))return;try{await read('mural','archive',{id});await refresh()}catch(e){setError(e.message)}};
  const prioritized=notices.filter(item=>!noticeHistorical(item,today)).sort((a,b)=>({urgent:2,important:1,normal:0}[b.priority||'normal']-({urgent:2,important:1,normal:0}[a.priority||'normal']))||String(b.publishedAt||'').localeCompare(String(a.publishedAt||'')));
  const visibleNotices=showAllNotices?prioritized:prioritized.slice(0,2);
  const loadOlder=async()=>{try{const d=await read('mural','publicNotices',{before:noticeCursor});setNotices(a=>[...a,...(d.items||[]).filter(p=>!a.some(x=>x.id===p.id))]);setNoticeCursor(d.nextCursor||null)}catch(e){setError(e.message)}};
@@ -79,11 +81,22 @@ export default function TeamMural({membership,onOpenProduction}){
  const publishedCurrent=Boolean(current);
  const scheduleLabel=publishedCurrent?'Escala do mês publicada':'Sem escala oficial para este mês';
  return <section className="ti-planning ti-mural-home ti-mural-v4" aria-label="Mural da equipe">
-  <header className="ti-mural-v5-hero"><div className="ti-mural-v5-overline"><Megaphone size={18}/> MURAL DA EQUIPE</div><h1>Tudo da sua unidade em um só lugar</h1><p>Comunicados, escala, folgas e informações do dia.</p><LiveStatus state={live}/></header>
+  <header className="ti-mural-v5-hero"><h1>Mural da equipe</h1><p>Comunicados, escala, folgas e informações do dia.</p><LiveStatus state={live}/></header>
   <section className="ti-mural-v5-stats" aria-label="Resumo de hoje"><div><Users size={18}/><strong>{roster.length}</strong><small>Equipe de hoje</small></div><div><ShieldCheck size={18}/><strong>{presenceError?'—':roster.filter(p=>p.declared).length}</strong><small>Entradas declaradas</small></div><div><Clock3 size={18}/><strong>{presenceError?'—':roster.filter(p=>!p.declared).length}</strong><small>Sem entrada declarada</small></div><div><Sun size={18}/><strong>{roster.filter(p=>p.shift==='Manhã').length}</strong><small>Manhã · {roster.filter(p=>p.shift==='Noite').length} noite</small></div></section>
   {error&&<p role="alert" className="team-error">{error}</p>}{presenceError&&<p role="status" className="team-error">{presenceError}</p>}
   <nav className="ti-mural-v5-nav" aria-label="Navegar no mural">{[['mural-v5-team','Equipe de hoje'],['mural-v5-notices','Comunicados'],['mural-v5-schedule','Escala mensal'],['mural-v5-production','Produção']].map(([target,label])=><button type="button" key={target} onClick={()=>document.getElementById(target)?.scrollIntoView({behavior:'smooth',block:'start'})}>{label}</button>)}</nav>
   <div className="ti-mural-v4-sections">
+   <section id="mural-v5-production" className="ti-mural-card ti-v4-feature ti-v4-production-mural" aria-labelledby="mural-production-title">
+    <header className="ti-v4-section-title"><div className="ti-v4-title-left"><ClipboardList size={22} aria-hidden="true"/><div><h2 id="mural-production-title">Produção de hoje</h2><p>Checklist da cozinha · atualizado com os registros.</p></div></div><span className="ti-mural-prod-count">{productionTasks.filter(t=>t.status==='completed').length}/{productionTasks.length} feitas</span></header>
+    {productionError?<p role="status" className="ti-mural-empty">{productionError}</p>:productionTasks.length===0?<p className="ti-mural-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-mural-prod-mini">{productionTasks.map(task=>{
+     const done=task.status==='completed',partial=task.status==='partial',finished=Number(task.completedQuantity)||0;
+     const pct=task.plannedQuantity?Math.max(0,Math.min(100,Math.round(100*finished/task.plannedQuantity))):null;
+     return <li key={task.id} className={done?'is-complete':''}>
+      <span className="ti-mural-prod-icon" aria-hidden="true">{done?<CheckCircle2 size={19}/>:<Circle size={19}/>}</span>
+      <span className="ti-mural-prod-content"><strong>{task.recipeName}</strong><small>{done?'Concluída':partial?'Parcial':'Pendente'} · {task.plannedQuantity?finished+' de '+task.plannedQuantity+' '+(task.unit||'un'):finished?finished+' '+(task.unit||'un')+' registradas':'Quantidade livre'}</small>{pct!==null&&<span className="ti-mural-prod-track" role="progressbar" aria-label={'Progresso de '+task.recipeName} aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}><span style={{width:pct+'%'}}/></span>}</span>
+      {!done&&<button type="button" className="ti-mural-prod-action" onClick={()=>onOpenProduction?.(task.id)} aria-label={'Registrar execução de '+task.recipeName}>Registrar</button>}
+     </li>})}</ul>}
+   </section>
    <section id="mural-v5-team" className="ti-mural-card ti-mural-roster ti-v4-feature ti-mural-v5-roster" aria-labelledby="mural-roster-title">
     <header className="ti-v4-section-title"><div className="ti-v4-title-left"><CalendarDays size={22} aria-hidden="true"/><div><h2 id="mural-roster-title">Escala da equipe</h2><p>{loading?'Carregando escala…':scheduleLabel}</p></div></div>{publishedCurrent&&<span className="ti-v4-official"><ShieldCheck size={14} aria-hidden="true"/> Oficial</span>}</header>
     <div className="ti-v4-roster-summary">
@@ -110,17 +123,8 @@ export default function TeamMural({membership,onOpenProduction}){
     {manager&&<details className="ti-mural-roster-details"><summary>Publicar comunicado</summary><form className="stock-action-form" onSubmit={publishNotice}><label>Título<input required minLength={3} maxLength={100} value={noticeForm.title} onChange={e=>setNoticeForm(x=>({...x,title:e.target.value}))}/></label><label>Prioridade<select value={noticeForm.priority} onChange={e=>setNoticeForm(x=>({...x,priority:e.target.value}))}><option value="normal">Normal</option><option value="important">Importante</option><option value="urgent">Urgente</option></select></label><label>Válido até (opcional)<input type="date" min={today} value={noticeForm.expiresOn} onChange={e=>setNoticeForm(x=>({...x,expiresOn:e.target.value}))}/></label><small>Sem data, permanece publicado até a gestão arquivar.</small><label>Mensagem<textarea required maxLength={3000} value={noticeForm.body} onChange={e=>setNoticeForm(x=>({...x,body:e.target.value}))}/></label><button type="submit" disabled={publishing}>{publishing?'Publicando…':'Revisar e publicar'}</button></form></details>}
    </section>
 
-   <section id="mural-v5-production" className="ti-mural-card ti-v4-feature ti-v4-production-mural" aria-labelledby="mural-production-title">
-    <header className="ti-v4-section-title"><div className="ti-v4-title-left"><ClipboardList size={22} aria-hidden="true"/><div><h2 id="mural-production-title">Produção de hoje</h2><p>Checklist da cozinha · atualizado com os registros.</p></div></div><span className="ti-mural-prod-count">{productionTasks.filter(t=>t.status==='completed').length}/{productionTasks.length} feitas</span></header>
-    {productionError?<p role="status" className="ti-mural-empty">{productionError}</p>:productionTasks.length===0?<p className="ti-mural-empty">Nenhuma preparação planejada para hoje.</p>:<ul className="ti-mural-prod-mini">{productionTasks.map(task=>{
-     const done=task.status==='completed',partial=task.status==='partial',finished=Number(task.completedQuantity)||0;
-     const pct=task.plannedQuantity?Math.max(0,Math.min(100,Math.round(100*finished/task.plannedQuantity))):null;
-     return <li key={task.id} className={done?'is-complete':''}>
-      <span className="ti-mural-prod-icon" aria-hidden="true">{done?<CheckCircle2 size={19}/>:<Circle size={19}/>}</span>
-      <span className="ti-mural-prod-content"><strong>{task.recipeName}</strong><small>{done?'Concluída':partial?'Parcial':'Pendente'} · {task.plannedQuantity?finished+' de '+task.plannedQuantity+' '+(task.unit||'un'):finished?finished+' '+(task.unit||'un')+' registradas':'Quantidade livre'}</small>{pct!==null&&<span className="ti-mural-prod-track" role="progressbar" aria-label={'Progresso de '+task.recipeName} aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}><span style={{width:pct+'%'}}/></span>}</span>
-      {!done&&<button type="button" className="ti-mural-prod-action" onClick={()=>onOpenProduction?.(task.id)} aria-label={'Registrar execução de '+task.recipeName}>Registrar</button>}
-     </li>})}</ul>}
-   </section>
+
   </div>
+  {confirmationSheet}
  </section>;
 }

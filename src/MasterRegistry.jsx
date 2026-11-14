@@ -1,3 +1,4 @@
+import useAppConfirmation from './useAppConfirmation.jsx';
 import {requestJson} from './api-client.js';
 import {useDialogFocus} from './useDialogFocus.js';
 import {useUnitLive} from './useUnitLive.js';
@@ -11,6 +12,7 @@ async function api(action,extra={}){
  return requestJson('/api/members/manage',{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Erro ao consultar cadastro.'});
 }
 export default function MasterRegistry({membership={}}){
+ const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const [query,setQuery]=useViewState('master:query',membership.unitId,''),[statusFilter,setStatusFilter]=useViewState('master:status',membership.unitId,'active');
  const dialog=useRef(null);
  const [claims,setClaims]=useState([]),[editing,setEditing]=useState(null),[form,setForm]=useState({}),[data,setData]=useState(null),[selected,setSelected]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
@@ -20,11 +22,11 @@ export default function MasterRegistry({membership={}}){
  useDialogFocus(dialog,!!editing,()=>{if(!busy)setEditing(null)});
  const selectable=(data?.people||[]).filter(p=>p.state==='new');
  const filteredRegistry=(data?.registry||[]).filter(p=>(statusFilter==='all'||p.status===statusFilter)&&[p.name,p.jobTitle,p.sector,p.shift].some(v=>String(v||'').toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR'))));
- const activate=async()=>{if(!window.confirm('Confirmou os 12 colaboradores, cargos, folgas e vínculos? Ativar esta base como fonte de novas escalas?'))return;setBusy(true);setError('');try{const d=await api('masterRegistryActivate',{confirm:true});setNotice(d.message);await refresh()}catch(err){setError(err.message);notifyLocal(err.message)}finally{setBusy(false)}};
+ const activate=async()=>{if(!await askConfirmation('Confirmou os 12 colaboradores, cargos, folgas e vínculos? Ativar esta base como fonte de novas escalas?'))return;setBusy(true);setError('');try{const d=await api('masterRegistryActivate',{confirm:true});setNotice(d.message);await refresh()}catch(err){setError(err.message);notifyLocal(err.message)}finally{setBusy(false)}};
  const notifyLocal=message=>setError(message);
- const linkAccount=async(claim)=>{if(!window.confirm('Confirmou pessoalmente que esta conta pertence ao colaborador?'))return;setBusy(true);try{const d=await api('masterRegistryLink',{id:claim.registryId,uid:claim.accountUid});setNotice(d.message);await refresh()}catch(e){setError(e.message)}finally{setBusy(false)}};
+ const linkAccount=async(claim)=>{if(!await askConfirmation('Confirmou pessoalmente que esta conta pertence ao colaborador?'))return;setBusy(true);try{const d=await api('masterRegistryLink',{id:claim.registryId,uid:claim.accountUid});setNotice(d.message);await refresh()}catch(e){setError(e.message)}finally{setBusy(false)}};
  const importSelected=async()=>{
-  if(!selected.length||!window.confirm('Criar '+selected.length+' fichas sem login? Contas já existentes não serão modificadas.'))return;
+  if(!selected.length||!await askConfirmation('Criar '+selected.length+' fichas sem login? Contas já existentes não serão modificadas.'))return;
   setBusy(true);setError('');
   try{const r=await api('masterRegistryImport',{confirm:true,names:selected});setNotice(r.message);await refresh()}catch(e){setError(e.message)}finally{setBusy(false)}
  };
@@ -79,5 +81,6 @@ export default function MasterRegistry({membership={}}){
    <button type="button" onClick={()=>setEditing(null)}>Cancelar</button>
   </form></div></div>}
 
+  {confirmationSheet}
  </section>;
 }

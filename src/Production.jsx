@@ -1,3 +1,4 @@
+import useAppConfirmation from './useAppConfirmation.jsx';
 import {canPlanProduction} from '../server/production/planning-permissions.js';
 import {restaurantDay} from '../shared/operation-day.js';
 import PageHeading from './ui/PageHeading.jsx';
@@ -20,12 +21,14 @@ async function call(path,action,payload={}){
 }
 export default function Production({membership,initialTaskId}){
  const {notify}=useFeedback();
+ const {askConfirmation,confirmationSheet}=useAppConfirmation();
+ const [executionError,setExecutionError]=useState('');
  const openedTaskRef=useRef(null);
  const [view,setView]=useState('today'),[setupRecipe,setSetupRecipe]=useState(null),[setupDirty,setSetupDirty]=useState(false);
  const [preparationEditor,setPreparationEditor]=useState(false),[preparationSearch,setPreparationSearch]=useState(''),[preparationFilter,setPreparationFilter]=useState('all');
- const switchView=next=>{if(next!==view&&setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setView(next);if(next!=='preparations')setPreparationEditor(false);if(next!=='today'){setShowExecution(false);setShowPhotoImport(false);setActiveTaskId(null);}};
+ const switchView=async next=>{if(next!==view&&setupDirty&&!await askConfirmation('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setView(next);if(next!=='preparations')setPreparationEditor(false);if(next!=='today'){setShowExecution(false);setShowPhotoImport(false);setActiveTaskId(null);}};
  const openPreparation=id=>{setSetupRecipe({id,nonce:Date.now()});setPreparationEditor(true);requestAnimationFrame(()=>document.querySelector('.production-preparation-editor')?.scrollIntoView({behavior:'smooth',block:'start'}));};
- const closePreparation=()=>{if(setupDirty&&!window.confirm('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setPreparationEditor(false);setSetupRecipe(null);};
+ const closePreparation=async()=>{if(setupDirty&&!await askConfirmation('Sair e descartar as alterações não salvas desta preparação?'))return;setSetupDirty(false);setPreparationEditor(false);setSetupRecipe(null);};
  const [blockedRecipes,setBlockedRecipes]=useState([]),[reviewRecipes,setReviewRecipes]=useState([]);
  const [recipes,setRecipes]=useState([]),[runs,setRuns]=useState([]),[products,setProducts]=useState([]);
  const [recipeId,setRecipeId]=useState(''),[name,setName]=useState(''),[yieldQuantity,setYield]=useState('1'),[outputProductId,setOutputProductId]=useState('');
@@ -64,6 +67,7 @@ export default function Production({membership,initialTaskId}){
  },[initialTaskId,dailyTasks,recipes]);
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=(id,task=null)=>{
+  setExecutionError('');
   setOutputLot('');setExpiryDate('');setRecipeId(id);setRequestId(null);setConfirmed(false);setActiveTaskId(null);
   const r=recipes.find(x=>x.id===id);
   const quantity=executionQuantity(task,r);
@@ -85,7 +89,7 @@ export default function Production({membership,initialTaskId}){
  };
  const archiveRecipe=async()=>{
   if(!editRecipeId||!Number.isInteger(recipeVersion))return;
-  if(!window.confirm('Arquivar esta ficha? Ela não aparecerá mais para novas produções, mas o histórico será preservado.'))return;
+  if(!await askConfirmation('Arquivar esta ficha? Ela não aparecerá mais para novas produções, mas o histórico será preservado.'))return;
   setBusy(true);setStatus('');
   try{
    await call('/api/production/manage','archiveRecipe',{id:editRecipeId,expectedVersion:recipeVersion});
@@ -96,14 +100,14 @@ export default function Production({membership,initialTaskId}){
  };
  const finish=async e=>{
   e.preventDefault();if(busy||!confirmed||!selected)return;
-  if(!window.confirm(selected?.outputProductId?'Confirmar a transformação? Os ingredientes sairão dos locais definidos na ficha e o produto preparado entrará na reserva.':'Confirmar a produção e descontar agora os ingredientes realmente utilizados do giro?'))return;
-  setBusy(true);setStatus('');
+  if(!await askConfirmation(selected?.outputProductId?'Confirmar a transformação? Os ingredientes sairão dos locais definidos na ficha e o produto preparado entrará na reserva.':'Confirmar a produção e descontar agora os ingredientes realmente utilizados do giro?'))return;
+  setBusy(true);setStatus('');setExecutionError('');
   const id=requestId||crypto.randomUUID();setRequestId(id);
   try{
    const data=await call('/api/production/manage','finish',{recipeId,requestId:id,portions:Number(portions),
     items:items.map(i=>({productId:i.productId,quantity:Number(i.quantity)})),notes,outputLot,expiryDate,taskId:activeTaskId});
    setStatus(data.message);notify(data.message,'success');choose('');setShowExecution(false);await Promise.all([load(),loadTasks()]);
-  }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
+  }catch(e){setExecutionError(e.message)}finally{setBusy(false)}
  };
  const option=(id)=>products.find(p=>p.id===id);
  const inputUnit=id=>{const p=option(id);return p?.operationalUnitOverride||p?.physicalUnit||p?.unit||'un';};
@@ -114,6 +118,7 @@ export default function Production({membership,initialTaskId}){
  const typeName=t=>({portion:'Porcionamento',transform:'Transformação',recipe:'Receita'})[t]||'Ficha técnica';
  const visiblePreparations=library.filter(r=>{const t=preparationType(r);const query=preparationSearch.trim().toLocaleLowerCase('pt-BR');const name=(r.configurationDraft?.name||r.name||'').toLocaleLowerCase('pt-BR');return (!query||name.includes(query)||typeName(t).toLocaleLowerCase('pt-BR').includes(query))&&(preparationFilter==='all'||(preparationFilter==='ready'&&r.available&&r.preparationConfig)||(preparationFilter==='pending'&&!(r.available&&r.preparationConfig))||preparationFilter===t);});
  return <section className="inventory-page production-page">
+  {confirmationSheet}
   <PageHeading eyebrow={"OPERAÇÃO · UNIDADE "+membership.unitId.toUpperCase()} title="Produção da cozinha" description="Planeje o preparo, registre a quantidade produzida e consulte o histórico."><LiveStatus state={live}/></PageHeading>
   <nav className="production-tabs" aria-label="Seções da produção">{[['today','Hoje'],...(admin?[['preparations','Preparações']]:[]),['history','Histórico']].map(([key,label])=><button key={key} type="button" aria-pressed={view===key} onClick={()=>switchView(key)}>{label}</button>)}</nav>
   {view==='today'&&blockedRecipes.length>0&&<aside className="production-attention"><div><strong>{blockedRecipes.length} {blockedRecipes.length===1?'preparação precisa':'preparações precisam'} de revisão</strong><p>Vínculos ou unidades pendentes impedem novas produções.</p></div>{admin?<button type="button" onClick={()=>setView('preparations')}>Revisar</button>:<span>Solicite à gestão</span>}</aside>}
@@ -126,13 +131,13 @@ export default function Production({membership,initialTaskId}){
   </section>}
   {status&&<p role="status" className="receiving-notice">{status}</p>}
   {view==='today'&&<section className="receiving-card ti-v4-daily-tasks" aria-label="Central de produção do dia">
-   <div className="ti-production-command-heading"><div><span className="ti-production-eyebrow">COZINHA · HOJE</span><h2>Produção do dia</h2><p>Acompanhe tarefas e registre o que foi realmente preparado.</p></div>{canPlan&&recipes.length>0&&<button type="button" className="ti-production-plan-trigger" aria-expanded={showPlanner} onClick={()=>{setShowPlanner(x=>!x);setShowPhotoImport(false)}}>{showPlanner?<><X size={16}/> Fechar</>:<><Plus size={17}/> Planejar preparação</>}</button>}</div>
+   <div className="ti-production-command-heading"><div><h2>Tarefas de hoje</h2></div>{canPlan&&recipes.length>0&&<button type="button" className="ti-production-plan-trigger" aria-expanded={showPlanner} onClick={()=>{setShowPlanner(x=>!x);setShowPhotoImport(false)}}>{showPlanner?<><X size={16}/> Fechar</>:<><Plus size={17}/> Planejar preparação</>}</button>}</div>
    {canPlan&&recipes.length>0&&!showPhotoImport&&<button type="button" className="ti-production-photo-trigger" aria-expanded={showPhotoImport} onClick={()=>{setShowPhotoImport(v=>!v);setShowPlanner(false)}}><Camera size={17}/>{showPhotoImport?'Fechar importação por foto':'Importar planejamento por foto'}</button>}
    {showPhotoImport&&canPlan&&recipes.length>0&&<ProductionPhotoImport key={membership.unitId} recipes={recipes} onRecognize={(image,signal)=>requestJson('/api/production/manage',{action:'photoRecognize',image},{signal})} onImport={importPhotoTasks} onClose={()=>setShowPhotoImport(false)}/>}
    <div className="ti-production-pulse" aria-label="Resumo do dia"><div><small>Planejadas</small><strong>{dailyTasks.length}</strong></div><div><small>Concluídas</small><strong>{dailyTasks.filter(t=>t.status==='completed').length}</strong></div><div><small>Pendentes</small><strong>{dailyTasks.filter(t=>t.status!=='completed').length}</strong></div></div>
    {!loading&&recipes.length===0&&<p className="production-empty">Ainda não há preparações disponíveis. {admin?'Abra Preparações para revisar e ativar o cadastro.':'A gestão precisa revisar e ativar as preparações.'}</p>}
    {canPlan&&recipes.length>0&&showPlanner&&<form className="ti-v4-daily-task-form ti-production-planner" onSubmit={addDailyTask}><div className="ti-production-planner-heading"><strong>Planejar preparação</strong><small>O planejamento não movimenta estoque.</small></div><label>Preparação<select required value={plannedRecipe} onChange={e=>setPlannedRecipe(e.target.value)}><option value="">Escolher preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Meta opcional ({recipes.find(r=>r.id===plannedRecipe)?.outputUnit||'un'})<input type="number" min="0.001" max="10000" step="0.001" value={plannedQuantity} onChange={e=>setPlannedQuantity(e.target.value)}/></label><button type="submit" disabled={!plannedRecipe||taskLoading||loading}>{taskLoading?'Adicionando…':'Adicionar à lista'}</button></form>}
-   {dailyTasks.length===0?<div className="ti-production-day-empty"><ClipboardList size={28}/><strong>Nenhuma preparação planejada</strong><p>Organize a cozinha adicionando uma preparação à lista de hoje.</p>{canPlan&&recipes.length>0&&!showPlanner&&<button type="button" onClick={()=>setShowPlanner(true)}><Plus size={16}/> Planejar preparação</button>}</div>:<><div className="ti-production-today-heading"><span>{dailyTasks.filter(t=>t.status==='completed').length} de {dailyTasks.length} concluídas</span><small>Atualização após produção confirmada</small></div><ul className="ti-v4-daily-task-list ti-production-checklist">{dailyTasks.map(task=>{
+   {dailyTasks.length===0?<div className="ti-production-day-empty"><ClipboardList size={28}/><strong>Nenhuma preparação planejada</strong></div>:<><div className="ti-production-today-heading"><span>{dailyTasks.filter(t=>t.status==='completed').length} de {dailyTasks.length} concluídas</span><small>Atualização após produção confirmada</small></div><ul className="ti-v4-daily-task-list ti-production-checklist">{dailyTasks.map(task=>{
     const done=task.status==='completed',partial=task.status==='partial',available=recipes.some(r=>r.id===task.recipeId);
     const completed=Number(task.completedQuantity)||0,goal=Number(task.plannedQuantity)||0,progress=goal>0?Math.max(0,Math.min(100,Math.round(completed/goal*100))):null;
     return <li key={task.id} className={'ti-production-check-card'+(done?' is-complete':'')}>
@@ -147,7 +152,8 @@ export default function Production({membership,initialTaskId}){
   </section>}
   <div className="production-layout ti-v4-production-layout">
    {view==='today'&&showExecution&&<section className="receiving-card ti-production-execution" aria-label="Registrar produção"><div className="ti-production-execution-head"><h2><ClipboardList size={19} aria-hidden="true"/> Registrar produção</h2><button type="button" onClick={()=>{setShowExecution(false);choose('');}}><X size={17}/> Fechar</button></div><p>{activeTaskId?'Registro vinculado à tarefa de hoje.':'Registro avulso, sem necessidade de planejamento anterior.'} Confirme somente as quantidades realmente preparadas.</p>
-    {selected?.stockEffect==='portion_same_product'?<><label>Preparação<select aria-label="Preparação para registrar produção" value={recipeId} onChange={e=>choose(e.target.value)}><option value="">Selecione a preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><SameProductPortioning key={membership.unitId+recipeId+(activeTaskId||'')} taskId={activeTaskId} recipe={selected} call={call} management={admin} onSaved={async message=>{setStatus(message);notify(message,'success');setShowExecution(false);choose('');await Promise.all([load(true),loadTasks()])}}/></>:<form className="stock-action-form" onSubmit={finish}>
+    {executionError&&<p className="v3-error ti-form-error" role="alert">{executionError}</p>}
+    {selected?.stockEffect==='portion_same_product'?<><label>Preparação<select aria-label="Preparação para registrar produção" value={recipeId} onChange={e=>choose(e.target.value)}><option value="">Selecione a preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><SameProductPortioning key={membership.unitId+recipeId+(activeTaskId||'')} taskId={activeTaskId} recipe={selected} call={call} management={admin} onSaved={async message=>{setStatus(message);notify(message,'success');setShowExecution(false);choose('');await Promise.all([load(true),loadTasks()])}}/></>:<form className="stock-action-form" onSubmit={finish} onChange={()=>setExecutionError('')}>
      <label>Preparação<select aria-label="Preparação para registrar produção" required value={recipeId} onChange={e=>choose(e.target.value)}>
       <option value="">Selecione a preparação</option>
       {recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
