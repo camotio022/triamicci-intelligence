@@ -30,7 +30,9 @@ export function summarizeStock(products,balances,hasMore=false){
  return {kind:'stock',source:'catálogo e última contagem física disponível; não é saldo conferido em tempo real',hasMore,items};
 }
 export async function operationalContext(db,unitId,question){
- const intent=classifyQuestion(question),unit=db.collection('units').doc(unitId),data=[];
+ const intent=classifyQuestion(question),data=[];
+ if(!intent.production&&!intent.stock)return {scope:'Unidade autenticada, somente leitura',intent,sections:[],notice:'Nenhum módulo consultado para esta pergunta.'};
+ const unit=db.collection('units').doc(unitId);
  if(intent.production){
   const day=restaurantDay(new Date());
   const tasks=await unit.collection('productionDays').doc(day).collection('tasks').orderBy('createdAt','asc').limit(31).get();
