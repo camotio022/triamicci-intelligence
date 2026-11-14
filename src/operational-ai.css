@@ -14,3 +14,20 @@
 .ti-ai-rich-text strong{font-weight:750}.ti-ai-rich-text code{font-size:12px;background:#eef4f0;padding:2px 4px;border-radius:4px}
 .ti-ai-rich-text hr{border:0;border-top:1px solid #e5ece7;margin:16px 0}
 @media(max-width:760px){.ti-ai-page{height:calc(100dvh - 176px);min-height:370px}.ti-ai-dialog{padding:8px 0}.ti-ai-msg.is-user{max-width:95%}.ti-ai-rich-text{font-size:14px}}
+
+
+.ti-ai-history-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ti-ai-history-controls button{display:flex;align-items:center;gap:6px;border:1px solid #d7e5dc;background:#fff;border-radius:12px;padding:8px 11px;color:#28523a;font:inherit;font-size:12px;font-weight:650}
+.ti-ai-history-controls button:disabled{opacity:.45}
+.ti-ai-history-panel{background:#fff;border:1px solid #dce7df;border-radius:16px;padding:10px 12px;max-height:min(36dvh,310px);overflow:auto;flex-shrink:0;box-shadow:0 8px 22px #20352912}
+.ti-ai-history-title{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 6px;font-size:14px}
+.ti-ai-history-title button{border:0;background:transparent;display:flex;padding:8px}
+.ti-ai-history-panel>p{font-size:12px;color:#65756a}
+.ti-ai-thread{display:flex;gap:4px;align-items:center;border-top:1px solid #edf0ee}
+.ti-ai-thread button{background:transparent;border:0;text-align:left;min-width:0;padding:10px 6px;color:#254130}
+.ti-ai-thread button:first-child{flex:1;display:flex;flex-direction:column;gap:3px}
+.ti-ai-thread button:first-child strong{font-size:13px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
+.ti-ai-thread button:first-child small{font-size:11px;color:#738175}
+.ti-ai-thread button:last-child{padding:11px;color:#8b4545}
+.ti-ai-thread button:disabled{opacity:.45}
+.ti-ai-thread [aria-current=true]{background:#ecf8f0;border-radius:8px}
