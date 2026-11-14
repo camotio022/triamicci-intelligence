@@ -26,7 +26,7 @@ const slotFor=(person,date)=>(
  Array.isArray(person?.professional?.availability)?person.professional.availability:
  Array.isArray(person?.availability)?person.availability:[]
 ).find(slot=>slot.day===weekdayOf(date))||null;
-const safeHour=value=>/^([01]\\d|2[0-3]):[0-5]\\d$/.test(value||'')?value:null;
+const safeHour=value=>/^([01]\d|2[0-3]):[0-5]\d$/.test(value||'')?value:null;
 export function rosterDirectory(docs){
  const people=docs.map(d=>({id:d.id,data:d.data()}));
  const byId=new Map(people.map(p=>[p.id,p.data]));
