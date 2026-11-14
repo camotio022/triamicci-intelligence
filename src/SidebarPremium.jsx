@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState} from 'react';
-import {LayoutDashboard,ClipboardCheck,Package,ChefHat,UserRound,CalendarDays,Users,History,Boxes,Settings,BookOpen,Search,ChevronDown,X,LogOut,Building2,ClipboardList,Bell} from 'lucide-react';
+import {LayoutDashboard,ClipboardCheck,Package,ChefHat,UserRound,CalendarDays,Users,History,Boxes,Settings,BookOpen,Search,ChevronDown,X,LogOut,Building2,ClipboardList,Bell,Bot} from 'lucide-react';
 import {isManagement,canAccessPage} from '../server/permissions/v31-policy.js';
 import {isIndependentSession} from './firebase.js';
 import './sidebar-premium.css';
@@ -21,6 +21,7 @@ const sections=[
   {id:'people',label:'Gestão de pessoas',icon:Users,mentor:'mentor-people'}
  ]},
  {id:'learning',title:'Aprendizagem',icon:BookOpen,items:[
+  {id:'assistant-ai',label:'Assistente Triamicci',icon:Bot},
   {id:'mentor',label:'Triamicci Mentor',icon:BookOpen}
  ]}
 ];
