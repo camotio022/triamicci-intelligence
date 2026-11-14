@@ -4,6 +4,7 @@ import {AI_CAPABILITIES,AI_READS,AI_ANALYSES,AI_DRAFTS,AI_WRITES,aiAllowed,requi
 import {classifyAiV1,aiV1Context} from '../server/ai/context-v1.js';
 import {validateAiDraft} from '../server/ai/drafts-handler.js';
 import {draftIntent} from '../server/ai/draft-generation.js';
+import {draftDisplayTitle,draftPromptGuidance} from '../src/ai-draft-presentation.js';
 
 test('contract is closed to all roles outside management and unknown capabilities',()=>{
  for(const role of ['cook','auxiliar',undefined,null,'guest']){
@@ -49,4 +50,13 @@ test('only explicit draft preparation triggers AI draft creation',()=>{
  assert.equal(draftIntent('Crie um rascunho de ficha técnica'),'recipeDraft');
  assert.equal(draftIntent('Monte uma proposta de escala'),'scheduleDraft');
  assert.equal(draftIntent('Faça um rascunho de cobertura'),'coverageDraft');
+});
+
+test('draft titles are short, stable and preserve legacy records',()=>{
+ assert.equal(draftDisplayTitle('planDraft','Crie um rascunho de planejamento de produção com base na fotografia ...'),'Planejamento de produção');
+ assert.equal(draftDisplayTitle('scheduleDraft','Monte uma proposta de escala'),'Proposta de escala');
+ assert.equal(draftDisplayTitle('coverageDraft'),'Solicitação de cobertura');
+ assert.equal(draftDisplayTitle('unknown','Rascunho livre'),'Rascunho livre');
+ assert.ok(draftPromptGuidance('planDraft').includes('## Itens planejados'));
+ assert.ok(draftPromptGuidance('planDraft').includes('sem alegar que foi publicado ou executado'));
 });
