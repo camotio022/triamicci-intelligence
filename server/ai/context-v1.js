@@ -12,7 +12,7 @@ export function classifyAiV1(question){
   stock:/estoque|saldo|inventario|insumo|compra|repor|reposic|falta|desperdic|divergenc/.test(s),
   production:/produc|prepar|porcion|cozinha|prioridade|planej/.test(s),
   schedules:/escala|turno|folga|dobr|cobertura|plantao|disponib/.test(s),
-  attendance:/presen|ponto|entrada|saida|trabalhando agora/.test(s),
+  attendance:/presen|ponto|entrada|saida|trabalhando agora|dobr|cobertura/.test(s),
   sessions:/logad|conectad|sessao ativa|online agora/.test(s),
   team:/equipe|colaborador|funcionario|pessoal|cargo|funcao|disponib|dobr/.test(s),
   receiving:/receb|entrega|fornecedor|pedido de mercadoria/.test(s),
