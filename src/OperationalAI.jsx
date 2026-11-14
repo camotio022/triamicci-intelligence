@@ -39,7 +39,7 @@ export default function OperationalAI(){
    const data=await response.json();
    if(!response.ok)throw Error(data.message||'Não foi possível obter a resposta.');
    setMessages(old=>[...old,{role:'assistant',text:data.answer}]);setAttachment(null);
-  }catch(e){setError(e.message||'Erro temporário.');setDraft(message);}
+  }catch(e){setError(e.message||'Erro temporário.');setMessages(previous);setDraft(message);}
   finally{setPending(false);setTimeout(()=>endRef.current?.scrollIntoView({block:'end',behavior:'smooth'}),10);}
  }
  return <section className="ti-ai-page" aria-label="Assistente operacional">
