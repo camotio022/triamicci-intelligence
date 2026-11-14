@@ -90,3 +90,11 @@
  .ti-ai-compose{padding:8px 10px 7px;border-radius:20px}
 }
 @media(prefers-reduced-motion:reduce){.ti-ai-cursor{animation:none}}
+
+/* AI-Permissions V1 draft staging surface: no operational action controls. */
+.ti-ai-draft-receipt{display:flex;align-items:center;gap:7px;color:#18683b;background:#e9f7ed;border-radius:10px;padding:8px 10px;font-size:12px;margin:6px 2px}
+.ti-ai-drafts-disclaimer{margin:0;color:#617365;font-size:12px;line-height:1.4}
+.ti-ai-draft-details{flex:1;min-height:0;overflow-y:auto}
+.ti-ai-draft-details>button{border:0;background:#edf5ef;border-radius:9px;padding:8px 11px;color:#206c41;font:inherit;font-size:12px}
+.ti-ai-draft-details h3{font-size:17px;line-height:1.35;overflow-wrap:anywhere;margin:14px 0 10px}
+.ti-ai-draft-body{white-space:pre-wrap;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
