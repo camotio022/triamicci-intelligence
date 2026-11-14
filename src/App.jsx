@@ -28,7 +28,7 @@ import KitchenV3 from './KitchenV3.jsx';
 import StorageManager from './StorageManager.jsx';
 import './kitchen.css';
 import './v4-foundation.css';
-import {canAccessPage} from '../server/permissions/v31-policy.js';
+import {canAccessPage,isManagement} from '../server/permissions/v31-policy.js';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import SidebarPremium from './SidebarPremium.jsx';
 import {sessionAuth as auth,isIndependentSession} from './firebase.js';
@@ -42,13 +42,15 @@ export function Workspace(props) {
  return <NotificationProvider key={props.user.uid+':'+props.membership.unitId+':'+props.membership.role} unitId={props.membership.unitId}><WorkspaceContent {...props}/></NotificationProvider>;
 }
 function WorkspaceContent({ user, membership, logout, openTerminals }) {
+ const aiManagementOnly=import.meta.env.VITE_AI_PERMISSIONS_V1_ENABLED==='true';
+ const permittedPage=target=>canAccessPage(membership.role,target)&&!(aiManagementOnly&&target==='assistant-ai'&&!isManagement(membership.role));
  const routes=['storages','notifications','checklists','kitchen','mural','production','receiving','count','inventory','daily-inventory','history','catalog','kitchen-v3','my-profile','people','master-registry','team','skills','shifts','schedule-planning','leave-requests','labels','mentor','assistant-ai'];
- const permittedRoute=target=>routes.includes(target)&&canAccessPage(membership.role,target);
+ const permittedRoute=target=>routes.includes(target)&&permittedPage(target);
  const savedRoute=()=>recallRoute(window.localStorage,{uid:user.uid,unitId:membership.unitId,allowed:permittedRoute});
  const initialRoute=()=>selectInitialRoute({params:new URLSearchParams(window.location.search),allowed:permittedRoute,stored:savedRoute(),unitId:membership.unitId,standalone:isStandalone()});
  const [requestedPage, setPage] = useState(initialRoute);
  const [productionTaskId,setProductionTaskId]=useState(null);
- const page=canAccessPage(membership.role,requestedPage)?requestedPage:'kitchen';
+ const page=permittedPage(requestedPage)?requestedPage:'kitchen';
  const [today,setToday]=useState(()=>restaurantDay());
  useEffect(()=>{const refresh=()=>setToday(restaurantDay());const timer=setInterval(refresh,60000);document.addEventListener('visibilitychange',refresh);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh)}},[]);
  const [menuOpen, setMenuOpen] = useState(false);
