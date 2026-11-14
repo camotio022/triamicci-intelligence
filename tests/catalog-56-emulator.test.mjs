@@ -106,6 +106,20 @@ test('56 produtos: ativação, conciliação, pedido, aprovação, giro, produç
  assert.equal((await call(stock,aux,'count',count)).code,403);
  assert.equal((await call(stock,manager,'count',count)).code,200);
  assert.equal((await call(products,aux,'list')).products.find(p=>p.id===raw).physicalBalance.total,2);
+ const manual=await call(products,manager,'create',{name:'Frango a passarinho cru',category:'Proteínas',unit:'kg',minStock:0,trackExpiry:true});
+ assert.equal(manual.code,201);
+ const draftDashboard=await call(kitchen,manager,'v3Dashboard');
+ assert.equal(draftDashboard.catalogPending.some(p=>p.id===manual.id),true);
+ assert.equal(draftDashboard.products.some(p=>p.id===manual.id),false);
+ assert.equal((await call(kitchen,aux,'v3Dashboard')).catalogPending,undefined);
+ assert.equal((await call(kitchen,manager,'v3ProfileSave',{productId:manual.id,profile:{
+  displayName:'Frango a passarinho cru',aliases:[],origin:'supplier',controlMode:'quantitative',
+  countUnit:'kg',locations:['reserva'],receivingPresentation:'kg'
+ }})).code,200);
+ const activeDashboard=await call(kitchen,manager,'v3Dashboard');
+ assert.equal(activeDashboard.catalogPending.some(p=>p.id===manual.id),false);
+ assert.equal(activeDashboard.products.find(p=>p.id===manual.id)?.profile.origin,'supplier');
+ assert.equal((await root.collection('physicalBalances').doc(manual.id).get()).exists,false);
  const legacy='b'.repeat(40);await root.collection('products').doc(legacy).set({name:'Experimento',status:'active',unit:'un'});await root.collection('operationalProfiles').doc(legacy).set({origin:'supplier',controlMode:'quantitative',countUnit:'un',locations:['reserva','giro']});
  assert.equal((await call(products,aux,'list')).products.some(p=>p.id===legacy),false);
  assert.equal((await call(kitchen,aux,'v3Dashboard')).products.some(p=>p.id===legacy),false);

@@ -4,7 +4,7 @@ import {countUnit,validQuantity} from './logic.js';
 import {RECEIVING_UNITS} from './unit-engine.js';
 import {conferenceProfile} from './conference-profile.js';
 import {sendQuotaError} from '../quota-error.js';
-import {isOperationalProduct,belongsToOperationalCatalog} from './catalog-identity.js';
+import {isOperationalProduct,belongsToOperationalCatalog,OPERATIONAL_CATALOG_VERSION} from './catalog-identity.js';
 import {operationalView} from './shared-balance.js';
 import {signalUnitChange} from '../live-signal.js';
 import v3Ledger from './v3-ledger.js';
@@ -25,6 +25,8 @@ const now=()=>new Date();
 const dateOk=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!Number.isNaN(Date.parse(x+'T12:00:00Z'))&&new Date(x+'T12:00:00Z').toISOString().slice(0,10)===x;
 const quantity=(v,unit,zero=false)=>validQuantity(v,{unit,allowZero:zero});
 const newAudit=(tx,db,event,unitId,actorUid,details)=>{signalUnitChange(tx,db,unitId,['stock', 'catalog']);return tx.create(db.collection('auditLogs').doc(),{event,unitId,actorUid,details,at:now()});};
+// Manual registrations may be configured by management before joining the operational catalog.
+const isPendingProduct=p=>p?.status==='inactive'&&p.reviewRequired===true&&!belongsToOperationalCatalog(p)&&!p.catalogId;
 const verify=(a,unitId,allowed)=>a.exists&&a.data().status==='active'&&a.data().unitId===unitId&&allowed.includes(a.data().role);
 const productPath=(unit,id)=>unit.collection('products').doc(id);
 const limitText=(x,max=240)=>typeof x==='string'&&x.length<=max;
@@ -61,6 +63,9 @@ export default async function kitchenV3(req,res){
    const bm=new Map(legacy.docs.map(obj).map(p=>[p.id,operationalView(p)]));for(const doc of e.docs)bm.set(doc.id,operationalView(obj(doc)));
    return send(res,200,'Painel operacional carregado.',{
     products:a.docs.filter(s=>isOperationalProduct(s.data())).map(s=>{const data={...configuredProduct(obj(s),pm.get(s.id)),profile:conferenceProfile(s.data(),pm.get(s.id)),v3Balance:bm.get(s.id)||null};return roles.includes(member.role)?data:redactFinancial(data)}).sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')),
+    ...(action==='v3Dashboard'&&roles.includes(member.role)?{
+     catalogPending:a.docs.filter(d=>isPendingProduct(d.data())).map(d=>({id:d.id,name:d.data().name,unit:d.data().unit,status:'inactive',reviewRequired:true}))
+    }:{}),
     availability:checks.docs.map(s=>({...obj(s),at:iso(s.data().at)})),
     signals:c.docs.map(obj).filter(s=>s.status!=='resolved'),
     orders:d.docs.map(obj).filter(o=>o.status!=='cancelled').map(x=>roles.includes(member.role)?x:redactFinancial(x)).sort((x,y)=>(x.etaDate||'').localeCompare(y.etaDate||'')),
@@ -84,7 +89,8 @@ export default async function kitchenV3(req,res){
     if(sourceIds.includes(productId))throw Error('INVALID_SOURCE');
     if(sourceIds.length){const sourceDocs=await Promise.all(sourceIds.map(id=>tx.get(products.doc(id))));if(sourceDocs.some(d=>!d.exists||!isOperationalProduct(d.data())))throw Error('INVALID_SOURCE');}
     if(prior.exists&&prior.data().version!==expectedVersion||!prior.exists&&expectedVersion!==null&&expectedVersion!==p.data().profile?.version)throw Error('STALE');
-    if(!isOperationalProduct(p.data()))throw Error('INACTIVE');
+    const pending=isPendingProduct(p.data());
+    if(!pending&&!isOperationalProduct(p.data()))throw Error('INACTIVE');
     const targetUnit=profile.countUnit||countUnit(p.data());
     const unitChanged=countUnit(p.data())!==targetUnit||(balance.exists&&balance.data().unit!==targetUnit)||(!balance.exists&&oldLegacy.exists&&oldLegacy.data().unit!==targetUnit);
     const legacy=unitChanged?oldLegacy:null;
@@ -98,8 +104,8 @@ export default async function kitchenV3(req,res){
       sourceProductIds:profile.sourceProductIds||[],alternativeProductIds:profile.alternativeProductIds||[],
       trackingNote:(profile.trackingNote||'').slice(0,240),version:(prior.data()?.version||p.data().profile?.version||0)+1,updatedAt:now(),updatedBy:user.uid};
     version=next.version;tx.set(ref,next);
-    tx.update(pref,{name:next.displayName,aliases:[...new Set([...(p.data().aliases||[]),...(next.aliases||[]),p.data().name].filter(Boolean))],profile:next,unit:targetUnit,operationalUnitOverride:targetUnit,receivingUnitOverride:profile.receivingModel?.receivingUnit||([...unitNames,'ml'].includes(profile.receivingPresentation)?profile.receivingPresentation:unitChanged?targetUnit:p.data().receivingUnitOverride||null),...(unitChanged?{quantity:0,minStock:0}:{}),updatedAt:now()});
-    if(unitChanged){
+    tx.update(pref,{...(pending?{status:'active',reviewRequired:false,operationalCatalogVersion:OPERATIONAL_CATALOG_VERSION,operationalCatalogOrigin:'reviewed_manual_product',lotTrackingMode:p.data().trackExpiry===true?'per_lot':'none'}:{}),name:next.displayName,aliases:[...new Set([...(p.data().aliases||[]),...(next.aliases||[]),p.data().name].filter(Boolean))],profile:next,unit:targetUnit,operationalUnitOverride:targetUnit,receivingUnitOverride:profile.receivingModel?.receivingUnit||([...unitNames,'ml'].includes(profile.receivingPresentation)?profile.receivingPresentation:unitChanged?targetUnit:p.data().receivingUnitOverride||null),...(unitChanged?{quantity:0,minStock:0}:{}),updatedAt:now()});
+    if(unitChanged&&(!pending||balance.exists||oldLegacy.exists)){
      tx.set(balances.doc(productId),{productId,unit:targetUnit,reserve:0,rotation:0,total:0,quality:'CONFIGURATION_RESET',at:null,countedTotal:null,countSessions:{},lastCountAtByArea:{},entriesSinceCount:0,exitsSinceCount:0,updatedAt:now(),configurationVersion:next.version});
      if(legacy?.exists)tx.set(legacy.ref,{productId,unit:targetUnit,reserva:0,giro:0,total:0,quality:'CONFIGURATION_RESET',updatedAt:now()});
      for(const lot of lots.docs)tx.delete(lot.ref);
