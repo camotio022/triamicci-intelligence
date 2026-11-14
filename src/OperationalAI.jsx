@@ -34,8 +34,8 @@ export default function OperationalAI(){
    const image=attachment?await jpegBase64(attachment):undefined;
    const token=await auth.currentUser?.getIdToken();
    if(!token)throw Error('Faça login para conversar com o assistente.');
-   const response=await apiFetch('/api/ai/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({message,image,history:previous.slice(-6).map(({role,text})=>({role,text}))})});
+   const response=await apiFetch('/api/production/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({action:'assistantChat',message,image,history:previous.slice(-6).map(({role,text})=>({role,text}))})});
    const data=await response.json();
    if(!response.ok)throw Error(data.message||'Não foi possível obter a resposta.');
    setMessages(old=>[...old,{role:'assistant',text:data.answer}]);setAttachment(null);
