@@ -1,71 +1,92 @@
-.ti-ai-page{width:min(100%,900px);margin:0 auto;padding:clamp(12px,3vw,24px);display:flex;flex-direction:column;gap:12px;min-height:calc(100dvh - 155px)}.ti-ai-head{display:flex;align-items:center;gap:12px}.ti-ai-symbol{display:grid;place-items:center;width:46px;height:46px;border-radius:15px;background:#e7f5ec;color:#087a41;flex-shrink:0}.ti-ai-head h1{font-size:clamp(19px,3.6vw,25px);margin:0;line-height:1.2}.ti-ai-head p{font-size:13px;color:#6a7380;margin:4px 0 0}.ti-ai-beta{margin-left:auto;border:1px solid #d9e6df;border-radius:8px;padding:5px 7px;font-size:10px;font-weight:800;color:#34674c;letter-spacing:.08em}.ti-ai-privacy{margin:0;display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.4;color:#53645c}.ti-ai-privacy svg{flex-shrink:0}.ti-ai-dialog{display:flex;flex-direction:column;gap:13px;flex:1;min-height:250px;padding:14px 0;overflow-wrap:anywhere}.ti-ai-welcome{margin:auto;text-align:center;padding:25px 5px}.ti-ai-welcome strong{font-size:20px}.ti-ai-welcome p{color:#64727b;font-size:14px}.ti-ai-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:17px}.ti-ai-chips button{border:1px solid #dce5df;background:#fff;border-radius:14px;padding:10px 12px;font-size:12px;color:#24493b}.ti-ai-msg{width:fit-content;max-width:90%;padding:12px 14px;border-radius:17px;background:white;border:1px solid #e6eae8;white-space:pre-wrap}.ti-ai-msg.is-user{align-self:flex-end;background:#e7f5ec;border-color:#d9ecdf}.ti-ai-msg span{font-weight:700;font-size:11px;color:#527361}.ti-ai-msg p{margin:6px 0 0;font-size:14px;line-height:1.5}.ti-ai-msg small{display:block;margin-top:6px;color:#75827a}.ti-ai-loading{font-size:13px;color:#567364}.ti-ai-compose{position:sticky;bottom:env(safe-area-inset-bottom,0px);border:1px solid #e0e8e2;border-radius:19px;background:#fff;box-shadow:0 10px 35px #173c2a13;padding:12px;display:flex;flex-direction:column;gap:10px}.ti-ai-compose textarea{resize:vertical;min-height:56px;max-height:160px;border:0;outline:none;background:transparent;padding:7px;color:#172822;font:inherit;font-size:16px;width:100%}.ti-ai-actions{display:flex;gap:10px;align-items:center}.ti-ai-actions small{font-size:11px;color:#728078;flex:1}.ti-ai-actions button{display:flex;align-items:center;gap:5px;border-radius:11px;padding:10px 12px;font:inherit;font-size:12px;font-weight:700}.ti-ai-attach{background:#f1f5f2;border:1px solid #e0e7e2}.ti-ai-send{background:#087b43;color:#fff;border:1px solid #087b43}.ti-ai-send:disabled{opacity:.5}.ti-ai-file{display:flex;align-items:center;justify-content:space-between;background:#f3f7f4;padding:7px 12px;border-radius:9px;font-size:12px}.ti-ai-file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ti-ai-file button{background:none;border:0}.ti-ai-error{margin:0;color:#a21a2b;font-size:12px}@media(max-width:440px){.ti-ai-page{padding:12px 10px;min-height:calc(100dvh - 125px)}.ti-ai-msg{max-width:95%}.ti-ai-actions small{font-size:10px}.ti-ai-chips{flex-direction:column}.ti-ai-chips button{text-align:left}}
-/* Conversa: apenas as mensagens rolam, sem sobrepor o compositor. */
-.ti-ai-page{height:calc(100dvh - 145px);min-height:410px;min-width:0;overflow:hidden}
-.ti-ai-dialog{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;display:flex;flex-direction:column}
-.ti-ai-compose{position:relative;bottom:auto;flex-shrink:0;z-index:1}
-.ti-ai-msg{flex-shrink:0;white-space:normal;min-width:0}
-.ti-ai-msg.is-ai{max-width:100%;width:100%}
-.ti-ai-rich-text{font-size:14px;line-height:1.62;overflow-wrap:anywhere}
-.ti-ai-rich-text p{margin:8px 0 12px;line-height:1.62}
-.ti-ai-rich-text h3,.ti-ai-rich-text h4{margin:17px 0 8px;font-weight:750;line-height:1.35;color:#1e3f32}
-.ti-ai-rich-text h3{font-size:15px}.ti-ai-rich-text h4{font-size:14px}
-.ti-ai-rich-text ul,.ti-ai-rich-text ol{padding-left:20px;margin:7px 0 13px}
-.ti-ai-rich-text li{padding-left:2px;margin:5px 0;line-height:1.55}
-.ti-ai-rich-text strong{font-weight:750}.ti-ai-rich-text code{font-size:12px;background:#eef4f0;padding:2px 4px;border-radius:4px}
-.ti-ai-rich-text hr{border:0;border-top:1px solid #e5ece7;margin:16px 0}
-@media(max-width:760px){.ti-ai-page{height:calc(100dvh - 176px);min-height:370px}.ti-ai-dialog{padding:8px 0}.ti-ai-msg.is-user{max-width:95%}.ti-ai-rich-text{font-size:14px}}
-
-
-.ti-ai-history-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.ti-ai-history-controls button{display:flex;align-items:center;gap:6px;border:1px solid #d7e5dc;background:#fff;border-radius:12px;padding:8px 11px;color:#28523a;font:inherit;font-size:12px;font-weight:650}
-.ti-ai-history-controls button:disabled{opacity:.45}
-.ti-ai-history-panel{background:#fff;border:1px solid #dce7df;border-radius:16px;padding:10px 12px;max-height:min(36dvh,310px);overflow:auto;flex-shrink:0;box-shadow:0 8px 22px #20352912}
-.ti-ai-history-title{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 6px;font-size:14px}
-.ti-ai-history-title button{border:0;background:transparent;display:flex;padding:8px}
-.ti-ai-history-panel>p{font-size:12px;color:#65756a}
-.ti-ai-thread{display:flex;gap:4px;align-items:center;border-top:1px solid #edf0ee}
-.ti-ai-thread button{background:transparent;border:0;text-align:left;min-width:0;padding:10px 6px;color:#254130}
-.ti-ai-thread button:first-child{flex:1;display:flex;flex-direction:column;gap:3px}
-.ti-ai-thread button:first-child strong{font-size:13px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
-.ti-ai-thread button:first-child small{font-size:11px;color:#738175}
-.ti-ai-thread button:last-child{padding:11px;color:#8b4545}
-.ti-ai-thread button:disabled{opacity:.45}
-.ti-ai-thread [aria-current=true]{background:#ecf8f0;border-radius:8px}
-
-
-/* Full-height conversation viewport: only messages scroll, not the composer. */
+/* Triamicci Intelligence — Assistente conversacional mobile-first */
 .main-content:has(.ti-ai-page)>.footer{display:none}
+.main-content:has(.ti-ai-page){min-width:0}
 .ti-ai-page{
-  height:calc(100dvh - 105px);
-  min-height:0;
-  max-height:none;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-  padding-bottom:max(8px,env(safe-area-inset-bottom));
+ --ti-ai-green:#087b43;--ti-ai-ink:#1b293b;--ti-ai-muted:#6c7881;
+ width:min(100%,920px);height:calc(var(--ti-ai-viewport-height,100dvh) - 150px);
+ margin:0 auto;display:flex;flex-direction:column;min-height:0;min-width:0;
+ padding:12px clamp(8px,2.5vw,22px) max(10px,env(safe-area-inset-bottom));
+ gap:0;overflow:hidden;color:var(--ti-ai-ink);
 }
-.ti-ai-head,.ti-ai-history-controls,.ti-ai-privacy{flex-shrink:0}
-.ti-ai-dialog{
-  flex:1 1 0;
-  height:0;
-  min-height:0;
-  overflow:auto;
-  overscroll-behavior:contain;
-  -webkit-overflow-scrolling:touch;
-  scrollbar-gutter:auto;
-  scroll-padding-bottom:16px;
-}
-.ti-ai-compose{flex:0 0 auto;position:relative;margin:0;max-width:100%}
-.ti-ai-msg{max-width:100%;overflow:visible}
-.ti-ai-msg.is-ai{width:100%;max-width:100%}
-.ti-ai-cursor{display:inline-block;width:2px;height:12px;margin-left:4px;background:#087b43;vertical-align:middle;animation:ti-ai-blink 850ms steps(1,end) infinite}
+.ti-ai-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto;padding:4px 3px 10px;border-bottom:1px solid #e8eee9}
+.ti-ai-heading{display:flex;align-items:center;min-width:0;gap:9px}
+.ti-ai-symbol{display:grid;place-items:center;width:38px;height:38px;flex-shrink:0;border-radius:13px;color:var(--ti-ai-green);background:#e7f5ec}
+.ti-ai-head h1{font-size:clamp(16px,2.8vw,19px);font-weight:780;letter-spacing:-.025em;margin:0;line-height:1.25}
+.ti-ai-head p{font-size:11px;color:var(--ti-ai-muted);margin:3px 0 0}
+.ti-ai-heading-actions{display:flex;gap:3px;flex:0 0 auto}
+.ti-ai-icon-button{width:38px;height:38px;display:grid;place-items:center;background:transparent;border:0;color:#53685c;border-radius:11px}
+.ti-ai-icon-button:hover,.ti-ai-icon-button:focus-visible{background:#eaf3ed}
+.ti-ai-icon-button:disabled{opacity:.4}
+.ti-ai-privacy{font-size:11px;color:#76867c;margin:8px 5px 0;display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.ti-ai-privacy svg{flex:0 0 auto}
+.ti-ai-dialog{display:flex;flex-direction:column;gap:16px;flex:1 1 0;height:0;min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px 6px 16px;scroll-padding-bottom:20px;overflow-wrap:anywhere}
+.ti-ai-welcome{margin:auto;display:flex;align-items:center;flex-direction:column;gap:10px;width:100%;max-width:440px;text-align:center;padding:20px 8px}
+.ti-ai-welcome-icon{display:grid;place-items:center;color:var(--ti-ai-green);background:#e9f5ee;width:46px;height:46px;border-radius:16px}
+.ti-ai-welcome h2{font-size:21px;font-weight:760;margin:4px 0 0;letter-spacing:-.035em;line-height:1.25}
+.ti-ai-welcome p{color:var(--ti-ai-muted);font-size:13px;line-height:1.55;margin:0}
+.ti-ai-chips{display:flex;flex-direction:column;gap:8px;margin-top:13px;width:100%}
+.ti-ai-chips button{text-align:left;background:#fff;border:1px solid #dce8df;border-radius:14px;padding:11px 13px;font-size:13px;color:#28513b;line-height:1.3}
+.ti-ai-chips button:hover{background:#f1f9f4}
+.ti-ai-msg{flex:0 0 auto;min-width:0;max-width:100%;background:transparent;border:0;border-radius:0;padding:0;white-space:normal}
+.ti-ai-msg.is-user{align-self:flex-end;background:#e8f4ec;border:1px solid #daeddf;border-radius:19px 19px 5px 19px;padding:11px 14px;max-width:min(88%,570px)}
+.ti-ai-msg.is-user p{font-size:14px;line-height:1.5;margin:0;color:var(--ti-ai-ink);white-space:pre-wrap}
+.ti-ai-msg small{display:block;font-size:10px;color:#7c8c80;margin-top:7px}
+.ti-ai-msg.is-ai{align-self:stretch;width:100%;max-width:100%;padding:0 4px}
+.ti-ai-agent-name{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:750;color:#237149;margin:2px 0 8px}
+.ti-ai-rich-text{font-size:14px;line-height:1.6;overflow-wrap:anywhere;color:var(--ti-ai-ink)}
+.ti-ai-rich-text p{margin:5px 0 10px;line-height:1.6}
+.ti-ai-rich-text h3,.ti-ai-rich-text h4{font-size:15px;color:#244e36;font-weight:760;line-height:1.35;margin:15px 0 7px}
+.ti-ai-rich-text ul,.ti-ai-rich-text ol{padding-left:21px;margin:7px 0 12px}
+.ti-ai-rich-text li{margin:5px 0;line-height:1.55}
+.ti-ai-rich-text strong{font-weight:760}
+.ti-ai-rich-text code{font-size:12px;border-radius:5px;background:#eaf2ed;padding:2px 4px}
+.ti-ai-rich-text hr{border:0;border-top:1px solid #e5eee8;margin:14px 0}
+.ti-ai-loading{font-size:12px;color:#658775;margin:0 5px}
+.ti-ai-cursor{display:inline-block;height:13px;width:2px;background:var(--ti-ai-green);vertical-align:middle;animation:ti-ai-blink .85s steps(1,end) infinite}
 @keyframes ti-ai-blink{50%{opacity:0}}
+.ti-ai-compose{position:relative;flex:0 0 auto;width:100%;max-width:100%;display:flex;flex-direction:column;gap:2px;border:1px solid #dce9df;border-radius:22px;padding:10px 11px 8px;background:#fff;box-shadow:0 5px 23px #183b2912;margin:0}
+.ti-ai-compose textarea{appearance:none;display:block;width:100%;height:auto;min-height:35px;max-height:144px;padding:6px 8px;resize:none;outline:none;border:0;border-radius:0;background:transparent;color:var(--ti-ai-ink);font:inherit;font-size:16px;line-height:1.45;overflow-y:auto}
+.ti-ai-compose textarea::placeholder{color:#9ba8a0}
+.ti-ai-actions{display:flex;align-items:center;gap:8px;min-height:35px}
+.ti-ai-actions button{display:grid;place-items:center;flex:0 0 auto;font:inherit}
+.ti-ai-attach{width:35px;height:35px;border:0;background:transparent;color:#427b5b;border-radius:50%}
+.ti-ai-attach:hover{background:#edf5ee}
+.ti-ai-compose-hint{flex:1;font-size:10px;color:#8b9b8f}
+.ti-ai-send{width:35px;height:35px;border:0;border-radius:50%;background:var(--ti-ai-green);color:#fff}
+.ti-ai-send:disabled{opacity:.44}
+.ti-ai-file{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f0f6f1;padding:7px 10px;border-radius:10px;font-size:12px;min-width:0}
+.ti-ai-file span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ti-ai-file button{border:0;background:transparent;padding:4px}
+.ti-ai-error{font-size:12px;color:#ac2636;margin:2px 5px 8px}
+.ti-ai-drawer-layer{position:fixed;inset:0;z-index:70;display:flex;justify-content:flex-start}
+.ti-ai-drawer-backdrop{position:absolute;inset:0;border:0;background:#16261f70;cursor:default}
+.ti-ai-drawer{position:relative;z-index:1;width:min(340px,88vw);max-width:100%;height:100%;height:100dvh;display:flex;flex-direction:column;gap:12px;padding:calc(16px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom));background:#fff;box-shadow:12px 0 32px #11241825;overflow:hidden}
+.ti-ai-drawer-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 4px}
+.ti-ai-drawer-top strong{font-size:18px;letter-spacing:-.02em}
+.ti-ai-drawer-top button{background:transparent;border:0;color:#536a5a;width:36px;height:36px;display:grid;place-items:center;border-radius:9px}
+.ti-ai-new-thread{display:flex;align-items:center;gap:9px;background:#eff7f1;color:#236d42;border:1px solid #dbe9dd;font-weight:700;font-size:13px;border-radius:12px;padding:11px 12px;text-align:left}
+.ti-ai-history-search{display:flex;align-items:center;gap:9px;background:#f4f7f5;border:1px solid #e6ede7;border-radius:11px;color:#7c9282;padding:9px 11px}
+.ti-ai-history-search input{min-width:0;flex:1;background:transparent;border:0;outline:none;font:inherit;font-size:13px;color:#243a2d}
+.ti-ai-threads{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.ti-ai-history-empty{font-size:13px;color:#7a8a80;padding:10px 6px}
+.ti-ai-thread{display:flex;align-items:center;gap:3px;margin:3px 0;border-radius:11px}
+.ti-ai-thread:has([aria-current=page]){background:#edf6ef}
+.ti-ai-thread button{background:transparent;border:0;color:#34473a}
+.ti-ai-thread button:first-child{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;flex:1;min-width:0;text-align:left;gap:3px;padding:10px 8px}
+.ti-ai-thread button:first-child span{display:block;font-size:13px;font-weight:650;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ti-ai-thread button:first-child small{font-size:10px;color:#91a095}
+.ti-ai-remove-thread{width:36px;height:40px;display:grid;place-items:center;color:#9b4b4b!important}
+.ti-ai-thread button:disabled,.ti-ai-new-thread:disabled{opacity:.45}
+.ti-ai-drawer-note{border-top:1px solid #e8eee9;padding:12px 3px 2px;display:flex;gap:7px;align-items:center;color:#738979;font-size:11px}
 @media(max-width:760px){
- .ti-ai-page{height:calc(100dvh - 120px);min-height:0;padding:10px 8px max(10px,env(safe-area-inset-bottom))}
- .ti-ai-dialog{padding:8px 0 12px}
- .ti-ai-compose textarea{min-height:42px;resize:none}
- .ti-ai-head h1{font-size:18px}
- .ti-ai-privacy{font-size:11px}
- .ti-ai-history-controls{gap:6px}
- .ti-ai-history-controls button{padding:7px 9px;font-size:11px}
+ .main-content:has(.ti-ai-page){padding-bottom:0}
+ .main-content:has(.ti-ai-page)>.ti-mobile-context{display:none}
+ .ti-ai-page{height:calc(var(--ti-ai-viewport-height,100dvh) - 88px);width:100%;padding:6px 8px max(8px,env(safe-area-inset-bottom))}
+ .ti-ai-head{padding:4px 0 9px}
+ .ti-ai-head h1{font-size:17px}
+ .ti-ai-dialog{padding:14px 2px 12px;gap:18px}
+ .ti-ai-msg.is-user{max-width:90%}
+ .ti-ai-privacy{font-size:10px;margin:6px 3px 0}
+ .ti-ai-compose{padding:8px 10px 7px;border-radius:20px}
 }
+@media(prefers-reduced-motion:reduce){.ti-ai-cursor{animation:none}}
