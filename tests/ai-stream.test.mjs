@@ -12,7 +12,7 @@ test('SSE progressively displays text even when event JSON splits across chunks'
  const stream=new ReadableStream({start(controller){for(const part of chunks)controller.enqueue(new TextEncoder().encode(part));controller.close();}});
  const result=await consumeAssistantSSE(new Response(stream,{status:200}),text=>rendered.push(text));
  assert.deepEqual(rendered,['Olá!','Olá! Hoje.']);
- assert.deepEqual(result,{text:'Olá! Hoje.',historySaved:true});
+ assert.deepEqual(result,{text:'Olá! Hoje.',historySaved:true,draftSaved:null});
 });
 test('SSE interrupted before done is not treated as a saved answer',async()=>{
  const stream=new ReadableStream({start(c){c.enqueue(new TextEncoder().encode('data: {"type":"delta","text":"Parcial"}\n\n'));c.close();}});
