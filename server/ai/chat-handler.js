@@ -1,7 +1,10 @@
 import {authenticate,checkRequest,getDb,membership,send} from '../_lib.js';
 import {sendQuotaError} from '../quota-error.js';
 import {operationalContext} from './operational-context.js';
+import {aiV1Context} from './context-v1.js';
+import {AI_ENABLED,requireAiAccess} from './permissions-v1.js';
 import {saveConversation} from './history-handler.js';
+import {draftIntent,persistAiDraft} from './draft-generation.js';
 
 const MODEL='gemini-3.1-flash-lite';
 const ENDPOINT='https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent';
@@ -73,6 +76,8 @@ export default async function chatHandler(req,res){
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!m?.unitId)return send(res,403,'Sem acesso a uma unidade ativa.');
+  const v1=AI_ENABLED();
+  if(v1&&!requireAiAccess(m,'stock'))return send(res,403,'Assistente AI-Permissions V1 restrito à gestão.');
   const {message,history,image,threadId}=req.body||{};
   const streaming=req.body?.stream===true;
   if(typeof message!=='string'||message.trim().length<2||message.length>1800||!Array.isArray(history||[]))
@@ -84,10 +89,17 @@ export default async function chatHandler(req,res){
   const db=getDb();
   const quota=await reserve(db,m.unitId,actor.uid);
   if(!quota.allowed)return send(res,429,'Limite diário do assistente atingido. O OCR continua separado deste limite.',{code:'AI_DAILY_LIMIT'});
-  const context=await operationalContext(db,m.unitId,message);
+  const context=v1?await aiV1Context(db,m,message):await operationalContext(db,m.unitId,message);
+  if(v1){
+   // Mandatory audit of accessed module names only; never log prompts, photos or response contents.
+   await db.collection('auditLogs').add({event:'ai.v1.context_read',unitId:m.unitId,
+    actorUid:actor.uid,role:m.role,modules:context.sections.map(s=>s.kind),
+    omitted:context.unavailable?.length||0,at:new Date(),version:'AI-Permissions-1.0'});
+  }
   const system=[
    'Você é o Assistente Triamicci, apoio de leitura e sugestões de operação de cozinha em pt-BR.',
    'Você não executa ações, não aprova escalas, não cria pedidos nem movimenta estoque.',
+   ...(v1?['AI-Permissions 1.0: somente gestores; leitura mínima e rascunhos sem publicação ou execução.','Use somente os campos das seções do contexto. Se uma seção está unavailable, explique que não há fonte confiável; não improvise nomes nem dados.','Diferencie registrado, planejado e presença efetiva; não trate login ou escala como prova de disponibilidade para dobra.','Uma proposta de dobra exige confirmação humana e verificação de descansos e jornadas. Nenhum registro é alterado.']:[]),
    'Responda em até 140 palavras, de modo objetivo, com no máximo três passos práticos e sem longas introduções. Termine sempre a última frase. Use títulos e listas Markdown apenas quando úteis. Faça distinção entre fatos presentes no contexto e sugestões.',
    'Nunca invente saldos, pessoas, quantidades, entregas, horários ou demandas. Dados ausentes exigem confirmação humana.',
    'Para perguntas sobre produção, use PRIMEIRO as tarefas reais do dia presentes no contexto. Cite as preparações e quantidades efetivamente informadas. Priorize tarefas pendentes, sinalize lacunas e não invente escalas, responsáveis, insumos ou tempos.',
@@ -123,7 +135,10 @@ export default async function chatHandler(req,res){
     let historySaved=false;
     try{historySaved=await saveConversation(db,m.unitId,actor.uid,threadId,message.trim(),answer,!!jpeg);}
     catch(e){console.error('AI history save:',e.name);}
-    emit(res,{type:'done',historySaved});return res.end();
+    let draftSaved=null;
+    const type=v1?draftIntent(message):null;
+    if(type){try{draftSaved=await persistAiDraft(db,m,actor.uid,type,message.trim().slice(0,100),answer);}catch(e){console.error('AI draft auto-save:',e.name);}}
+    emit(res,{type:'done',historySaved,draftSaved});return res.end();
    }catch(e){
     console.error('AI stream:',e.name);
     emit(res,{type:'error',message:'A conexão com o Gemini foi interrompida. A resposta não foi salva.'});
@@ -135,7 +150,10 @@ export default async function chatHandler(req,res){
   if(!answer)return send(res,503,'O assistente não conseguiu responder. Tente reformular.');
   let historySaved=false;
   try{historySaved=await saveConversation(db,m.unitId,actor.uid,threadId,message.trim(),answer,!!jpeg);}catch(e){console.error('AI history save:',e.name);}
-  return send(res,200,'Resposta gerada.',{answer:answer.slice(0,4000),imageUsed:!!jpeg,contextKinds:context.sections.map(s=>s.kind),historySaved});
+  let draftSaved=null;
+  const draftType=v1?draftIntent(message):null;
+  if(draftType){try{draftSaved=await persistAiDraft(db,m,actor.uid,draftType,message.trim().slice(0,100),answer);}catch(e){console.error('AI draft auto-save:',e.name);}}
+  return send(res,200,'Resposta gerada.',{answer:answer.slice(0,4000),imageUsed:!!jpeg,contextKinds:context.sections.map(s=>s.kind),historySaved,draftSaved});
  }catch(error){
   if(error.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
   if(error.message==='BAD_IMAGE')return send(res,400,'Anexe apenas uma imagem JPEG válida de até 1 MB.');

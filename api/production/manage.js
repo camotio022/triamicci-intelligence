@@ -1,6 +1,7 @@
 import photoOcrHandler from '../../server/production/photo-ocr-handler.js';
 import chatHandler from '../../server/ai/chat-handler.js';
 import historyHandler from '../../server/ai/history-handler.js';
+import aiDraftsHandler from '../../server/ai/drafts-handler.js';
 import {restaurantDay} from '../../shared/operation-day.js';
 import productionWorkspace from '../../server/production/workspace.js';
 import {MANAGEMENT_ROLES} from '../../server/permissions/v31-policy.js';
@@ -30,6 +31,7 @@ function validLine(x){
   (x?.substitutes===undefined||Array.isArray(x.substitutes)&&x.substitutes.length<=4&&x.substitutes.every(id=>productIdPattern.test(id)));
 }
 export default async function handler(req,res){
+ if(['assistantDraftList','assistantDraftCreate','assistantDraftGet','assistantDraftDelete'].includes(req.body?.action))return aiDraftsHandler(req,res);
  if(['assistantHistoryList','assistantHistoryGet','assistantHistoryDelete'].includes(req.body?.action))return historyHandler(req,res);
  if(req.body?.action==='assistantChat')return chatHandler(req,res);
  if(req.body?.action==='photoRecognize')return photoOcrHandler(req,res);

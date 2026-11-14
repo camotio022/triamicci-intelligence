@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Bot,ArrowUp,ImagePlus,X,ShieldCheck,History,Plus,Trash2,PanelLeftClose,SquarePen,Search} from 'lucide-react';
+import {Bot,ArrowUp,ImagePlus,X,ShieldCheck,History,Plus,Trash2,PanelLeftClose,SquarePen,Search,FileText} from 'lucide-react';
 import {sessionAuth as auth} from './firebase.js';
 import {apiFetch} from './api-fetch.js';
 import AIMessageFormat from './AIMessageFormat.jsx';
@@ -32,6 +32,12 @@ export default function OperationalAI(){
  const [historyBusy,setHistoryBusy]=useState(false);
  const [historyError,setHistoryError]=useState('');
  const [historySearch,setHistorySearch]=useState('');
+ const v1DraftUi=import.meta.env.VITE_AI_PERMISSIONS_V1_ENABLED==='true';
+ const [showDrafts,setShowDrafts]=useState(false);
+ const [savedDrafts,setSavedDrafts]=useState([]);
+ const [draftDetail,setDraftDetail]=useState(null);
+ const [draftsError,setDraftsError]=useState('');
+ const [draftReceipt,setDraftReceipt]=useState(null);
  const [viewportHeight,setViewportHeight]=useState(null);
  const composerRef=useRef(null),textareaRef=useRef(null),historyTriggerRef=useRef(null),drawerRef=useRef(null);
  const fileRef=useRef(null),endRef=useRef(null);
@@ -44,6 +50,17 @@ export default function OperationalAI(){
   if(!response.ok)throw Error(data.message||'Não foi possível consultar as conversas.');
   return data;
  }
+ async function aiDraftApi(action,id){
+  const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Faça login novamente.');
+  const response=await apiFetch('/api/production/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,id})});
+  const data=await response.json();if(!response.ok)throw Error(data.message||'Falha ao consultar rascunhos.');return data;
+ }
+ async function openDrafts(){
+  if(pending)return;setDraftsError('');setShowDrafts(true);
+  try{const data=await aiDraftApi('assistantDraftList');setSavedDrafts(data.drafts||[]);}catch(e){setDraftsError(e.message);}
+ }
+ async function openDraft(id){try{setDraftsError('');const data=await aiDraftApi('assistantDraftGet',id);setDraftDetail(data.draft);}catch(e){setDraftsError(e.message);}}
+ async function deleteDraft(id){if(!window.confirm('Excluir este rascunho privado?'))return;try{await aiDraftApi('assistantDraftDelete',id);setSavedDrafts(prev=>prev.filter(x=>x.id!==id));if(draftDetail?.id===id)setDraftDetail(null);}catch(e){setDraftsError(e.message);}}
  async function refreshThreads(){
   const data=await historyApi('assistantHistoryList');
   setThreads(data.threads||[]);
@@ -68,7 +85,7 @@ export default function OperationalAI(){
  useEffect(()=>{const area=dialogRef.current;if(area)area.scrollTop=area.scrollHeight;},[messages.length,liveText]);
  function newConversation(){
   if(pending)return;
-  setThreadId(crypto.randomUUID());setMessages([]);setDraft('');setAttachment(null);setError('');setShowHistory(false);textareaRef.current?.focus();
+  setThreadId(crypto.randomUUID());setMessages([]);setDraft('');setAttachment(null);setError('');setShowHistory(false);setDraftReceipt(null);textareaRef.current?.focus();
  }
  async function openConversation(id){
   if(pending||historyBusy)return;
@@ -88,7 +105,7 @@ export default function OperationalAI(){
   if(pending||message.length<2)return;
   const previous=messages;
   const own={role:'user',text:message,hasPhoto:!!attachment};
-  setMessages([...previous,own]);setDraft('');setError('');setLiveText('');setPending(true);
+  setMessages([...previous,own]);setDraft('');setError('');setDraftReceipt(null);setLiveText('');setPending(true);
   try{
    const image=attachment?await jpegBase64(attachment):undefined;
    const token=await auth.currentUser?.getIdToken();
@@ -103,6 +120,7 @@ export default function OperationalAI(){
    if(!result.text.trim())throw Error('O assistente não retornou uma resposta.');
    setMessages(old=>[...old,{role:'assistant',text:result.text}]);
    setLiveText('');setAttachment(null);
+   if(result.draftSaved)setDraftReceipt(result.draftSaved);
    if(result.historySaved)refreshThreads().catch(()=>{});
    else setHistoryError('Resposta recebida, mas não foi possível guardar esta conversa.');
   }catch(e){setError(e.message||'Erro temporário.');setMessages(previous);setLiveText('');setDraft(message);}
@@ -113,11 +131,13 @@ export default function OperationalAI(){
   <header className="ti-ai-head">
    <div className="ti-ai-heading"><span className="ti-ai-symbol"><Bot size={21}/></span><div><h1>Assistente Triamicci</h1><p>Inteligência operacional</p></div></div>
    <div className="ti-ai-heading-actions">
+    {v1DraftUi&&<button type="button" className="ti-ai-icon-button" onClick={openDrafts} aria-label="Abrir rascunhos privados" disabled={pending}><FileText size={20}/></button>}
     <button ref={historyTriggerRef} type="button" className="ti-ai-icon-button" onClick={()=>setShowHistory(true)} aria-label="Abrir histórico de conversas" aria-haspopup="dialog" disabled={pending}><History size={21}/></button>
     <button type="button" className="ti-ai-icon-button" onClick={newConversation} aria-label="Nova conversa" disabled={pending}><SquarePen size={21}/></button>
    </div>
   </header>
   <p className="ti-ai-privacy"><ShieldCheck size={14}/> Recomendações de apoio · sem alterar dados da loja</p>
+  {draftReceipt&&<p className="ti-ai-draft-receipt" role="status"><FileText size={15}/> Rascunho privado salvo. Nenhuma operação executada.</p>}
   <div className="ti-ai-dialog" ref={dialogRef} role="log" aria-live="off" aria-label="Mensagens da conversa">
    {!messages.length&&!pending&&<div className="ti-ai-welcome">
     <span className="ti-ai-welcome-icon"><Bot size={25}/></span>
@@ -145,6 +165,15 @@ export default function OperationalAI(){
     <button className="ti-ai-send" type="submit" aria-label="Enviar pergunta" disabled={pending||draft.trim().length<2}><ArrowUp size={20}/></button>
    </div>
   </form>
+  {v1DraftUi&&showDrafts&&<div className="ti-ai-drawer-layer">
+   <button type="button" className="ti-ai-drawer-backdrop" aria-label="Fechar rascunhos" onClick={()=>{setShowDrafts(false);setDraftDetail(null);}}/>
+   <aside className="ti-ai-drawer" role="dialog" aria-modal="true" aria-label="Rascunhos privados do assistente">
+    <div className="ti-ai-drawer-top"><strong>Rascunhos privados</strong><button type="button" onClick={()=>{setShowDrafts(false);setDraftDetail(null);}} aria-label="Fechar rascunhos"><X size={22}/></button></div>
+    <p className="ti-ai-drafts-disclaimer">Sem publicação, alteração de estoque, escala ou envio de notificações.</p>
+    {draftsError&&<p role="alert" className="ti-ai-error">{draftsError}</p>}
+    {draftDetail?<div className="ti-ai-draft-details"><button type="button" onClick={()=>setDraftDetail(null)}>Voltar aos rascunhos</button><h3>{draftDetail.title}</h3><div className="ti-ai-draft-body">{draftDetail.body}</div></div>:<div className="ti-ai-threads">{!savedDrafts.length&&<p className="ti-ai-history-empty">Nenhum rascunho salvo ainda.</p>}{savedDrafts.map(item=><div className="ti-ai-thread" key={item.id}><button type="button" onClick={()=>openDraft(item.id)}><span>{item.title}</span><small>{item.type} · {item.updatedAt?new Date(item.updatedAt).toLocaleDateString('pt-BR'):''}</small></button><button type="button" className="ti-ai-remove-thread" onClick={()=>deleteDraft(item.id)} aria-label={'Excluir rascunho '+item.title}><Trash2 size={16}/></button></div>)}</div>}
+   </aside>
+  </div>}
   {showHistory&&<div className="ti-ai-drawer-layer">
    <button type="button" className="ti-ai-drawer-backdrop" aria-label="Fechar histórico" onClick={()=>setShowHistory(false)}/>
    <aside className="ti-ai-drawer" ref={drawerRef} role="dialog" aria-modal="true" aria-label="Histórico do Assistente Triamicci">
