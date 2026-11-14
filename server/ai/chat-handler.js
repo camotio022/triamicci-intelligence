@@ -77,7 +77,7 @@ export default async function chatHandler(req,res){
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!m?.unitId)return send(res,403,'Sem acesso a uma unidade ativa.');
   const v1=AI_ENABLED();
-  if(v1&&!requireAiAccess(m,'stock'))return send(res,403,'Assistente AI-Permissions V1 restrito à gestão.');
+  if(v1&&(!requireAiAccess(m,'stock')||req.terminalIdentity))return send(res,403,'Assistente AI-Permissions V1 restrito à gestão em sessão individual.');
   const {message,history,image,threadId}=req.body||{};
   const streaming=req.body?.stream===true;
   if(typeof message!=='string'||message.trim().length<2||message.length>1800||!Array.isArray(history||[]))

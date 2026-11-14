@@ -136,7 +136,7 @@ export default function OperationalAI(){
     <button type="button" className="ti-ai-icon-button" onClick={newConversation} aria-label="Nova conversa" disabled={pending}><SquarePen size={21}/></button>
    </div>
   </header>
-  <p className="ti-ai-privacy"><ShieldCheck size={14}/> Recomendações de apoio · sem alterar dados da loja</p>
+  <p className="ti-ai-privacy"><ShieldCheck size={14}/> {v1DraftUi?'Gestão · consultas e rascunhos sem execução':'Recomendações de apoio · sem alterar dados da loja'}</p>
   {draftReceipt&&<p className="ti-ai-draft-receipt" role="status"><FileText size={15}/> Rascunho privado salvo. Nenhuma operação executada.</p>}
   <div className="ti-ai-dialog" ref={dialogRef} role="log" aria-live="off" aria-label="Mensagens da conversa">
    {!messages.length&&!pending&&<div className="ti-ai-welcome">

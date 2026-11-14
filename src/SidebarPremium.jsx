@@ -43,7 +43,7 @@ export default function SidebarPremium({open,onClose,user,membership,avatar,logo
  useEffect(()=>{try{localStorage.setItem(key,JSON.stringify(expanded))}catch{/* Storage opcional. */}},[key,expanded]);
  useEffect(()=>{if(open)setQuery('')},[open]);
  useEffect(()=>{if(!open)return;const handle=e=>{if(e.key==='Escape')onClose()};document.addEventListener('keydown',handle);return()=>document.removeEventListener('keydown',handle)},[open,onClose]);
- const permitted=item=>canAccessPage(membership.role,item.id);
+ const permitted=item=>canAccessPage(membership.role,item.id)&&!(import.meta.env.VITE_AI_PERMISSIONS_V1_ENABLED==='true'&&item.id==='assistant-ai'&&!isManagement(membership.role));
  const matches=item=>normalize(item.label).includes(normalize(query.trim()));
  const quickMatches=quick.filter(item=>permitted(item)&&matches(item));
  const groups=useMemo(()=>sections.filter(section=>!section.management||isManagement(membership.role)).map(section=>({...section,items:section.items.filter(item=>permitted(item)&&matches(item))})).filter(section=>section.items.length),[membership.role,query]);
