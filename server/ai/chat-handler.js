@@ -19,6 +19,41 @@ function cleanHistory(history){
  return history.slice(-6).filter(x=>x&&['user','assistant'].includes(x.role)&&typeof x.text==='string')
   .map(x=>({role:x.role==='user'?'user':'model',parts:[{text:x.text.slice(0,1400)}]}));
 }
+// Gemini emits SSE fragments. Forward only text deltas, never provider metadata.
+function emit(res,event){if(!res.writableEnded)res.write('data: '+JSON.stringify(event)+'\n\n');}
+async function forwardGeminiStream(response,res){
+ const decoder=new TextDecoder(),reader=response.body.getReader();
+ let buffer='',answer='';
+ const parseFrame=frame=>{
+  for(const line of frame.split('\n')){
+   if(!line.startsWith('data:'))continue;
+   const raw=line.slice(5).trim();
+   if(!raw||raw==='[DONE]')continue;
+   const payload=JSON.parse(raw);
+   const parts=payload.candidates?.[0]?.content?.parts||[];
+   const delta=parts.filter(p=>!p.thought&&typeof p.text==='string').map(p=>p.text).join('');
+   if(delta){
+    const remaining=Math.max(0,4000-answer.length);
+    const accepted=delta.slice(0,remaining);
+    if(accepted){answer+=accepted;emit(res,{type:'delta',text:accepted});}
+   }
+  }
+ };
+ try{
+  while(true){
+   const {done,value}=await reader.read();if(done)break;
+   buffer+=decoder.decode(value,{stream:true}).replace(/\r\n/g,'\n');
+   let boundary;
+   while((boundary=buffer.indexOf('\n\n'))>=0){
+    const frame=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);
+    parseFrame(frame);
+   }
+   if(buffer.length>120000)throw Error('STREAM_FRAME_TOO_LARGE');
+  }
+  if(buffer.trim())parseFrame(buffer);
+ }finally{reader.releaseLock();}
+ return answer;
+}
 async function reserve(db,unitId,uid){
  const maxUnit=finiteLimit(process.env.AI_CHAT_DAILY_UNIT_LIMIT,20,100);
  const maxUser=finiteLimit(process.env.AI_CHAT_DAILY_USER_LIMIT,8,50);
@@ -39,6 +74,7 @@ export default async function chatHandler(req,res){
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!m?.unitId)return send(res,403,'Sem acesso a uma unidade ativa.');
   const {message,history,image,threadId}=req.body||{};
+  const streaming=req.body?.stream===true;
   if(typeof message!=='string'||message.trim().length<2||message.length>1800||!Array.isArray(history||[]))
    return send(res,400,'Escreva uma pergunta válida de até 1800 caracteres.');
   const jpeg=validImage(image);
@@ -65,7 +101,7 @@ export default async function chatHandler(req,res){
   ].join('\n');
   const parts=[{text:message.trim()}];
   if(jpeg)parts.push({inlineData:{mimeType:'image/jpeg',data:jpeg}});
-  const response=await fetch(ENDPOINT,{
+  const response=await fetch(streaming?ENDPOINT.replace(':generateContent',':streamGenerateContent')+'?alt=sse':ENDPOINT,{
    method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},
    body:JSON.stringify({
     systemInstruction:{parts:[{text:system}]},
@@ -73,8 +109,27 @@ export default async function chatHandler(req,res){
     generationConfig:{maxOutputTokens:650,temperature:0.25,thinkingConfig:{thinkingLevel:'MINIMAL'}}
    }),signal:AbortSignal.timeout(45000)
   });
-  if(response.status===429)return send(res,429,'Cota do provedor indisponível agora. O OCR usa a mesma cota do Gemini.',{code:'GEMINI_QUOTA'});
+  if(response.status===429)return send(res,429,'Cota do Gemini indisponível agora. O OCR compartilha a cota.',{code:'GEMINI_QUOTA'});
   if(!response.ok)throw Error('GEMINI_HTTP_'+response.status);
+  if(streaming){
+   res.statusCode=200;
+   res.setHeader('Content-Type','text/event-stream; charset=utf-8');
+   res.setHeader('Cache-Control','no-cache, no-transform');
+   res.setHeader('X-Accel-Buffering','no');
+   res.flushHeaders?.();
+   try{
+    const answer=await forwardGeminiStream(response,res);
+    if(!answer.trim()){emit(res,{type:'error',message:'O Gemini não retornou texto. Tente novamente.'});return res.end();}
+    let historySaved=false;
+    try{historySaved=await saveConversation(db,m.unitId,actor.uid,threadId,message.trim(),answer,!!jpeg);}
+    catch(e){console.error('AI history save:',e.name);}
+    emit(res,{type:'done',historySaved});return res.end();
+   }catch(e){
+    console.error('AI stream:',e.name);
+    emit(res,{type:'error',message:'A conexão com o Gemini foi interrompida. A resposta não foi salva.'});
+    return res.end();
+   }
+  }
   const payload=await response.json();
   const answer=payload.candidates?.[0]?.content?.parts?.filter(p=>!p.thought).map(p=>p.text||'').join('').trim();
   if(!answer)return send(res,503,'O assistente não conseguiu responder. Tente reformular.');
