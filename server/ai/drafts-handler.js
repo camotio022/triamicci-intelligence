@@ -28,7 +28,10 @@ export default async function aiDraftsHandler(req,res){
    const count=await root.limit(51).get();
    if(count.size>=50)return send(res,429,'Limite de rascunhos atingido.');
    const ref=root.doc();
-   await ref.create({...body,status:'draft',createdAt:new Date(),updatedAt:new Date(),authorUid:actor.uid});
+   const at=new Date(),batch=db.batch();
+   batch.create(ref,{...body,status:'draft',createdAt:at,updatedAt:at,authorUid:actor.uid});
+   batch.create(db.collection('auditLogs').doc(),{event:'ai.v1.draft_created',at,unitId:member.unitId,actorUid:actor.uid,type:body.type,draftId:ref.id});
+   await batch.commit();
    return send(res,201,'Rascunho privado criado. Nenhuma operação foi executada.',{id:ref.id});
   }
   if(action==='assistantDraftGet'){
@@ -40,7 +43,10 @@ export default async function aiDraftsHandler(req,res){
   if(action==='assistantDraftDelete'){
    const id=req.body?.id;
    if(typeof id!=='string'||!/^[A-Za-z0-9_-]{8,64}$/.test(id))return send(res,400,'ID inválido.');
-   await root.doc(id).delete();
+   const at=new Date(),batch=db.batch();
+   batch.delete(root.doc(id));
+   batch.create(db.collection('auditLogs').doc(),{event:'ai.v1.draft_deleted',at,unitId:member.unitId,actorUid:actor.uid,draftId:id});
+   await batch.commit();
    return send(res,200,'Rascunho descartado. Nenhum registro operacional alterado.');
   }
   return send(res,400,'Operação não autorizada pela fase 1.');
