@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {AI_CAPABILITIES,AI_READS,AI_ANALYSES,AI_DRAFTS,AI_WRITES,aiAllowed,requireAiAccess,aiDraftType} from '../server/ai/permissions-v1.js';
 import {classifyAiV1,aiV1Context} from '../server/ai/context-v1.js';
 import {validateAiDraft} from '../server/ai/drafts-handler.js';
+import {draftIntent} from '../server/ai/draft-generation.js';
 
 test('contract is closed to all roles outside management and unknown capabilities',()=>{
  for(const role of ['cook','auxiliar',undefined,null,'guest']){
@@ -39,4 +40,13 @@ test('draft contract refuses operational verbs and invalid content',()=>{
  assert.equal(validateAiDraft({type:'productionDraft',title:'Produção',body:'Proposta de registro'}).type,'productionDraft');
  assert.equal(validateAiDraft({type:'finish',title:'Produção',body:'Alterar saldo agora'}),null);
  assert.equal(validateAiDraft({type:'recipeDraft',title:'x',body:'y'}),null);
+});
+
+test('only explicit draft preparation triggers AI draft creation',()=>{
+ assert.equal(draftIntent('Quem está logado agora?'),null);
+ assert.equal(draftIntent('Quem pode dobrar hoje?'),null);
+ assert.equal(draftIntent('Prepare uma notificação para a equipe'),'notificationDraft');
+ assert.equal(draftIntent('Crie um rascunho de ficha técnica'),'recipeDraft');
+ assert.equal(draftIntent('Monte uma proposta de escala'),'scheduleDraft');
+ assert.equal(draftIntent('Faça um rascunho de cobertura'),'coverageDraft');
 });
