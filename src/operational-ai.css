@@ -31,3 +31,41 @@
 .ti-ai-thread button:last-child{padding:11px;color:#8b4545}
 .ti-ai-thread button:disabled{opacity:.45}
 .ti-ai-thread [aria-current=true]{background:#ecf8f0;border-radius:8px}
+
+
+/* Full-height conversation viewport: only messages scroll, not the composer. */
+.main-content:has(.ti-ai-page)>.footer{display:none}
+.ti-ai-page{
+  height:calc(100dvh - 105px);
+  min-height:0;
+  max-height:none;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  padding-bottom:max(8px,env(safe-area-inset-bottom));
+}
+.ti-ai-head,.ti-ai-history-controls,.ti-ai-privacy{flex-shrink:0}
+.ti-ai-dialog{
+  flex:1 1 0;
+  height:0;
+  min-height:0;
+  overflow:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-gutter:auto;
+  scroll-padding-bottom:16px;
+}
+.ti-ai-compose{flex:0 0 auto;position:relative;margin:0;max-width:100%}
+.ti-ai-msg{max-width:100%;overflow:visible}
+.ti-ai-msg.is-ai{width:100%;max-width:100%}
+.ti-ai-cursor{display:inline-block;width:2px;height:12px;margin-left:4px;background:#087b43;vertical-align:middle;animation:ti-ai-blink 850ms steps(1,end) infinite}
+@keyframes ti-ai-blink{50%{opacity:0}}
+@media(max-width:760px){
+ .ti-ai-page{height:calc(100dvh - 120px);min-height:0;padding:10px 8px max(10px,env(safe-area-inset-bottom))}
+ .ti-ai-dialog{padding:8px 0 12px}
+ .ti-ai-compose textarea{min-height:42px;resize:none}
+ .ti-ai-head h1{font-size:18px}
+ .ti-ai-privacy{font-size:11px}
+ .ti-ai-history-controls{gap:6px}
+ .ti-ai-history-controls button{padding:7px 9px;font-size:11px}
+}

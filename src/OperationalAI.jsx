@@ -3,6 +3,7 @@ import {Bot,Send,ImagePlus,X,ShieldCheck,History,Plus,Trash2,ChevronLeft} from '
 import {sessionAuth as auth} from './firebase.js';
 import {apiFetch} from './api-fetch.js';
 import AIMessageFormat from './AIMessageFormat.jsx';
+import {consumeAssistantSSE} from './ai-stream.js';
 import './operational-ai.css';
 
 async function jpegBase64(file){
@@ -23,6 +24,8 @@ export default function OperationalAI(){
  const [attachment,setAttachment]=useState(null);
  const [pending,setPending]=useState(false);
  const [error,setError]=useState('');
+ const [liveText,setLiveText]=useState('');
+ const dialogRef=useRef(null);
  const [threadId,setThreadId]=useState(()=>crypto.randomUUID());
  const [threads,setThreads]=useState([]);
  const [showHistory,setShowHistory]=useState(false);
@@ -43,7 +46,7 @@ export default function OperationalAI(){
   setThreads(data.threads||[]);
  }
  useEffect(()=>{refreshThreads().catch(e=>setHistoryError(e.message));},[]);
- useEffect(()=>{endRef.current?.scrollIntoView({block:'end'});},[messages.length]);
+ useEffect(()=>{const area=dialogRef.current;if(area)area.scrollTop=area.scrollHeight;},[messages.length,liveText]);
  function newConversation(){
   if(pending)return;
   setThreadId(crypto.randomUUID());setMessages([]);setDraft('');setAttachment(null);setError('');setShowHistory(false);
@@ -66,19 +69,25 @@ export default function OperationalAI(){
   if(pending||message.length<2)return;
   const previous=messages;
   const own={role:'user',text:message,hasPhoto:!!attachment};
-  setMessages([...previous,own]);setDraft('');setError('');setPending(true);
+  setMessages([...previous,own]);setDraft('');setError('');setLiveText('');setPending(true);
   try{
    const image=attachment?await jpegBase64(attachment):undefined;
    const token=await auth.currentUser?.getIdToken();
    if(!token)throw Error('Faça login para conversar com o assistente.');
-   const response=await apiFetch('/api/production/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({action:'assistantChat',threadId,message,image,history:previous.slice(-6).map(({role,text})=>({role,text}))})});
-   const data=await response.json();
-   if(!response.ok)throw Error(data.message||'Não foi possível obter a resposta.');
-   setMessages(old=>[...old,{role:'assistant',text:data.answer}]);setAttachment(null);
-   if(data.historySaved)refreshThreads().catch(()=>{});else setHistoryError('Resposta recebida, mas não foi possível guardar esta conversa.');
-  }catch(e){setError(e.message||'Erro temporário.');setMessages(previous);setDraft(message);}
-  finally{setPending(false);setTimeout(()=>endRef.current?.scrollIntoView({block:'end',behavior:'smooth'}),10);}
+   // Streaming requests bypass the JSON caching client: consume bytes as they arrive.
+   const response=await fetch('/api/production/manage',{method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    cache:'no-store',
+    body:JSON.stringify({action:'assistantChat',stream:true,threadId,message,image,
+     history:previous.slice(-6).map(({role,text})=>({role,text}))})});
+   const result=await consumeAssistantSSE(response,part=>setLiveText(part));
+   if(!result.text.trim())throw Error('O assistente não retornou uma resposta.');
+   setMessages(old=>[...old,{role:'assistant',text:result.text}]);
+   setLiveText('');setAttachment(null);
+   if(result.historySaved)refreshThreads().catch(()=>{});
+   else setHistoryError('Resposta recebida, mas não foi possível guardar esta conversa.');
+  }catch(e){setError(e.message||'Erro temporário.');setMessages(previous);setLiveText('');setDraft(message);}
+  finally{setPending(false);}
  }
  return <section className="ti-ai-page" aria-label="Assistente operacional">
   <header className="ti-ai-head"><span className="ti-ai-symbol"><Bot size={23}/></span><div><h1>Assistente Triamicci</h1><p>Ideias e orientações para sua operação</p></div><span className="ti-ai-beta">BETA</span></header>
@@ -90,11 +99,11 @@ export default function OperationalAI(){
    {!threads.length&&<p>Nenhuma conversa salva ainda.</p>}
    {threads.map(t=><div className="ti-ai-thread" key={t.id}><button type="button" onClick={()=>openConversation(t.id)} disabled={historyBusy||pending} aria-current={t.id===threadId?'true':undefined}><strong>{t.title||'Conversa sem título'}</strong><small>{t.updatedAt?new Date(t.updatedAt).toLocaleDateString('pt-BR'):'Sem data'}</small></button><button type="button" disabled={historyBusy||pending} aria-label={'Apagar '+t.title} onClick={()=>deleteConversation(t.id)}><Trash2 size={17}/></button></div>)}
   </section>}
-  <div className="ti-ai-dialog" aria-live="polite">
+  <div className="ti-ai-dialog" ref={dialogRef} role="log" aria-live="off" aria-label="Mensagens da conversa">
    {!messages.length&&<div className="ti-ai-welcome"><strong>Como posso ajudar hoje?</strong><p>Consulte informações e receba sugestões para sua unidade.</p>
     <div className="ti-ai-chips">{['O que pode precisar de reposição?','Sugira uma organização para a produção','Como planejar a escala da cozinha?'].map(s=><button key={s} onClick={()=>setDraft(s)} type="button">{s}</button>)}</div></div>}
    {messages.map((m,i)=><article className={'ti-ai-msg '+(m.role==='user'?'is-user':'is-ai')} key={i}><span>{m.role==='user'?'Você':'Assistente'}</span>{m.role==='assistant'?<AIMessageFormat text={m.text}/>:<p>{m.text}</p>}{m.hasPhoto&&<small>Foto anexada</small>}</article>)}
-   {pending&&<p className="ti-ai-loading" role="status">Analisando sua pergunta…</p>}
+   {pending&&(liveText?<article className="ti-ai-msg is-ai ti-ai-streaming"><span>Assistente <i className="ti-ai-cursor" aria-hidden="true"/></span><AIMessageFormat text={liveText}/></article>:<p className="ti-ai-loading" role="status">Preparando a resposta…</p>)}
    <div ref={endRef}/>
   </div>
   <form className="ti-ai-compose" onSubmit={submit}>
