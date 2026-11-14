@@ -65,3 +65,4 @@ export default function OperationalAI(){
    </div>
   </form>
  </section>;
+}
