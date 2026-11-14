@@ -4,6 +4,7 @@ import {operationalContext} from './operational-context.js';
 import {aiV1Context} from './context-v1.js';
 import {AI_ENABLED,requireAiAccess} from './permissions-v1.js';
 import {saveConversation} from './history-handler.js';
+import {draftIntent,persistAiDraft} from './draft-generation.js';
 
 const MODEL='gemini-3.1-flash-lite';
 const ENDPOINT='https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent';
@@ -134,7 +135,10 @@ export default async function chatHandler(req,res){
     let historySaved=false;
     try{historySaved=await saveConversation(db,m.unitId,actor.uid,threadId,message.trim(),answer,!!jpeg);}
     catch(e){console.error('AI history save:',e.name);}
-    emit(res,{type:'done',historySaved});return res.end();
+    let draftSaved=null;
+    const type=v1?draftIntent(message):null;
+    if(type){try{draftSaved=await persistAiDraft(db,m,actor.uid,type,message.trim().slice(0,100),answer);}catch(e){console.error('AI draft auto-save:',e.name);}}
+    emit(res,{type:'done',historySaved,draftSaved});return res.end();
    }catch(e){
     console.error('AI stream:',e.name);
     emit(res,{type:'error',message:'A conexão com o Gemini foi interrompida. A resposta não foi salva.'});
@@ -146,7 +150,10 @@ export default async function chatHandler(req,res){
   if(!answer)return send(res,503,'O assistente não conseguiu responder. Tente reformular.');
   let historySaved=false;
   try{historySaved=await saveConversation(db,m.unitId,actor.uid,threadId,message.trim(),answer,!!jpeg);}catch(e){console.error('AI history save:',e.name);}
-  return send(res,200,'Resposta gerada.',{answer:answer.slice(0,4000),imageUsed:!!jpeg,contextKinds:context.sections.map(s=>s.kind),historySaved});
+  let draftSaved=null;
+  const draftType=v1?draftIntent(message):null;
+  if(draftType){try{draftSaved=await persistAiDraft(db,m,actor.uid,draftType,message.trim().slice(0,100),answer);}catch(e){console.error('AI draft auto-save:',e.name);}}
+  return send(res,200,'Resposta gerada.',{answer:answer.slice(0,4000),imageUsed:!!jpeg,contextKinds:context.sections.map(s=>s.kind),historySaved,draftSaved});
  }catch(error){
   if(error.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
   if(error.message==='BAD_IMAGE')return send(res,400,'Anexe apenas uma imagem JPEG válida de até 1 MB.');
