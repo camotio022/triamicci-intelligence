@@ -89,6 +89,12 @@ export default async function chatHandler(req,res){
   const quota=await reserve(db,m.unitId,actor.uid);
   if(!quota.allowed)return send(res,429,'Limite diário do assistente atingido. O OCR continua separado deste limite.',{code:'AI_DAILY_LIMIT'});
   const context=v1?await aiV1Context(db,m,message):await operationalContext(db,m.unitId,message);
+  if(v1){
+   // Mandatory audit of accessed module names only; never log prompts, photos or response contents.
+   await db.collection('auditLogs').add({event:'ai.v1.context_read',unitId:m.unitId,
+    actorUid:actor.uid,role:m.role,modules:context.sections.map(s=>s.kind),
+    omitted:context.unavailable?.length||0,at:new Date(),version:'AI-Permissions-1.0'});
+  }
   const system=[
    'Você é o Assistente Triamicci, apoio de leitura e sugestões de operação de cozinha em pt-BR.',
    'Você não executa ações, não aprova escalas, não cria pedidos nem movimenta estoque.',
