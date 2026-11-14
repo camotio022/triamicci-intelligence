@@ -1,3 +1,4 @@
+import {draftDisplayTitle} from '../../src/ai-draft-presentation.js';
 import {AI_DRAFTS} from './permissions-v1.js';
 
 // A draft is created only after a manager explicitly asks to prepare one.
@@ -19,7 +20,7 @@ export async function persistAiDraft(db,member,uid,type,title,body){
  const snapshot=await root.limit(51).get();
  if(snapshot.size>=50)return null;
  const at=new Date(),ref=root.doc(),batch=db.batch();
- batch.create(ref,{type,title:String(title).slice(0,100),body:String(body).slice(0,3500),
+ batch.create(ref,{type,title:draftDisplayTitle(type,title),body:String(body).slice(0,3500),
   status:'draft',createdAt:at,updatedAt:at,authorUid:uid,generatedByAI:true});
  batch.create(db.collection('auditLogs').doc(),{event:'ai.v1.draft_created',at,unitId:member.unitId,
   actorUid:uid,type,draftId:ref.id,generatedByAI:true});

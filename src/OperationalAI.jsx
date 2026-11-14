@@ -3,6 +3,7 @@ import {Bot,ArrowUp,ImagePlus,X,ShieldCheck,History,Plus,Trash2,PanelLeftClose,S
 import {sessionAuth as auth} from './firebase.js';
 import {apiFetch} from './api-fetch.js';
 import AIMessageFormat from './AIMessageFormat.jsx';
+import {draftDisplayTitle} from './ai-draft-presentation.js';
 import {consumeAssistantSSE} from './ai-stream.js';
 import './operational-ai.css';
 
@@ -167,11 +168,17 @@ export default function OperationalAI(){
   </form>
   {v1DraftUi&&showDrafts&&<div className="ti-ai-drawer-layer">
    <button type="button" className="ti-ai-drawer-backdrop" aria-label="Fechar rascunhos" onClick={()=>{setShowDrafts(false);setDraftDetail(null);}}/>
-   <aside className="ti-ai-drawer" role="dialog" aria-modal="true" aria-label="Rascunhos privados do assistente">
+   <aside className="ti-ai-drawer ti-ai-drafts-drawer" role="dialog" aria-modal="true" aria-label="Rascunhos privados do assistente">
     <div className="ti-ai-drawer-top"><strong>Rascunhos privados</strong><button type="button" onClick={()=>{setShowDrafts(false);setDraftDetail(null);}} aria-label="Fechar rascunhos"><X size={22}/></button></div>
-    <p className="ti-ai-drafts-disclaimer">Sem publicação, alteração de estoque, escala ou envio de notificações.</p>
+    <p className="ti-ai-drafts-disclaimer"><ShieldCheck size={15}/> Somente leitura · nenhuma operação executada</p>
     {draftsError&&<p role="alert" className="ti-ai-error">{draftsError}</p>}
-    {draftDetail?<div className="ti-ai-draft-details"><button type="button" onClick={()=>setDraftDetail(null)}>Voltar aos rascunhos</button><h3>{draftDetail.title}</h3><div className="ti-ai-draft-body">{draftDetail.body}</div></div>:<div className="ti-ai-threads">{!savedDrafts.length&&<p className="ti-ai-history-empty">Nenhum rascunho salvo ainda.</p>}{savedDrafts.map(item=><div className="ti-ai-thread" key={item.id}><button type="button" onClick={()=>openDraft(item.id)}><span>{item.title}</span><small>{item.type} · {item.updatedAt?new Date(item.updatedAt).toLocaleDateString('pt-BR'):''}</small></button><button type="button" className="ti-ai-remove-thread" onClick={()=>deleteDraft(item.id)} aria-label={'Excluir rascunho '+item.title}><Trash2 size={16}/></button></div>)}</div>}
+    {draftDetail?<div className="ti-ai-draft-details">
+     <button type="button" className="ti-ai-draft-back" onClick={()=>setDraftDetail(null)}>Voltar aos rascunhos</button>
+     <span className="ti-ai-draft-kicker">Documento para revisão</span>
+     <h3>{draftDisplayTitle(draftDetail.type,draftDetail.title)}</h3>
+     <div className="ti-ai-draft-body"><AIMessageFormat text={draftDetail.body}/></div>
+     <p className="ti-ai-draft-warning"><ShieldCheck size={15}/> Rascunho privado. Não altera a produção, o estoque, as escalas ou as notificações.</p>
+    </div>:<div className="ti-ai-threads">{!savedDrafts.length&&<p className="ti-ai-history-empty">Nenhum rascunho salvo ainda.</p>}{savedDrafts.map(item=><div className="ti-ai-thread" key={item.id}><button type="button" onClick={()=>openDraft(item.id)}><span>{draftDisplayTitle(item.type,item.title)}</span><small>{item.updatedAt?new Date(item.updatedAt).toLocaleDateString('pt-BR'):'Sem data'} · Rascunho</small></button><button type="button" className="ti-ai-remove-thread" onClick={()=>deleteDraft(item.id)} aria-label={'Excluir rascunho '+draftDisplayTitle(item.type,item.title)}><Trash2 size={16}/></button></div>)}</div>}
    </aside>
   </div>}
   {showHistory&&<div className="ti-ai-drawer-layer">
