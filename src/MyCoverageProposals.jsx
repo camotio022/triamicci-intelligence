@@ -1,3 +1,4 @@
+import useAppConfirmation from './useAppConfirmation.jsx';
 import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
 import React,{useEffect,useState} from 'react';
@@ -5,6 +6,7 @@ import {sessionAuth as auth} from './firebase.js';
 import {pastProposal} from './operation-time.js';
 import {useOperationDay} from './useOperationDay.js';
 export default function MyCoverageProposals({unitId}){
+ const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const today=useOperationDay();
  const [items,setItems]=useState([]),[requests,setRequests]=useState([]),[requestKind,setRequestKind]=useState('coverage'),[requestDate,setRequestDate]=useState(''),[requestReason,setRequestReason]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState('');
  async function api(action,extra={}){const token=await auth.currentUser?.getIdToken();if(!token)throw Error('Sessão expirada');const r=await apiFetch('/api/coverage/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...extra})});const d=await r.json();if(!r.ok)throw Error(d.message);return d;}
@@ -12,7 +14,7 @@ export default function MyCoverageProposals({unitId}){
  useUnitLive(unitId,()=>load(),{domains:['coverage']});
 
  async function sendRequest(e){e.preventDefault();if(busy)return;setBusy('request');setError('');setNotice('');try{const d=await api('requestChange',{kind:requestKind,date:requestDate,reason:requestReason.trim()});setNotice(d.message);setRequestReason('');setRequestDate('');await load()}catch(e){setError(e.message)}finally{setBusy('')}}
- async function respond(id,decision){if(!window.confirm(decision==='accepted'?'Confirmar aceite desta proposta?':'Recusar esta proposta?'))return;setBusy(id);try{await api('respond',{id,decision});await load()}catch(e){setError(e.message)}finally{setBusy('')}}
+ async function respond(id,decision){if(!await askConfirmation(decision==='accepted'?'Confirmar aceite desta proposta?':'Recusar esta proposta?'))return;setBusy(id);try{await api('respond',{id,decision});await load()}catch(e){setError(e.message)}finally{setBusy('')}}
  const active=p=>!pastProposal(p,today)&&['pending_acceptance','pending_approval','accepted','approved'].includes(p.status);
  const current=items.filter(active),past=items.filter(p=>!active(p));
  return <section className="ti-premium-card"><h2>Trocas de turno e coberturas</h2>
@@ -25,5 +27,6 @@ export default function MyCoverageProposals({unitId}){
  {current.map(p=><article key={p.id} style={{borderTop:'1px solid #ddd',padding:'12px 0'}}><strong>{p.date} · {p.first?.start}–{p.first?.end} / {p.second?.start}–{p.second?.end}</strong><p>{p.reason}</p><p>Valor total praticado: {Number(p.practicePayment).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} · Situação: {({pending_acceptance:'Aguardando sua resposta',pending_approval:'Aguardando aprovação gerencial',approved:'Aprovada pela gestão',rejected:'Recusada pela gestão',declined:'Recusada pelo convidado',accepted:'Aceita; aguardando gestão'})[p.status]||'Consulte a gestão'}</p>
  {p.status==='pending_acceptance'&&<div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button disabled={busy===p.id} type="button" onClick={()=>respond(p.id,'accepted')}>Aceitar proposta</button><button disabled={busy===p.id} type="button" onClick={()=>respond(p.id,'declined')}>Recusar</button></div>}</article>)}
  <details className="ti-history-disclosure"><summary>Convites anteriores ({past.length})</summary>{past.map(p=><article key={p.id}><strong>{p.date} · {p.first?.start}–{p.second?.end}</strong><p>{['pending_acceptance','pending_approval','accepted'].includes(p.status)?'Vencido · o turno já passou; consulte a gestão.':({approved:'Aprovada pela gestão',rejected:'Recusada pela gestão',declined:'Recusada pelo convidado'})[p.status]||p.status}</p></article>)}</details>
+  {confirmationSheet}
  </section>;
 }

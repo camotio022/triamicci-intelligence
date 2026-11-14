@@ -54,7 +54,14 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      const execution=page;await execution.getByRole('button',{name:'Registrar produção não planejada'}).click();await execution.getByLabel('Preparação para registrar produção',{exact:true}).selectOption('isca-medida');
      const raw=execution.getByLabel('Quantidade realmente utilizada (kg)',{exact:true});assert.equal(await raw.inputValue(),'','Transformação não presume consumo');await raw.fill('2');
      await execution.getByLabel('Quantidade produzida (un)',{exact:true}).fill('5');assert.equal(await raw.inputValue(),'2','Alterar rendimento não recalcula matéria-prima');
-     await execution.getByLabel('Lote do preparo final',{exact:true}).fill('ISCA-UI');await execution.getByLabel('Validade do preparo',{exact:true}).fill('2099-12-30');await execution.getByRole('checkbox').check();page.once('dialog',dialog=>dialog.accept());await execution.getByRole('button',{name:'Confirmar transformação na reserva',exact:true}).click();
+     await execution.getByLabel('Lote do preparo final',{exact:true}).fill('ISCA-UI');await execution.getByLabel('Validade do preparo',{exact:true}).fill('2099-12-30');await execution.getByRole('checkbox').check();await execution.getByRole('button',{name:'Confirmar transformação na reserva',exact:true}).click();
+     const confirmation=page.getByRole('alertdialog');
+     const beforeConfirmation=finishes.length;
+     await confirmation.getByRole('button',{name:'Cancelar',exact:true}).click();
+     assert.equal(finishes.length,beforeConfirmation,'Cancelar não envia a produção');
+     assert.equal(await raw.inputValue(),'2','Cancelar preserva o formulário');
+     await execution.getByRole('button',{name:'Confirmar transformação na reserva',exact:true}).click();
+     await confirmation.getByRole('button',{name:'Confirmar',exact:true}).click();
      await page.getByRole('status').filter({hasText:'Consulta de teste'}).first().waitFor();assert.equal(finishes.at(-1).portions,5);assert.equal(finishes.at(-1).items[0].quantity,2);assert.equal(finishes.at(-1).taskId,null,'Execução avulsa não conclui tarefa anterior');
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'Transformação cabe em '+width);
     }
@@ -83,7 +90,8 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      if(await page.getByLabel('Quantidade física conferida (un)').count())await page.getByLabel('Quantidade física conferida (un)').fill('5'); // Unidades iguais: quantidade física acompanha o peso/contagem informada.
      assert.equal(await page.getByLabel('Lote',{exact:true}).count(),0,'Recebimento padrão não deve exigir lote individual');
      await page.getByRole('button',{name:'Revisar conferência',exact:true}).click();
-     assert.equal(await page.getByText('Revisar antes de enviar',{exact:true}).count(),1);
+     assert.equal(await page.getByRole('heading',{name:'Revisar entrega',exact:true}).count(),1);
+     assert.equal(await page.evaluate(()=>document.activeElement?.textContent),'Revisar entrega');
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`Recebimento review overflows at ${width}`);
     }
     if(screen==='Recebimento pendente'){
@@ -104,11 +112,12 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      await page.getByLabel('Quanto chegou?').fill('1');
      assert.equal(await page.getByLabel('Lote',{exact:true}).count(),1);
      await page.getByRole('button',{name:'Revisar conferência',exact:true}).click();
-     assert.equal(await page.getByText('Revisar antes de enviar',{exact:true}).count(),0,'Lote obrigatório não pode ser omitido');
+     assert.equal(await page.getByRole('heading',{name:'Revisar entrega',exact:true}).count(),0,'Lote obrigatório não pode ser omitido');
      await page.getByLabel('Lote',{exact:true}).fill('TESTE-LOTE');
      await page.getByLabel('Validade',{exact:true}).fill('2099-12-31');
      await page.getByRole('button',{name:'Revisar conferência',exact:true}).click();
-     assert.equal(await page.getByText('Revisar antes de enviar',{exact:true}).count(),1);
+     assert.equal(await page.getByRole('heading',{name:'Revisar entrega',exact:true}).count(),1);
+     assert.equal(await page.evaluate(()=>document.activeElement?.textContent),'Revisar entrega');
     }
     if(screen==='Contagem'){
      const dismissMessages=async()=>{for(let i=0;i<4&&await page.getByRole('button',{name:'Fechar mensagem',exact:true}).count();i++)await page.getByRole('button',{name:'Fechar mensagem',exact:true}).first().click();};
@@ -163,9 +172,17 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      await page.keyboard.press('Escape');assert.equal(await dialog.count(),0);
     }
     if(screen==='Navegação'){
+     assert.equal(await page.getByRole('navigation',{name:'Atalhos rápidos'}).count(),0);
      if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible()&&await page.getByRole('button',{name:'Abrir menu',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
      await page.locator('#primary-sidebar').getByRole('button',{name:'Estoque e insumos',exact:true}).click();
-     await page.getByRole('navigation',{name:'Seções de estoque e insumos',exact:true}).getByRole('button',{name:'Hoje',exact:true}).click();
+     const stockNav=page.getByRole('navigation',{name:'Seções de estoque e insumos',exact:true});
+     await page.getByRole("heading",{level:1,name:"Estoque e insumos",exact:true}).waitFor();
+     assert.equal(await page.getByRole("heading",{level:1,name:"Estoque e insumos",exact:true}).count(),1);
+     await stockNav.getByRole('button',{name:'Operações',exact:true}).click();
+     const stockOperations=page.getByRole('navigation',{name:'Operações e consultas de estoque'});
+     await stockOperations.getByRole('button',{name:'Entregas',exact:true}).click();
+     assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'Operação selecionada');
+     await stockNav.getByRole('button',{name:'Hoje',exact:true}).click();
      await page.getByPlaceholder('Nome do insumo').fill('Frango');
      if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible()&&await page.getByRole('button',{name:'Abrir menu',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
      await page.locator('#primary-sidebar').getByRole('button',{name:'Produção',exact:true}).click();

@@ -4,8 +4,8 @@ import {allowedRecipient,noticeUrl} from './policy.js';
 import {signalUnitChange} from '../live-signal.js';
 export const pushConfigured=()=>!!(process.env.WEB_PUSH_PUBLIC_KEY&&process.env.WEB_PUSH_PRIVATE_KEY&&process.env.PUBLIC_APP_URL);
 // Stored atomically with the business mutation. No network calls inside a transaction.
-export function queuePush(tx,db,unitId,eventId,{uid=null,audience='member',title,page='my-profile',targetDevice=null}){
- tx.set(db.doc(`units/${unitId}/pushOutbox/${eventId}`),{uid,audience,title,page,targetDevice,state:'pending',attempts:0,createdAt:new Date(),expiresAt:new Date(Date.now()+86400000),delivered:[]});
+export function queuePush(tx,db,unitId,eventId,{uid=null,audience='member',title,message=null,page='my-profile',targetDevice=null}){
+ tx.set(db.doc(`units/${unitId}/pushOutbox/${eventId}`),{uid,audience,title,message,page,targetDevice,state:'pending',attempts:0,createdAt:new Date(),expiresAt:new Date(Date.now()+86400000),delivered:[]});
 }
 export async function drainPush(unitId,{db=getDb(),transport=sendNotification,eventId=null}={}){
  const configured=pushConfigured();
@@ -29,7 +29,7 @@ export async function drainPush(unitId,{db=getDb(),transport=sendNotification,ev
     if(Date.now()>deadline){failed=true;break}
     // The inbox uses the same event ID, so retries cannot duplicate entries.
     const inbox=db.doc(`units/${unitId}/memberNotifications/${member.id}/items/${item.id}`);
-    await db.runTransaction(async tx=>{const prior=await tx.get(inbox);if(!prior.exists){tx.create(inbox,{title:event.title,message:'Abra o aplicativo para consultar os detalhes.',recipientUid:member.id,unitId,at:event.createdAt,read:false,source:'Operação',page:event.page});signalUnitChange(tx,db,unitId,['notifications'])}});
+    await db.runTransaction(async tx=>{const prior=await tx.get(inbox);if(!prior.exists){tx.create(inbox,{title:event.title,message:event.message||'Abra o aplicativo para consultar os detalhes.',recipientUid:member.id,unitId,at:event.createdAt,read:false,source:'Operação',page:event.page});signalUnitChange(tx,db,unitId,['notifications'])}});
     if(!configured){failed=true;continue}
     const devices=await db.collection('pushDevices').where('uid','==',member.id).limit(10).get();
     for(const device of devices.docs){

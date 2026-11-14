@@ -7,12 +7,12 @@ test('fase 1: fundação importada depois das folhas de compatibilidade',()=>{
  const main=read('main.jsx');
  assert.match(main,/import '\.\/ios-edge-to-edge\.css';\s*import '\.\/ui-foundation-phase1\.css';/);
 });
-test('fase 1: cabeçalho mobile apresenta título completo e drawer controla foco',()=>{
+test('fase 1: cabeçalho móvel deixa o título para a tela e o menu controla o foco',()=>{
  const app=read('App.jsx'),css=read('ui-foundation-phase1.css');
- assert.match(app,/className="ti-mobile-page-label"/);
+ assert.doesNotMatch(app,/className="ti-mobile-page-label"|aria-label="Atalhos rápidos"/);
  assert.match(app,/ref=\{menuTriggerRef\}/);
  assert.match(app,/document\.body\.style\.overflow='hidden'/);
- assert.match(css,/\.ti-mobile-page-label\{display:block/);
+ assert.match(css,/\.main-content>\.topbar\{position:sticky/);
  assert.match(css,/max-width:359px/);
 });
 test('fase 1: confirmação acessível tem Escape, foco, botões e safe areas',()=>{

@@ -181,9 +181,11 @@ export default async function kitchenV3(req,res){
     const [actor,old,...ps]=await Promise.all([tx.get(actorRef),tx.get(ref),...items.map(x=>tx.get(productPath(unit,x.productId)))]);
     if(!verify(actor,unitId,roles))throw Error('FORBIDDEN');
     if(old.exists){if(old.data().fingerprint!==fingerprint||old.data().createdBy!==user.uid)throw Error('CONFLICT');duplicate=true;return;}
-    if(ps.some(p=>!p.exists||!isOperationalProduct(p.data())))throw Error('NOT_FOUND');
+    const unavailable=ps.findIndex(p=>!p.exists||!isOperationalProduct(p.data()));
+    if(unavailable>=0)throw Object.assign(Error('ORDER_ITEM_UNAVAILABLE'),{itemIndex:unavailable});
     const configs=await Promise.all(items.map(item=>tx.get(profiles.doc(item.productId))));
-    if(configs.some(cfg=>!cfg.exists||!['supplier','both'].includes(cfg.data().origin)))throw Error('NOT_FOUND');
+    const invalidOrigin=configs.findIndex(cfg=>!cfg.exists||!['supplier','both'].includes(cfg.data().origin));
+    if(invalidOrigin>=0)throw Object.assign(Error('ORDER_ITEM_ORIGIN'),{itemIndex:invalidOrigin,productName:ps[invalidOrigin].data().name});
     tx.create(ref,{etaDate,supplier:supplier.trim(),notes,items:items.map((x,i)=>({...x,name:ps[i].data().name})),status:'requested',
       channel:'whatsapp',createdAt:now(),createdBy:user.uid,fingerprint,delivered:[],updatedAt:now()});
     newAudit(tx,db,'v3.order_created',unitId,user.uid,{orderId:requestId,etaDate,items});
@@ -207,6 +209,8 @@ export default async function kitchenV3(req,res){
   }
   return send(res,400,'Ação desconhecida.');
  }catch(e){
+  if(e.message==='ORDER_ITEM_UNAVAILABLE')return send(res,409,'O insumo da linha '+(e.itemIndex+1)+' está indisponível. Escolha um insumo ativo da unidade.',{code:e.message,itemIndex:e.itemIndex});
+  if(e.message==='ORDER_ITEM_ORIGIN')return send(res,409,e.productName+' não está habilitado para pedidos. Confira a origem em Gestão de Insumos.',{code:e.message,itemIndex:e.itemIndex});
   const errors={UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem autorização.'],NOT_FOUND:[404,'Insumo ou pedido inexistente.'],
    STALE:[409,'Configuração alterada por outra pessoa. Recarregue antes de salvar.'],INACTIVE:[409,'Insumo arquivado.'],UNIT_LOCKED:[409,'Existe saldo no novo controle. Recontagem e migração supervisionada são necessárias antes de trocar unidade.'],INVALID_SOURCE:[409,'Origem de preparação inválida ou indisponível.'],
    TOO_MANY:[409,'Há muitos registros para validar a operação.'],DUPLICATE_NAME:[409,'Esse nome ou sinônimo já identifica outro insumo. Revise para evitar duplicidade.'],PRODUCT_HAS_STOCK:[409,'Insumo com estoque registrado: reconcilie antes de arquivar.'],PRODUCT_HAS_PENDING:[409,'Há faltas ou pedidos em aberto para esse insumo. Resolva antes de arquivar.'],

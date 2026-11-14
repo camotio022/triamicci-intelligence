@@ -11,6 +11,7 @@ test('notification groups use restaurant date at midnight, keep newest first and
 test('notification destination rejects external/unknown destinations and supports existing notices',()=>{
  assert.equal(notificationDestination({page:'https://evil.test',title:'Acesso atualizado'}),'my-profile');
  assert.equal(notificationDestination({page:'people'}),'people');
+ assert.equal(notificationDestination({title:'Recebimento aguardando aprovação',page:'kitchen-v3'}),'receiving');
  assert.equal(notificationDestination({title:'Solicitação de folga analisada'}),'leave-requests');
  assert.equal(notificationDestination({title:'Nova escala publicada'}),'mural');
 });

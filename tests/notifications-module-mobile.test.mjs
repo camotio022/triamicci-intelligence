@@ -33,6 +33,7 @@ test('notification module: mobile density, independent route, lifecycle and coll
    await page.route('**/api/**',async route=>{
     const body=route.request().postDataJSON()||{};actions.push(body.action);
     if(body.action==='notifications'){loads++;return route.fulfill({json:{notifications:items}})}
+    if(body.action==='v3Dashboard')return route.fulfill({json:{signals:[],products:[],orders:[]}});
     if(body.action==='v3Alerts')return route.fulfill({json:{signals:[{id:'cheddar',productName:'Cheddar',location:'giro'}],deliveries:[]}});
     if(body.action==='pushConfiguration')return route.fulfill({json:{configured:true,publicKey:'a'.repeat(87)}});
     const item=items.find(n=>n.id===body.id);
@@ -48,6 +49,15 @@ test('notification module: mobile density, independent route, lifecycle and coll
    assert.ok(dimensions.document<=width+1&&dimensions.body<=width+1,JSON.stringify(dimensions));
    assert.ok(dimensions.row<=125,'Default notice row must stay compact: '+JSON.stringify(dimensions));assert.ok(dimensions.device<=80,'Device controls must stay collapsed.');
    const initialLoads=loads;await page.getByRole('button',{name:/Abrir notificações:/}).click();assert.ok(page.url().includes('page=notifications'));assert.equal(loads,initialLoads,'Bell navigation must reuse provider data');
+   assert.equal(await page.locator('.ti-bell-count').textContent(),'2');
+   await page.evaluate(()=>{
+    sessionStorage.setItem('triamicci-view:fixture-user:Barigui:KitchenV3.jsx:tab',JSON.stringify('orders'));
+   });
+   await page.getByRole('button',{name:/Avisos da equipe/}).click();
+   assert.equal(new URL(page.url()).searchParams.get('stockTab'),'overview');
+   await page.getByRole('heading',{name:'Avisos da equipe',exact:true}).waitFor();
+   assert.equal(await page.getByRole('heading',{name:'Registrar pedido feito no WhatsApp'}).count(),0);
+   await page.goBack();
    await page.getByRole('button',{name:'Não lidas',exact:true}).click();
    const access=page.locator('.ti-notify-row').filter({has:page.getByRole('button',{name:/Acesso atualizado/})});
    await access.locator('.ti-notify-summary').click();await access.getByRole('button',{name:'Excluir',exact:true}).waitFor();
@@ -55,7 +65,7 @@ test('notification module: mobile density, independent route, lifecycle and coll
    await access.getByRole('button',{name:'Excluir',exact:true}).click();await page.getByRole('button',{name:/Lixeira/}).click();
    const trash=page.locator('.ti-notify-row').filter({has:page.getByRole('button',{name:/Acesso atualizado/})});
    await trash.locator('.ti-notify-summary').click();await trash.getByRole('button',{name:'Restaurar',exact:true}).click();
-   await page.getByRole('button',{name:/Recebidas/}).click();await page.getByRole('button',{name:/Acesso atualizado/}).waitFor();
+   await page.getByRole('button',{name:/Recebidas/}).click();assert.equal(await page.getByRole('button',{name:'Não lidas',exact:true}).getAttribute('aria-pressed'),'true');await page.getByRole('button',{name:'Não lidas',exact:true}).click();await page.getByRole('button',{name:/Acesso atualizado/}).waitFor();
    await page.locator('.ti-notify-device>summary').click();await page.getByRole('button',{name:'Ativar notificações',exact:true}).click();await page.getByRole('button',{name:'Testar aviso',exact:true}).click();await page.getByRole('button',{name:'Desativar aqui',exact:true}).click();await page.getByRole('button',{name:'Ativar notificações',exact:true}).waitFor();
    assert.ok(actions.includes('pushSubscribe')&&actions.includes('pushTest')&&actions.includes('pushUnsubscribe'));
    assert.deepEqual(errors,[],'Browser errors at '+width);

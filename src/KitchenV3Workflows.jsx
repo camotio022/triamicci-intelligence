@@ -9,7 +9,7 @@ async function invoke(action,payload={}){
  return requestJson('/api/operations/stock',{action,...payload},{sessionMessage:'Sessão expirada.',formatError:data=>data.message||'Operação não realizada.'});
 }
 function Field({name,children}){return <label>{name}{children}</label>}
-export default function KitchenV3Workflows({kind,approvedReceipts=[],products,orders,membership,onChange,onConfigure,initialProductId=null}){
+export default function KitchenV3Workflows({kind,approvedReceipts=[],products,orders,membership,onChange,onConfigure,standalone=false,initialProductId=null}){
  const {notify}=useFeedback();const managers=isManagement(membership.role);
  const [productId,setProductId]=useState(initialProductId||''),[location,setLocation]=useState('reserva'),[supplier,setSupplier]=useState(''),
  [commercialUnit,setCommercialUnit]=useState('kg'),[commercialQuantity,setCommercialQuantity]=useState(''),
@@ -79,9 +79,9 @@ export default function KitchenV3Workflows({kind,approvedReceipts=[],products,or
  const relevantProduct=prepared?out:chosen;
  const locations=relevantProduct?.profile?.locations||['reserva','giro'];
  const showLot=(kind==='receive'&&usesPhysicalLots(chosen))||(prepared&&out?.trackExpiry);
- if(kind==='receive')return <ShipmentReceiving approvedReceipts={approvedReceipts} products={products} orders={orders} membership={membership} onChange={onChange} onConfigure={onConfigure}/>;
+ if(kind==='receive')return <ShipmentReceiving approvedReceipts={approvedReceipts} products={products} orders={orders} membership={membership} onChange={onChange} onConfigure={onConfigure} standalone={standalone}/>;
  return <section className="v3-page v3-card v3-workflow">
-  {kind==='receive'&&<ShipmentReceiving products={products} orders={orders} membership={membership} onChange={onChange} onConfigure={onConfigure}/>}
+  {kind==='receive'&&<ShipmentReceiving products={products} orders={orders} membership={membership} onChange={onChange} onConfigure={onConfigure} standalone={standalone}/>}
   <details open={kind!=='receive'}><summary>{kind==='receive'?'Conferência individual e pendências anteriores':'Detalhes da operação'}</summary>
   <h2>{({receive:'Receber mercadoria',count:'Conferir estoque',transfer:'Abastecer Giro ou devolver à Reserva',produce:'Registrar produção concluída'})[kind]}</h2>
   <p>{({receive:'Confira o que realmente chegou. Um pedido não é estoque antes de ser recebido.',count:'Registre o que encontrou fisicamente. Uma diferença não significa automaticamente venda ou produção.',transfer:'Mova quantidades entre locais sem baixar o total da cozinha.',produce:'Escolha a origem real da matéria-prima e informe o rendimento realmente preparado. Não fazemos conversões presumidas.'})[kind]}</p>
