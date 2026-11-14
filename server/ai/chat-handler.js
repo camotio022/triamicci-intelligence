@@ -1,6 +1,8 @@
 import {authenticate,checkRequest,getDb,membership,send} from '../_lib.js';
 import {sendQuotaError} from '../quota-error.js';
 import {operationalContext} from './operational-context.js';
+import {aiV1Context} from './context-v1.js';
+import {AI_ENABLED,requireAiAccess} from './permissions-v1.js';
 import {saveConversation} from './history-handler.js';
 
 const MODEL='gemini-3.1-flash-lite';
@@ -73,6 +75,8 @@ export default async function chatHandler(req,res){
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!m?.unitId)return send(res,403,'Sem acesso a uma unidade ativa.');
+  const v1=AI_ENABLED();
+  if(v1&&!requireAiAccess(m,'stock'))return send(res,403,'Assistente AI-Permissions V1 restrito à gestão.');
   const {message,history,image,threadId}=req.body||{};
   const streaming=req.body?.stream===true;
   if(typeof message!=='string'||message.trim().length<2||message.length>1800||!Array.isArray(history||[]))
@@ -84,10 +88,11 @@ export default async function chatHandler(req,res){
   const db=getDb();
   const quota=await reserve(db,m.unitId,actor.uid);
   if(!quota.allowed)return send(res,429,'Limite diário do assistente atingido. O OCR continua separado deste limite.',{code:'AI_DAILY_LIMIT'});
-  const context=await operationalContext(db,m.unitId,message);
+  const context=v1?await aiV1Context(db,m,message):await operationalContext(db,m.unitId,message);
   const system=[
    'Você é o Assistente Triamicci, apoio de leitura e sugestões de operação de cozinha em pt-BR.',
    'Você não executa ações, não aprova escalas, não cria pedidos nem movimenta estoque.',
+   ...(v1?['AI-Permissions 1.0: somente gestores; leitura mínima e rascunhos sem publicação ou execução.','Use somente os campos das seções do contexto. Se uma seção está unavailable, explique que não há fonte confiável; não improvise nomes nem dados.','Diferencie registrado, planejado e presença efetiva; não trate login ou escala como prova de disponibilidade para dobra.','Uma proposta de dobra exige confirmação humana e verificação de descansos e jornadas. Nenhum registro é alterado.']:[]),
    'Responda em até 140 palavras, de modo objetivo, com no máximo três passos práticos e sem longas introduções. Termine sempre a última frase. Use títulos e listas Markdown apenas quando úteis. Faça distinção entre fatos presentes no contexto e sugestões.',
    'Nunca invente saldos, pessoas, quantidades, entregas, horários ou demandas. Dados ausentes exigem confirmação humana.',
    'Para perguntas sobre produção, use PRIMEIRO as tarefas reais do dia presentes no contexto. Cite as preparações e quantidades efetivamente informadas. Priorize tarefas pendentes, sinalize lacunas e não invente escalas, responsáveis, insumos ou tempos.',
