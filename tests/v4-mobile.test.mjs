@@ -55,7 +55,13 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      const raw=execution.getByLabel('Quantidade realmente utilizada (kg)',{exact:true});assert.equal(await raw.inputValue(),'','Transformação não presume consumo');await raw.fill('2');
      await execution.getByLabel('Quantidade produzida (un)',{exact:true}).fill('5');assert.equal(await raw.inputValue(),'2','Alterar rendimento não recalcula matéria-prima');
      await execution.getByLabel('Lote do preparo final',{exact:true}).fill('ISCA-UI');await execution.getByLabel('Validade do preparo',{exact:true}).fill('2099-12-30');await execution.getByRole('checkbox').check();await execution.getByRole('button',{name:'Confirmar transformação na reserva',exact:true}).click();
-     await page.getByRole('alertdialog').getByRole('button',{name:'Confirmar',exact:true}).click();
+     const confirmation=page.getByRole('alertdialog');
+     const beforeConfirmation=finishes.length;
+     await confirmation.getByRole('button',{name:'Cancelar',exact:true}).click();
+     assert.equal(finishes.length,beforeConfirmation,'Cancelar não envia a produção');
+     assert.equal(await raw.inputValue(),'2','Cancelar preserva o formulário');
+     await execution.getByRole('button',{name:'Confirmar transformação na reserva',exact:true}).click();
+     await confirmation.getByRole('button',{name:'Confirmar',exact:true}).click();
      await page.getByRole('status').filter({hasText:'Consulta de teste'}).first().waitFor();assert.equal(finishes.at(-1).portions,5);assert.equal(finishes.at(-1).items[0].quantity,2);assert.equal(finishes.at(-1).taskId,null,'Execução avulsa não conclui tarefa anterior');
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'Transformação cabe em '+width);
     }
