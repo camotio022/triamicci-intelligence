@@ -1,5 +1,6 @@
 import {authenticate,checkRequest,getDb,membership,send} from '../_lib.js';
 import {sendQuotaError} from '../quota-error.js';
+import {AI_ENABLED,requireAiAccess} from './permissions-v1.js';
 
 const idPattern=/^[a-f0-9-]{36}$/i;
 const safeText=v=>typeof v==='string'?v.slice(0,4000):'';
@@ -24,7 +25,7 @@ export default async function historyHandler(req,res){
  res.setHeader('Cache-Control','no-store');
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
-  if(!m?.unitId)return send(res,403,'Unidade não autorizada.');
+  if(!m?.unitId||AI_ENABLED()&&!requireAiAccess(m,'stock'))return send(res,403,'Unidade ou cargo não autorizado.');
   const {action,threadId}=req.body||{};
   const ref=root(getDb(),m.unitId,actor.uid);
   if(action==='assistantHistoryList'){
