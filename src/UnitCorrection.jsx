@@ -1,3 +1,4 @@
+import useAppConfirmation from './useAppConfirmation.jsx';
 import {isManagement} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import {STOCK_UNITS,RECEIVING_UNITS,UNIT_LABELS} from '../server/operations/unit-engine.js';
@@ -5,6 +6,7 @@ import React,{useState} from 'react';
 import {sessionAuth as auth} from './firebase.js';
 const renderUnit=unit=><option key={unit} value={unit}>{unit} · {UNIT_LABELS[unit]}</option>;
 export default function UnitCorrection({product,membership,onUpdated}){
+ const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const [open,setOpen]=useState(false);
  const [operational,setOperational]=useState(product.operationalUnitOverride||product.unit);
  const [receiving,setReceiving]=useState(product.receivingUnitOverride||product.unit);
@@ -13,7 +15,7 @@ export default function UnitCorrection({product,membership,onUpdated}){
  if(!isManagement(membership.role))return null;
  const submit=async e=>{
   e.preventDefault();if(saving)return;
-  if(!window.confirm('Esta alteração NÃO converterá contagens antigas. Será preciso fazer uma nova contagem na unidade corrigida. Confirmar?'))return;
+  if(!await askConfirmation('Esta alteração NÃO converterá contagens antigas. Será preciso fazer uma nova contagem na unidade corrigida. Confirmar?'))return;
   setSaving(true);setStatus('');
   try{
    const token=await auth.currentUser?.getIdToken();
@@ -40,5 +42,6 @@ export default function UnitCorrection({product,membership,onUpdated}){
    <button type="submit" className="stock-action-save" disabled={saving||reason.trim().length<8}>{saving?'Salvando...':'Confirmar correção da unidade'}</button>
   </form>}
   {status&&<p role="status">{status}</p>}
+  {confirmationSheet}
  </section>;
 }

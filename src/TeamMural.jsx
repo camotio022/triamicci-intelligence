@@ -1,3 +1,4 @@
+import useAppConfirmation from './useAppConfirmation.jsx';
 import {restaurantDay} from '../shared/operation-day.js';
 import {requestJson} from './api-client.js';
 import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
@@ -20,6 +21,7 @@ const monthLabel=period=>new Intl.DateTimeFormat('pt-BR',{month:'long',year:'num
 const todayInSaoPaulo=()=>restaurantDay(new Date());
 
 export default function TeamMural({membership,onOpenProduction}){
+ const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const [schedules,setSchedules]=useState([]),[notices,setNotices]=useState([]),[presence,setPresence]=useState({}),[today,setToday]=useState(todayInSaoPaulo),[productionTasks,setProductionTasks]=useState([]),[productionError,setProductionError]=useState('');
  const [loading,setLoading]=useState(true),[error,setError]=useState(''),[expanded,setExpanded]=useState(null),[staff,setStaff]=useState([]),[clock,setClock]=useState('00:00');
  const [noticeCursor,setNoticeCursor]=useState(null),[presenceError,setPresenceError]=useState(''),[showNoticeHistory,setShowNoticeHistory]=useState(false);
@@ -68,10 +70,10 @@ export default function TeamMural({membership,onOpenProduction}){
  const endedTeam=roster.filter(x=>x.start&&!x.ongoing&&!x.upcoming);
  const visibleTeam=teamFilter==='now'?nowTeam:teamFilter==='next'?nextTeam:teamFilter==='ended'?endedTeam:roster;
  const [noticeForm,setNoticeForm]=useState({title:'',body:'',priority:'normal',expiresOn:''}),[publishing,setPublishing]=useState(false);
- const publishNotice=async e=>{e.preventDefault();if(publishing||!window.confirm('Publicar este comunicado para a unidade?'))return;setPublishing(true);try{const token=await auth.currentUser.getIdToken();const write=async(action,payload)=>{const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'mural',action,...payload})});const d=await response.json();if(!response.ok)throw Error(d.message);return d};const draft=await write('saveDraft',{item:{kind:'notice',...noticeForm}});await write('publish',{id:draft.id});setNoticeForm({title:'',body:'',priority:'normal',expiresOn:''});await refresh()}catch(e){setError(e.message)}finally{setPublishing(false)}};
+ const publishNotice=async e=>{e.preventDefault();if(publishing||!await askConfirmation('Publicar este comunicado para a unidade?'))return;setPublishing(true);try{const token=await auth.currentUser.getIdToken();const write=async(action,payload)=>{const response=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({module:'mural',action,...payload})});const d=await response.json();if(!response.ok)throw Error(d.message);return d};const draft=await write('saveDraft',{item:{kind:'notice',...noticeForm}});await write('publish',{id:draft.id});setNoticeForm({title:'',body:'',priority:'normal',expiresOn:''});await refresh()}catch(e){setError(e.message)}finally{setPublishing(false)}};
  const [showAllNotices,setShowAllNotices]=useState(false);
  const historicalNotices=notices.filter(item=>noticeHistorical(item,today));
- const archiveNotice=async id=>{if(!window.confirm('Arquivar este comunicado? Ele continuará no histórico da unidade.'))return;try{await read('mural','archive',{id});await refresh()}catch(e){setError(e.message)}};
+ const archiveNotice=async id=>{if(!await askConfirmation('Arquivar este comunicado? Ele continuará no histórico da unidade.'))return;try{await read('mural','archive',{id});await refresh()}catch(e){setError(e.message)}};
  const prioritized=notices.filter(item=>!noticeHistorical(item,today)).sort((a,b)=>({urgent:2,important:1,normal:0}[b.priority||'normal']-({urgent:2,important:1,normal:0}[a.priority||'normal']))||String(b.publishedAt||'').localeCompare(String(a.publishedAt||'')));
  const visibleNotices=showAllNotices?prioritized:prioritized.slice(0,2);
  const loadOlder=async()=>{try{const d=await read('mural','publicNotices',{before:noticeCursor});setNotices(a=>[...a,...(d.items||[]).filter(p=>!a.some(x=>x.id===p.id))]);setNoticeCursor(d.nextCursor||null)}catch(e){setError(e.message)}};
@@ -122,5 +124,6 @@ export default function TeamMural({membership,onOpenProduction}){
      </li>})}</ul>}
    </section>
   </div>
+  {confirmationSheet}
  </section>;
 }

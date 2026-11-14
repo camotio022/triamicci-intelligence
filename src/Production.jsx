@@ -22,6 +22,7 @@ async function call(path,action,payload={}){
 export default function Production({membership,initialTaskId}){
  const {notify}=useFeedback();
  const [confirmation,setConfirmation]=useState(null);
+ const [executionError,setExecutionError]=useState('');
  const confirmAction=()=>{const action=confirmation?.action;setConfirmation(null);return action?.();};
  const openedTaskRef=useRef(null);
  const [view,setView]=useState('today'),[setupRecipe,setSetupRecipe]=useState(null),[setupDirty,setSetupDirty]=useState(false);
@@ -68,6 +69,7 @@ export default function Production({membership,initialTaskId}){
  },[initialTaskId,dailyTasks,recipes]);
  const selected=recipes.find(r=>r.id===recipeId);
  const choose=(id,task=null)=>{
+  setExecutionError('');
   setOutputLot('');setExpiryDate('');setRecipeId(id);setRequestId(null);setConfirmed(false);setActiveTaskId(null);
   const r=recipes.find(x=>x.id===id);
   const quantity=executionQuantity(task,r);
@@ -103,13 +105,13 @@ export default function Production({membership,initialTaskId}){
   setConfirmation({title:selected.outputProductId?'Confirmar transformação?':'Confirmar produção?',description:selected.outputProductId?'Os ingredientes sairão dos locais definidos na ficha. O produto preparado entrará na Reserva.':'O estoque será atualizado com as quantidades de ingredientes informadas.',label:'Registrar produção',action:saveProduction});
  };
  const saveProduction=async()=>{
-  setBusy(true);setStatus('');
+  setBusy(true);setStatus('');setExecutionError('');
   const id=requestId||crypto.randomUUID();setRequestId(id);
   try{
    const data=await call('/api/production/manage','finish',{recipeId,requestId:id,portions:Number(portions),
     items:items.map(i=>({productId:i.productId,quantity:Number(i.quantity)})),notes,outputLot,expiryDate,taskId:activeTaskId});
    setStatus(data.message);notify(data.message,'success');choose('');setShowExecution(false);await Promise.all([load(),loadTasks()]);
-  }catch(e){setStatus(e.message);notify(e.message,'error')}finally{setBusy(false)}
+  }catch(e){setExecutionError(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const option=(id)=>products.find(p=>p.id===id);
  const inputUnit=id=>{const p=option(id);return p?.operationalUnitOverride||p?.physicalUnit||p?.unit||'un';};
@@ -153,6 +155,7 @@ export default function Production({membership,initialTaskId}){
   </section>}
   <div className="production-layout ti-v4-production-layout">
    {view==='today'&&showExecution&&<section className="receiving-card ti-production-execution" aria-label="Registrar produção"><div className="ti-production-execution-head"><h2><ClipboardList size={19} aria-hidden="true"/> Registrar produção</h2><button type="button" onClick={()=>{setShowExecution(false);choose('');}}><X size={17}/> Fechar</button></div><p>{activeTaskId?'Registro vinculado à tarefa de hoje.':'Registro avulso, sem necessidade de planejamento anterior.'} Confirme somente as quantidades realmente preparadas.</p>
+    {executionError&&<p role="alert" className="v3-error">{executionError}</p>}
     {selected?.stockEffect==='portion_same_product'?<><label>Preparação<select aria-label="Preparação para registrar produção" value={recipeId} onChange={e=>choose(e.target.value)}><option value="">Selecione a preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><SameProductPortioning key={membership.unitId+recipeId+(activeTaskId||'')} taskId={activeTaskId} recipe={selected} call={call} management={admin} onSaved={async message=>{setStatus(message);notify(message,'success');setShowExecution(false);choose('');await Promise.all([load(true),loadTasks()])}}/></>:<form className="stock-action-form" onSubmit={finish}>
      <label>Preparação<select aria-label="Preparação para registrar produção" required value={recipeId} onChange={e=>choose(e.target.value)}>
       <option value="">Selecione a preparação</option>
