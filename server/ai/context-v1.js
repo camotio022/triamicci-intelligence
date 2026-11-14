@@ -20,8 +20,45 @@ export function classifyAiV1(question){
   checklists:/checklist|abertura|fechamento/.test(s)
  };
 }
+const weekdays=['dom','seg','ter','qua','qui','sex','sab'];
+const weekdayOf=date=>weekdays[new Date(date+'T12:00:00Z').getUTCDay()];
+const slotFor=(person,date)=>(
+ Array.isArray(person?.professional?.availability)?person.professional.availability:
+ Array.isArray(person?.availability)?person.availability:[]
+).find(slot=>slot.day===weekdayOf(date))||null;
+const safeHour=value=>/^([01]\d|2[0-3]):[0-5]\d$/.test(value||'')?value:null;
+export function rosterDirectory(docs){
+ const people=docs.map(d=>({id:d.id,data:d.data()}));
+ const byId=new Map(people.map(p=>[p.id,p.data]));
+ for(const p of people){
+  if(p.data?.accountUid && !byId.has(p.data.accountUid))byId.set(p.data.accountUid,p.data);
+ }
+ return byId;
+}
+export function summarizeScheduleDocs(docs,directory,date,limit=15){
+ return docs.slice(0,limit).filter(d=>d.data().status==='published'&&!d.data().archivedAt).map(d=>({
+  status:'published',date,entries:(d.data().entries||[]).filter(e=>e.date===date).slice(0,60).map(e=>{
+   const p=directory.get(e.uid);
+   const slot=slotFor(p,date);
+   return {
+    name:str(p?.name||'Colaborador sem identificação confirmada',90),
+    role:str(p?.jobTitle||p?.professional?.jobTitle||'',60),
+    sector:str(p?.sector||p?.professional?.sector||'',32),
+    shift:str(p?.shift||'',24),
+    status:['work','off','leave','monthly_sunday'].includes(e.type)?e.type:'não identificado',
+    plannedStart:safeHour(e.start)||safeHour(slot?.start),
+    plannedEnd:safeHour(e.end)||safeHour(slot?.end),
+    timeSource:(safeHour(e.start)&&safeHour(e.end))?'escala':(safeHour(slot?.start)&&safeHour(slot?.end))?'disponibilidade habitual':'não informado',
+    nameConfirmed:Boolean(p?.name)
+   };
+  })
+ }));
+}
+
 export async function aiV1Context(db,member,question){
  const intents=classifyAiV1(question),unit=db.collection('units').doc(member.unitId),sections=[];
+ let staffCache;
+ const staff=async()=>staffCache??=(await unit.collection('staffRegistry').limit(201).get());
  const base={scope:'Somente unidade autenticada; informações minimizadas; nenhuma ação operacional',day:DAY(),sections,unavailable:[]};
  // Never expose all modules in one prompt; cap the number of consulted modules.
  const requested=Object.keys(intents).filter(k=>intents[k]);
@@ -35,26 +72,28 @@ export async function aiV1Context(db,member,question){
   }
   if(kind==='schedules'){
    const period=DAY().slice(0,7);
-   const snap=await unit.collection('schedules').where('period','==',period).limit(16).get();
-   sections.push({kind,period,source:'escala cadastrada; somente status publicado é oficial',
-    incomplete:snap.size>=16,
-    records:snap.docs.slice(0,15).filter(d=>d.data().status==='published').map(d=>({
-     status:'published',entries:(d.data().entries||[]).filter(e=>e.date===DAY()).slice(0,60).map(e=>({
-      uid:str(e.uid,128),date:e.date,type:str(e.type,32),shift:str(e.shift,32),
-      start:str(e.start,8),end:str(e.end,8)}))
-    }))});continue;
+   const [snap,staffSnap]=await Promise.all([unit.collection('schedules').where('period','==',period).limit(16).get(),staff()]);
+   const directory=rosterDirectory(staffSnap.docs);
+   sections.push({kind,period,date:DAY(),source:'escala publicada cruzada com cadastro da equipe da própria unidade; horários de disponibilidade habitual são previsão, não ponto real',
+    incomplete:snap.size>=16||staffSnap.size>200,
+    records:summarizeScheduleDocs(snap.docs,directory,DAY()),
+    ...(snap.size===0?{note:'Nenhuma escala do mês encontrada.'}:{})});continue;
   }
   if(kind==='attendance'){
-   const snap=await unit.collection('attendanceV31').where('day','==',DAY()).limit(61).get();
+   const [snap,staffSnap]=await Promise.all([unit.collection('attendanceV31').where('day','==',DAY()).limit(61).get(),staff()]);
+   const directory=rosterDirectory(staffSnap.docs);
    sections.push({kind,day:DAY(),source:'registros de ponto; não prova presença física ou disponibilidade',
-    incomplete:snap.size>=61,records:snap.docs.slice(0,60).map(d=>({uid:str(d.data().uid,128),
-     status:str(d.data().status,24),updatedAt:iso(d.data().updatedAt)}))});continue;
+    incomplete:snap.size>=61||staffSnap.size>200,records:snap.docs.slice(0,60).map(d=>{
+     const p=directory.get(d.data().uid);
+     return {name:str(p?.name||'Colaborador sem identificação confirmada',90),
+      status:str(d.data().status,24),updatedAt:iso(d.data().updatedAt)};
+    })});continue;
   }
   if(kind==='team'){
-   const snap=await unit.collection('staffRegistry').limit(61).get();
+   const snap=await staff();
    sections.push({kind,source:'cadastro de equipe; disponibilidade prevista não é aceitação de dobra',
-    incomplete:snap.size>=61,people:snap.docs.slice(0,60).filter(d=>d.data().status==='active').map(d=>({
-      uid:d.id,name:str(d.data().name,90),jobTitle:str(d.data().jobTitle,60),
+    incomplete:snap.size>200,people:snap.docs.slice(0,60).filter(d=>d.data().status==='active').map(d=>({
+      name:str(d.data().name,90),jobTitle:str(d.data().jobTitle,60),
       sector:str(d.data().sector,40),shift:str(d.data().shift,24),
       availability:Array.isArray(d.data().availability)?d.data().availability.slice(0,7).map(a=>({day:str(a.day,4),start:str(a.start,5),end:str(a.end,5)})):[]
     }))});continue;
