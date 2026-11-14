@@ -1,6 +1,7 @@
 import {authenticate,checkRequest,getDb,membership,send} from '../_lib.js';
 import {sendQuotaError} from '../quota-error.js';
 import {operationalContext} from './operational-context.js';
+import {saveConversation} from './history-handler.js';
 
 const MODEL='gemini-3.1-flash-lite';
 const ENDPOINT='https://generativelanguage.googleapis.com/v1beta/models/'+MODEL+':generateContent';
@@ -37,7 +38,7 @@ export default async function chatHandler(req,res){
  try{
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!m?.unitId)return send(res,403,'Sem acesso a uma unidade ativa.');
-  const {message,history,image}=req.body||{};
+  const {message,history,image,threadId}=req.body||{};
   if(typeof message!=='string'||message.trim().length<2||message.length>1800||!Array.isArray(history||[]))
    return send(res,400,'Escreva uma pergunta válida de até 1800 caracteres.');
   const jpeg=validImage(image);
@@ -77,7 +78,9 @@ export default async function chatHandler(req,res){
   const payload=await response.json();
   const answer=payload.candidates?.[0]?.content?.parts?.filter(p=>!p.thought).map(p=>p.text||'').join('').trim();
   if(!answer)return send(res,503,'O assistente não conseguiu responder. Tente reformular.');
-  return send(res,200,'Resposta gerada.',{answer:answer.slice(0,4000),imageUsed:!!jpeg,contextKinds:context.sections.map(s=>s.kind)});
+  let historySaved=false;
+  try{historySaved=await saveConversation(db,m.unitId,actor.uid,threadId,message.trim(),answer,!!jpeg);}catch(e){console.error('AI history save:',e.name);}
+  return send(res,200,'Resposta gerada.',{answer:answer.slice(0,4000),imageUsed:!!jpeg,contextKinds:context.sections.map(s=>s.kind),historySaved});
  }catch(error){
   if(error.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
   if(error.message==='BAD_IMAGE')return send(res,400,'Anexe apenas uma imagem JPEG válida de até 1 MB.');
