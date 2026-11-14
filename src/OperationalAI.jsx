@@ -2,6 +2,7 @@ import React,{useRef,useState} from 'react';
 import {Bot,Send,ImagePlus,X,ShieldCheck} from 'lucide-react';
 import {sessionAuth as auth} from './firebase.js';
 import {apiFetch} from './api-fetch.js';
+import AIMessageFormat from './AIMessageFormat.jsx';
 import './operational-ai.css';
 
 async function jpegBase64(file){
@@ -48,7 +49,7 @@ export default function OperationalAI(){
   <div className="ti-ai-dialog" aria-live="polite">
    {!messages.length&&<div className="ti-ai-welcome"><strong>Como posso ajudar hoje?</strong><p>Consulte informações e receba sugestões para sua unidade.</p>
     <div className="ti-ai-chips">{['O que pode precisar de reposição?','Sugira uma organização para a produção','Como planejar a escala da cozinha?'].map(s=><button key={s} onClick={()=>setDraft(s)} type="button">{s}</button>)}</div></div>}
-   {messages.map((m,i)=><article className={'ti-ai-msg '+(m.role==='user'?'is-user':'is-ai')} key={i}><span>{m.role==='user'?'Você':'Assistente'}</span><p>{m.text}</p>{m.hasPhoto&&<small>Foto anexada</small>}</article>)}
+   {messages.map((m,i)=><article className={'ti-ai-msg '+(m.role==='user'?'is-user':'is-ai')} key={i}><span>{m.role==='user'?'Você':'Assistente'}</span>{m.role==='assistant'?<AIMessageFormat text={m.text}/>:<p>{m.text}</p>}{m.hasPhoto&&<small>Foto anexada</small>}</article>)}
    {pending&&<p className="ti-ai-loading" role="status">Analisando sua pergunta…</p>}
    <div ref={endRef}/>
   </div>
