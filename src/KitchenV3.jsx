@@ -30,12 +30,21 @@ const units=STOCK_UNITS;
 const status={reported:'A verificar',requested:'Pedido feito',confirmed:'Confirmado pelo fornecedor',overdue:'Atrasado',partially_received:'Recebido parcialmente',received:'Recebido',cancelled:'Cancelado'};
 const date=iso=>iso?new Date(iso+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const longDate=x=>x?new Date(x).toLocaleString('pt-BR'):'—';
-export default function KitchenV3({membership,onOpenProduction}){
+export default function KitchenV3({membership,onOpenProduction,initialTab}){
  const {notify}=useFeedback();
  const [hasData,setHasData]=useState(false);
  const canManage=isManagement(membership.role);
  const [tab,setTab]=useViewState('KitchenV3.jsx:tab',membership.unitId,'overview'),[products,setProducts]=useState([]),[catalogPending,setCatalogPending]=useState([]),[signals,setSignals]=useState([]),[orders,setOrders]=useState([]);
  const panelRef=useRef(null);
+ const alertsRef=useRef(null);
+ useEffect(()=>{
+  if(initialTab==='overview'||initialTab==='orders')setTab(initialTab);
+ },[initialTab,setTab]);
+ useEffect(()=>{
+  if(!hasData||tab!==initialTab)return;
+  if(initialTab==='overview')alertsRef.current?.focus();
+  if(initialTab==='orders')panelRef.current?.focus();
+ },[hasData,initialTab,tab]);
  const focusPanel=useRef(false);
  const selectTab=(next,focus=false)=>{
   if(focus&&tab===next){
@@ -135,7 +144,7 @@ export default function KitchenV3({membership,onOpenProduction}){
      <button type="button" onClick={()=>selectTab('orders',true)}><strong>{orders.filter(o=>o.status==='overdue').length}</strong><span>Entregas atrasadas</span></button>
      <button type="button" onClick={()=>setOverviewFilter('review')} aria-pressed={overviewFilter==='review'} className={overviewFilter==='review'?'selected':''}><strong>{active.filter(p=>!p.profile).length}</strong><span>Sem configuração</span></button>
     </div>
-    <section className="v3-card ti-v4-stock-alerts"><header className="ti-v4-stock-section-head"><div><h2>Avisos da equipe</h2><p>Relatos da equipe que precisam de verificação.</p></div><span className="ti-v4-stock-pill">{signals.length}</span></header>
+    <section className="v3-card ti-v4-stock-alerts" ref={alertsRef} tabIndex={-1} aria-label="Avisos da equipe"><header className="ti-v4-stock-section-head"><div><h2>Avisos da equipe</h2><p>Relatos da equipe que precisam de verificação.</p></div><span className="ti-v4-stock-pill">{signals.length}</span></header>
      {signals.length===0?<p className="ti-v4-stock-empty">Nenhum aviso em aberto.</p>:<div className="ti-v4-stock-list">{signals.map(sig=><article className="ti-v4-stock-item" key={sig.id}><div className="ti-v4-stock-item-title"><div><strong>{sig.productName}</strong><small>{sig.location==='giro'?'Giro · 1º piso':'Reserva · 2º piso'} · {sig.reports?.length||1} relato(s)</small></div><span className="ti-v4-stock-pill attention">{sig.observation==='missing'?'Possível falta':'Estoque baixo'}</span></div>{canManage&&<details className="ti-v4-stock-action"><summary>Conferir aviso</summary><form className="v3-inline-resolve" onSubmit={e=>{e.preventDefault();update('v3ResolveSignal',{productId:sig.productId,location:sig.location,resolution:resolutionById[sig.id]||''},'Aviso resolvido.')}}><label>Decisão<input required maxLength={240} value={resolutionById[sig.id]||''} onChange={e=>setResolutionById(old=>({...old,[sig.id]:e.target.value}))} placeholder="Ex.: conferido e localizado"/></label><button type="submit" disabled={busy}>Resolver</button></form></details>}</article>)}</div>}
     </section>
     <section className="v3-card ti-v4-stock-deliveries"><header className="ti-v4-stock-section-head"><div><h2>Entregas previstas</h2><p>Atrasadas e próximas entregas da unidade.</p></div><button type="button" className="v3-secondary" onClick={()=>selectTab('orders',true)}>Ver agenda</button></header>

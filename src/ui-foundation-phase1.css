@@ -54,7 +54,7 @@ html body #root .app-shell main select:not([multiple]):not([size]) {
 .ti-insumos-item[open] .ti-insumos-chevron {transform:rotate(180deg)}
 .ti-form-error {padding:10px 12px;border:1px solid #e8b5b3;border-radius:10px;background:#fff1ef;color:#8d211d}
 .ti-inventory-investigate-link {display:inline-flex;align-items:center;justify-self:start;min-height:44px;padding:8px 12px;border:1px solid var(--ti-line);border-radius:10px;background:var(--ti-surface);color:var(--ti-brand);font-weight:700;text-decoration:none}
-.ti-stock-active-panel,.ti-shipment-wizard h3,#inventory-report-title {scroll-margin-top:calc(80px + env(safe-area-inset-top,0px))}
+.ti-stock-active-panel,.ti-v4-stock-alerts,.ti-shipment-wizard h3,#inventory-report-title {scroll-margin-top:calc(80px + env(safe-area-inset-top,0px))}
 
 @media(max-width:760px){
  .main-content>.ti-mobile-context {padding-block:3px;margin-block:4px 10px}

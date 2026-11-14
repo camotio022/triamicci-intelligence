@@ -15,6 +15,6 @@ export function allowedRecipient(member,unitId,audience){
  return member?.status==='active'&&member.unitId===unitId&&(audience!=='managers'||MANAGEMENT_ROLES.includes(member.role));
 }
 export function noticeUrl(page,unitId){
- const safe=['my-profile','leave-requests','people','kitchen-v3','mural'];
+ const safe=['my-profile','leave-requests','people','kitchen-v3','mural','receiving'];
  return '/?'+new URLSearchParams({page:safe.includes(page)?page:'my-profile',pushUnit:unitId});
 }

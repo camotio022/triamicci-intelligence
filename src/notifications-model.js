@@ -20,11 +20,18 @@ export function notificationCategory(item){
  if(title.includes('recebimento')||title.includes('estoque'))return 'Cozinha';
  return 'Equipe';
 }
-const destinations=new Set(['my-profile','leave-requests','people','kitchen-v3','mural']);
+const destinations=new Set(['my-profile','leave-requests','people','kitchen-v3','mural','receiving']);
 export function notificationDestination(item){
- if(destinations.has(item.page))return item.page;
+
  const title=String(item.title||'').toLocaleLowerCase('pt-BR');
+ if(title==='recebimento aguardando aprovação')return 'receiving';
+ if(destinations.has(item.page))return item.page;
  if(title.includes('folga'))return 'leave-requests';
  if(title.includes('escala publicada'))return 'mural';
  return 'my-profile';
+}
+
+export function notificationMessage(item){
+ const message=item.message?.trim();
+ return message==='Abra o aplicativo para consultar os detalhes.'?'':message||'';
 }

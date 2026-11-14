@@ -88,7 +88,7 @@ export default async function shipments(req,res){
     normalized.push({...line,productName:p.data().name,stockUnit:quantitative?cfg.countUnit:null,measurementSnapshot:action==='shipmentInspect'?{configurationVersion:cfg.version||0,receivingUnit:line.commercialUnit,stockUnit:cfg.countUnit||null,receivingModel:cfg.receivingModel||null}:line.measurementSnapshot||null});
    }
    const now=new Date();
-   if(action==='shipmentInspect')queuePush(tx,db,m.unitId,'receipt_pending_'+requestId,{audience:'managers',title:'Recebimento aguardando aprovação',page:'kitchen-v3'});
+   if(action==='shipmentInspect')queuePush(tx,db,m.unitId,'receipt_pending_'+requestId,{audience:'managers',title:'Recebimento aguardando aprovação',message:(order?.data()?.supplier||data.supplier)+' · '+normalized.length+(normalized.length===1?' item conferido':' itens conferidos'),page:'receiving'});
    if(action==='shipmentInspect')tx.create(ref,{...data,lines:normalized,supplier:order?.data()?.supplier||data.supplier,status:'pending',fingerprint:hash({orderId,lines,supplier:supplier.trim(),notes:notes.trim()}),createdBy:actor.uid,createdAt:now,unitId:m.unitId});
    else if(action==='shipmentReject')tx.update(ref,{status:'rejected',reason:reason.trim(),decidedBy:actor.uid,decidedAt:now});
    else{
