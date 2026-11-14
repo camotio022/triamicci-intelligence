@@ -167,10 +167,11 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     }
     if(screen==='Navegação'){
      assert.equal(await page.getByRole('navigation',{name:'Atalhos rápidos'}).count(),0);
-     assert.equal(await page.getByRole('heading',{level:1,name:'Operação da cozinha',exact:true}).count(),1);
      if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible()&&await page.getByRole('button',{name:'Abrir menu',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
      await page.locator('#primary-sidebar').getByRole('button',{name:'Estoque e insumos',exact:true}).click();
      const stockNav=page.getByRole('navigation',{name:'Seções de estoque e insumos',exact:true});
+     await page.getByRole("heading",{level:1,name:"Estoque e insumos",exact:true}).waitFor();
+     assert.equal(await page.getByRole("heading",{level:1,name:"Estoque e insumos",exact:true}).count(),1);
      await stockNav.getByRole('button',{name:'Operações',exact:true}).click();
      const stockOperations=page.getByRole('navigation',{name:'Operações e consultas de estoque'});
      await stockOperations.getByRole('button',{name:'Entregas',exact:true}).click();
