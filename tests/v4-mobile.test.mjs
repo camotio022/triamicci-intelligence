@@ -16,7 +16,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     if(b.action==='list'&&(route.request().url().includes('/api/products/manage')||b.includeProducts&&route.request().url().includes('/api/production/manage')))base.products.push({id:'e'.repeat(40),name:'Tilápia em kg',unit:'kg',physicalUnit:'kg',status:'active'},{id:'f'.repeat(40),name:'Isca pronta',unit:'un',physicalUnit:'un',status:'active',lotTrackingMode:'per_lot'});
     if(b.action==='finish')finishes.push(b);
     if(b.module==='operationalCatalog'&&b.action==='status')base.items=[{id:'bacon',active:false,reason:'missing_profile',needsReconciliation:true,matches:[{id:'e'.repeat(40),name:'Bacon',configuration:{stockUnit:'un',operationalUnit:'un',receivingUnit:'kg',source:'supplier',trackExpiry:false,minStock:5,countFrequency:'daily',critical:true}}]}];
-    if(b.action==='shipmentsList'){base.shipments=[{id:'closed',status:'approved',supplier:'Entrega recente',createdAt:new Date().toISOString(),lines:[]}];base.pendingShipments=[{id:'pending-old',status:'pending',supplier:'Pendência antiga de teste',createdAt:'2020-01-01T12:00:00Z',lines:[]}];base.pendingComplete=true;}
+    if(b.action==='shipmentsList'){base.shipments=[{id:'closed',status:'approved',supplier:'Entrega recente',createdAt:new Date().toISOString(),lines:[{productName:'Tilápia',commercialQuantity:1,commercialUnit:'caixa',stockQuantity:12.5,stockUnit:'kg',location:'giro',lot:'LOTE-TILAPIA'}]}];base.pendingShipments=[{id:'pending-old',status:'pending',supplier:'Pendência antiga de teste',createdAt:'2020-01-01T12:00:00Z',lines:[{productName:'Óleo de soja',commercialQuantity:4,commercialUnit:'L',stockQuantity:4,stockUnit:'L',location:'reserva'}]}];base.pendingComplete=true;}
     if(b.action==='list'&&route.request().url().includes('/api/operations/stock'))base.productions=base.runs;
     if(b.action==='v3Count')counts.push(b);
     if(['v3Dashboard','v3Conference'].includes(b.action))base.products=[{...product,catalogId:'bacon',operationalCatalogVersion:'56-v1',name:'Bacon',trackExpiry:true,unit:'kg',profile:{origin:'supplier',controlMode:'quantitative',countUnit:'kg',locations:['reserva','giro']},v3Balance:{reserva:1,giro:1,total:2,unit:'kg'}}];
@@ -83,6 +83,20 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     if(['Recebimento','Recebimento pendente','Recebimento com lote'].includes(screen))await page.getByRole('button',{name:'＋ Nova conferência',exact:true}).click();
     if(screen==='Recebimento'){
      assert.equal(await page.getByText('Pendência antiga de teste',{exact:true}).count(),1,'Pendência antiga não desaparece com a paginação do histórico');
+     const pendingReceipt=page.getByRole('region',{name:'Pendências de aprovação'});
+     assert.equal(await pendingReceipt.locator('summary').getByText('4 L',{exact:true}).isVisible(),true);
+     assert.equal(await pendingReceipt.locator('summary').getByText('Reserva',{exact:true}).isVisible(),true);
+     await pendingReceipt.locator('summary').getByText('Óleo de soja',{exact:true}).click();
+     assert.equal(await pendingReceipt.getByRole('button',{name:'Revisar e aprovar entrega'}).isVisible(),true);
+     const historySearch=page.getByRole('searchbox',{name:'Buscar registros históricos'});
+     await historySearch.fill('Tilápia');
+     const receipt=page.locator('.ti-receipt-card[data-status="approved"]').filter({hasText:'Entrega recente'});
+     assert.equal(await receipt.getByText('12,5 kg',{exact:true}).first().isVisible(),true);
+     assert.equal(await receipt.getByText('Giro · Entrega: 1 caixa',{exact:true}).first().isVisible(),true);
+     await receipt.locator('summary').click();
+     assert.equal(await receipt.getByText('Lote LOTE-TILAPIA',{exact:true}).isVisible(),true);
+     await historySearch.fill('');
+     if(width===390)await page.screenshot({path:'/tmp/recebimento-cards-390.png',fullPage:true});
      await page.getByLabel('Fornecedor da entrega não prevista',{exact:true}).fill('Fornecedor teste');
      await page.getByLabel('Por que a entrega não estava prevista?').fill('Compra experimental autorizada');
      await page.getByRole('button',{name:'Conferir itens',exact:true}).click();await page.screenshot({path:'/tmp/v4-receive-step-'+width+'.png',fullPage:true});
