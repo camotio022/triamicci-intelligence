@@ -45,3 +45,18 @@
   .app-shell .kitchen-home .kitchen-action {padding:11px;min-height:90px}
   .app-shell .kitchen-home .kitchen-action strong {font-size:13px}
 }
+
+/* Page back is contextual: the global Triamicci header never contains it. */
+.app-shell .ti-page-back-nav{display:flex;align-items:center;min-height:44px;margin:6px 0 8px;max-width:1200px}
+.app-shell .ti-page-back-button{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-width:44px;min-height:44px;padding:8px 11px;border:1px solid #dce2ec;
+  border-radius:12px;background:#fff;color:#202a3d;font-weight:650;
+  font-size:13px;cursor:pointer;
+}
+.app-shell .ti-page-back-button:hover{border-color:#a71916;color:#a71916}
+.app-shell .ti-page-back-button:focus-visible{outline:2px solid #a71916;outline-offset:2px}
+@media(max-width:760px){
+ .app-shell .ti-page-back-nav{margin:2px 0 6px;min-height:40px}
+ .app-shell .ti-page-back-button{min-height:40px;min-width:44px;padding:7px 10px}
+}
