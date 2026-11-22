@@ -32,13 +32,13 @@ export default function KitchenHome({membership,navigate}){
  const latest=[...history.receipts.map(x=>({...x,label:'Recebimento'})),...history.counts.map(x=>({...x,label:'Contagem'})),...history.outflows.map(x=>({...x,label:'Saída'})),...history.transfers.map(x=>({...x,label:'Transferência'})),...history.productions.map(x=>({...x,label:'Produção'}))]
    .filter(x=>recordDay(x.at)===today).sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)).slice(0,5);
  const actions=[{name:'Registrar produção',description:'Registrar preparo e transformação de insumos',page:'production',Icon:CookingPot},{name:'Receber mercadoria',description:'Conferir fornecedor e entrega',page:'receiving',Icon:PackageCheck},
-  {name:'Conferência de estoque',description:'Contar por área e conferir disponibilidade',page:'count',Icon:ClipboardCheck},
-  {name:'Estoque físico',description:'Consultar produtos da cozinha',page:'inventory',Icon:Boxes},
+  {name:'Contar estoque',description:'Contar por área e conferir disponibilidade',page:'count',Icon:ClipboardCheck},
+  {name:'Ver estoque',description:'Consultar produtos da cozinha',page:'inventory',Icon:Boxes},
   {name:'Histórico',description:'Consultar operações registradas',page:'history',Icon:History}];
  if(!hasData)return <DataState title="Operação da cozinha" error={error} onRetry={()=>{apiFetch.clearCache();load()}}/>;
  return <section className="kitchen-home">
-  <PageHeading className="kitchen-header" eyebrow={"TRIAMICCI INTELLIGENCE · UNIDADE "+membership.unitId.toUpperCase()} title="Operação da cozinha" description="Recebimentos, contagens e estoque físico da unidade em um só lugar." actions={<button type="button" onClick={()=>{apiFetch.clearCache();load()}} disabled={loading}><RefreshCw size={16}/> Atualizar</button>}/>
-  <div className="kitchen-actions">{actions.filter(action=>action.page!=='count'||MANAGEMENT_ROLES.includes(membership.role)).map(({name,description,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong><span>{description}</span></button>)}</div>
+  <PageHeading className="kitchen-header ti-compact-heading" title="Operação da cozinha" actions={<button type="button" className="ti-compact-refresh" aria-label="Atualizar operação da cozinha" title="Atualizar" onClick={()=>{apiFetch.clearCache();load()}} disabled={loading}><RefreshCw size={18} aria-hidden="true"/></button>}/>
+  <div className="kitchen-actions">{actions.filter(action=>action.page!=='count'||MANAGEMENT_ROLES.includes(membership.role)).map(({name,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong></button>)}</div>
   {error&&<p role="alert" className="receiving-notice"><AlertCircle size={16}/> Falha na atualização. Os dados da última consulta podem estar desatualizados. {error}</p>}
   <section className="ti-operations-overview" aria-label="Resumo operacional">
    <h2>Resumo operacional</h2>

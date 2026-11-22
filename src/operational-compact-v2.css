@@ -1,0 +1,62 @@
+/* Compact operational layout v2. Scoped selectors prevent the PR #231 empty-space regression. */
+@media (max-width:760px) {
+  .app-shell .ti-page-heading:not(.ti-compact-heading) {gap:8px;margin-bottom:12px}
+  .app-shell .ti-page-heading:not(.ti-compact-heading) h1 {margin-bottom:4px}
+  .app-shell .ti-page-heading:not(.ti-compact-heading) .eyebrow {margin-bottom:5px}
+  .app-shell .ti-page-heading:not(.ti-compact-heading) .ti-page-heading__description {line-height:1.35}
+
+  .app-shell .kitchen-home {padding-top:10px}
+  .app-shell .kitchen-home .ti-page-heading.ti-compact-heading {
+    display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;
+    justify-content:space-between;gap:10px;margin:0 0 12px;min-height:44px;
+  }
+  .app-shell .kitchen-home .ti-compact-heading .ti-page-heading__copy {flex:1;min-width:0}
+  .app-shell .kitchen-home .ti-compact-heading h1 {
+    font-size:clamp(21px,5.5vw,26px);line-height:1.2;letter-spacing:-.035em;
+    margin:0;text-align:left;
+  }
+  .app-shell .kitchen-home .ti-compact-heading .ti-page-heading__actions {
+    flex:0 0 auto;display:flex;align-items:center;max-width:none;
+  }
+  .app-shell .kitchen-home .ti-compact-refresh {
+    display:inline-flex;align-items:center;justify-content:center;
+    width:44px;height:44px;min-width:44px;min-height:44px;
+    border:1px solid #dce2ec;border-radius:12px;background:#fff;
+    color:#202a3d;padding:0;cursor:pointer;
+  }
+  .app-shell .kitchen-home .kitchen-actions {
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:9px;margin:0 0 20px;align-items:stretch;
+  }
+  .app-shell .kitchen-home .kitchen-action {
+    min-width:0;min-height:94px;padding:13px;gap:9px;
+    border-radius:16px;justify-content:center;align-items:flex-start;
+    display:flex;flex-direction:column;
+  }
+  .app-shell .kitchen-home .kitchen-action svg {width:21px;height:21px;flex-shrink:0}
+  .app-shell .kitchen-home .kitchen-action strong {
+    font-size:14px;line-height:1.3;font-weight:700;overflow-wrap:anywhere;
+  }
+  .app-shell .kitchen-home .ti-operations-overview>h2 {
+    margin-top:0;margin-bottom:12px;font-size:21px;line-height:1.25;
+  }
+}
+@media (max-width:360px) {
+  .app-shell .kitchen-home .kitchen-action {padding:11px;min-height:90px}
+  .app-shell .kitchen-home .kitchen-action strong {font-size:13px}
+}
+
+/* Page back is contextual: the global Triamicci header never contains it. */
+.app-shell .ti-page-back-nav{display:flex;align-items:center;min-height:44px;margin:6px 0 8px;max-width:1200px}
+.app-shell .ti-page-back-button{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-width:44px;min-height:44px;padding:8px 11px;border:1px solid #dce2ec;
+  border-radius:12px;background:#fff;color:#202a3d;font-weight:650;
+  font-size:13px;cursor:pointer;
+}
+.app-shell .ti-page-back-button:hover{border-color:#a71916;color:#a71916}
+.app-shell .ti-page-back-button:focus-visible{outline:2px solid #a71916;outline-offset:2px}
+@media(max-width:760px){
+ .app-shell .ti-page-back-nav{margin:2px 0 6px;min-height:40px}
+ .app-shell .ti-page-back-button{min-height:40px;min-width:44px;padding:7px 10px}
+}
