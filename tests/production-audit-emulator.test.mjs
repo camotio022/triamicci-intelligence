@@ -85,6 +85,44 @@ test('auditoria produção: unidades, dependências, transformação medida, lot
  const molho=unit.collection('physicalBalances').doc(c);await molho.set({unit:'kg',reserve:0,rotation:0,total:0});
  const recipe={...config,type:'recipe',name:'Molho audit',sourceProductId:'',outputProductId:c,resultUnit:'balde',outputPerBatch:900,ingredients:[{name:'Ingrediente',amount:'100',unit:'g',tracked:true,productId:a}]};
  const invalid=await call(manager,'savePreparation',{id:'molho-audit',configuration:recipe,activate:true});assert.equal(invalid.http,200,JSON.stringify(invalid));assert.equal((await molho.get()).data().unit,'kg');assert.equal((await unit.collection('productionRecipes').doc('molho-audit').get()).exists,true);
+ await molho.set({unit:'g',reserve:0,rotation:0,total:0});
+ const cru='d'.repeat(40),preparado='e'.repeat(40),tomate='f'.repeat(40),cebola='1'.repeat(40);
+ for(const [productId,name,stockUnit,quantity] of [
+  [cru,'Frango cru','kg',6],[preparado,'Frango temperado','kg',0],
+  [tomate,'Tomate','kg',4],[cebola,'Cebola','kg',3]
+ ]){
+  await unit.collection('products').doc(productId).set(product(name,stockUnit));
+  await unit.collection('physicalBalances').doc(productId).set({unit:stockUnit,reserve:quantity,rotation:0,total:quantity});
+ }
+ const total=async productId=>(await unit.collection('physicalBalances').doc(productId).get()).data().total;
+ const journeys=[
+  {recipeId:'frango-audit',configuration:{...config,type:'portion',name:'Frango a passarinho',sourceProductId:cru,outputProductId:preparado,portionWeight:500},
+   quantity:1.5,items:[{productId:cru,quantity:1.5}],outputUnit:'kg',expected:[[cru,4.5],[preparado,1.5]]},
+  {recipeId:'molho-completo-audit',configuration:{...recipe,ingredients:[
+   {name:'Tomate',amount:'500',unit:'g',tracked:true,productId:tomate},
+   {name:'Cebola',amount:'300',unit:'g',tracked:true,productId:cebola}
+  ]},quantity:900,items:[{productId:tomate,quantity:.5},{productId:cebola,quantity:.3}],outputUnit:'g',
+   expected:[[tomate,3.5],[cebola,2.7],[c,900]]}
+ ];
+ for(const {recipeId,configuration,quantity,items,outputUnit,expected} of journeys){
+  const initial=await Promise.all(expected.map(([productId])=>total(productId)));
+  const saved=await call(manager,'savePreparation',{id:recipeId,configuration,activate:true});
+  assert.equal(saved.http,200,JSON.stringify(saved));
+  const task=await call(aux,'dayAdd',{recipeId,plannedQuantity:quantity});
+  assert.equal(task.http,200,JSON.stringify(task));
+  assert.deepEqual(await Promise.all(expected.map(([productId])=>total(productId))),initial);
+  const runPayload={recipeId,requestId:randomUUID(),taskId:task.taskId,portions:quantity,items};
+  assert.ok(runPayload.taskId,'Execução precisa estar vinculada à tarefa');
+  const finished=await call(aux,'finish',runPayload);
+  assert.equal(finished.http,200,JSON.stringify(finished));
+  assert.equal((await call(aux,'finish',runPayload)).duplicate,true);
+  for(const [productId,quantity] of expected)assert.equal(await total(productId),quantity);
+  const managerTasks=(await call(manager,'dayList')).tasks;
+  assert.equal(managerTasks.find(t=>t.id===runPayload.taskId)?.status,'completed');
+  const history=(await call(manager,'list')).runs.find(r=>r.id===runPayload.requestId);
+  assert.equal(history?.outputUnit,outputUnit);
+  assert.deepEqual(history.items.map(({productId,quantity})=>({productId,quantity})),items);
+ }
  // Cadastro ainda ativo, mas dependência inativa: mesmo diagnóstico nas duas listas.
  await unit.collection('products').doc(a).update({status:'inactive'});
  const list=await call(aux,'list');assert.equal(list.recipes.some(r=>r.id===id),false);assert.match(list.blockedRecipes.find(r=>r.id===id).errors.join(' '),/Tilápia/);

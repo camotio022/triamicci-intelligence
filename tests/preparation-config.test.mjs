@@ -18,3 +18,16 @@ test('método de contagem é opcional, validado e não muda o efeito no estoque'
  assert.equal(validatePreparation({...same,countMode:'arbitrary'}),'Escolha um método de contagem válido.');
  assert.equal(validatePreparation({...same,countMode:'portions'}),null);
 });
+
+test('porcionamento de produtos distintos converte o rendimento para a unidade física da saída',()=>{
+ for(const [unit,yieldQuantity] of [['kg',.25],['g',250]]){
+  const plan=preparationPlan(base,[products[0],{...products[1],unit}]);
+  assert.equal(plan.ready,true,plan.errors.join(' '));
+  assert.equal(plan.sameProduct,false);
+  assert.equal(plan.outputUnit,unit);
+  assert.equal(plan.yieldQuantity,yieldQuantity);
+  assert.equal(plan.lines[0].quantity,.25);
+ }
+ const incompatible=preparationPlan(base,[products[0],{...products[1],unit:'L'}]);
+ assert.equal(incompatible.ready,false);
+});

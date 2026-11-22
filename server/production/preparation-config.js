@@ -44,8 +44,16 @@ export function preparationPlan(c,products){
   if(!p||p.status!=='active')errors.push('O insumo de origem precisa estar ativo.');
   if(!converted.ok)errors.push('O peso da porção não pode ser convertido para a unidade física do insumo.');
   else lines.push({productId:p.id,quantity:converted.quantity,location:c.location,substitutes:[]});
-  if(!sameProduct&&(!['un','porcao'].includes(outputUnit)||!['un','porcao'].includes(c.resultUnit)))errors.push('O produto preparado precisa ser contado em unidades ou porções para este porcionamento. Revise a unidade no catálogo.');
   yieldQuantity=1;
+  if(!sameProduct){
+   if(MASS_UNITS.includes(outputUnit)){
+    const preparedWeight=convertPhysical({quantity:c.portionWeight,from:c.weightUnit,to:outputUnit});
+    if(preparedWeight.ok)yieldQuantity=preparedWeight.quantity;
+    else errors.push('O peso da porção precisa ser compatível com a unidade do produto preparado.');
+   }else if(!['un','porcao'].includes(outputUnit)){
+    errors.push('O produto preparado precisa ser contado em kg, g, unidades ou porções. Revise a unidade no catálogo.');
+   }
+  }
  }
  if(c.type==='recipe'){
   if(c.resultUnit!==outputUnit){
