@@ -9,6 +9,7 @@ import './button-foundation.css';
 import './ios-input-focus.css';
 import './ios-edge-to-edge.css';
 import './ui-foundation-phase1.css';
+import './operational-compact-v2.css';
 
 if (window.navigator.standalone === true) document.documentElement.classList.add('ti-ios-standalone');
 
