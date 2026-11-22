@@ -1,3 +1,4 @@
+import {historyQuantity} from './operation-time.js';
 import {requestJson} from './api-client.js';
 import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import StockConference from './StockConference.jsx';
@@ -108,7 +109,7 @@ function PhysicalOperations({membership,mode='receive',initialProductId=null}){
  return <section className="receiving-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId}</p>
   <h1>{mode==='history'?'Histórico da operação':mode==='receive'?'Recebimento de mercadorias':'Contagem diária — reserva e giro'}</h1>
-  <p>{mode==='history'?'Registros físicos de recebimento e contagem, com data e responsável.':mode==='receive'?'Registre a mercadoria conferida com a quantidade física efetivamente recebida.':
+  <p>{mode==='history'?'Recebimentos, produções, contagens, transferências e saídas, com data e responsável.':mode==='receive'?'Registre a mercadoria conferida com a quantidade física efetivamente recebida.':
     'Informe o estoque físico encontrado em cada área; confira o histórico antes de salvar.'}</p>
   <div className="receiving-notice">Cada operação mantém data e responsável. Após a primeira contagem, as movimentações atualizam o saldo. Quantidades antigas sem conferência ficam separadas; lotes com pendência precisam de revisão da gestão.</div>
   {mode==='history'?null:mode==='receive'&&!canReceive?<p>Somente administrador ou gerente pode registrar recebimentos.</p>:
@@ -171,8 +172,9 @@ function PhysicalOperations({membership,mode='receive',initialProductId=null}){
   </section>}
   <section className="receiving-card"><TriamicciHistory title="Histórico de operações" records={rows}
     getTitle={r=>r.productName||r.recipeName||(r.productId?'Produto · '+r.productId:'Produto sem identificação no registro')} getDate={r=>r.at}
-    getQuantity={r=>({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'}
-    getDescription={r=>r.kind==='receive'?qty(r.physicalQuantity)+' '+r.unit:r.kind==='count'?qty(r.reserve)+' reserva + '+qty(r.rotation)+' giro':r.kind==='production'?r.portions+' porções':r.kind==='transfer'?qty(r.quantity)+' '+r.unit+' · '+r.from+' → '+r.to:qty(r.quantity)+' '+r.unit}
+    getBadge={r=>({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'}
+    getQuantity={r=>historyQuantity(r.kind==='receive'?r.physicalQuantity:r.kind==='count'?(r.total??(Number.isFinite(r.reserve)&&Number.isFinite(r.rotation)?r.reserve+r.rotation:null)):r.kind==='production'?r.portions:r.quantity,r.kind==='production'?r.outputUnit||'porcao':r.unit)}
+    getDescription={r=>r.kind==='count'?qty(r.reserve)+' Reserva · '+qty(r.rotation)+' Giro':r.kind==='transfer'?r.from+' → '+r.to:''}
     getPerson={r=>r.actorName||r.actorUid} renderDetails={r=><div>Tipo: {({receive:'Recebimento',count:'Contagem',dispatch:'Saída',transfer:'Transferência',production:'Produção'})[r.kind]||'Operação'} · ID: {r.id}{(r.productNameSource||r.actorNameSource)&&<p>Nome consultado no cadastro atual; o registro original foi preservado.</p>}</div>}
     empty="Nenhum registro encontrado para o período."/>
    {(more.receipts||more.counts||more.outflows||more.transfers||more.productions)&&<button type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore?'Carregando...':'Carregar registros anteriores'}</button>}
