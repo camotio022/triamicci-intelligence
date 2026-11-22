@@ -126,11 +126,3 @@
 .ti-attendance-v31 button:disabled{opacity:.55;cursor:wait}
 .ti-attendance-notice{flex-basis:100%;color:#176b4b!important}
 @media(max-width:480px){.ti-attendance-actions{width:100%;flex-direction:column}.ti-attendance-actions button{width:100%}}
-
-@media(max-width:760px){
- .kitchen-home .kitchen-actions{gap:8px;margin:12px 0}
- .kitchen-home .kitchen-action{min-height:72px;gap:5px;padding:10px;border-radius:12px}
- .kitchen-home .kitchen-action strong{font-size:14px;line-height:1.25}
- .kitchen-home .kitchen-action svg{width:19px;height:19px}
- .kitchen-home .kitchen-action > span{display:none}
-}

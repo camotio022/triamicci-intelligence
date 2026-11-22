@@ -66,9 +66,9 @@ export default function LeaveRequests({membership}){
   finally{setBusy(false);}
  };
  return <section className="ti-planning ti-leave-v4">
-
+  <p className="eyebrow">EQUIPE · FOLGAS</p>
   <h1>Solicitações de folga</h1>
-  <p className="ti-desktop-intro">A gestão revisa e publica a escala após decidir os pedidos.</p>
+  <p>A aprovação não altera a escala oficial. A gestão deve revisar e publicar a escala correspondente.</p>
   <div className="ti-leave-v4-intro">
    <div><strong>{manager?pendingCount:requests.filter(x=>x.status==='pending'&&x.date>=today).length}</strong><span>{manager?'Pedidos aguardando decisão':'Meus pedidos pendentes'}</span></div>
    <button type="button" className="ti-leave-v4-primary" onClick={()=>setShowForm(v=>!v)} aria-expanded={showForm} aria-controls="ti-leave-request-form">{showForm?'Fechar formulário':'Solicitar folga'}</button>
