@@ -7,12 +7,3 @@
 .ti-page-heading__actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0}
 .ti-page-heading__actions>button{min-height:var(--ti-control-height);border-radius:var(--ti-radius-control)}
 @media(max-width:760px){:root{--ti-page-title:24px}.ti-page-heading.ti-page-heading{flex-wrap:wrap;gap:12px}.ti-page-heading__actions{max-width:100%}.ti-page-heading__description{font-size:14px}}
-
-/* Context copy is optional on narrow operational screens. */
-@media(max-width:760px){
- .ti-desktop-intro,.ti-page-heading .eyebrow,.ti-page-heading .ti-page-heading__description{display:none}
- .ti-page-heading.ti-page-heading{align-items:center;gap:8px;margin-bottom:12px}
- .ti-page-heading.ti-page-heading h1{margin:0}
- .ti-page-heading__copy{flex:1 1 160px}
- .ti-page-heading__actions{max-width:100%}
-}

@@ -57,7 +57,7 @@ export default function DailyInventory({membership}){
  const pendingCount=closures.filter(x=>x.status==='pending').length;
  return <section className="receiving-page ti-inventory-v4">
   <h1>Inventário inteligente</h1>
-  <p className="ti-desktop-intro">Investigue diferenças entre contagens físicas, entradas e saídas registradas. Esta análise não altera o estoque.</p>
+  <p>Investigue diferenças entre contagens físicas, entradas e saídas registradas. Esta análise não altera o estoque.</p>
   <a className="ti-inventory-investigate-link" href="#inventory-report-title">Investigar produto</a>
   {isManager&&<section className="receiving-card ti-inventory-v4-summary" aria-labelledby="inventory-pending-title">
    <div className="ti-v4-inventory-heading"><ClipboardCheck size={21} aria-hidden="true"/><div><h2 id="inventory-pending-title">Fechamentos para conferência</h2><p>Registros submetidos à análise gerencial.</p></div><span className={pendingCount?'ti-inventory-v4-count pending':'ti-inventory-v4-count'}>{pendingCount} pendente(s)</span></div>

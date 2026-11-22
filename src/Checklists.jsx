@@ -69,7 +69,7 @@ export default function Checklists({membership,call=checklistCall}){
  const cards=data?[...data.templates.filter(t=>!data.runs.some(r=>r.templateId===t.id&&t.model.frequency!=='manual')).map(t=>({template:t})),...data.runs.map(r=>({run:r}))]:[];
  const pending=cards.filter(c=>c.run?.progress?.status!=='completed').length,completed=cards.length-pending;
  return <section className="ti-checklists">
-  <header className="ti-check-heading"><h1><ClipboardCheck size={26}/> Checklists da unidade</h1></header>
+  <header className="ti-check-heading"><small>OPERAÇÃO · {membership.unitId}</small><h1><ClipboardCheck size={26}/> Checklists da unidade</h1><p>Conferências e evidências da cozinha.</p></header>
   <nav className="ti-check-tabs" aria-label="Áreas dos checklists">{[['today','Hoje'],['history','Histórico'],...(management?[['management','Gestão']]:[])].map(([value,label])=><button type="button" key={value} aria-current={tab===value?'page':undefined} className={tab===value?'selected':''} onClick={()=>changeTab(value)}>{label}</button>)}</nav>
   {!online&&<p role="status" className="ti-check-alert">Você está sem conexão. Nenhuma nova conferência será apresentada como enviada. Reconecte para continuar.</p>}
   {error&&<p role="alert" className="ti-check-alert">{error}</p>}{notice&&<p role="status" className="ti-check-success">{notice}</p>}
