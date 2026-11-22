@@ -104,12 +104,12 @@ function PhysicalOperations({membership,mode='receive',initialProductId=null}){
   ...history.transfers.map(x=>({...x,kind:'transfer'})),...history.productions.map(x=>({...x,kind:'production'}))
  ].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0)):mode==='receive'?history.receipts:history.counts)
  .filter(x=>!initialProductId||x.productId===initialProductId||x.kind==='production'&&x.items?.some(i=>i.productId===initialProductId));
- if(mode==='receive')return <section className="receiving-page"><h1>Recebimento de mercadorias</h1><p>Confira a entrega e encaminhe para aprovação gerencial.</p>{status&&<p role="status">{status}</p>}<KitchenV3Workflows standalone kind="receive" approvedReceipts={history.receipts} products={operational.products} orders={operational.orders} membership={membership} initialProductId={initialProductId} onChange={load} onConfigure={()=>window.dispatchEvent(new CustomEvent('ti-navigate',{detail:'kitchen-v3'}))}/></section>;
+ if(mode==='receive')return <section className="receiving-page"><h1>Recebimento de mercadorias</h1>{status&&<p role="status">{status}</p>}<KitchenV3Workflows standalone kind="receive" approvedReceipts={history.receipts} products={operational.products} orders={operational.orders} membership={membership} initialProductId={initialProductId} onChange={load} onConfigure={()=>window.dispatchEvent(new CustomEvent('ti-navigate',{detail:'kitchen-v3'}))}/></section>;
  if(mode==='count'&&!canReceive)return <section className="ti-premium-card"><h2>Contagem oficial</h2><p>A contagem física que altera saldos é restrita à gestão. Comunique divergências pela Central de Insumos.</p></section>;
  return <section className="receiving-page">
   <p className="eyebrow">OPERAÇÃO · FIREBASE · {membership.unitId}</p>
   <h1>{mode==='history'?'Histórico da operação':mode==='receive'?'Recebimento de mercadorias':'Contagem diária — reserva e giro'}</h1>
-  <p>{mode==='history'?'Recebimentos, produções, contagens, transferências e saídas, com data e responsável.':mode==='receive'?'Registre a mercadoria conferida com a quantidade física efetivamente recebida.':
+  <p className="ti-desktop-intro">{mode==='history'?'Recebimentos, produções, contagens, transferências e saídas, com data e responsável.':mode==='receive'?'Registre a mercadoria conferida com a quantidade física efetivamente recebida.':
     'Informe o estoque físico encontrado em cada área; confira o histórico antes de salvar.'}</p>
   <div className="receiving-notice">Cada operação mantém data e responsável. Após a primeira contagem, as movimentações atualizam o saldo. Quantidades antigas sem conferência ficam separadas; lotes com pendência precisam de revisão da gestão.</div>
   {mode==='history'?null:mode==='receive'&&!canReceive?<p>Somente administrador ou gerente pode registrar recebimentos.</p>:

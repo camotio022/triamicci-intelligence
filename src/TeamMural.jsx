@@ -81,7 +81,7 @@ export default function TeamMural({membership,onOpenProduction}){
  const publishedCurrent=Boolean(current);
  const scheduleLabel=publishedCurrent?'Escala do mês publicada':'Sem escala oficial para este mês';
  return <section className="ti-planning ti-mural-home ti-mural-v4" aria-label="Mural da equipe">
-  <header className="ti-mural-v5-hero"><h1>Mural da equipe</h1><p>Comunicados, escala, folgas e informações do dia.</p><LiveStatus state={live}/></header>
+  <header className="ti-mural-v5-hero"><h1>Mural da equipe</h1><p className="ti-desktop-intro">Comunicados e escala da equipe.</p><LiveStatus state={live}/></header>
   <section className="ti-mural-v5-stats" aria-label="Resumo de hoje"><div><Users size={18}/><strong>{roster.length}</strong><small>Equipe de hoje</small></div><div><ShieldCheck size={18}/><strong>{presenceError?'—':roster.filter(p=>p.declared).length}</strong><small>Entradas declaradas</small></div><div><Clock3 size={18}/><strong>{presenceError?'—':roster.filter(p=>!p.declared).length}</strong><small>Sem entrada declarada</small></div><div><Sun size={18}/><strong>{roster.filter(p=>p.shift==='Manhã').length}</strong><small>Manhã · {roster.filter(p=>p.shift==='Noite').length} noite</small></div></section>
   {error&&<p role="alert" className="team-error">{error}</p>}{presenceError&&<p role="status" className="team-error">{presenceError}</p>}
   <nav className="ti-mural-v5-nav" aria-label="Navegar no mural">{[['mural-v5-team','Equipe de hoje'],['mural-v5-notices','Comunicados'],['mural-v5-schedule','Escala mensal'],['mural-v5-production','Produção']].map(([target,label])=><button type="button" key={target} onClick={()=>document.getElementById(target)?.scrollIntoView({behavior:'smooth',block:'start'})}>{label}</button>)}</nav>
