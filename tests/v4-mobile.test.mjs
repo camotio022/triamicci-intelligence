@@ -167,7 +167,12 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       if(management){
        await adminNav.click();
        await page.locator('section.inventory-page').getByRole('heading',{name:'Gestão de Insumos',exact:true}).waitFor();
-       await page.getByRole('button',{name:'Configurar 56 produtos Validar e ativar insumos da nova lista',exact:true}).click();
+       await page.getByRole('button',{name:/^Embalagens/}).click();
+       await page.getByRole('combobox',{name:'Selecionar insumo',exact:true}).waitFor();
+       assert.equal(await page.getByRole('heading',{name:'Embalagens e contagem',exact:true}).count(),1);
+       assert.equal(await page.getByRole('heading',{name:'Produtos vinculados à unidade',exact:true}).count(),0);
+       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`Embalagens overflows at ${width}`);
+       await page.getByRole('button',{name:/^Configurar 56 produtos/}).click();
        await page.getByRole('button',{name:'Bacon Configuração pendente · Proteínas e carnes',exact:true}).click();
        await page.getByRole('heading',{name:'Configuração da cozinha preservada',exact:true}).waitFor();
        assert.equal(await page.getByRole('combobox',{name:'Unidade de estoque',exact:true}).inputValue(),'un');
