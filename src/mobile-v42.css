@@ -149,3 +149,13 @@
  .ti-stock-filters>button{min-height:44px}
  .ti-mobile-quicknav{scrollbar-width:none}
 }
+
+.topbar .ti-app-back {
+ display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;padding:0;
+ border:1px solid #e8cdcc;border-radius:11px;background:#fff6f5;color:#a71916;cursor:pointer;
+}
+.topbar .ti-app-back:hover {background:#fbeae9}
+.topbar .ti-app-back:focus-visible {outline:2px solid #a71916;outline-offset:2px}
+@media(max-width:760px){
+ .topbar:has(.ti-app-back){gap:6px}
+}

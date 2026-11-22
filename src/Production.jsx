@@ -119,7 +119,7 @@ export default function Production({membership,initialTaskId}){
  const preparationType=r=>r.preparationConfig?.type||r.configurationDraft?.type||'';
  const typeName=t=>({portion:'Porcionamento',transform:'Transformação',recipe:'Receita'})[t]||'Ficha técnica';
  const visiblePreparations=library.filter(r=>{const t=preparationType(r);const query=preparationSearch.trim().toLocaleLowerCase('pt-BR');const name=(r.configurationDraft?.name||r.name||'').toLocaleLowerCase('pt-BR');return (!query||name.includes(query)||typeName(t).toLocaleLowerCase('pt-BR').includes(query))&&(preparationFilter==='all'||(preparationFilter==='ready'&&r.available&&r.preparationConfig)||(preparationFilter==='pending'&&!(r.available&&r.preparationConfig))||preparationFilter===t);});
- return <section className="inventory-page production-page">
+ return <section className="inventory-page production-page" data-unsaved-navigation={setupDirty}>
   {confirmationSheet}
   <PageHeading eyebrow={"OPERAÇÃO · UNIDADE "+membership.unitId.toUpperCase()} title="Produção da cozinha" description="Planeje o preparo, registre a quantidade produzida e consulte o histórico."><LiveStatus state={live}/></PageHeading>
   <nav className="production-tabs" aria-label="Seções da produção">{[['today','Hoje'],...(admin?[['preparations','Preparações']]:[]),['history','Histórico']].map(([key,label])=><button key={key} type="button" aria-pressed={view===key} onClick={()=>switchView(key)}>{label}</button>)}</nav>

@@ -87,7 +87,7 @@ export default function ShipmentReceiving({approvedReceipts=[],products,orders,m
  const todayKey=useOperationDay();
  const todaysCount=shipments.filter(s=>new Date(s.createdAt).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'})===todayKey).length;
 
- return <section className="v3-page ti-shipment ti-shipment-v2">
+ return <section className="v3-page ti-shipment ti-shipment-v2" data-unsaved-navigation={showWizard&&Boolean(orderId||supplier.trim()||notes.trim()||lines.some(line=>line.productId||line.commercialQuantity))}>
   {!standalone&&<header className="ti-shipment-heading"><h2>Recebimento</h2></header>}
   {pendingComplete===false&&<p role="alert">Há mais de 200 conferências pendentes. Resolva as primeiras e consulte novamente.</p>}
   <button className="ti-shipment-start" ref={startButton} type="button" aria-controls="shipment-wizard" aria-expanded={showWizard} onClick={()=>{setShowWizard(v=>!v);setError('')}}>{showWizard?'Fechar conferência':'＋ Nova conferência'}</button>
