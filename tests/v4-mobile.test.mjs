@@ -206,7 +206,8 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      await page.getByPlaceholder('Nome do insumo').fill('Frango');
      if(await page.getByRole('button',{name:'Abrir menu',exact:true}).isVisible()&&await page.getByRole('button',{name:'Abrir menu',exact:true}).getAttribute('aria-expanded')!=='true')await page.getByRole('button',{name:'Abrir menu',exact:true}).click();
      await page.locator('#primary-sidebar').getByRole('button',{name:'Produção',exact:true}).click();
-     await page.goBack();await page.waitForTimeout(200);
+     await page.getByRole('button',{name:'Voltar à tela anterior',exact:true}).click();
+     await page.getByPlaceholder('Nome do insumo').waitFor();
      assert.equal(await page.getByPlaceholder('Nome do insumo').inputValue(),'Frango');
     }
     if(screen==='Mural'&&width===390)await page.screenshot({path:'/tmp/triamicci-v4-mural.png',fullPage:true});
