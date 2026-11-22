@@ -38,7 +38,7 @@ export default function KitchenHome({membership,navigate}){
  if(!hasData)return <DataState title="Operação da cozinha" error={error} onRetry={()=>{apiFetch.clearCache();load()}}/>;
  return <section className="kitchen-home">
   <PageHeading className="kitchen-header ti-compact-heading" title="Operação da cozinha" actions={<button type="button" className="ti-compact-refresh" aria-label="Atualizar operação da cozinha" title="Atualizar" onClick={()=>{apiFetch.clearCache();load()}} disabled={loading}><RefreshCw size={18} aria-hidden="true"/></button>}/>
-  <div className="kitchen-actions">{actions.filter(action=>action.page!=='count'||MANAGEMENT_ROLES.includes(membership.role)).map(({name,description,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong></button>)}</div>
+  <div className="kitchen-actions">{actions.filter(action=>action.page!=='count'||MANAGEMENT_ROLES.includes(membership.role)).map(({name,page,Icon})=><button type="button" key={page} onClick={()=>navigate(page)} className="kitchen-action"><Icon size={24}/><strong>{name}</strong></button>)}</div>
   {error&&<p role="alert" className="receiving-notice"><AlertCircle size={16}/> Falha na atualização. Os dados da última consulta podem estar desatualizados. {error}</p>}
   <section className="ti-operations-overview" aria-label="Resumo operacional">
    <h2>Resumo operacional</h2>
