@@ -17,3 +17,11 @@ export function balancePresentation(balance){
  if(!counted&&balance.quality==='NOT_COUNTED')return {title:'Saldo inicial não conferido',estimated:false,counted:false};
  return {title:estimated?'Saldo calculado':balance.quality==='PARTIAL_LOCATION_COUNT'?'Conferência parcial':'Último saldo registrado',estimated,counted};
 }
+
+
+const historyNumber = new Intl.NumberFormat('pt-BR', {maximumFractionDigits: 3});
+export function historyQuantity(value, unit){
+ if(!Number.isFinite(value))return '—';
+ const label=unit==='porcao'?(value===1?'porção':'porções'):unit;
+ return [historyNumber.format(value),label].filter(Boolean).join(' ');
+}

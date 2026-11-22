@@ -1,3 +1,4 @@
+import {historyQuantity} from './operation-time.js';
 import useAppConfirmation from './useAppConfirmation.jsx';
 import {canPlanProduction} from '../server/production/planning-permissions.js';
 import {restaurantDay} from '../shared/operation-day.js';
@@ -186,8 +187,8 @@ export default function Production({membership,initialTaskId}){
 
   </div>
   {view==='history'&&<section className="receiving-card"><TriamicciHistory title="Histórico de produção" records={runs} loading={loading}
-   getTitle={r=>r.recipeName||'Produção'} getDate={r=>r.at} getQuantity={r=>r.portions+' '+(r.outputUnit||'un')}
-   getDescription={r=>r.stockEffect==='portion_same_product'?`Porcionado: ${r.portionedWeight} ${r.stockUnit} · saldo total preservado`:(r.items||[]).map(i=>i.productName+' · '+i.quantity+' '+i.unit).join(' · ')}
+   getTitle={r=>r.recipeName||'Produção'} getDate={r=>r.at} getQuantity={r=>historyQuantity(r.portions,r.outputUnit||'un')}
+   getDescription={r=>r.stockEffect==='portion_same_product'?`Porcionado: ${historyQuantity(r.portionedWeight,r.stockUnit)} · saldo total preservado`:(r.items||[]).map(i=>i.productName+' · '+historyQuantity(i.quantity,i.unit)).join(' · ')}
    getPerson={r=>r.actorName||r.actorUid}
    renderDetails={r=><>{r.notes&&<div>Observação: {r.notes}</div>}<div>Registro: {r.id}</div></>}
    empty="Nenhuma produção registrada para o período. A lista planejada não movimenta estoque."/></section>}

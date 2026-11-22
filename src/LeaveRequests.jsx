@@ -83,24 +83,23 @@ export default function LeaveRequests({membership}){
     <button type="submit" className="ti-leave-v4-primary" disabled={busy||reason.trim().length<10||!date||context?.official||context?.pending}> {busy?'Enviando...':'Revisar e enviar pedido'}</button>
    </form>
   </section>}
-  {requests.some(overdue)&&<p role="status" className="receiving-notice">{requests.filter(overdue).length} pedido(s) de datas passadas aguardam encerramento. Consulte o filtro Datas passadas.</p>}
   <section className="ti-planning-card ti-leave-v4-requests">
    <div className="ti-planning-heading">
     <div><h2>{manager?'Pedidos da equipe':'Meus pedidos'}</h2><small>{filtered.length} {filtered.length===1?'registro':'registros'} na lista</small></div>
     <button type="button" onClick={load} disabled={loading||busy}>Atualizar</button>
    </div>
    <div className="ti-leave-v4-filters" role="group" aria-label="Filtrar solicitações">
-    {[['pending','Pendentes'],['past','Datas passadas'],['all','Todas'],['approved','Aprovadas'],['rejected','Recusadas']].map(([key,label])=><button type="button" key={key} className={filter===key?'selected':''} aria-pressed={filter===key} onClick={()=>{setFilter(key);setReviewId(null)}}>{label}</button>)}
+    {[['pending','Pendentes'],['past','Datas passadas'+(requests.some(overdue)?' · '+requests.filter(overdue).length:'')],['all','Todas'],['approved','Aprovadas'],['rejected','Recusadas']].map(([key,label])=><button type="button" key={key} className={filter===key?'selected':''} aria-pressed={filter===key} onClick={()=>{setFilter(key);setReviewId(null)}}>{label}</button>)}
    </div>
    {loading?<p role="status">Carregando solicitações...</p>:filtered.length===0?<p className="ti-leave-v4-empty">Nenhuma solicitação neste filtro.</p>:<div className="ti-leave-v4-list">{filtered.map(x=><article className="ti-leave-v4-item" key={x.id}>
     <div className="ti-leave-v4-item-head"><div><strong>{dateLabel(x.date)}</strong><span className={'ti-leave-v4-status '+(x.status||'')}>{overdue(x)?'Data passada · sem decisão':statuses[x.status]||x.status}</span></div>
     {manager&&x.status==='pending'&&<button type="button" disabled={busy} aria-expanded={reviewId===x.id} onClick={()=>setReviewId(v=>v===x.id?null:x.id)}>{reviewId===x.id?'Fechar revisão':'Revisar pedido'}</button>}</div>
-    {overdue(x)&&<p role="status">A data solicitada já passou. O pedido permanece registrado e precisa de encerramento pela gestão; ele não altera a escala.</p>}<p>{x.reason}</p>
+    <p>{x.reason}</p>
     {x.note&&<small className="ti-leave-v4-note">Decisão: {x.note}</small>}
     {manager&&reviewId===x.id&&x.status==='pending'&&<div className="ti-leave-v4-review">
      <label>Justificativa da decisão<textarea rows={3} maxLength={400} minLength={8} value={notes[x.id]||''} onChange={e=>setNotes(n=>({...n,[x.id]:e.target.value}))} placeholder="Registre o motivo da decisão"/></label>
      <div className="ti-leave-v4-actions"><button type="button" disabled={busy||overdue(x)||(notes[x.id]||'').trim().length<8} onClick={()=>decide(x.id,'approved')}>Aprovar</button><button type="button" disabled={busy||(notes[x.id]||'').trim().length<8} onClick={()=>decide(x.id,'rejected')}>{overdue(x)?'Encerrar sem aprovação':'Recusar'}</button></div>
-     <small>A decisão não altera a escala automaticamente.</small>
+     <small>{overdue(x)?'A data passou. Encerre o pedido para registrar a decisão. A escala permanece como publicada.':'A decisão não altera a escala automaticamente.'}</small>
     </div>}
    </article>)}</div>}
   </section>

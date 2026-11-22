@@ -1,3 +1,4 @@
+import {historyQuantity} from './operation-time.js';
 import {apiFetch} from './api-fetch.js';
 import TriamicciHistory from './TriamicciHistory.jsx';
 import React,{useEffect,useState} from 'react';
@@ -18,8 +19,9 @@ export default function KitchenV3History({products}){
   {error&&<p role="alert" className="v3-error">{error}</p>}
   <TriamicciHistory title="Histórico operacional" records={items} loading={loading}
    getTitle={op=>product(op.productId)} getDate={op=>op.at?((op.at._seconds??op.at.seconds)!==undefined?new Date((op.at._seconds??op.at.seconds)*1000):op.at):null}
-   getQuantity={op=>label[op.kind]||op.kind}
-   getDescription={op=>op.kind==='receipt'?'Entrada: '+(op.stockQuantity??'não medida')+' '+(op.stockUnit||''):op.kind==='count'?'Encontrado: '+op.quantity+' '+op.unit:op.kind==='transfer'?op.from+' → '+op.to+' · '+op.quantity+' '+op.unit:op.kind==='production'?'Produzido: '+op.outputQuantity+' '+op.outputUnit:''}
+   getBadge={op=>label[op.kind]||op.kind}
+   getQuantity={op=>historyQuantity(op.kind==='receipt'?op.stockQuantity:op.kind==='production'?op.outputQuantity:op.quantity,op.kind==='receipt'?op.stockUnit:op.kind==='production'?op.outputUnit:op.unit)}
+   getDescription={op=>op.kind==='transfer'?op.from+' → '+op.to:''}
    renderDetails={op=><div>Registro: {op.id} · {op.location||op.outputLocation||op.to||'Local não informado'}</div>}
    empty="Nenhuma movimentação registrada nesta consulta."/>
  </section>;

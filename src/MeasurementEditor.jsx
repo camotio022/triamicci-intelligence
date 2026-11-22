@@ -18,10 +18,10 @@ export default function MeasurementEditor({products}){
    const r=await request('save',{productId,expectedVersion:version,packages:payload,countingMethod,note});setVersion(r.version);setNotice(r.message)}
   catch(e){setError(e.message)}finally{setBusy(false)}
  };
- return <section className="receiving-card" style={{marginTop:18}}>
-  <h2>Apresentações e embalagens</h2>
-  <p>Configure como cada insumo chega à loja. Somente equivalências comprovadas serão aceitas. Este cadastro <strong>não modifica saldos, lotes ou históricos</strong>.</p>
-  <label>Produto<select value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Selecione um produto ativo</option>{products.filter(p=>p.status==='active').map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+ return <section className="ti-catalog-v41-pane ti-package-editor">
+  <h2>Embalagens e contagem</h2>
+  <label>Selecionar insumo<select value={productId} onChange={e=>setProductId(e.target.value)}><option value="">Selecione um insumo ativo</option>{products.filter(p=>p.status==='active').map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+  <p>Use equivalências conferidas. Os saldos e lotes são preservados.</p>
   {productId&&<form className="stock-action-form" onSubmit={submit}>
    <p>Versão da configuração: {version||'Ainda não cadastrada'}</p>
    {packages.map((p,i)=><fieldset key={i} style={{border:'1px solid #dedede',borderRadius:12,padding:14,display:'grid',gap:8}}>
