@@ -1,3 +1,17 @@
+export function previousProductionDay(day){
+ const date=new Date(day+'T00:00:00Z');
+ date.setUTCDate(date.getUTCDate()-1);
+ return date.toISOString().slice(0,10);
+}
+
+export async function readProductionTask(tx,unit,day,taskId){
+ if(!taskId)return null;
+ const days=unit.collection('productionDays');
+ const current=await tx.get(days.doc(day).collection('tasks').doc(taskId));
+ if(current.exists)return current;
+ return tx.get(days.doc(previousProductionDay(day)).collection('tasks').doc(taskId));
+}
+
 // Regra pura: tarefas só são concluídas por execução registrada e quantitativa.
 export function progressAfterProduction(task,actualQuantity){
  if(!task||!['pending','partial'].includes(task.status||'pending')||

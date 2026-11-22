@@ -6,7 +6,7 @@ import {sendQuotaError} from '../quota-error.js';
 import {signalUnitChange} from '../live-signal.js';
 import {isOperationalProduct} from '../operations/catalog-identity.js';
 import {countUnit,validQuantity} from '../operations/logic.js';
-import {progressAfterProduction} from './daily-task.js';
+import {progressAfterProduction,readProductionTask} from './daily-task.js';
 const round=x=>Math.round(x*1000)/1000;
 const manager=m=>MANAGEMENT_ROLES.includes(m?.role);
 const stamp=s=>s.updateTime?`${s.updateTime.seconds}:${s.updateTime.nanoseconds}`:null;
@@ -54,11 +54,14 @@ export default async function portioningHandler(req,res){
    }else{
     if(!status.ready)throw Error('REVIEW');
     const weight=round(portions*recipe.portionSize);if(!validQuantity(weight,{unit})||weight>status.unmarkedWeight)throw Error('INSUFFICIENT');
-    const today=restaurantDay(now),taskRef=taskId?root.collection('productionDays').doc(today).collection('tasks').doc(taskId):null,task=taskRef?await tx.get(taskRef):null;
-    if(taskRef&&(!task.exists||task.data().recipeId!==recipeId||!['pending','partial'].includes(task.data().status)))throw Error('TASK');
+    const task=await readProductionTask(tx,root,restaurantDay(now),taskId);
+    if(taskId&&(!task?.exists||task.data().recipeId!==recipeId||!['pending','partial'].includes(task.data().status)))throw Error('TASK');
     tx.set(sRef,{productId,location:area,unit,basis,weight:round(status.portionedWeight+weight),updatedAt:now,lastRunId:requestId},{merge:true});
     tx.create(recordRef,{recipeId,recipeName:recipe.name,recipeVersion:recipe.version,stockEffect:'portion_same_product',outputUnit:'porcao',portions,portionWeight:cfg.portionWeight,weightUnit:cfg.weightUnit,portionedWeight:weight,stockUnit:unit,productId,sourceArea:area,destinationArea:area,items:[],notes,actorUid:actor.uid,actorName:a.data().displayName||a.data().name||actor.name||actor.uid,payloadHash:hash,unitId:m.unitId,at:now});
-    if(taskRef)tx.update(taskRef,{...progressAfterProduction(task.data(),portions),productionRunId:requestId,completedBy:actor.uid});
+    if(task){
+     const progress=progressAfterProduction(task.data(),portions);
+     tx.update(task.ref,{...progress,...(progress.status==='completed'?{completedAt:now}:{}),productionRunId:requestId,completedBy:actor.uid});
+    }
    }
    signalUnitChange(tx,db,m.unitId,['production','stock']);tx.create(db.collection('auditLogs').doc(),{event:action==='reconcilePortioning'?'production.portioning_reviewed':'production.portioned',unitId:m.unitId,recipeId,operationId:requestId,actorUid:actor.uid,at:now});
   });

@@ -1,3 +1,4 @@
+import {previousProductionDay} from './daily-task.js';
 import {restaurantDay} from '../../shared/operation-day.js';
 import {createHash} from 'node:crypto';
 import {recipeAvailability,recipeProducts} from './readiness.js';
@@ -10,7 +11,7 @@ const recipePattern=/^[a-z0-9-]{3,64}$/;
 const datePattern=/^\d{4}-\d{2}-\d{2}$/;
 const formatDay=restaurantDay;
 import {canPlanProduction} from './planning-permissions.js';
-const view=d=>({id:d.id,recipeId:d.data().recipeId,recipeName:d.data().recipeName,unit:d.data().unit||'un',plannedQuantity:d.data().plannedQuantity??null,status:d.data().status||'pending',completedQuantity:d.data().completedQuantity??null,createdBy:d.data().createdBy,createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,completedAt:d.data().completedAt?.toDate?.()?.toISOString?.()||null});
+const view=(d,day)=>({id:d.id,day,recipeId:d.data().recipeId,recipeName:d.data().recipeName,unit:d.data().unit||'un',plannedQuantity:d.data().plannedQuantity??null,status:d.data().status||'pending',completedQuantity:d.data().completedQuantity??null,createdBy:d.data().createdBy,createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,completedAt:d.data().completedAt?.toDate?.()?.toISOString?.()||null});
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
@@ -18,12 +19,27 @@ export default async function handler(req,res){
   const actor=await authenticate(req),m=await membership(actor.uid);
   if(!m?.unitId)return send(res,403,'Sem acesso à produção desta unidade.');
   const db=getDb(),unit=db.collection('units').doc(m.unitId);
-  const {action,day=formatDay()}=req.body||{};
-  if(!datePattern.test(day)||day!==formatDay())return send(res,400,'A lista do dia deve corresponder à data atual da unidade.');
+  const today=formatDay();
+  const {action,day=today}=req.body||{};
+  if(!datePattern.test(day)||day!==today)return send(res,400,'A lista do dia deve corresponder à data atual da unidade.');
   const ref=unit.collection('productionDays').doc(day).collection('tasks');
   if(action==='dayList'){
-   const snap=await ref.orderBy('createdAt','asc').limit(100).get();
-   return send(res,200,'Lista de produção consultada.',{day,tasks:snap.docs.map(view),hasMore:snap.size===100});
+   const previousDay=previousProductionDay(day);
+   const previousTasks=unit.collection('productionDays').doc(previousDay).collection('tasks');
+   const [current,pending,completed]=await Promise.all([
+    ref.orderBy('createdAt','asc').limit(100).get(),
+    previousTasks.where('status','in',['pending','partial']).limit(100).get(),
+    previousTasks.where('completedAt','>=',new Date(day+'T00:00:00Z')).limit(100).get()
+   ]);
+   const carryover=[
+    ...pending.docs.map(d=>view(d,previousDay)),
+    ...completed.docs.map(d=>view(d,previousDay)).filter(task=>
+     task.status==='completed'&&task.completedAt&&formatDay(task.completedAt)===day)
+   ].sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')||a.id.localeCompare(b.id));
+   return send(res,200,'Lista de produção consultada.',{
+    day,tasks:[...carryover,...current.docs.map(d=>view(d,day))],
+    hasMore:[current,pending,completed].some(snapshot=>snapshot.size===100)
+   });
   }
   if(action==='dayImport'){
    if(!canPlanProduction(m.role))return send(res,403,'Sem permissão para planejar produção.');
