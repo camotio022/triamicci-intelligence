@@ -34,6 +34,7 @@ function rows(path){
   let d={name:'Synthetic',status:'open',at:timestamp,createdAt:timestamp,etaDate:'2026-11-10',unit:'kg',productId:id(1),productName:'Synthetic',actorName:'Synthetic',reserve:1,rotation:1,total:2,physicalQuantity:1,quantity:1};
   if(name==='physicalCounts'&&fallback)d={...d,at:{toDate:()=>new Date(1794283200000+i*1000),toMillis:()=>1794283200000+i*1000}};
   if(name==='products')d=product(i+1);
+  if(name==='tasks')d={...d,status:i<2?'pending':'completed',...(i<2?{}:{completedAt:timestamp})};
   if(name==='productionRecipes')d={...d,active:true,preparationConfig:{},lines:Array.from({length:6},(_,j)=>({productId:id((i*6+j)%56+1),quantity:1}))};
   if(name==='storageLinksV1')d={...d,productId:key,allowedStorageIds:['1']};
   return makeDoc(path+'/'+key,d);
@@ -47,7 +48,7 @@ class Ref{
  where(...args){return new Ref(this.path,this.isDoc,this.lim,[...this.filters,args])}
  async get(){
   if(this.isDoc){events.push({type:'LOOKUP',path:this.path,docs:1});return makeDoc(this.path,document(this.path))}
-  let docs=rows(this.path);for(const [k,op,v] of this.filters){if(op==='=='&&k==='productId')docs=docs.filter(d=>d.data()[k]===v);if(k==='__after')docs=docs.slice(docs.findIndex(d=>d.id===v)+1)}
+  let docs=rows(this.path);for(const [k,op,v] of this.filters){if(op==='=='&&k==='productId')docs=docs.filter(d=>d.data()[k]===v);if(op==='in')docs=docs.filter(d=>v.includes(d.data()[k]));if(op==='>='&&k==='completedAt')docs=docs.filter(d=>d.data()[k]?.toDate()>=v);if(k==='__after')docs=docs.slice(docs.findIndex(d=>d.id===v)+1)}
   docs=docs.slice(0,this.lim);events.push({type:'QUERY',path:this.path,docs:docs.length,minimumReads:Math.max(1,docs.length),limit:Number.isFinite(this.lim)?this.lim:null});return {docs,size:docs.length,empty:!docs.length};
  }
 }

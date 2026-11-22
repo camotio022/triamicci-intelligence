@@ -25,16 +25,20 @@ export default async function handler(req,res){
   const ref=unit.collection('productionDays').doc(day).collection('tasks');
   if(action==='dayList'){
    const previousDay=previousProductionDay(day);
-   const [current,previous]=await Promise.all([
+   const previousTasks=unit.collection('productionDays').doc(previousDay).collection('tasks');
+   const [current,pending,completed]=await Promise.all([
     ref.orderBy('createdAt','asc').limit(100).get(),
-    unit.collection('productionDays').doc(previousDay).collection('tasks').orderBy('createdAt','asc').limit(100).get()
+    previousTasks.where('status','in',['pending','partial']).limit(100).get(),
+    previousTasks.where('completedAt','>=',new Date(day+'T00:00:00Z')).limit(100).get()
    ]);
-   const carryover=previous.docs.map(d=>view(d,previousDay)).filter(task=>
-    task.status==='pending'||task.status==='partial'||
-    task.status==='completed'&&task.completedAt&&formatDay(task.completedAt)===day
-   );
+   const carryover=[
+    ...pending.docs.map(d=>view(d,previousDay)),
+    ...completed.docs.map(d=>view(d,previousDay)).filter(task=>
+     task.status==='completed'&&task.completedAt&&formatDay(task.completedAt)===day)
+   ].sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||'')||a.id.localeCompare(b.id));
    return send(res,200,'Lista de produção consultada.',{
-    day,tasks:[...carryover,...current.docs.map(d=>view(d,day))],hasMore:current.size===100||previous.size===100
+    day,tasks:[...carryover,...current.docs.map(d=>view(d,day))],
+    hasMore:[current,pending,completed].some(snapshot=>snapshot.size===100)
    });
   }
   if(action==='dayImport'){
