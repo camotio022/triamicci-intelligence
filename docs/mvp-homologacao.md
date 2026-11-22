@@ -17,6 +17,7 @@ O gerente e o operador devem conseguir fechar um dia de teste em uma unidade com
 - Frango cru e temperado com cadastros separados. Com peso de 500 g por porção, registrar 1,5 kg de frango preparado e conferir a baixa de 1,5 kg no cru e o crédito de 1,5 kg no preparado.
 - Tilápia. Informar consumo e rendimento efetivamente medidos. Conferir a baixa, a entrada do preparado e o lote.
 - Molho. Informar o rendimento final e verificar a baixa de cada ingrediente controlado.
+- Planejar uma tarefa em um dia e concluí-la no dia seguinte pelo telão. Conferir a tarefa original concluída e o histórico na data da execução.
 - Durante o planejamento, verificar que todos os saldos permanecem iguais. Reenviar uma confirmação com o mesmo identificador na suíte automatizada e verificar que a movimentação ocorreu uma única vez.
 
 ## Liberação

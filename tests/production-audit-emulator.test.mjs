@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,randomUUID} from 'node:crypto';
+import {restaurantDay} from '../shared/operation-day.js';
+import {previousProductionDay} from '../server/production/daily-task.js';
 import {checklistPhotoBase64} from './fixtures/checklist-photo.js';
 test('auditoria produção: unidades, dependências, transformação medida, lotes, idempotência, concorrência e isolamento',{timeout:90000},async()=>{
  const project='demo-triamicci-v31',{privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});
@@ -65,7 +67,23 @@ test('auditoria produção: unidades, dependências, transformação medida, lot
  assert.equal((await call(aux,'dayImport',{requestId:randomUUID(),items:[{recipeId:id,plannedQuantity:1.5}]})).http,400);
  assert.equal((await call(foreign,'dayImport',photoPayload)).http,404);
  assert.equal((await source.get()).data().total,stockBefore,'Importar foto não movimenta estoque');
- const runId=randomUUID(),payload={recipeId:id,requestId:runId,portions:5,items:[{productId:a,quantity:2}],outputLot:'ISCA-1',expiryDate:'2099-12-30'};
+ const today=restaurantDay(),yesterday=previousProductionDay(today);
+ const plannedRef=unit.collection('productionDays').doc(today).collection('tasks').doc(planned.taskId);
+ const previousTasks=unit.collection('productionDays').doc(yesterday).collection('tasks');
+ const yesterdayTask=previousTasks.doc(planned.taskId);
+ const oldTask=unit.collection('productionDays').doc(previousProductionDay(yesterday)).collection('tasks').doc();
+ const taskData=(await plannedRef.get()).data();
+ await yesterdayTask.set({...taskData,day:yesterday,createdAt:new Date(yesterday+'T12:00:00Z'),plannedQuantity:6,status:'partial',completedQuantity:1});
+ await plannedRef.delete();
+ await previousTasks.doc().set({...taskData,day:yesterday,status:'completed',completedAt:new Date(yesterday+'T12:00:00Z')});
+ await oldTask.set({...taskData,day:previousProductionDay(yesterday)});
+ const visibleBefore=(await call(manager,'dayList')).tasks;
+ assert.deepEqual(visibleBefore.map(task=>task.id),[planned.taskId,imported.taskIds[0]]);
+ assert.equal(visibleBefore[0].day,yesterday);
+ assert.equal(visibleBefore[0].completedQuantity,1);
+ const runId=randomUUID(),payload={recipeId:id,requestId:runId,taskId:planned.taskId,portions:5,items:[{productId:a,quantity:2}],outputLot:'ISCA-1',expiryDate:'2099-12-30'};
+ assert.equal((await call(aux,'finish',{...payload,taskId:oldTask.id})).http,409);
+
  assert.equal((await call(foreign,'finish',payload)).http,404,'Nenhum acesso ao estoque da outra unidade');
  assert.equal((await call(aux,'savePreparation',{id:'aux-block',configuration:config,activate:true})).http,403);
  assert.equal((await call(aux,'finish',{...payload,outputLot:''})).http,409);
@@ -75,11 +93,15 @@ test('auditoria produção: unidades, dependências, transformação medida, lot
  const result=await call(aux,'finish',payload);assert.equal(result.http,200,JSON.stringify(result));
  assert.equal((await source.get()).data().total,8,'Consumo medido de 2 kg, não 5 × 330 g');assert.equal((await target.get()).data().total,5);
  assert.equal((await unit.collection('physicalLots').doc(a).collection('lots').doc('raw').get()).data().reserva,8);
+ assert.equal((await yesterdayTask.get()).data().completedQuantity,6);
+ const completed=(await call(manager,'dayList')).tasks.find(task=>task.id===planned.taskId);
+ assert.equal(completed.status,'completed');
+ assert.equal(restaurantDay(completed.completedAt),today);
  const replay=await call(aux,'finish',payload);assert.equal(replay.duplicate,true);assert.equal((await target.get()).data().total,5);
  assert.equal((await call(aux,'finish',{...payload,portions:6})).http,409);
  const run=(await unit.collection('productionRuns').doc(runId).get()).data();assert.equal(run.items[0].quantity,2);assert.equal(run.items[0].lots[0].lot,'RECEBIDO');assert.equal(run.actorName,'auxiliar auditoria');
  // Duas execuções disputam a mesma matéria-prima: só uma pode consumir 5 kg.
- const race=await Promise.all([aux,manager].map(actor=>call(actor,'finish',{...payload,requestId:randomUUID(),items:[{productId:a,quantity:5}],portions:10})));
+ const race=await Promise.all([aux,manager].map(actor=>call(actor,'finish',{...payload,taskId:null,requestId:randomUUID(),items:[{productId:a,quantity:5}],portions:10})));
  assert.deepEqual(race.map(r=>r.http).sort(),[200,409]);assert.equal((await source.get()).data().total,3);assert.equal((await target.get()).data().total,15);
  // Cadastro permite ativar a ficha com saldo físico divergente; a execução continua impedida até conciliar.
  const molho=unit.collection('physicalBalances').doc(c);await molho.set({unit:'kg',reserve:0,rotation:0,total:0});
@@ -134,7 +156,6 @@ test('auditoria produção: unidades, dependências, transformação medida, lot
  const history=await call(manager,'list',{},stockHandler);assert.equal(history.counts[0].productName,'Tilápia');assert.equal(history.counts[0].actorName,'manager auditoria');assert.equal(history.transfers[0].actorName,undefined);assert.equal((await unit.collection('physicalCounts').doc('legacy').get()).data().productName,undefined);
  // Prorrogação é uma declaração explícita, auditada e idempotente; não fabrica saída.
  const {default:attendance}=await import('../server/workflows/attendance-v31.js');
- const {restaurantDay}=await import('../server/schedules/restaurant-today.js');
  assert.equal((await call(aux,'continue_work',{requestId:randomUUID()},attendance)).http,409,'Não abre jornada por prorrogação');
  const entry=await call(aux,'clock_in',{requestId:randomUUID()},attendance);assert.equal(entry.http,200);
  const extensionId=randomUUID();assert.equal((await call(aux,'continue_work',{requestId:extensionId},attendance)).http,200);

@@ -18,7 +18,7 @@ import {countUnit,validQuantity} from '../../server/operations/logic.js';
 import {areaTotals,allocateFEFO} from '../../server/operations/lot-logic.js';
 import {validProductionSelection} from '../../server/production/logic.js';
 import {transformationPreview} from '../../server/production/transformation.js';
-import {progressAfterProduction} from '../../server/production/daily-task.js';
+import {progressAfterProduction,readProductionTask} from '../../server/production/daily-task.js';
 import {createHash} from 'node:crypto';
 
 const productIdPattern=/^[a-f0-9]{40}$/;
@@ -120,9 +120,9 @@ export default async function handler(req,res){
    const recipeRef=recipes.doc(recipeId),actorRef=db.doc('memberships/'+actor.uid);
    const productRefs=items.map(i=>unit.collection('products').doc(i.productId));
    const balanceRefs=items.map(i=>unit.collection('physicalBalances').doc(i.productId));
-   const today=restaurantDay(new Date());
-   const taskRef=taskId?unit.collection('productionDays').doc(today).collection('tasks').doc(taskId):null;
-   const [a,recipe,existing,task,...docs]=await Promise.all([tx.get(actorRef),tx.get(recipeRef),tx.get(ref),taskRef?tx.get(taskRef):Promise.resolve(null),
+   const now=new Date();
+   const today=restaurantDay(now);
+   const [a,recipe,existing,task,...docs]=await Promise.all([tx.get(actorRef),tx.get(recipeRef),tx.get(ref),readProductionTask(tx,unit,today,taskId),
     ...productRefs.map(p=>tx.get(p)),...balanceRefs.map(b=>tx.get(b))]);
    if(!a.exists||a.data().status!=='active'||a.data().unitId!==member.unitId||
      !['admin','manager','submanager','cook','auxiliar'].includes(a.data().role))throw Error('FORBIDDEN');
@@ -131,7 +131,7 @@ export default async function handler(req,res){
     duplicate=true;return;
    }
    if(!recipe.exists||recipe.data().active!==true)throw Error('RECIPE_NOT_FOUND');
-   if(taskRef&&(!task?.exists||task.data().recipeId!==recipeId||!['pending','partial'].includes(task.data().status)))throw Error('TASK_NOT_PENDING');
+   if(taskId&&(!task?.exists||task.data().recipeId!==recipeId||!['pending','partial'].includes(task.data().status)))throw Error('TASK_NOT_PENDING');
    if(recipe.data().stockEffect==='portion_same_product')throw Error('INVALID_TRANSFORMATION');
    const recipeData=recipe.data(),productDocs=docs.slice(0,items.length),balanceDocs=docs.slice(items.length);
    const transformed=Boolean(recipeData.outputProductId);
@@ -202,7 +202,6 @@ export default async function handler(req,res){
      unit:physicalUnit,location:sourceArea,substituted:!recipeData.lines.some(l=>l.productId===item.productId),
      lots:allocations});
    }
-   const now=new Date();
    for(const x of lotUpdates)tx.update(x.ref,x.data);
    for(const x of updates)tx.update(x.ref,x.data);
    if(transformed){const b=outputBalanceDoc.data()||{reserve:0,rotation:0,total:0};tx.set(outputBalanceRef,{productId:recipeData.outputProductId,unit:outputUnit,rotation:b.rotation,reserve:round(b.reserve+portions),total:round(b.total+portions),...(Number.isFinite(b.countedTotal)?{entriesSinceCount:round((b.entriesSinceCount||0)+portions)}:{}),lastProductionId:requestId,lastMovementAt:now},{merge:true});}
@@ -212,8 +211,8 @@ export default async function handler(req,res){
     actorName:a.data().displayName||a.data().name||actor.name||actor.email||actor.uid,
     unitId:member.unitId,at:now};
    tx.create(ref,record);
-   if(taskRef){const progress=progressAfterProduction(task.data(),portions);
-    tx.update(taskRef,{...progress,...(progress.status==='completed'?{completedAt:now}:{}),completedBy:actor.uid,productionRunId:requestId});}
+   if(task){const progress=progressAfterProduction(task.data(),portions);
+    tx.update(task.ref,{...progress,...(progress.status==='completed'?{completedAt:now}:{}),completedBy:actor.uid,productionRunId:requestId});}
    signalUnitChange(tx,db,member.unitId,['production', 'stock']);
    tx.create(db.collection('auditLogs').doc(),{event:'production.finished',unitId:member.unitId,
     operationId:requestId,actorUid:actor.uid,at:now,details:record});

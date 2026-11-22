@@ -1,3 +1,5 @@
+import {restaurantDay} from '../shared/operation-day.js';
+import {previousProductionDay} from '../server/production/daily-task.js';
 import test from 'node:test';import assert from 'node:assert/strict';import {generateKeyPairSync,randomUUID} from 'node:crypto';
 test('preparações: rascunho, ativação, concorrência, permissões e transformação sem consumo presumido',{timeout:90000},async()=>{
  const project='demo-triamicci-v31',{privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});Object.assign(process.env,{APP_ENV:'staging',PUBLIC_APP_URL:'https://triamicci-e2e.test',FIREBASE_EXPECTED_PROJECT_ID:project,FIRESTORE_EMULATOR_HOST:'127.0.0.1:8080',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099',FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({project_id:project,client_email:'preparation@'+project+'.iam.gserviceaccount.com',private_key:privateKey.export({type:'pkcs8',format:'pem'}).toString()})});
@@ -23,11 +25,18 @@ test('preparações: rascunho, ativação, concorrência, permissões e transfor
  assert.equal((await call(manager,'savePreparation',{id:sameId,configuration:same,activate:true})).http,200);
  const countGuide=await call(manager,'preparationCountGuide',{productId:a});assert.equal(countGuide.http,200);assert.equal(countGuide.guides.some(g=>g.id===sameId&&g.portionSize===.5&&g.stockUnit==='kg'&&g.countMode==='both'),true);
  assert.equal((await call(aux,'preparationCountGuide',{productId:a})).http,403);
+ const yesterday=previousProductionDay(restaurantDay());
+ const previousTask=root.collection('productionDays').doc(yesterday).collection('tasks').doc();
+ await previousTask.set({recipeId:sameId,recipeName:same.name,unit:'porcao',status:'pending',plannedQuantity:10,createdAt:new Date(yesterday+'T12:00:00Z')});
  const before=(await balance.get()).data();const runId=randomUUID();
- const portioned=await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,portions:10});assert.equal(portioned.http,200,JSON.stringify(portioned));assert.deepEqual((await balance.get()).data(),before,'Porcionamento não altera saldos físicos');
+ const portioned=await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,taskId:previousTask.id,portions:10});assert.equal(portioned.http,200,JSON.stringify(portioned));assert.deepEqual((await balance.get()).data(),before,'Porcionamento não altera saldos físicos');
+ const carried=(await call(manager,'dayList')).tasks.find(task=>task.id===previousTask.id);
+ assert.equal(carried.status,'completed');
+ assert.equal(carried.day,yesterday);
+ assert.equal(restaurantDay(carried.completedAt),restaurantDay());
  const status=await call(aux,'portionStatus',{recipeId:sameId});assert.equal(status.portionedWeight,5);assert.equal(status.unmarkedWeight,4);assert.equal(status.total,9);
- const replay=await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,portions:10});assert.equal(replay.http,200);assert.equal(replay.duplicate,true);
- assert.equal((await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,portions:9})).http,409);
+ const replay=await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,taskId:previousTask.id,portions:10});assert.equal(replay.http,200);assert.equal(replay.duplicate,true);
+ assert.equal((await call(aux,'finishPortioning',{recipeId:sameId,requestId:runId,taskId:previousTask.id,portions:9})).http,409);
  assert.equal((await call(aux,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:10})).http,409,'Não porciona novamente o peso já marcado');
  const concurrent=await Promise.all([call(aux,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:6}),call(manager,'finishPortioning',{recipeId:sameId,requestId:randomUUID(),portions:6})]);assert.deepEqual(concurrent.map(x=>x.http).sort(),[200,409]);assert.deepEqual((await balance.get()).data(),before);
  await balance.update({reserve:10,total:10});const changed=await call(aux,'portionStatus',{recipeId:sameId});assert.equal(changed.ready,false,'Mudança externa exige conferência da gestão');

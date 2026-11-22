@@ -40,6 +40,7 @@ export default function Production({membership,initialTaskId}){
  const [confirmed,setConfirmed]=useState(false);
  const [dailyTasks,setDailyTasks]=useState([]),[plannedRecipe,setPlannedRecipe]=useState(''),[plannedQuantity,setPlannedQuantity]=useState(''),[activeTaskId,setActiveTaskId]=useState(null),[taskLoading,setTaskLoading]=useState(false);
  const [showPlanner,setShowPlanner]=useState(false),[showExecution,setShowExecution]=useState(false),[showPhotoImport,setShowPhotoImport]=useState(false);
+ const today=restaurantDay();
  const admin=MANAGEMENT_ROLES.includes(membership.role);
  const canPlan=canPlanProduction(membership.role);
  const loadTasks=useCallback(async()=>{try{const r=await call('/api/production/manage','dayList');setDailyTasks(r.tasks||[]);return true;}catch(e){setStatus(e.message);return false}},[notify,membership?.unitId]);
@@ -143,7 +144,7 @@ export default function Production({membership,initialTaskId}){
     return <li key={task.id} className={'ti-production-check-card'+(done?' is-complete':'')}>
      <span className={'ti-production-check-icon'+(done?' is-complete':'')} aria-hidden="true">{done?<CheckCircle2 size={22}/>:<Clock3 size={20}/>}</span>
      <div className="ti-production-check-info"><div className="ti-production-card-heading"><strong>{task.recipeName}</strong><span className={'ti-production-task-status'+(done?' is-done':'')}>{done?'Concluída':partial?'Em andamento':'Pendente'}</span></div>
-     <small>{goal>0?Math.min(completed,goal)+' de '+goal+' '+(task.unit||'un')+' produzidas':completed+' '+(task.unit||'un')+' registradas · meta livre'}</small>
+     <small>{task.day&&task.day<today?'Planejada ontem · ':''}{goal>0?Math.min(completed,goal)+' de '+goal+' '+(task.unit||'un')+' produzidas':completed+' '+(task.unit||'un')+' registradas · meta livre'}</small>
      {progress!==null&&<><div className="ti-production-progress" role="progressbar" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100" aria-label={'Progresso de '+task.recipeName}><span style={{width:progress+'%'}}/></div><small className="ti-production-progress-detail">{done?'Meta concluída':Math.max(0,goal-completed)+' '+(task.unit||'un')+' restantes'} · {progress}%</small></>}
      </div>
      {done?<span className="ti-v4-task-done"><CheckCircle2 size={14}/> Feito</span>:<button type="button" disabled={!available} title={!available?'Preparação indisponível; solicite revisão à gestão':undefined} onClick={()=>openExecution(task)}>{available?(partial?'Continuar produção':'Registrar produção'):'Indisponível'}</button>}
@@ -151,10 +152,10 @@ export default function Production({membership,initialTaskId}){
    {recipes.length>0&&<div className="ti-production-unplanned"><span>Preparou algo fora do planejamento?</span><button type="button" onClick={openUnplanned}><PlayCircle size={16}/> Registrar produção não planejada</button></div>}
   </section>}
   <div className="production-layout ti-v4-production-layout">
-   {view==='today'&&showExecution&&<section className="receiving-card ti-production-execution" aria-label="Registrar produção"><div className="ti-production-execution-head"><h2><ClipboardList size={19} aria-hidden="true"/> Registrar produção</h2><button type="button" onClick={()=>{setShowExecution(false);choose('');}}><X size={17}/> Fechar</button></div><p>{activeTaskId?'Registro vinculado à tarefa de hoje.':'Registro avulso, sem necessidade de planejamento anterior.'} Confirme somente as quantidades realmente preparadas.</p>
+   {view==='today'&&showExecution&&<section className="receiving-card ti-production-execution" aria-label="Registrar produção"><div className="ti-production-execution-head"><h2><ClipboardList size={19} aria-hidden="true"/> Registrar produção</h2><button type="button" onClick={()=>{setShowExecution(false);choose('');}}><X size={17}/> Fechar</button></div><p>{activeTaskId?'Registro vinculado à tarefa planejada.':'Registro avulso, sem necessidade de planejamento anterior.'} Confirme somente as quantidades realmente preparadas.</p>
     {executionError&&<p className="v3-error ti-form-error" role="alert">{executionError}</p>}
-    {selected?.stockEffect==='portion_same_product'?<><label>Preparação<select aria-label="Preparação para registrar produção" value={recipeId} onChange={e=>choose(e.target.value)}><option value="">Selecione a preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><SameProductPortioning key={membership.unitId+recipeId+(activeTaskId||'')} taskId={activeTaskId} recipe={selected} call={call} management={admin} onSaved={async message=>{setStatus(message);notify(message,'success');setShowExecution(false);choose('');await Promise.all([load(true),loadTasks()])}}/></>:<form className="stock-action-form" onSubmit={finish} onChange={()=>setExecutionError('')}>
-     <label>Preparação<select aria-label="Preparação para registrar produção" required value={recipeId} onChange={e=>choose(e.target.value)}>
+    {selected?.stockEffect==='portion_same_product'?<><label>Preparação<select aria-label="Preparação para registrar produção" disabled={Boolean(activeTaskId)} value={recipeId} onChange={e=>choose(e.target.value)}><option value="">Selecione a preparação</option>{recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><SameProductPortioning key={membership.unitId+recipeId+(activeTaskId||'')} taskId={activeTaskId} recipe={selected} call={call} management={admin} onSaved={async message=>{setStatus(message);notify(message,'success');setShowExecution(false);choose('');await Promise.all([load(true),loadTasks()])}}/></>:<form className="stock-action-form" onSubmit={finish} onChange={()=>setExecutionError('')}>
+     <label>Preparação<select aria-label="Preparação para registrar produção" required disabled={Boolean(activeTaskId)} value={recipeId} onChange={e=>choose(e.target.value)}>
       <option value="">Selecione a preparação</option>
       {recipes.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
      </select></label>
