@@ -130,7 +130,7 @@ export default function OperationalAI(){
  const filteredThreads=threads.filter(t=>(t.title||'').toLocaleLowerCase('pt-BR').includes(historySearch.toLocaleLowerCase('pt-BR')));
  return <section className="ti-ai-page" style={viewportHeight?{'--ti-ai-viewport-height':viewportHeight+'px'}:undefined} aria-label="Assistente operacional">
   <header className="ti-ai-head">
-   <div className="ti-ai-heading"><span className="ti-ai-symbol"><Bot size={21}/></span><div><h1>Assistente Triamicci</h1><p>Inteligência operacional</p></div></div>
+   <div className="ti-ai-heading"><span className="ti-ai-symbol"><Bot size={21}/></span><div><h1>Assistente Triamicci</h1></div></div>
    <div className="ti-ai-heading-actions">
     {v1DraftUi&&<button type="button" className="ti-ai-icon-button" onClick={openDrafts} aria-label="Abrir rascunhos privados" disabled={pending}><FileText size={20}/></button>}
     <button ref={historyTriggerRef} type="button" className="ti-ai-icon-button" onClick={()=>setShowHistory(true)} aria-label="Abrir histórico de conversas" aria-haspopup="dialog" disabled={pending}><History size={21}/></button>
