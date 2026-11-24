@@ -113,7 +113,7 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
  const recurring = (policy.recurring || []).flatMap(rule=>{
   const absent=active.find(person=>person.uid===rule.absentId), cover=active.find(person=>person.uid===rule.coverId);
   if(!absent||!offTypes.has(typeOf(absent)))return [];
-  return [{uid:rule.coverId,forUid:rule.absentId,paid:rule.paid===true,available:Boolean(cover&&typeOf(cover)==='work'&&inSector(cover,profile(absent).sector)&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector===profile(absent).sector)?.coverageWindow)),name:cover?name(cover):'Pessoa indisponível',sector:profile(absent).sector,shift:profile(absent).shift}];
+  return [{uid:rule.coverId,forUid:rule.absentId,paid:rule.paid??null,available:Boolean(cover&&typeOf(cover)==='work'&&inSector(cover,profile(absent).sector)&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector===profile(absent).sector)?.coverageWindow)),name:cover?name(cover):'Pessoa indisponível',sector:profile(absent).sector,shift:profile(absent).shift}];
  });
  const managers=active.filter(management);
  const manager=managers.filter(person=>title(person)==='manager'), deputy=managers.filter(person=>title(person)==='submanager');
@@ -215,7 +215,7 @@ export function validOperationalPolicy(policy){
   [null,true,false].includes(policy.countManagement)&&[null,true,false].includes(policy.managementPaid)&&
   (policy.frontWeekdayMinimum===null||Number.isInteger(policy.frontWeekdayMinimum)&&policy.frontWeekdayMinimum>=1&&policy.frontWeekdayMinimum<=30)&&
   Array.isArray(policy.recurring)&&policy.recurring.length<=60&&policy.recurring.every(item=>item&&
-   [item.absentId,item.coverId].every(id=>typeof id==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(id))&&item.absentId!==item.coverId&&typeof item.paid==='boolean');
+   [item.absentId,item.coverId].every(id=>typeof id==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(id))&&item.absentId!==item.coverId&&[null,true,false].includes(item.paid));
 }
 
 export function forecastPaymentDate(date,payroll) {
