@@ -199,7 +199,7 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
      {activePlans.map(item=><option value={item.id} key={item.id}>{item.title} · {item.period}</option>)}</select></label>}
    </div>
   </div>
-  <CoverageMonth plan={plan} request={request} today={today} selected={date} choose={choose}
+  <CoverageMonth shift={shift} sector={sector} plan={plan} request={request} today={today} selected={date} choose={choose}
    alerts={data?.alerts} proposals={data?.proposals} onOpenAlert={item=>{alertFocus.current=item.sector+':'+item.shift;choose(item.date,item.shift,item.sector);if(current?.date===item.date){setOpened(alertFocus.current);alertFocus.current=null;}}}/>
   {!activeId&&<p className="panel ti-cov-feedback" role="status">{data?'Nenhuma escala disponível para avaliar.':'Carregando a escala…'}</p>}
   {loading&&<p className="panel ti-cov-feedback" role="status">Conferindo o turno…</p>}
