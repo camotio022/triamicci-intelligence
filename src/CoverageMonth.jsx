@@ -16,8 +16,16 @@ export default function CoverageMonth({plan,request,selected,choose,today,alerts
  },[id,version,request,attempt,alerts,proposals]);
  if(!plan)return null;
  const month=state&&state.id===id?state.month:null;
+ const matchesScope=item=>(shift==='todos'||item.shift===shift)&&(sector==='todos'||item.sector===sector);
+ const feeCounts=items=>{
+  const keys=rows=>new Set(rows.map(item=>item.uid+'|'+item.shift));
+  const confirmed=keys(items.filter(item=>item.available&&item.paid===true));
+  const pending=keys(items.filter(item=>!item.available&&item.paid===true&&!confirmed.has(item.uid+'|'+item.shift)));
+  const unknown=keys(items.filter(item=>item.paid==null&&!confirmed.has(item.uid+'|'+item.shift)&&!pending.has(item.uid+'|'+item.shift)));
+  return {recurringFees:confirmed.size,recurringPendingFees:pending.size,recurringUnknownFees:unknown.size};
+ };
  const fixed=new Map();
- for(const day of month?.days||[])for(const item of day.recurring){
+ for(const day of month?.days||[])for(const item of day.recurring.filter(matchesScope)){
   const key=[item.uid,item.forUid,item.shift,item.sector].join(':');
   const fallback={...item,days:[],pending:0};
   const group=fixed.get(key)||fallback;
@@ -25,13 +33,15 @@ export default function CoverageMonth({plan,request,selected,choose,today,alerts
   fixed.set(key,group);
  }
  const scoped=(month?.days||[]).map(day=>{
-  const shifts=day.shifts.filter(row=>(shift==='todos'||row.shift===shift)&&(sector==='todos'||row.sector===sector));
-  return {...day,shifts,attention:shifts.some(row=>row.attention)};
+  const shifts=day.shifts.filter(matchesScope);
+  const recurring=day.recurring.filter(matchesScope);
+  return {...day,...feeCounts(recurring),recurring,shifts,attention:shifts.some(row=>row.attention)};
  });
  const dates=scoped.filter(day=>mode==='all'||(mode==='sundays'?day.sunday:day.attention));
  const upcoming=scoped.filter(day=>day.date>=today);
  const confirmed=upcoming.filter(day=>day.shifts.some(row=>row.confirmedDeficit)).length;
  const uncertain=upcoming.filter(day=>day.shifts.some(row=>row.uncertain)).length;
+ const totalFees=key=>upcoming.reduce((n,day)=>n+day[key],0);
  const extra=upcoming.reduce((n,day)=>n+day.shifts.reduce((sum,row)=>sum+row.extra,0),0);
  return <section className="ti-coverage-month" aria-label="Cobertura do mês">
   <div className="board-heading"><div><h2>Visão do mês · {plan.period.split('-').reverse().join('/')}</h2><p>{plan.status==='published'?'Escala publicada':'Escala em preparação'}</p></div>
@@ -39,9 +49,9 @@ export default function CoverageMonth({plan,request,selected,choose,today,alerts
   </div>
   {error?<p role="alert">{error} <button type="button" className="action quiet" onClick={()=>retry(value=>value+1)}>Tentar novamente</button></p>:
    !month?<p role="status" className="panel ti-cov-feedback">Conferindo os turnos do mês…</p>:<>
-    <div className="panel roster-impact"><div><strong>{confirmed}</strong> dias com déficit confirmado a partir de hoje · <strong>{uncertain}</strong> com dados pendentes <span>·</span> <strong>{month.recurringFees}</strong> taxas fixas confirmadas na projeção mensal · <strong>{month.recurringPendingFees??0}</strong> pendentes · <strong>{month.recurringUnknownFees??0}</strong> com remuneração a definir <span>·</span> {month.extra===null?'Extras a estimar após completar a escala':<><strong>{extra}</strong> vagas estimadas futuras (não são taxas)</>}</div></div>
-    {alerts?.some(item=>item.planId===id)&&<div className="panel ti-cov-month-alerts"><h3>Alertas da gestão</h3>
-     {alerts.filter(item=>item.planId===id).slice(0,5).map(item=><button key={item.id} className="action quiet" type="button" onClick={()=>onOpenAlert(item)}>
+    <div className="panel roster-impact"><div><strong>{confirmed}</strong> dias com déficit confirmado a partir de hoje · <strong>{uncertain}</strong> com dados pendentes <span>·</span> <strong>{totalFees('recurringFees')}</strong> taxas fixas confirmadas na previsão futura · <strong>{totalFees('recurringPendingFees')}</strong> pendentes · <strong>{totalFees('recurringUnknownFees')}</strong> com remuneração a definir <span>·</span> {month.extra===null?'Extras a estimar após completar a escala':<><strong>{extra}</strong> vagas estimadas futuras (não são taxas)</>}</div></div>
+    {alerts?.some(item=>item.planId===id&&matchesScope(item))&&<div className="panel ti-cov-month-alerts"><h3>Alertas da gestão</h3>
+     {alerts.filter(item=>item.planId===id&&matchesScope(item)).slice(0,5).map(item=><button key={item.id} className="action quiet" type="button" onClick={()=>onOpenAlert(item)}>
       {short(item.date)} · {labels[item.shift]} · {labels[item.sector]} · {item.reason}
      </button>)}
     </div>}
