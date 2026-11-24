@@ -14,7 +14,13 @@ export function validSubscription(value){
 export function allowedRecipient(member,unitId,audience){
  return member?.status==='active'&&member.unitId===unitId&&(audience!=='managers'||MANAGEMENT_ROLES.includes(member.role));
 }
-export function noticeUrl(page,unitId){
- const safe=['my-profile','my-coverage','leave-requests','people','kitchen-v3','mural','receiving'];
- return '/?'+new URLSearchParams({page:safe.includes(page)?page:'my-profile',pushUnit:unitId});
+export function noticeUrl(page,unitId,coverage){
+ const safe=['my-profile','my-coverage','leave-requests','people','kitchen-v3','mural','receiving','coverage'];
+ const params=new URLSearchParams({page:safe.includes(page)?page:'my-profile',pushUnit:unitId});
+ if(page==='coverage'&&coverage){
+  for(const [key,value] of Object.entries({plan:coverage.planId,date:coverage.date,shift:coverage.shift,sector:coverage.sector})){
+   if(typeof value==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(value))params.set(key,value);
+  }
+ }
+ return '/?'+params;
 }

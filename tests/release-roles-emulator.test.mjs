@@ -161,6 +161,33 @@ test('entrega: rotina e fronteiras dos cinco perfis, folgas, cobertura e revoga�
  assert.equal(settled.fee.dueDate,day);
  assert.equal(settled.paidDate,day);
  assert.equal(settled.consentEvidence,undefined);
+ // Assess an entire month and raise a deduplicated alert for a published absence.
+ const published=unit.collection('schedules').doc(randomUUID());
+ const entries=[{date:coverDay,uid:people.cook.uid,type:'work'}];
+ await published.set({title:'Publicada de teste',period:coverDay.slice(0,7),status:'published',revision:1,entries});
+ const lock=unit.collection('schedulePublicationState').doc(coverDay.slice(0,7));
+ await lock.set({activeId:published.id});
+ const periodReport=await expect(coverage,manager,'assessMonth',{planId:published.id},200);
+ assert.equal(periodReport.month.complete,true);
+ assert.equal(periodReport.month.days.some(item=>item.date===coverDay&&item.attention),true);
+ await expect(coverage,people.cook,'assessMonth',{planId:published.id},403);
+ const absence={planId:published.id,date:coverDay,staffId:people.cook.uid,reason:'TESTE indisponibilidade de cobertura'};
+ await expect(schedules,people.cook,'recordPublishedAbsence',absence,403);
+ await expect(schedules,manager,'recordPublishedAbsence',absence,200);
+ await expect(schedules,manager,'recordPublishedAbsence',absence,200);
+ assert.deepEqual((await published.get()).data().entries,entries);
+ const coverageAlert=await unit.collection('coverageAlerts').doc([published.id,coverDay,'noite','cozinha'].join('_')).get();
+ assert.equal(coverageAlert.data().status,'open');
+ const outbox=await unit.collection('pushOutbox').doc('coverage_alert_absence_'+people.cook.uid+'_'+coverDay).get();
+ assert.deepEqual(outbox.data().coverage,{planId:published.id,date:coverDay,shift:'noite',sector:'cozinha'});
+ assert.equal(outbox.data().audience,'managers');
+ await expect(schedules,people.cook,'withdrawPublication',{id:published.id,reason:'TESTE retirada da publicação'},403);
+ await expect(schedules,manager,'withdrawPublication',{id:published.id,reason:'TESTE retirada da publicação'},200);
+ assert.equal((await lock.get()).data().activeId,null);
+ assert.equal((await published.get()).data().status,'withdrawn');
+ assert.equal((await coverageAlert.ref.get()).data().status,'resolved');
+ assert.equal((await expect(schedules,people.cook,'mine',{},200)).schedules.some(item=>item.id===published.id),false);
+ await expect(coverage,manager,'assessMonth',{planId:published.id},404);
  const expiredId=randomUUID();await unit.collection('coverageProposals').doc(expiredId).set({staffId:people.auxiliar.uid,date:'2020-01-01',status:'pending_acceptance',createdBy:manager.uid});
  await expect(coverage,people.auxiliar,'respond',{id:expiredId,decision:'accepted'},409);
  // Pendência antiga continua visível mesmo fora da primeira página do histórico.

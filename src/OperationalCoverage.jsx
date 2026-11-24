@@ -1,6 +1,7 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {reviewCoverageAssignment,wholeTurnAssignment} from '../server/coverage/operational.js';
 import './roster-board.css';
+import CoverageMonth from './CoverageMonth.jsx';
 import {coverageCardId,coverageColumns,moveCoverageCard,projectCoverage} from './coverage-board-state.js';
 import {monthDates} from '../server/schedules/rules.js';
 import {restaurantDay} from '../shared/operation-day.js';
@@ -28,12 +29,13 @@ const problems=(row,impact)=>[
  impact.skillGap?'Montagem em atenção':'',
 ].filter(Boolean).join(' · ') || (impact.open?'Cobertura a confirmar':'Equipe suficiente');
 
-function CoverageDrawer({card,data,date,plan,request,run,busy,selected,setSelected,close,renderProposal}){
+function CoverageDrawer({card,data,date,plan,request,run,busy,selected,setSelected,close,renderProposal,onRecordAbsence}){
  const {row,matches,impact,intervals,recurring}=card;
  const panel=useRef(null);
  const [failure,setFailure]=useState(false);
  const [note,setNote]=useState(problems(row,impact).length>=10?problems(row,impact):'Reforço para o turno');
  const [coveredStart,setCoveredStart]=useState(false);
+ const [absent,setAbsent]=useState(''),[absenceReason,setAbsenceReason]=useState('');
  const person=row.candidates.find(candidate=>candidate.uid===selected);
  const assignment=person&&options(row,person).available?options(row,person).assignment:null;
  const preview=person&&assignment&&projectCoverage(row,matches,intervals,recurring,person);
@@ -48,6 +50,16 @@ function CoverageDrawer({card,data,date,plan,request,run,busy,selected,setSelect
    <ul className="ti-cov-team">{row.people.map(item=><li key={item.uid}><strong>{candidateName(item)}</strong><small>{hours(item.hours)}</small></li>)}</ul>
    {!row.people.length&&<p>Ninguém confirmado na escala.</p>}
    {row.uncertain&&<p className="ti-cov-coverage-why">{!row.window?'Confira a jornada cadastrada para este turno.':row.minimum==null?'Defina o mínimo da frente nas configurações.':'Confira os horários da equipe e se a gestão conta no mínimo da frente.'}</p>}
+   {onRecordAbsence&&date>=restaurantDay()&&plan.status==='published'&&row.people.length>0&&<details>
+    <summary>Registrar indisponibilidade</summary>
+    <form className="ti-cov-policy" onSubmit={async event=>{event.preventDefault();const result=await onRecordAbsence({planId:plan.id,date,staffId:absent,reason:absenceReason.trim()});setFailure(!result);}}>
+     <label>Pessoa escalada<select required value={absent} onChange={event=>setAbsent(event.target.value)}>
+      <option value="">Selecione</option>{row.people.map(item=><option key={item.uid} value={item.uid}>{item.name}</option>)}
+     </select></label>
+     <label>Motivo<textarea required maxLength={400} minLength={8} value={absenceReason} onChange={event=>setAbsenceReason(event.target.value)}/></label>
+     <button type="submit" disabled={busy||!absent||absenceReason.trim().length<8}>Registrar e reavaliar</button>
+    </form>
+   </details>}
    {recurring.filter(item=>item.available&&item.paid===false).map(item=><p key={item.uid+item.forUid}>{item.name} · cobertura fixa sem taxa</p>)}
    {intervals.map((item,i)=><p key={i}>{item.skill||item.sector} · {item.start}–{item.end} · {item.covered}/{item.minimum}</p>)}
   </section>
@@ -73,19 +85,20 @@ function CoverageDrawer({card,data,date,plan,request,run,busy,selected,setSelect
      setFailure(!response);
      if(response){setSelected('');setCoveredStart(false);}
     }}>Enviar convite</button>
-    {failure&&<p role="alert">O convite não foi enviado. Feche o painel para ver o motivo.</p>}
+
    </div>}
   </section>}
+  {failure&&<p role="alert">A ação não foi concluída. Feche o painel para ver o motivo.</p>}
  </dialog>;
 }
 
-export default function OperationalCoverage({data,request,run,busy,focus,preferenceKey,renderProposal}){
+export default function OperationalCoverage({data,request,run,busy,focus,preferenceKey,renderProposal,recordAbsence}){
  const [planId,setPlanId]=useState(focus?.planId||'');
  const [chosenDate,setDate]=useState(focus?.date||'');
  const [preferences,setPreferences]=useState(()=>{
-  try{const saved=JSON.parse(localStorage.getItem(preferenceKey));return saved&&typeof saved==='object'?saved:{};}catch{return {};}
+  try{const saved=JSON.parse(localStorage.getItem(preferenceKey));return {...(saved&&typeof saved==='object'?saved:{}),...focus?.shift&&{shift:focus.shift},...focus?.sector&&{sector:focus.sector}};}catch{return {};}
  });
- const {shift='noite',sector='todos'}=preferences;
+ const {shift=focus?.shift||'noite',sector=focus?.sector||'todos'}=preferences;
  const order=Array.isArray(preferences.order)?[...new Set([...preferences.order.filter(key=>initialOrder.includes(key)),...initialOrder])]:initialOrder;
  const prefer=change=>setPreferences(previous=>({...previous,...change}));
  useEffect(()=>{try{localStorage.setItem(preferenceKey,JSON.stringify(preferences));}catch{/* view stays usable */}},[preferenceKey,preferences]);
@@ -94,9 +107,9 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
  const [result,setResult]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
  const today=restaurantDay();
  const activePlans=(data?.plans||[]).filter(item=>item.period>=today.slice(0,7));
- const plan=activePlans.find(item=>item.id===planId)||activePlans[0];
+ const plan=activePlans.find(item=>item.id===planId)||activePlans.find(item=>item.period===today.slice(0,7)&&item.status==='published')||activePlans[0];
  const period=plan?.period;
- const date=chosenDate.startsWith(period+'-')?chosenDate:period===today.slice(0,7)?today:period?period+'-01':'';
+ const date=chosenDate.startsWith(period+'-')?chosenDate:'';
  const current=result?.planId===plan?.id&&result?.date===date?result:null;
  const cards=(current?.evaluation.shifts||[]).map(row=>{
   const matches=data.proposals.filter(p=>p.operational&&p.planId===plan.id&&p.date===date&&p.sector===row.sector&&p.shift===row.shift);
@@ -131,6 +144,14 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
   finally{if(attempt===generation.current)setLoading(false);}
  },[request]);
  const activeId=plan?.id;
+ const choose=(day,turn,area)=>{
+  setDate(day);setPerson('');
+  if(turn||area)prefer({...turn&&{shift:turn},...area&&{sector:area}});
+ };
+ const alertFocus=useRef(focus?.sector&&focus?.shift?focus.sector+':'+focus.shift:null);
+ useEffect(()=>{
+  if(current&&alertFocus.current){setOpened(alertFocus.current);alertFocus.current=null;}
+ },[current]);
  useEffect(()=>{
   if(activeId&&date)void evaluate(activeId,date);
   return ()=>{generation.current++;};
@@ -174,10 +195,12 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
     <button className="tab" type="button" key={id} aria-pressed={id===shift} onClick={()=>{prefer({shift:id});setPerson('');}}>{label}</button>)}</nav>
    <div className="ti-cov-date-pick">
     <label>Data <input type="date" required value={date} min={period?period+'-01':undefined} max={period?monthDates(period).at(-1):undefined} onChange={event=>{setDate(event.target.value);setPerson('');}}/></label>
-    {activePlans.length>1&&<label>Escala <select value={activeId} onChange={event=>{setPlanId(event.target.value);setPerson('');}}>
+    {activePlans.length>1&&<label>Escala <select value={activeId} onChange={event=>{setPlanId(event.target.value);setDate('');setPerson('');}}>
      {activePlans.map(item=><option value={item.id} key={item.id}>{item.title} · {item.period}</option>)}</select></label>}
    </div>
   </div>
+  <CoverageMonth plan={plan} request={request} today={today} selected={date} choose={choose}
+   alerts={data?.alerts} proposals={data?.proposals} onOpenAlert={item=>{alertFocus.current=item.sector+':'+item.shift;choose(item.date,item.shift,item.sector);if(current?.date===item.date){setOpened(alertFocus.current);alertFocus.current=null;}}}/>
   {!activeId&&<p className="panel ti-cov-feedback" role="status">{data?'Nenhuma escala disponível para avaliar.':'Carregando a escala…'}</p>}
   {loading&&<p className="panel ti-cov-feedback" role="status">Conferindo o turno…</p>}
   {error&&<p className="team-error" role="alert">{error} {activeId&&<button type="button" className="action quiet" onClick={()=>evaluate(activeId,date)}>Tentar novamente</button>}</p>}
@@ -221,7 +244,7 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
    })}</div>
    </div>
   </div>}
-  {openedCard&&<CoverageDrawer key={openedCard.id} card={openedCard} data={data} date={date} plan={plan} request={request} run={run} busy={busy} selected={selected} setSelected={setSelected} close={()=>setOpened(null)} renderProposal={renderProposal}/>}
+  {openedCard&&<CoverageDrawer key={openedCard.id} card={openedCard} data={data} date={date} plan={plan} request={request} run={run} busy={busy} selected={selected} setSelected={setSelected} close={()=>setOpened(null)} renderProposal={renderProposal} onRecordAbsence={recordAbsence?async payload=>{const response=await recordAbsence(payload);if(response)await evaluate(activeId,date);return response;}:null}/>}
  </section>;
 }
 export function CoveragePolicyForm({initial,people,save,busy}){

@@ -1,3 +1,4 @@
+import {alertStaff,writeCoverageAlerts} from '../coverage/alerts.js';
 import {queuePush,tryDrainPush} from '../push/delivery.js';
 import {MANAGEMENT_ROLES,isManagement} from '../permissions/v31-policy.js';
 import {sendQuotaError} from '../quota-error.js';
@@ -147,6 +148,60 @@ export default async function handler(req,res){
    return send(res,200,'Decisão registrada. A escala oficial precisa ser atualizada e publicada separadamente.');
   }
   if(!MANAGEMENT_ROLES.includes(m.role))return send(res,403,'Somente gerência pode administrar escalas.');
+  if(action==='recordPublishedAbsence'){
+   const {planId,date,staffId,reason}=req.body||{};
+   if(!isManagement(m.role))return send(res,403,'Apenas a gestão registra indisponibilidade.');
+   if(!idOk(planId)||!idOk(staffId)||!validDate(date)||date<unitDay()||typeof reason!=='string'||reason.trim().length<8||reason.length>400)
+    return send(res,400,'Informe uma data válida e um motivo de pelo menos 8 caracteres.');
+   const now=new Date();
+   const eventId=await db.runTransaction(async tx=>{
+    const requests=unit.collection('leaveRequests');
+    const [member,plan,person,staff,policy,leaves,prior,proposals]=await Promise.all([
+     tx.get(db.doc('memberships/'+actor.uid)),tx.get(schedules.doc(planId)),tx.get(unit.collection('staffRegistry').doc(staffId)),
+     tx.get(unit.collection('staffRegistry').limit(201)),tx.get(unit.collection('configuration').doc('coverageRequirements')),
+     tx.get(requests.where('date','==',date).limit(201)),tx.get(unit.collection('coverageAlerts').where('planId','==',planId)),
+     tx.get(unit.collection('coverageProposals').where('date','==',date).limit(201))
+    ]);
+    if(member.data()?.status!=='active'||member.data()?.unitId!==m.unitId||!isManagement(member.data()?.role))throw Error('FORBIDDEN');
+    if(plan.data()?.status!=='published'||plan.data().archivedAt||plan.data().period!==date.slice(0,7)||person.data()?.status!=='active')throw Error('CONFLICT');
+    if(staff.size>200||leaves.size>200||proposals.size>200)throw Error('HISTORY_LIMIT');
+    const ids=new Set([staffId,person.data().accountUid].filter(Boolean));
+    if(!plan.data().entries.some(e=>e.date===date&&e.type==='work'&&ids.has(e.uid)))throw Error('CONFLICT');
+    if(leaves.docs.some(doc=>doc.data().status==='approved'&&ids.has(doc.data().uid)))return null;
+    const uid=person.data().accountUid||staffId;
+    const id='absence_'+staffId+'_'+date;
+    tx.create(requests.doc(id),{uid,date,status:'approved',source:'published_absence',reason:reason.trim(),createdAt:now,decidedAt:now,decidedBy:actor.uid,unitId:m.unitId});
+    tx.create(db.collection('auditLogs').doc(),{event:'schedule.absence_recorded',actorUid:actor.uid,unitId:m.unitId,planId,staffId,date,at:now});
+    const entries=[...plan.data().entries,...leaves.docs.filter(doc=>doc.data().status==='approved').map(doc=>({uid:doc.data().uid,date,type:'leave'})),{uid,date,type:'leave'}];
+    const event=writeCoverageAlerts({tx,db,unit,unitId:m.unitId,planId,dates:[date],entries,people:staff.docs.map(alertStaff),
+     requirements:policy.data()?.requirements||[],policy:policy.data()?.operationalPolicy||{},prior,proposals:proposals.docs.map(doc=>doc.data()),now,reference:id,
+     affected:['manha','noite'].includes(person.data().shift)?{shift:person.data().shift,sector:person.data().sector==='cozinha'?'cozinha':'frente'}:null});
+    signalUnitChange(tx,db,m.unitId,['schedules','coverage','notifications']);
+    return event;
+   });
+   if(eventId)await tryDrainPush(m.unitId,eventId);
+   return send(res,200,'Indisponibilidade registrada e turno reavaliado.');
+  }
+  if(action==='withdrawPublication'){
+   const {id,reason}=req.body||{};
+   if(!isManagement(m.role))return send(res,403,'Apenas a gestão retira a publicação.');
+   if(!idOk(id)||typeof reason!=='string'||reason.trim().length<8||reason.length>400)return send(res,400,'Informe o motivo da retirada (mínimo de 8 caracteres).');
+   await db.runTransaction(async tx=>{
+    const ref=schedules.doc(id);
+    const [member,plan]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
+    if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!isManagement(member.data().role))throw Error('FORBIDDEN');
+    if(!plan.exists||plan.data().status!=='published'||plan.data().archivedAt)throw Error('CONFLICT');
+    const {period}=plan.data(),now=new Date();
+    const lockRef=unit.collection('schedulePublicationState').doc(period),lock=await tx.get(lockRef);
+    const openAlerts=await tx.get(unit.collection('coverageAlerts').where('planId','==',id));
+    if(lock.data()?.activeId===id)tx.set(lockRef,{activeId:null,updatedAt:now},{merge:true});
+    tx.update(ref,{status:'withdrawn',withdrawnAt:now,withdrawnBy:actor.uid,withdrawalReason:reason.trim(),updatedAt:now});
+    for(const alert of openAlerts.docs.filter(item=>item.data().status==='open'))tx.update(alert.ref,{status:'resolved',updatedAt:now});
+    signalUnitChange(tx,db,m.unitId,['schedules','coverage','notifications']);
+    tx.create(db.collection('auditLogs').doc(),{event:'schedule.withdrawn',actorUid:actor.uid,unitId:m.unitId,scheduleId:id,at:now,note:reason.trim()});
+   });
+   return send(res,200,'Escala retirada do Mural. Histórico preservado.');
+  }
   if(action==='scheduleArchive'||action==='scheduleRestore'){
    const id=req.body?.id;if(!idOk(id))return send(res,400,'Identificador de escala inválido.');
    const ref=schedules.doc(id),now=new Date();
@@ -242,11 +297,14 @@ export default async function handler(req,res){
    const states={submit:'in_review',approve:'approved',publish:'published'},now=new Date();
    const publicationNoticeId='schedule_'+id+'_'+now.getTime();
    const lockRef=unit.collection('schedulePublicationState').doc(snap.data().period);
+   let coverageEvent=null;
    await db.runTransaction(async tx=>{
     const [member,current,lock]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref),action==='publish'?tx.get(lockRef):Promise.resolve(null)]);
     const previousId=action==='publish'?lock?.data()?.activeId:null;
     const previousRef=previousId&&previousId!==id?schedules.doc(previousId):null;
     const previous=previousRef?await tx.get(previousRef):null;
+    const priorAlerts=action==='publish'?await tx.get(unit.collection('coverageAlerts').where('planId','==',id)):null;
+    const previousAlerts=previousRef?await tx.get(unit.collection('coverageAlerts').where('planId','==',previousId)):null;
     const latestPolicy=await tx.get(coveragePolicy.ref);if(JSON.stringify(latestPolicy.data()?.requirements||[])!==JSON.stringify(requirements))throw Error('CONFLICT');
     const livePeople=masterActive?await tx.get(unit.collection('staffRegistry').limit(201)):await tx.get(unit.collection('staffProfiles').limit(201));
     if(livePeople.size>200)throw Error('CONFLICT');
@@ -266,6 +324,11 @@ export default async function handler(req,res){
      if(requests.size>500)throw Error('HISTORY_LIMIT');
      if(requests.docs.some(d=>d.data().status==='pending'))throw Error('PENDING_LEAVE');
      for(const request of requests.docs.filter(d=>d.data().status==='approved')){const r=request.data();const uid=masterActive?registryList.find(x=>x.accountUid===r.uid||x.uid===r.uid)?.uid:r.uid;if(!uid||!(current.data().entries||[]).some(e=>e.uid===uid&&e.date===r.date&&['off','leave','monthly_sunday'].includes(e.type)))throw Error('APPROVED_LEAVE_CONFLICT');}
+     coverageEvent=writeCoverageAlerts({tx,db,unit,unitId:m.unitId,planId:id,
+      dates:[...new Set(current.data().entries.map(entry=>entry.date))].filter(date=>date>=unitDay()),
+      entries:current.data().entries,people:masterActive?livePeople.docs.map(alertStaff):currentPeople,
+      requirements,policy:latestPolicy.data()?.operationalPolicy||{},prior:priorAlerts,now,reference:publicationNoticeId});
+     for(const alert of previousAlerts?.docs||[])if(alert.data().status==='open')tx.update(alert.ref,{status:'resolved',updatedAt:now});
      if(previous?.exists&&previous.data().status==='published')tx.update(previousRef,{status:'superseded',supersededAt:now,supersededBy:id});
      tx.set(lockRef,{activeId:id,unitId:m.unitId,period:current.data().period,updatedAt:now});
      queuePush(tx,db,m.unitId,publicationNoticeId,{audience:'unit',title:'Nova escala publicada',page:'mural'});
@@ -278,7 +341,7 @@ export default async function handler(req,res){
     signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'schedule.'+action,unitId:m.unitId,actorUid:actor.uid,scheduleId:id,at:now,revision:current.data().revision});
    });
-   if(action==='publish')await tryDrainPush(m.unitId,publicationNoticeId);
+   if(action==='publish'){await tryDrainPush(m.unitId,publicationNoticeId);if(coverageEvent)await tryDrainPush(m.unitId,coverageEvent);}
    return send(res,200,action==='publish'?'Escala publicada no Mural.':'Escala encaminhada para próxima etapa.');
   }
   return send(res,400,'Ação inválida.');
