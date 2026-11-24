@@ -3,7 +3,7 @@ import {requestJson} from './api-client.js';
 import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
 import {useUnitLive} from './useUnitLive.js';
-import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {sessionAuth as auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
 import {carryFiveTwoRoster,fiveTwoEntries,fiveTwoWeeks,shiftScheduleDate} from '../server/schedules/five-two.js';
@@ -21,7 +21,7 @@ async function membersApi(){
  const token=await auth.currentUser?.getIdToken();const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'profiles'})});const d=await r.json();if(!r.ok)throw Error(d.message);const staff=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryPreview'})});const sd=await staff.json();if(!staff.ok)throw Error(sd.message||'Cadastro Mestre indisponível.');return {activated:!!sd.activated,registeredCount:(sd.registry||[]).filter(p=>p.status==='active').length,people:sd.activated?(sd.registry||[]).filter(p=>p.status==='active').map(p=>({uid:p.id,accountUid:p.accountUid||null,name:p.name,status:p.status,professional:{sector:p.sector,shift:p.shift,availability:p.availability||[],jobTitle:p.jobTitle,skills:p.skills||[],certifications:p.certifications||[]},fixedWeekday:p.fixedWeekday,registry:true})):d.members||[]};
 }
 const labels={draft:'Rascunho',in_review:'Em análise',approved:'Aprovada',published:'Publicada',work:'Trabalho',off:'Folga',leave:'Ausência',monthly_sunday:'Domingo mensal adicional'};
-export default function SchedulePlanner({membership,onOpenCoverage}){
+export default function SchedulePlanner({membership,onOpenCoverage,initialPlanId}){
  const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const {notify}=useFeedback(),[plans,setPlans]=useState([]),[people,setPeople]=useState([]),[selected,setSelected]=useState(''),[title,setTitle]=useState('Escala da equipe'),[period,setPeriod]=useState(restaurantDay().slice(0,7)),[entries,setEntries]=useState([]);
  const [coveragePolicy,setCoveragePolicy]=useState({});
@@ -59,6 +59,14 @@ export default function SchedulePlanner({membership,onOpenCoverage}){
   setSelected(p.id);setDraftRevision(p.revision);setTitle(p.title);setPeriod(p.period);setEntries(p.entries||[]);
   setBoard(p.roster);setError('');
  };
+ const resumed=useRef(null);
+ useEffect(()=>{
+  if(!initialPlanId||!loaded||resumed.current===initialPlanId)return;
+  resumed.current=initialPlanId;
+  const draft=plans.find(item=>item.id===initialPlanId&&item.roster&&item.status==='draft'&&!item.archivedAt);
+  if(draft)void open(draft);
+  else setError('O rascunho selecionado não está mais disponível.');
+ },[initialPlanId,loaded,plans]);
  const reset=(nextPeriod=period)=>{
   setSelected('');setDraftRevision(null);setTitle('Escala da equipe');setEntries([]);setError('');
   setPeriod(nextPeriod);setBoard(carryFiveTwoRoster(nextPeriod,plans,people));
@@ -87,8 +95,8 @@ export default function SchedulePlanner({membership,onOpenCoverage}){
   }catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const transition=async action=>{setBusy(true);try{const d=await call(action,{id:selected});notify(d.message,'success');await refresh()}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
- const archivedPlans=plans.filter(p=>p.roster&&p.archivedAt),activePlans=plans.filter(p=>p.roster&&!p.archivedAt);
- const historical=plans.filter(p=>!p.roster&&!p.archivedAt&&p.status==='published');
+ const archivedPlans=plans.filter(p=>p.roster&&p.archivedAt),activePlans=plans.filter(p=>p.roster&&!p.archivedAt&&!['withdrawn','superseded'].includes(p.status));
+ const historical=plans.filter(p=>!p.archivedAt&&(p.status==='withdrawn'||p.status==='superseded'||!p.roster&&p.status==='published'));
  const changeArchive=async(p,action)=>{
   if(busy)return;
   if(action==='scheduleArchive'&&!await askConfirmation('Mover esta escala para a lixeira? O histórico será preservado e a escala poderá ser restaurada.'))return;
@@ -117,7 +125,7 @@ export default function SchedulePlanner({membership,onOpenCoverage}){
   {workflow}
  </section>}
  <div className="ti-roster-saved">
- <details className="ti-planning-card ti-roster-record"><summary>Escalas da unidade</summary>
+ <details className="ti-planning-card ti-roster-record"><summary>Escalas da unidade · {activePlans.filter(item=>item.status==='draft').length} rascunho(s)</summary>
  <div className="ti-planning-heading"><button type="button" onClick={()=>refresh()} disabled={busy||loading}>Atualizar</button><button type="button" disabled={busy} onClick={()=>startNew()}>Nova escala</button></div>
  <div className="ti-notification-tabs" role="group" aria-label="Lista de escalas"><button type="button" className={scheduleView==='active'?'selected':''} aria-pressed={scheduleView==='active'} onClick={()=>setScheduleView('active')}>Ativas ({activePlans.length})</button><button type="button" className={scheduleView==='trash'?'selected':''} aria-pressed={scheduleView==='trash'} onClick={()=>setScheduleView('trash')}>Lixeira ({archivedPlans.length})</button></div>
  {loading?<p>Carregando...</p>:(scheduleView==='active'?activePlans:archivedPlans).length?(scheduleView==='active'?activePlans:archivedPlans).map(x=><div key={x.id} className="ti-schedule-list-item">
@@ -125,8 +133,8 @@ export default function SchedulePlanner({membership,onOpenCoverage}){
   {scheduleView==='trash'?<button type="button" disabled={busy} className="ti-schedule-recycle-action" onClick={()=>changeArchive(x,'scheduleRestore')}>Restaurar</button>:<button type="button" disabled={busy||(x.status==='published'&&x.period>=today.slice(0,7))} className="ti-schedule-recycle-action" title={x.status==='published'&&x.period>=today.slice(0,7)?'Escala oficial protegida':'Mover para a lixeira'} onClick={()=>changeArchive(x,'scheduleArchive')}>Excluir</button>}
  </div>):<p>{scheduleView==='trash'?'Nenhuma escala na lixeira.':'Nenhuma escala cadastrada.'}</p>}
  </details>
- {historical.length>0&&<details className="ti-planning-card ti-roster-record"><summary>Histórico publicado ({historical.length})</summary>
-  {historical.map(item=><p key={item.id}><strong>{item.title}</strong> · {item.period} · Publicada</p>)}
+ {historical.length>0&&<details className="ti-planning-card ti-roster-record"><summary>Histórico de escalas ({historical.length})</summary>
+  {historical.map(item=><p key={item.id}><strong>{item.title}</strong> · {item.period} · {item.status==='withdrawn'?'Retirada do Mural':item.status==='superseded'?'Substituída':'Publicada'}</p>)}
  </details>}
  </div>{error&&loaded&&<p role="alert" className="team-error">{error}</p>}
   {confirmationSheet}

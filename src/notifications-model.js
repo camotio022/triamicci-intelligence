@@ -20,7 +20,7 @@ export function notificationCategory(item){
  if(title.includes('recebimento')||title.includes('estoque'))return 'Cozinha';
  return 'Equipe';
 }
-const destinations=new Set(['my-profile','my-coverage','leave-requests','people','kitchen-v3','mural','receiving']);
+const destinations=new Set(['my-profile','my-coverage','leave-requests','people','kitchen-v3','mural','receiving','coverage']);
 export function notificationDestination(item){
 
  const title=String(item.title||'').toLocaleLowerCase('pt-BR');

@@ -1,3 +1,5 @@
+import {alertStaff,writeCoverageAlerts} from '../../server/coverage/alerts.js';
+import {evaluateCoverageMonth} from '../../server/coverage/month.js';
 import {restaurantDay} from '../../shared/operation-day.js';
 import {evaluateOperationalDay,forecastPaymentDate,validOperationalPolicy,wholeTurnAssignment,reviewCoverageAssignment} from '../../server/coverage/operational.js';
 import {readCoverageContext} from '../../server/coverage/operational-context.js';
@@ -11,6 +13,7 @@ import {randomUUID} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
 import {evaluateCoverage,paymentFor,rateRoleFor,checkDoubleShift,approvalGate,minutes,DEFAULT_RATES} from '../../server/coverage/engine.js';
 import {validDate} from '../../server/schedules/rules.js';
+const cleanTime=value=>value?.toDate?.()?.toISOString?.()||null;
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 const roles=new Set(MANAGEMENT_ROLES);
 const validTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
@@ -37,13 +40,14 @@ export default async function handler(req,res){
   }
   if(action==='dashboard'){
    if(!manager)return send(res,403,'Apenas gerência.');
-   const [peopleSnap,plansSnap,rateSnap,proposalSnap,policySnap,requestSnap]=await Promise.all([
-    unit.collection('staffRegistry').limit(200).get(),unit.collection('schedules').limit(120).get(),settings.get(),proposals.limit(100).get(),policyRef.get(),staffRequests.limit(100).get()
+   const [peopleSnap,plansSnap,rateSnap,proposalSnap,policySnap,requestSnap,alerts]=await Promise.all([
+    unit.collection('staffRegistry').limit(200).get(),unit.collection('schedules').limit(120).get(),settings.get(),proposals.limit(100).get(),policyRef.get(),staffRequests.limit(100).get(),unit.collection('coverageAlerts').where('status','==','open').limit(250).get()
    ]);
    const people=peopleSnap.docs.map(d=>({uid:d.id,name:d.data().name||'',status:d.data().status||'inactive',jobTitle:d.data().jobTitle||'',professional:{sector:d.data().sector,jobTitle:d.data().jobTitle,shift:d.data().shift,availability:d.data().availability||[],skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
    const plans=plansSnap.docs.map(d=>({id:d.id,...d.data()}));
-   return send(res,200,'Painel de cobertura carregado.',{people,plans:plans.filter(p=>!p.archivedAt).sort((a,b)=>b.period.localeCompare(a.period)).map(p=>({id:p.id,title:p.title,period:p.period,status:p.status})),
+   return send(res,200,'Painel de cobertura carregado.',{people,plans:plans.filter(p=>!p.archivedAt&&['draft','in_review','approved','published'].includes(p.status)).sort((a,b)=>b.period.localeCompare(a.period)).map(p=>({id:p.id,title:p.title,period:p.period,status:p.status,revision:p.revision,updatedAt:cleanTime(p.updatedAt)})),
     rates:{...DEFAULT_RATES,...(rateSnap.data()?.rates||{})},requirements:policySnap.data()?.requirements||[],operationalPolicy:policySnap.data()?.operationalPolicy||{},payroll:rateSnap.data()?.payroll||null,configuredRates:rateSnap.data()?.rates||null,individualRates:rateSnap.data()?.individualRates||{},
+    alerts:alerts.docs.map(doc=>({id:doc.id,...doc.data(),updatedAt:cleanTime(doc.data().updatedAt)})).filter(item=>item.date>=restaurantDay()).sort((a,b)=>a.date.localeCompare(b.date)),
     proposals:proposalSnap.docs.map(clean).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))),
     staffRequests:requestSnap.docs.map(clean).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))),
     note:'Simulação não substitui validação de jornada e folha.'});
@@ -164,13 +168,26 @@ export default async function handler(req,res){
    });
    return send(res,200,'Regras operacionais salvas.');
   }
+  if(action==='assessMonth'){
+   const {planId}=req.body||{};
+   if(!idOk(planId))return send(res,400,'Selecione uma escala.');
+   const plan=await unit.collection('schedules').doc(planId).get();
+   if(!plan.exists||plan.data().archivedAt||!['draft','in_review','approved','published'].includes(plan.data().status))throw Error('PLAN_NOT_FOUND');
+   const record=plan.data(),period=record.period;
+   const [staff,policy,requests,monthlyProposals]=await Promise.all([unit.collection('staffRegistry').limit(201).get(),policyRef.get(),
+    unit.collection('leaveRequests').where('date','>=',period+'-01').where('date','<=',period+'-31').limit(501).get(),proposals.where('planId','==',planId).limit(301).get()]);
+   if(staff.size>200||requests.size>500||monthlyProposals.size>300)throw Error('ASSESSMENT_LIMIT');
+   const leaves=requests.docs.filter(doc=>doc.data().status==='approved').map(doc=>({uid:doc.data().uid,date:doc.data().date,type:'leave'}));
+   const month=evaluateCoverageMonth({plan:record,people:staff.docs.map(staffPerson),requirements:policy.data()?.requirements||[],policy:policy.data()?.operationalPolicy||{},leaves,proposals:monthlyProposals.docs.map(doc=>doc.data())});
+   return send(res,200,'Mês avaliado.',{month});
+  }
   if(action==='assessShift'||action==='inviteShift'){
    const {planId,date,sector,shift,staffId,coveredStart}=req.body||{};
    const inviting=action==='inviteShift';
    if(!idOk(planId)||!validDate(date)||!['cozinha','frente'].includes(sector)||!['manha','noite'].includes(shift)||inviting&&!idOk(staffId))return send(res,400,'Selecione escala, data, turno e setor.');
    const planRef=unit.collection('schedules').doc(planId), directory=unit.collection('staffRegistry').limit(201), leaves=unit.collection('leaveRequests').where('date','==',date).limit(201);
    const assess=(plan,staff,policy,leavesSnap)=>{
-    if(!plan.exists||plan.data().archivedAt||plan.data().period!==date.slice(0,7))throw Error('PLAN_NOT_FOUND');
+    if(!plan.exists||plan.data().archivedAt||!['draft','in_review','approved','published'].includes(plan.data().status)||plan.data().period!==date.slice(0,7))throw Error('PLAN_NOT_FOUND');
     if(staff.size>200||leavesSnap.size>200)throw Error('ASSESSMENT_LIMIT');
     return evaluateOperationalDay({date,entries:normalizePlanEntries(plan.data(),date,leavesSnap),people:staff.docs.map(staffPerson),requirements:policy.data()?.requirements||[],policy:policy.data()?.operationalPolicy||{}});
    };
@@ -295,18 +312,32 @@ export default async function handler(req,res){
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!roles.has(m.data().role))throw Error('FORBIDDEN');
     if(!p.exists||!['pending_approval','pending_acceptance'].includes(p.data().status)||decision==='approved'&&p.data().status!=='pending_approval')throw Error('CONFLICT');
     const currentPerson=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
+    let alertContext;
     if(decision==='approved'){
      if(pastProposal(p.data()))throw Error('EXPIRED');
      if(p.data().operational){
       if(!currentPerson.exists||currentPerson.data().accountUid!==p.data().accountUid)throw Error('STAFF_NOT_AVAILABLE');
       const plan=await tx.get(unit.collection('schedules').doc(p.data().planId));
-      if(!plan.exists||plan.data().archivedAt||(plan.data().revision||null)!==p.data().planRevision)throw Error('PLAN_CHANGED');
+      if(!plan.exists||plan.data().archivedAt||!['draft','in_review','approved','published'].includes(plan.data().status)||(plan.data().revision||null)!==p.data().planRevision)throw Error('PLAN_CHANGED');
+      if(plan.data().status==='published'){
+       const {date,planId}=p.data();
+       const [staff,policy,leaves,prior,sameDay]=await Promise.all([
+        tx.get(unit.collection('staffRegistry').limit(201)),tx.get(policyRef),
+        tx.get(unit.collection('leaveRequests').where('date','==',date).limit(201)),
+        tx.get(unit.collection('coverageAlerts').where('planId','==',planId)),
+        tx.get(proposals.where('date','==',date).limit(201))]);
+       if(staff.size<=200&&leaves.size<=200&&sameDay.size<=200)alertContext={tx,db,unit,unitId:member.unitId,planId,dates:[date],
+        entries:normalizePlanEntries(plan.data(),date,leaves),people:staff.docs.map(alertStaff),
+        policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[],prior,now,notify:false,
+        proposals:sameDay.docs.map(doc=>doc.id===id?{...doc.data(),status:'approved'}:doc.data())};
+      }
      }
      const gate=approvalGate({status:p.data().status,createdBy:p.data().createdBy,actorUid:actor.uid,
       consentPending:p.data().consentPending,acceptedAt:p.data().acceptedAt,staffActive:currentPerson.exists&&currentPerson.data().status==='active',
       legalChecked,consentVerified});
      if(gate)throw Error(gate);
     }
+    if(alertContext)writeCoverageAlerts(alertContext);
     tx.update(ref,{status:decision,decisionNote:note.trim(),legalValidated:false,legalReviewConfirmed:decision==='approved',consentVerified:decision==='approved',consentEvidence:decision==='approved'?req.body.consentEvidence.trim():null,decidedBy:actor.uid,decidedAt:now,updatedAt:now});
     if(currentPerson.data()?.accountUid)queuePush(tx,db,member.unitId,'coverage_decision_'+id,{uid:currentPerson.data().accountUid,title:'Sua proposta de cobertura ou dobra foi analisada',page:'my-coverage'});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);

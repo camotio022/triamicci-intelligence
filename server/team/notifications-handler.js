@@ -13,7 +13,7 @@ export default async function notifications(req,res,{db,actor,actingMember}){
         at:asISO(n.at),readAt:asISO(n.readAt),openedAt:asISO(n.openedAt),
         deletedAt:asISO(n.deletedAt),source:n.source||n.event||'Equipe',
         reference:n.reference||n.registryId||n.targetUid||null,
-        page:['my-profile','leave-requests','people','kitchen-v3','mural'].includes(n.page)?n.page:null};
+        page:['my-profile','my-coverage','leave-requests','people','kitchen-v3','mural','receiving','coverage'].includes(n.page)?n.page:null,coverage:n.page==='coverage'?n.coverage||null:null};
       })});
     }
     if(['notificationRead','notificationOpen','notificationDelete','notificationRestore'].includes(action)){

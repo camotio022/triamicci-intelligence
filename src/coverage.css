@@ -113,3 +113,16 @@
  .ti-cov-workspace .ti-cov-date-pick{justify-content:space-between}
  .ti-cov-workspace .ti-cov-column-tabs{margin:6px 0}
 }
+
+.ti-coverage-month{display:grid;gap:8px;margin:0 0 16px}
+.ti-coverage-month .roster-impact,.ti-coverage-month .board-heading{margin:0}
+.ti-cov-month-filter{justify-self:start}
+.ti-cov-month-dates{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.ti-cov-month-dates .day{min-width:0;overflow:hidden}
+.ti-cov-month-dates .day-body{display:grid;gap:4px;padding:8px}
+.ti-cov-month-dates .count{white-space:normal}
+.ti-cov-month-alerts,.ti-cov-fixed-month{padding:9px 12px}
+.ti-cov-month-alerts h3{margin:0 0 5px}
+.ti-cov-month-alerts .action{margin:3px}
+.ti-cov-fixed-month summary{cursor:pointer;font-weight:650}
+@media(max-width:680px){.ti-cov-month-dates{grid-template-columns:repeat(2,minmax(0,1fr))}}

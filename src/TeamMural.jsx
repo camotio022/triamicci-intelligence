@@ -20,17 +20,19 @@ async function read(module,action,payload={}){
 const monthLabel=period=>new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(period+'-01T12:00:00Z'));
 const todayInSaoPaulo=()=>restaurantDay(new Date());
 
-export default function TeamMural({membership,onOpenProduction}){
+export default function TeamMural({membership,onOpenProduction,onOpenDraft}){
  const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const [schedules,setSchedules]=useState([]),[notices,setNotices]=useState([]),[presence,setPresence]=useState({}),[today,setToday]=useState(todayInSaoPaulo),[productionTasks,setProductionTasks]=useState([]),[productionError,setProductionError]=useState('');
  const [loading,setLoading]=useState(true),[error,setError]=useState(''),[expanded,setExpanded]=useState(null),[staff,setStaff]=useState([]),[clock,setClock]=useState('00:00');
  const [noticeCursor,setNoticeCursor]=useState(null),[presenceError,setPresenceError]=useState(''),[showNoticeHistory,setShowNoticeHistory]=useState(false);
  const manager=MANAGEMENT_ROLES.includes(membership.role);
+ const [drafts,setDrafts]=useState([]),[withdraw,setWithdraw]=useState(null),[withdrawReason,setWithdrawReason]=useState(''),[withdrawing,setWithdrawing]=useState(false);
  const refresh=useCallback(async()=>{
   try{
    const [roster,board,people]=await Promise.all([read('schedules','list'),read('mural','publicNotices'),read('attendanceV31','teamDirectory')]);
    setStaff(people.registry||[]);
-   setSchedules((roster.schedules||[]).filter(x=>x.status==='published').sort((a,b)=>String(b.period).localeCompare(String(a.period))));
+   setDrafts(manager?(roster.schedules||[]).filter(item=>item.roster&&item.status==='draft'&&!item.archivedAt):[]);
+   setSchedules((roster.schedules||[]).filter(x=>x.status==='published'&&!x.archivedAt).sort((a,b)=>String(b.period).localeCompare(String(a.period))));
    setNotices(board.items||[]);setNoticeCursor(board.nextCursor||null);setError('');return true;
   }catch(e){setError(e.message);return false}finally{setLoading(false)}
  },[membership?.unitId,membership?.role]);
@@ -39,7 +41,7 @@ export default function TeamMural({membership,onOpenProduction}){
   try{const result=await read('attendanceV31','teamToday');setPresence(Object.fromEntries((result.presence||[]).map(x=>[x.uid,x])));setPresenceError('');return true;}
   catch{setPresenceError('Presenças indisponíveis. A escala prevista não confirma quem está trabalhando.');return false;}
  },[membership?.unitId]);
- useEffect(()=>{setSchedules([]);setNotices([]);setStaff([]);setPresence({});setProductionTasks([]);setLoading(true);},[membership?.unitId]);
+ useEffect(()=>{setSchedules([]);setDrafts([]);setWithdraw(null);setNotices([]);setStaff([]);setPresence({});setProductionTasks([]);setLoading(true);},[membership?.unitId]);
 
  const live=useUnitLive(membership?.unitId,(_initial,changes)=>Promise.all([
   !changes||changes.some(x=>['team','schedules','mural'].includes(x))?refresh():true,
@@ -78,6 +80,14 @@ export default function TeamMural({membership,onOpenProduction}){
  const visibleNotices=showAllNotices?prioritized:prioritized.slice(0,2);
  const loadOlder=async()=>{try{const d=await read('mural','publicNotices',{before:noticeCursor});setNotices(a=>[...a,...(d.items||[]).filter(p=>!a.some(x=>x.id===p.id))]);setNoticeCursor(d.nextCursor||null)}catch(e){setError(e.message)}};
  const markRead=async id=>{try{await read('mural','noticeRead',{id});setNotices(a=>a.map(x=>x.id===id?{...x,read:true}:x))}catch(e){setError(e.message)}};
+ const withdrawSchedule=async event=>{
+  event.preventDefault();
+  if(withdrawing||!await askConfirmation('Retirar esta escala do Mural? A equipe ficará sem essa versão publicada.'))return;
+  setWithdrawing(true);
+  try{await read('schedules','withdrawPublication',{id:withdraw.id,reason:withdrawReason.trim()});setWithdraw(null);setWithdrawReason('');await refresh();}
+  catch(e){setError(e.message);}
+  finally{setWithdrawing(false);}
+ };
  const publishedCurrent=Boolean(current);
  const scheduleLabel=publishedCurrent?'Escala do mês publicada':'Sem escala oficial para este mês';
  return <section className="ti-planning ti-mural-home ti-mural-v4" aria-label="Mural da equipe">
@@ -107,10 +117,19 @@ export default function TeamMural({membership,onOpenProduction}){
     <details id="mural-v5-schedule" className="ti-mural-roster-details ti-v4-roster-details"><summary><CalendarDays size={18} aria-hidden="true"/> Consultar escala mensal e folgas <ChevronRight size={17} aria-hidden="true"/></summary>
     {loading?<p role="status">Carregando escalas…</p>:schedules.length===0?<p className="ti-mural-empty">Nenhuma escala publicada.</p>:<>
      <div className="ti-mural-period-list">{schedules.slice(0,12).map(s=><button type="button" key={s.id} className={selected===s.id?'ti-mural-period active':'ti-mural-period'} aria-pressed={selected===s.id} onClick={()=>setExpanded(s.id)}>{monthLabel(s.period)}{s.id===current?.id&&<small>Mês atual</small>}</button>)}</div>
+     {manager&&active&&<button type="button" className="ti-v4-secondary-link" onClick={()=>{setWithdraw(active);setWithdrawReason('');}}>Retirar do Mural</button>}
+     {withdraw?.id===active?.id&&withdraw&&<form onSubmit={withdrawSchedule} className="ti-cov-policy">
+      <label>Motivo da retirada de {monthLabel(withdraw.period)} <textarea required minLength={8} maxLength={400} value={withdrawReason} onChange={event=>setWithdrawReason(event.target.value)}/></label>
+      <div className="ti-cov-actions"><button type="submit" disabled={withdrawing||withdrawReason.trim().length<8}>Confirmar retirada</button><button type="button" onClick={()=>setWithdraw(null)}>Cancelar</button></div>
+     </form>}
      {active?<PublishedRoster key={active.id} schedule={active} presence={presence}/>:<p>Escolha uma escala para consultar.</p>}
     </>}
     </details>
    </section>
+   {manager&&<section className="ti-mural-card ti-v4-feature"><h2>Rascunhos da gestão</h2>
+    {drafts.length?drafts.map(draft=><p key={draft.id}><strong>{draft.title} · {monthLabel(draft.period)}</strong>{draft.updatedAt&&<small> · {new Date(draft.updatedAt).toLocaleDateString('pt-BR')}</small>}
+     <button type="button" className="ti-v4-secondary-link" onClick={()=>onOpenDraft?.(draft.id)}>Continuar editando</button></p>):<p>Nenhum rascunho salvo.</p>}
+   </section>}
    <section id="mural-v5-notices" className="ti-mural-card ti-mural-notices ti-v4-feature" aria-labelledby="mural-notices-title">
     <header className="ti-v4-section-title"><div className="ti-v4-title-left"><Megaphone size={22} aria-hidden="true"/><div><h2 id="mural-notices-title">Comunicados</h2><p>Mensagens publicadas para a sua unidade.</p></div></div><span className="ti-v4-count" aria-label={prioritized.length+' comunicados atuais'}>{prioritized.length}</span></header>
     {loading?<p role="status">Carregando comunicados…</p>:prioritized.length===0?<p className="ti-mural-empty">Nenhum comunicado atual no momento.</p>:<>
