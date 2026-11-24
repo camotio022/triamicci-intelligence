@@ -72,12 +72,19 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
   const uniqueHours = group => [...new Map(group.map(person=>available(person,day)).filter(timed).map(slot=>[slot.start+'-'+slot.end,slot])).values()];
   const confirmed = roster.filter(person=>timed(available(person,day)));
   const slots = uniqueHours(confirmed.length?confirmed:cohort);
-  const window = slots.length===1 ? {start:slots[0].start,end:slots[0].end} : null;
-  const coverageWindow = window;
+  // A common envelope is safe for analysis only when the shifts are daytime and overlap.
+  // Mixed schedules remain subject to interval validation, not an inferred full-shift assignment.
+  const daytime=slots.every(slot=>minutes(slot.end)>minutes(slot.start));
+  const overlap=slots.length&&Math.max(...slots.map(slot=>minutes(slot.start)))<Math.min(...slots.map(slot=>minutes(slot.end)));
+  const window=slots.length===1?{start:slots[0].start,end:slots[0].end}:daytime&&overlap?{
+   start:slots.reduce((a,b)=>a.start<b.start?a:b).start,
+   end:slots.reduce((a,b)=>a.end>b.end?a:b).end
+  }:null;
+  const coverageWindow = slots.length===1?window:null;
   const managers = confirmed.filter(management);
   const minimum = sector==='cozinha' ? busyDay||strongPeak?4:2 : busyDay?3:policy.frontWeekdayMinimum??null;
   const count = sector==='frente'&&policy.countManagement===false ? confirmed.filter(person=>!management(person)).length : confirmed.length;
-  const uncertain = !window || roster.length!==confirmed.length || (sector==='frente'&&(minimum===null||policy.countManagement==null&&managers.length>0));
+  const uncertain = !window || slots.length>1 || roster.length!==confirmed.length || (sector==='frente'&&(minimum===null||policy.countManagement==null&&managers.length>0));
   const skill = sector==='cozinha'&&strongPeak ? 'montagem' : '';
   const explicit = window?weekdayRules.filter(rule=>rule.skill&&rule.sector===sector&&minutes(rule.start)<minutes(window.end)&&minutes(rule.end)>minutes(window.start)):[];
   const skillCount = skill ? assuredMontage(confirmed,explicit) : null;
@@ -146,7 +153,9 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
    Number(b.scheduled)-Number(a.scheduled)||a.name.localeCompare(b.name,'pt-BR'));
  }
  const recurringKeys=new Set(recurring.filter(r=>r.available&&r.paid).map(r=>r.uid+'|'+r.shift));
- return {date, holiday,busyDay,strongPeak,shifts,intervals,recurring,recurringFees:recurringKeys.size,
+ const recurringPendingFees=new Set(recurring.filter(r=>!r.available&&r.paid===true&&!recurringKeys.has(r.uid+'|'+r.shift)).map(r=>r.uid+'|'+r.shift)).size;
+ const recurringUnknownFees=new Set(recurring.filter(r=>r.paid==null).map(r=>r.uid+'|'+r.shift)).size;
+ return {date, holiday,busyDay,strongPeak,shifts,intervals,recurring,recurringFees:recurringKeys.size,recurringPendingFees,recurringUnknownFees,
   extra:shifts.reduce((total,row)=>total+(row.window&&!row.missingHours?row.shortage:0),0),
   attention:shifts.some(row=>row.shortage||row.uncertain)||intervals.some(row=>row.deficit)||recurring.some(row=>!row.available)};
 }
