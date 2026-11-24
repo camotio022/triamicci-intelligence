@@ -32,3 +32,19 @@ test('coverage month renders before the plan and the assessment arrive',async()=
   assert.match(html,/Conferindo os turnos do mês/);
  }finally{await vite.close();}
 });
+
+test('monthly projection distinguishes unknown staffing from confirmed vacancies and excludes legacy proposals',()=>{
+ const date='2026-11-23';
+ const person={uid:'cook',status:'active',jobTitle:'Cozinheiro',shift:'noite',sector:'cozinha',
+  availability:[{day:'seg',start:'14:00',end:'22:20'}]};
+ const plan={period:'2026-11',status:'published',entries:[{date,uid:'cook',type:'work'}]};
+ const result=evaluateCoverageMonth({plan,people:[person],requirements:[],policy:{}});
+ const rows=result.days.find(day=>day.date===date).shifts;
+ const kitchen=rows.find(row=>row.sector==='cozinha'&&row.shift==='noite');
+ const front=rows.find(row=>row.sector==='frente'&&row.shift==='noite');
+ assert.equal(kitchen.confirmedDeficit,true);
+ assert.equal(kitchen.extra,1);
+ assert.equal(front.uncertain,true);
+ assert.equal(front.confirmedDeficit,false);
+ assert.equal(front.extra,0);
+});
