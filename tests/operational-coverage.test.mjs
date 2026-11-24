@@ -120,3 +120,26 @@ test('a person absent from the Sunday roster cannot make a shared shift window l
  assert.deepEqual(row.window,{start:'12:00',end:'20:20'});
  assert.deepEqual(wholeTurnAssignment(row,row.candidates[0]).second,row.window);
 });
+
+test('recurring remuneration preserves unknown and explicit unpaid states',()=>{
+ const absent=kitchen('absent');
+ const cover=kitchen('cover');
+ const entries=[...work([absent],date,'off'),...work([cover],date)];
+ for(const paid of [null,false,true]){
+  const configured={...policy,recurring:[{absentId:absent.uid,coverId:cover.uid,paid}]};
+  assert.equal(validOperationalPolicy(configured),true);
+  const result=evaluateOperationalDay({date,entries,people:[absent,cover],policy:configured});
+  assert.equal(result.recurring[0].paid,paid);
+  assert.equal(result.recurringFees,paid===true?1:0);
+  assert.equal(result.recurringUnknownFees,paid===null?1:0);
+ }
+});
+
+test('recurring front coverage is associated with the operational front sector',()=>{
+ const absent=kitchen('cashier',[],{sector:'caixa',jobTitle:'Caixa'});
+ const cover=kitchen('support',[],{sector:'apoio',jobTitle:'Atendente'});
+ const result=evaluateOperationalDay({date,entries:[...work([absent],date,'off'),...work([cover],date)],people:[absent,cover],policy:{...policy,recurring:[{absentId:absent.uid,coverId:cover.uid,paid:false}]}});
+ assert.equal(result.recurring[0].sector,'frente');
+ assert.equal(result.recurring[0].available,true);
+ assert.equal(result.recurringFees,0);
+});
