@@ -85,3 +85,31 @@
  .ti-cov-kanban{grid-template-columns:1fr}
  .ti-cov-column[data-active=false]{display:none}
 }
+
+.ti-cov-page-tabs{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.ti-cov-page-tabs button{background:white;color:#24354a;border:1px solid #e0e4eb;border-radius:8px;padding:8px 11px;font:inherit;font-weight:650}
+.ti-cov-panel .ti-cov-page-tabs button{background:white;color:#24354a;border:1px solid #e0e4eb}
+.ti-cov-page-tabs button[aria-pressed=true]{background:#e6f3eb;color:#075a32;border-color:#89b99b}
+.ti-cov-workspace .ti-cov-workspace-tools{margin-bottom:12px}
+.ti-cov-workspace .ti-cov-date-pick{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ti-cov-date-pick label,.ti-cov-workspace .board-heading label{font-size:.83rem;display:flex;align-items:center;gap:6px}
+.ti-cov-date-pick :is(input,select),.ti-cov-workspace .board-heading select{border:1px solid #e0e4eb;background:#fff;border-radius:8px;padding:7px;font:inherit;color:inherit}
+.ti-cov-feedback{padding:12px}
+.ti-cov-person-list{display:grid;gap:5px}
+.ti-cov-workspace [data-cov-drag]:not(:disabled){cursor:grab}
+.ti-cov-workspace .ti-cov-column{padding:8px}
+.ti-cov-workspace .ti-cov-ticket{padding:0;gap:0;overflow:hidden}
+.ti-cov-workspace .ti-cov-ticket-body{display:grid;gap:4px;padding:8px 10px}
+.ti-cov-ticket-body p{margin:0}
+.ti-cov-ticket-body button{padding:6px 0;color:#075a32;font-size:.84rem;font-weight:700}
+.ti-cov-workspace .board-heading h2{margin:0}
+.ti-cov-drawer .ti-cov-reasons{margin-top:8px}
+.ti-cov-coverage-why{font-size:.86rem;color:#536378}
+@media(max-width:680px){
+ .ti-cov-person-list{display:flex;overflow-x:auto}
+ .ti-cov-person-list .person{width:auto;flex:none}
+ .ti-cov-workspace .team.ti-cov-team-side .section-head,.ti-cov-workspace .team.ti-cov-team-side .tip{display:block}
+ .ti-cov-workspace .team.ti-cov-team-side .section-head .count{display:none}
+ .ti-cov-workspace .ti-cov-date-pick{justify-content:space-between}
+ .ti-cov-workspace .ti-cov-column-tabs{margin:6px 0}
+}

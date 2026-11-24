@@ -1,5 +1,6 @@
-import React,{useEffect,useRef,useState} from 'react';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {reviewCoverageAssignment,wholeTurnAssignment} from '../server/coverage/operational.js';
+import './roster-board.css';
 import {coverageCardId,coverageColumns,moveCoverageCard,projectCoverage} from './coverage-board-state.js';
 import {monthDates} from '../server/schedules/rules.js';
 import {restaurantDay} from '../shared/operation-day.js';
@@ -14,12 +15,13 @@ const candidateName=person=>person.name+' · '+(person.jobTitle||'Função a con
 
 
 const initialOrder=['cozinha:manha','frente:manha','cozinha:noite','frente:noite'];
-const options=(row,person)=> {
+function options(row,person){
  const assignment=wholeTurnAssignment(row,person);
  const blocked=assignment?.first&&reviewCoverageAssignment(assignment).state==='blocked';
- return {assignment,available:Boolean(assignment&&!blocked&&person.hasAccount&&
-  (row.roleGap&&person.matchesRole||row.headcountGap&&person.countsForMinimum||row.skillGap&&person.skillConfirmed))};
-};
+ const helps=row.roleGap&&person.matchesRole||row.headcountGap&&person.countsForMinimum||row.skillGap&&person.skillConfirmed;
+ const reason=!helps?'Não cobre a função ou vaga que falta':!assignment?'Sem horário compatível com o turno':blocked?'A jornada somada ultrapassa o limite de revisão':!person.hasAccount?'Conta ainda não vinculada à ficha':'';
+ return {assignment,available:!reason,reason};
+}
 const problems=(row,impact)=>[
  impact.headcountGap?impact.headcountGap+' '+(impact.headcountGap===1?'vaga':'vagas'):'',
  impact.roleGap?(row.sector==='cozinha'?'Falta cozinheiro':'Falta gestão'):'',
@@ -45,6 +47,7 @@ function CoverageDrawer({card,data,date,plan,request,run,busy,selected,setSelect
    <h3>Quem está no turno</h3><p>Turno da loja · {hours(row.window)}</p>
    <ul className="ti-cov-team">{row.people.map(item=><li key={item.uid}><strong>{candidateName(item)}</strong><small>{hours(item.hours)}</small></li>)}</ul>
    {!row.people.length&&<p>Ninguém confirmado na escala.</p>}
+   {row.uncertain&&<p className="ti-cov-coverage-why">{!row.window?'Confira a jornada cadastrada para este turno.':row.minimum==null?'Defina o mínimo da frente nas configurações.':'Confira os horários da equipe e se a gestão conta no mínimo da frente.'}</p>}
    {recurring.filter(item=>item.available&&item.paid===false).map(item=><p key={item.uid+item.forUid}>{item.name} · cobertura fixa sem taxa</p>)}
    {intervals.map((item,i)=><p key={i}>{item.skill||item.sector} · {item.start}–{item.end} · {item.covered}/{item.minimum}</p>)}
   </section>
@@ -53,7 +56,11 @@ function CoverageDrawer({card,data,date,plan,request,run,busy,selected,setSelect
    <h3>Preparar reforço</h3>
    <ul className="ti-cov-team">{row.candidates.filter(item=>options(row,item).available&&!matches.some(p=>p.staffId===item.uid&&['pending_acceptance','pending_approval','approved','completed','paid'].includes(p.status))).map(item=>
     <li key={item.uid}><button type="button" aria-pressed={selected===item.uid} onClick={()=>{setSelected(item.uid);setCoveredStart(false);}}>{candidateName(item)}</button></li>)}</ul>
-   {!row.candidates.some(item=>options(row,item).available)&&<p>Sem reforço apto com os dados atuais. Confira jornada, vínculo ou disponibilidade.</p>}
+   {!row.candidates.some(item=>options(row,item).available)&&<p>Sem opção de convite agora. Confira as jornadas ou procure reforço com a gestão.</p>}
+   {row.candidates.some(item=>!options(row,item).available)&&<details className="ti-cov-reasons">
+    <summary>Por que alguns nomes não aparecem para convite?</summary>
+    <ul className="ti-cov-team">{row.candidates.filter(item=>!options(row,item).available).map(item=><li key={item.uid}><strong>{item.name}</strong><small>{options(row,item).reason}</small></li>)}</ul>
+   </details>}
    {assignment&&preview&&<div className="ti-cov-invite">
     <strong>Prévia · {person.name}</strong>
     <p>{row.minimum!==null?impact.count+' → '+preview.count+' de '+row.minimum:preview.count+' pessoas previstas'}. {impact.roleGap&&!preview.roleGap?'A pessoa cobre a função que faltava. ':''}{preview.headcountGap?preview.headcountGap+' vagas seguem abertas.':''}</p>
@@ -83,6 +90,7 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
  const prefer=change=>setPreferences(previous=>({...previous,...change}));
  useEffect(()=>{try{localStorage.setItem(preferenceKey,JSON.stringify(preferences));}catch{/* view stays usable */}},[preferenceKey,preferences]);
  const [column,setColumn]=useState('needs'),[personId,setPerson]=useState(''),[opened,setOpened]=useState(null),[selected,setSelected]=useState('');
+ const pointer=useRef(null), ignoreClick=useRef(false), generation=useRef(0);
  const [result,setResult]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
  const today=restaurantDay();
  const activePlans=(data?.plans||[]).filter(item=>item.period>=today.slice(0,7));
@@ -113,37 +121,83 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
   }
   setError('');setSelected(uid);setOpened(card.id);setPerson('');
  };
- const evaluate=async event=>{
-  event.preventDefault();setLoading(true);setError('');setResult(null);setPerson('');setOpened(null);
-  try{setResult({...await request('assessShift',{planId:plan.id,date,sector:'cozinha',shift:shift==='todos'?'noite':shift}),planId:plan.id,date});}
-  catch(e){setError(e.message);}
-  finally{setLoading(false);}
- };
- return <section className="ti-cov-panel ti-cov-board">
-  <h1>Cobertura</h1>
-  <form className="ti-cov-filter" onSubmit={evaluate}>
-   <label>Escala<select value={plan?.id||''} onChange={event=>{setPlanId(event.target.value);setPerson('');setError('');}}>
-    {!plan&&<option value="">{data?'Nenhuma escala disponível':'Carregando escalas…'}</option>}
-    {activePlans.map(item=><option value={item.id} key={item.id}>{item.title} · {item.period} · {item.status==='published'?'Publicada':'Em preparação'}</option>)}
-   </select></label>
-   <label>Data<input type="date" required value={date} min={period?period+'-01':undefined} max={period?monthDates(period).at(-1):undefined} onChange={event=>{setDate(event.target.value);setPerson('');setError('');}}/></label>
-   <button type="submit" disabled={!plan||!date||loading||busy}>{loading?'Avaliando…':'Avaliar situação'}</button>
-  </form>
-  {error&&<p className="team-error" role="alert">{error}</p>}
-  {current&&<>
-   <div className="ti-cov-board-tools">
-    <div className="ti-cov-segments" role="group" aria-label="Turno">{Object.entries({todos:'Todos',...shifts}).map(([id,label])=>
-     <button type="button" key={id} aria-pressed={id===shift} onClick={()=>{prefer({shift:id});setPerson('');}}>{label}</button>)}</div>
-    <label>Setor<select value={sector} onChange={event=>{prefer({sector:event.target.value});setPerson('');}}>
-     {Object.entries({todos:'Todos',...sectors}).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
+ const evaluate=useCallback(async(id,day)=>{
+  const attempt=++generation.current;
+  setLoading(true);setError('');setPerson('');setOpened(null);
+  try{
+   const result=await request('assessShift',{planId:id,date:day,sector:'cozinha',shift:'noite'});
+   if(attempt===generation.current)setResult({...result,planId:id,date:day});
+  }catch(e){if(attempt===generation.current){setResult(null);setError(e.message);}}
+  finally{if(attempt===generation.current)setLoading(false);}
+ },[request]);
+ const activeId=plan?.id;
+ useEffect(()=>{
+  if(activeId&&date)void evaluate(activeId,date);
+  return ()=>{generation.current++;};
+ },[activeId,date,evaluate]);
+
+ function pointerDown(event){
+  const grip=event.target.closest('[data-cov-drag]');
+  if(!grip||grip.disabled||event.button!==0||event.pointerType==='touch')return;
+  pointer.current={id:event.pointerId,x:event.clientX,y:event.clientY,key:grip.dataset.covDrag,kind:grip.dataset.covKind};
+  grip.setPointerCapture(event.pointerId);
+ }
+ function pointerMove(event){
+  const drag=pointer.current;
+  if(!drag||drag.id!==event.pointerId)return;
+  if(!drag.moved&&Math.hypot(drag.x-event.clientX,drag.y-event.clientY)<8)return;
+  drag.moved=true;
+  const target=document.elementFromPoint(event.clientX,event.clientY)?.closest('[data-cov-drop]');
+  if(drag.target!==target){
+   drag.target?.classList.remove('drop-active');
+   target?.classList.add('drop-active');drag.target=target;
+  }
+ }
+ function pointerEnd(event){
+  const drag=pointer.current;
+  if(!drag||drag.id!==event.pointerId)return;
+  pointer.current=null;drag.target?.classList.remove('drop-active');
+  if(!drag.moved)return;
+  ignoreClick.current=true;requestAnimationFrame(()=>{ignoreClick.current=false;});
+  if(event.type==='pointercancel')return;
+  const drop=document.elementFromPoint(event.clientX,event.clientY)?.closest('[data-cov-drop]');
+  const target=visible.find(card=>card.id===drop?.dataset.covDrop);
+  if(!target)return;
+  if(drag.kind==='person'){open(target,drag.key);return;}
+  const source=visible.find(card=>card.id===drag.key);
+  if(source?.impact.column===target.impact.column)prefer({order:moveCoverageCard(order,drag.key,target.id)});
+ }
+ return <section className="roster-board ti-cov-workspace" onPointerDown={pointerDown} onPointerMove={pointerMove}
+  onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onClickCapture={event=>{if(ignoreClick.current){event.preventDefault();event.stopPropagation();}}}>
+  <div className="toolbar ti-cov-workspace-tools">
+   <nav className="tabs" aria-label="Turno">{Object.entries({todos:'Todos',...shifts}).map(([id,label])=>
+    <button className="tab" type="button" key={id} aria-pressed={id===shift} onClick={()=>{prefer({shift:id});setPerson('');}}>{label}</button>)}</nav>
+   <div className="ti-cov-date-pick">
+    <label>Data <input type="date" required value={date} min={period?period+'-01':undefined} max={period?monthDates(period).at(-1):undefined} onChange={event=>{setDate(event.target.value);setPerson('');}}/></label>
+    {activePlans.length>1&&<label>Escala <select value={activeId} onChange={event=>{setPlanId(event.target.value);setPerson('');}}>
+     {activePlans.map(item=><option value={item.id} key={item.id}>{item.title} · {item.period}</option>)}</select></label>}
    </div>
-   {availablePeople.size>0&&<div className="ti-cov-pool" aria-label="Pessoas para avaliar">
-    <strong>Equipe para reforço</strong><div>{[...availablePeople.values()].map(person=>
-     <button key={person.uid} type="button" draggable aria-pressed={personId===person.uid}
-      onDragStart={event=>{event.dataTransfer.setData('application/x-tiamicci-person',person.uid);event.dataTransfer.effectAllowed='copy';}}
-      onClick={()=>setPerson(personId===person.uid?'':person.uid)}>{person.name}</button>)}</div>
-    {personId&&<small role="status">Toque no cartão para ver a prévia.</small>}
-   </div>}
+  </div>
+  {!activeId&&<p className="panel ti-cov-feedback" role="status">{data?'Nenhuma escala disponível para avaliar.':'Carregando a escala…'}</p>}
+  {loading&&<p className="panel ti-cov-feedback" role="status">Conferindo o turno…</p>}
+  {error&&<p className="team-error" role="alert">{error} {activeId&&<button type="button" className="action quiet" onClick={()=>evaluate(activeId,date)}>Tentar novamente</button>}</p>}
+  {current&&<div className="layout">
+   <aside className="panel team ti-cov-team-side" aria-label="Pessoas para reforço">
+    <div className="section-head"><h2>Equipe para reforço</h2><span className="count">{availablePeople.size}</span></div>
+    <p className="tip">{availablePeople.size?'Arraste um nome para o turno ou selecione os dois.':'Abra um turno para ver os horários e as opções.'}</p>
+    <div className="ti-cov-person-list">{[...availablePeople.values()].map(person=>
+     <button key={person.uid} type="button" className={'person'+(personId===person.uid?' selected':'')}
+      data-cov-drag={person.uid} data-cov-kind="person" aria-pressed={personId===person.uid}
+      onClick={()=>setPerson(personId===person.uid?'':person.uid)}>
+      <span className="avatar" aria-hidden="true">{person.name.slice(0,1)}</span><span className="identity"><strong>{person.name}</strong><small>{person.jobTitle}</small></span><span className="drag" aria-hidden="true">⠿</span>
+     </button>)}</div>
+    {personId&&<small role="status">Selecione um turno para ver a prévia.</small>}
+   </aside>
+   <div className="boards">
+    <div className="board-heading"><div><h2>Turnos de {shortDate(date)}</h2><p>{visible.filter(card=>card.impact.open).length} em atenção</p></div>
+    <label>Setor <select value={sector} onChange={event=>{prefer({sector:event.target.value});setPerson('');}}>
+     {Object.entries({todos:'Todos',...sectors}).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
+    </div>
    <div className="ti-cov-column-tabs" role="group" aria-label="Colunas do quadro">{Object.entries(coverageColumns).map(([id,label])=>
     <button key={id} type="button" aria-pressed={column===id} onClick={()=>setColumn(id)}>{label} {visible.filter(card=>card.impact.column===id).length}</button>)}</div>
    <div className="ti-cov-kanban">{Object.entries(coverageColumns).map(([id,label])=>{
@@ -151,28 +205,22 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
     return <section key={id} className="ti-cov-column" data-active={id===column} data-column={id} aria-label={label}>
      <h2>{label} <span>{items.length}</span></h2>
      {!items.length&&<p className="ti-cov-empty">Nenhum cartão nesta coluna.</p>}
-     {items.map((card,index)=><article key={card.id} className="ti-cov-ticket" data-selected={!!personId}
-      onDragOver={event=>event.preventDefault()} onDrop={event=>{
-       event.preventDefault();
-       const uid=event.dataTransfer.getData('application/x-tiamicci-person');
-       if(uid){open(card,uid);return;}
-       const from=event.dataTransfer.getData('application/x-tiamicci-card');
-       if(items.some(item=>item.id===from))prefer({order:moveCoverageCard(order,from,card.id)});
-      }}>
-      <header className="ti-cov-row"><h3>{sectors[card.row.sector]} · {shifts[card.row.shift]}</h3>
-       <button type="button" className="ti-cov-grip" draggable disabled={items.length<2} aria-label={'Reordenar '+sectors[card.row.sector]+' '+shifts[card.row.shift]}
-        title="Arrastar para reordenar" onDragStart={event=>{event.dataTransfer.setData('application/x-tiamicci-card',card.id);event.dataTransfer.effectAllowed='move';}}
+     {items.map((card,index)=><article key={card.id} className="day ti-cov-ticket" data-cov-drop={card.id} data-selected={!!personId}>
+      <header className="day-title"><h3>{sectors[card.row.sector]} · {shifts[card.row.shift]}</h3>
+       <button type="button" className="ti-cov-grip" disabled={items.length<2} aria-label={'Reordenar '+sectors[card.row.sector]+' '+shifts[card.row.shift]}
+        title="Arrastar para reordenar" data-cov-drag={card.id} data-cov-kind="card"
         onClick={()=>{const other=items[index===0?1:index-1];if(other)prefer({order:moveCoverageCard(order,card.id,other.id)});}}>⠿</button>
       </header>
+      <div className="day-body ti-cov-ticket-body">
       <p>{card.row.minimum===null?card.impact.count+' com horário':card.impact.count+' de '+card.row.minimum+' previstos'}</p>
       <p className="ti-cov-ticket-problem">{problems(card.row,card.impact)}</p>
       {card.impact.waiting.length>0&&<small>{card.impact.waiting.length} em análise</small>}
-      <button type="button" className="ti-cov-quiet" onClick={()=>open(card,personId)}>{personId?'Ver prévia':card.impact.column==='needs'?'Ver opções':card.impact.column==='waiting'?'Acompanhar':'Ver cobertura'}</button>
+      <button type="button" className="ti-cov-quiet" onClick={()=>open(card,personId)}>{personId?'Ver prévia':card.impact.column==='needs'?'Ver opções':card.impact.column==='waiting'?'Acompanhar':'Ver cobertura'}</button></div>
      </article>)}
     </section>;
    })}</div>
-   {current.context&&<p className="ti-cov-data">Base da avaliação · {current.evaluation.holiday?'Feriado':current.evaluation.busyDay?'Dia de movimento':'Dia comum'} · {current.context.production.tasks.length} tarefas de produção · movimento de clientes por turno a confirmar</p>}
-  </>}
+   </div>
+  </div>}
   {openedCard&&<CoverageDrawer key={openedCard.id} card={openedCard} data={data} date={date} plan={plan} request={request} run={run} busy={busy} selected={selected} setSelected={setSelected} close={()=>setOpened(null)} renderProposal={renderProposal}/>}
  </section>;
 }
