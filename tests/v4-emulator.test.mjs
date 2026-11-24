@@ -188,4 +188,32 @@ test('V4 transactions: production race, retry, tenancy, live rules, leave locks 
  await policy.set({requirements});assert.equal((await call(schedules,administrator,'publish',{id:planned.id})).code,200);
  assert.equal((await unit.collection('schedulePublicationState').doc(period).get()).data().activeId,planned.id);
 
+ const {fiveTwoSundays,fiveTwoWeeks,shiftScheduleDate}=await import('../server/schedules/five-two.js');
+ const days=fiveTwoSundays(period),weeks=fiveTwoWeeks(period);
+ const fiveTwo={weekly:Object.fromEntries(weeks.map(week=>[week,{'staff-one':0,'staff-two':2}])),sundays:{'staff-one':days[0],'staff-two':days[1]}};
+ const incomplete=await call(schedules,manager,'saveDraft',{period,title:'Quadro 5×2 incompleto',entries:[],roster:{weekly:{},sundays:{}}});
+ assert.equal(incomplete.code,200);
+ assert.equal((await call(schedules,manager,'submit',{id:incomplete.id})).code,409);
+ const newDraft=await call(schedules,manager,'saveDraft',{period,title:'Quadro 5×2',entries:[],roster:fiveTwo});
+ assert.equal(newDraft.code,200,JSON.stringify(newDraft));
+ const stored=(await unit.collection('schedules').doc(newDraft.id).get()).data();
+ assert.equal(stored.entries.filter(entry=>entry.uid==='staff-one'&&entry.type==='monthly_sunday').length,1);
+ const completeWeek=weeks.find(week=>week.startsWith(period));
+ const monday=stored.entries.find(entry=>entry.uid==='staff-one'&&entry.date===completeWeek);
+ assert.equal(monday.type,'off');
+ assert.equal((await call(schedules,manager,'submit',{id:newDraft.id})).code,200);
+ assert.equal((await call(schedules,administrator,'approve',{id:newDraft.id})).code,200);
+ const crossing=weeks.find(week=>[week,shiftScheduleDate(week,6)].some(date=>!date.startsWith(period)));
+ if(crossing){
+  const neighboringPeriod=[crossing,shiftScheduleDate(crossing,6)].find(date=>!date.startsWith(period)).slice(0,7);
+  const neighborRef=unit.collection('schedules').doc('five-two-neighbor');
+  const neighborLock=unit.collection('schedulePublicationState').doc(neighboringPeriod);
+  await neighborRef.set({period:neighboringPeriod,status:'published',entries:[],roster:{weekly:{[crossing]:{'staff-one':3,'staff-two':2}},sundays:{}}});
+  await neighborLock.set({activeId:neighborRef.id});
+  assert.equal((await call(schedules,administrator,'publish',{id:newDraft.id})).code,409);
+  await neighborRef.update({'roster.weekly':{[crossing]:{'staff-one':0,'staff-two':2}}});
+ }
+ assert.equal((await call(schedules,administrator,'publish',{id:newDraft.id})).code,200);
+ assert.equal((await unit.collection('schedulePublicationState').doc(period).get()).data().activeId,newDraft.id);
+
 });
