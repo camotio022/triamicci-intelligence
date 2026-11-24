@@ -113,7 +113,7 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
  const recurring = (policy.recurring || []).flatMap(rule=>{
   const absent=active.find(person=>person.uid===rule.absentId), cover=active.find(person=>person.uid===rule.coverId);
   if(!absent||!offTypes.has(typeOf(absent)))return [];
-  return [{uid:rule.coverId,forUid:rule.absentId,paid:rule.paid??null,available:Boolean(cover&&typeOf(cover)==='work'&&inSector(cover,profile(absent).sector)&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector===profile(absent).sector)?.coverageWindow)),name:cover?name(cover):'Pessoa indisponível',sector:profile(absent).sector,shift:profile(absent).shift}];
+  return [{uid:rule.coverId,forUid:rule.absentId,paid:rule.paid??null,available:Boolean(cover&&typeOf(cover)==='work'&&inSector(cover,front.has(profile(absent).sector)?'frente':profile(absent).sector)&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector===(front.has(profile(absent).sector)?'frente':profile(absent).sector))?.coverageWindow)),name:cover?name(cover):'Pessoa indisponível',sector:front.has(profile(absent).sector)?'frente':profile(absent).sector,shift:profile(absent).shift}];
  });
  const managers=active.filter(management);
  const manager=managers.filter(person=>title(person)==='manager'), deputy=managers.filter(person=>title(person)==='submanager');
@@ -154,7 +154,8 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
  }
  const recurringKeys=new Set(recurring.filter(r=>r.available&&r.paid).map(r=>r.uid+'|'+r.shift));
  const recurringPendingFees=new Set(recurring.filter(r=>!r.available&&r.paid===true&&!recurringKeys.has(r.uid+'|'+r.shift)).map(r=>r.uid+'|'+r.shift)).size;
- const recurringUnknownFees=new Set(recurring.filter(r=>r.paid==null).map(r=>r.uid+'|'+r.shift)).size;
+ const pendingKeys=new Set(recurring.filter(r=>!r.available&&r.paid===true).map(r=>r.uid+'|'+r.shift));
+ const recurringUnknownFees=new Set(recurring.filter(r=>r.paid==null&&!recurringKeys.has(r.uid+'|'+r.shift)&&!pendingKeys.has(r.uid+'|'+r.shift)).map(r=>r.uid+'|'+r.shift)).size;
  return {date, holiday,busyDay,strongPeak,shifts,intervals,recurring,recurringFees:recurringKeys.size,recurringPendingFees,recurringUnknownFees,
   extra:shifts.reduce((total,row)=>total+(row.window&&!row.missingHours?row.shortage:0),0),
   attention:shifts.some(row=>row.shortage||row.uncertain)||intervals.some(row=>row.deficit)||recurring.some(row=>!row.available)};
