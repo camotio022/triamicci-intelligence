@@ -43,7 +43,11 @@ export default async function portioningHandler(req,res){
    const central=product.data().catalogId?await tx.get(db.collection('productCatalog').doc(product.data().catalogId)):null;
    const unit=countUnit(product.data(),central?.data()),basis=stamp(balance);
    if(balance.data().unit!==unit||recipe.stockUnit!==unit||!['kg','g'].includes(unit)||!validQuantity(recipe.portionSize,{unit}))throw Error('UNIT');
-   const status=portionStatus(balance.data(),state.data(),area,basis);result={...status,basis,location:area};
+   const portioned=state.data();
+   // A contagem grava o saldo e o peso porcionado no mesmo commit.
+   const countBasis=portioned?.countOperationId?stamp(state):null;
+   const snapshotState=portioned?{...portioned,basis:portioned.basis??countBasis}:undefined;
+   const status=portionStatus(balance.data(),snapshotState,area,basis);result={...status,basis,location:area};
    if(action==='portionStatus')return;
    const now=new Date();
    if(action==='reconcilePortioning'){

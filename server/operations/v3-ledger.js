@@ -279,19 +279,34 @@ export default async function v3Ledger(req,res){
    return send(res,200,duplicate?'Recebimento já registrado.':'Recebimento salvo.',{duplicate,id:requestId});
   }
   if(action==='v3Count'){
-   const {requestId,sessionId,productId,location,quantity,lotCounts=[],initialLot=null,notes=''}=req.body||{};
+   const {requestId,sessionId,productId,location,quantity,lotCounts=[],initialLot=null,portionCount=null,notes=''}=req.body||{};
    if(!reqOk(requestId)||!reqOk(sessionId)||!idOk(productId)||!locations.includes(location)||
-    typeof notes!=='string'||notes.length>240||!Array.isArray(lotCounts)||lotCounts.length>100)return send(res,400,'Contagem incompleta.');
+    typeof notes!=='string'||notes.length>240||!Array.isArray(lotCounts)||lotCounts.length>100||
+    (portionCount!==null&&(typeof portionCount.recipeId!=='string'||!/^[a-z0-9-]{3,64}$/.test(portionCount.recipeId)||
+     !Number.isSafeInteger(portionCount.portions)||portionCount.portions<0||!number(portionCount.portionSize,'kg'))))return send(res,400,'Contagem incompleta.');
    const pr=products.doc(productId),cfgRef=profiles.doc(productId),balanceRef=balances.doc(productId),ref=unit.collection('v3Operations').doc(requestId);
    await db.runTransaction(async tx=>{
     const [a,p,cfg,balance,record]=await Promise.all([tx.get(actorRef),tx.get(pr),tx.get(cfgRef),operationalBalance(tx,balanceRef),tx.get(ref)]);
     if(!active(a,m.unitId,MANAGEMENT_ROLES))throw Error('FORBIDDEN');
-    if(record.exists){const old=record.data();if(old.kind==='count'&&old.actorUid===actor.uid&&old.sessionId===sessionId&&old.productId===productId&&old.location===location&&old.quantity===quantity&&old.notes===notes)return;throw Error('CONFLICT');}
+    if(record.exists){const old=record.data();if(old.kind==='count'&&old.actorUid===actor.uid&&old.sessionId===sessionId&&old.productId===productId&&old.location===location&&old.quantity===quantity&&old.notes===notes&&
+     (old.portionCount?.recipeId??null)===(portionCount?.recipeId??null)&&
+     (old.portionCount?.portions??null)===(portionCount?.portions??null)&&
+     (old.portionCount?.portionSize??null)===(portionCount?.portionSize??null))return;throw Error('CONFLICT');}
     const config=conferenceProfile(p.data(),cfg.data());
     if(!p.exists||!isOperationalProduct(p.data())||config?.controlMode!=='quantitative'||!config.locations?.includes(location))throw Error('MISSING');
     const u=config.countUnit;if(!number(quantity,u,true))throw Error('QUANTITY');
     const prior=balance.data()||{reserva:0,giro:0,total:0,unit:u};
     if(prior.unit!==u)throw Error('UNIT');
+    let portionedWeight=null;
+    if(portionCount){
+     const recipe=(await tx.get(unit.collection('productionRecipes').doc(portionCount.recipeId))).data();
+     const setup=recipe?.preparationConfig;
+     if(!recipe?.active||recipe.archivedAt||recipe.stockEffect!=='portion_same_product'||
+      setup?.sourceProductId!==productId||setup.outputProductId!==productId||!['portions','both'].includes(setup.countMode)||
+      recipe.stockUnit!==u||recipe.portionSize!==portionCount.portionSize)throw Error('COUNT_PREPARATION');
+     portionedWeight=round(portionCount.portions*recipe.portionSize);
+     if(portionedWeight>quantity)throw Error('QUANTITY');
+    }
     const today=new Date().toISOString().slice(0,10);
     const lotQuery=usesPhysicalLots(p.data())?await tx.get(lotRoots.doc(productId).collection('lots').limit(101)):null;
     if(lotQuery?.size>100)throw Error('LOT');
@@ -319,8 +334,12 @@ export default async function v3Ledger(req,res){
       lastCountAtByArea:{...(prior.lastCountAtByArea||{}),[location]:now()},
       countSessions:{...(prior.countSessions||{}),[location]:sessionId},
       quality:'PARTIAL_LOCATION_COUNT',lastOperationId:requestId},{merge:true},prior);
+    if(portionCount)tx.set(unit.collection('portioningState').doc(productId+'-'+location),{
+     productId,location,unit:u,weight:portionedWeight,countOperationId:requestId,updatedAt:now(),
+    });
     tx.create(ref,{kind:'count',actorUid:actor.uid,actorName:historyActor(a.data(),actor),productName:p.data().name,at:now(),productId,location,sessionId,quantity,unit:u,
-      before:prior[location]||0,difference:round(quantity-(prior[location]||0)),notes});
+      before:prior[location]||0,difference:round(quantity-(prior[location]||0)),notes,
+      ...(portionCount?{portionCount:{recipeId:portionCount.recipeId,portions:portionCount.portions,portionSize:portionCount.portionSize},portionedWeight}:{}),});
     if(prior.countSessions?.[location==='reserva'?'giro':'reserva']===sessionId){const reserve=location==='reserva'?quantity:prior.reserva,rotation=location==='giro'?quantity:prior.giro;const at=now();tx.set(balanceRef,{countedReserve:reserve,countedRotation:rotation,countedTotal:after,countId:requestId,entriesSinceCount:0,exitsSinceCount:0,at,quality:'PHYSICAL_COUNT'},{merge:true});tx.create(unit.collection('physicalCounts').doc(requestId),{inventorySummary:intervalFromBalance(prior),productId,productName:p.data().name,actorName:historyActor(a.data(),actor),unit:u,reserve,rotation,total:after,sessionId,actorUid:actor.uid,unitId:m.unitId,at});}
     audit(tx,db,'v3.counted',m.unitId,actor.uid,{requestId,productId,location,quantity,sessionId});
    });
@@ -436,7 +455,7 @@ export default async function v3Ledger(req,res){
  }catch(e){
   const errors={RECEIVING_UNIT:[409,'A unidade recebida difere da configuração do produto.'],RECEIVING_QUANTITY:[409,'Na mesma unidade, as quantidades recebida e física devem coincidir.'],UNAUTHENTICATED:[401,'Faça login.'],FORBIDDEN:[403,'Sem permissão.'],MISSING:[409,'Produto não configurado ou saldo indisponível.'],
    CONFLICT:[409,'Operação já registrada ou identificador repetido.'],UNIT:[409,'Unidades incompatíveis; revisão necessária.'],
-   QUANTITY:[409,'Quantidade inválida ou saldo insuficiente.'],LOT:[409,'Lotes e validade precisam ser reconciliados.'],
+   COUNT_PREPARATION:[409,'O padrão da preparação mudou. Reabra a contagem.'],QUANTITY:[409,'Quantidade inválida ou saldo insuficiente.'],LOT:[409,'Lotes e validade precisam ser reconciliados.'],
    RECEIPT_ORIGIN:[409,'Este produto é de produção interna e não pode entrar como entrega de fornecedor.'],RECEIPT_REASON:[409,'Explique a entrega não prevista ou o excedente com pelo menos oito caracteres.'],
    LOCATION:[409,'Local não permitido para este item.'],ORDER:[409,'Pedido não corresponde ao item recebido.'],
    ORDER_UNIT:[409,'Unidade do pedido não corresponde à conferência.'],SOURCE:[409,'Matéria-prima não autorizada nesta preparação.'],ALTERNATIVE:[409,'Explique a substituição antes de produzir.'],ALTERNATIVE_APPROVAL:[403,'Uma substituição de matéria-prima exige autorização gerencial. Solicite à gestão que registre a produção.']};

@@ -3,7 +3,7 @@ test('conferência real: contagem parcial, rodada completa, lotes, idempotência
  const project='demo-triamicci-v31',{privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});Object.assign(process.env,{APP_ENV:'staging',PUBLIC_APP_URL:'https://triamicci-e2e.test',FIREBASE_EXPECTED_PROJECT_ID:project,FIRESTORE_EMULATOR_HOST:'127.0.0.1:8080',FIREBASE_AUTH_EMULATOR_HOST:'127.0.0.1:9099',FIREBASE_SERVICE_ACCOUNT_JSON:JSON.stringify({project_id:project,client_email:'conference@'+project+'.iam.gserviceaccount.com',private_key:privateKey.export({type:'pkcs8',format:'pem'}).toString()})});
  const [{getDb},{default:handler}]=await Promise.all([import('../server/_lib.js'),import('../api/operations/stock.js')]);const db=getDb(),unitId='conference-'+randomUUID(),root=db.collection('units').doc(unitId);
  const user=async(role,tenant=unitId)=>{const r=await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=local',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:randomUUID()+'@conference.test',password:'test-password-only',returnSecureToken:true})});const u=await r.json();assert.equal(r.status,200);await db.doc('memberships/'+u.localId).set({unitId:tenant,role,status:'active',name:'Pessoa teste'});return {uid:u.localId,token:u.idToken};};const manager=await user('manager'),cook=await user('cook'),other=await user('manager','foreign-'+unitId);
- const call=async(actor,action,payload={})=>{const res={code:200,setHeader(){},status(n){this.code=n;return this},json(body){this.body=body;return this}};await handler({method:'POST',headers:{origin:'https://triamicci-e2e.test','content-type':'application/json',authorization:'Bearer '+actor.token},body:{action,...payload}},res);return {http:res.code,...res.body}};
+ const call=async(actor,action,payload={},endpoint=handler)=>{const res={code:200,setHeader(){},status(n){this.code=n;return this},json(body){this.body=body;return this}};await endpoint({method:'POST',headers:{origin:'https://triamicci-e2e.test','content-type':'application/json',authorization:'Bearer '+actor.token},body:{action,...payload}},res);return {http:res.code,...res.body}};
  const id='a'.repeat(40),bal=root.collection('physicalBalances').doc(id);await root.collection('products').doc(id).set({name:'Isca',status:'active',operationalCatalogVersion:'56-v1',unit:'un',countFrequency:'daily'});await root.collection('operationalProfiles').doc(id).set({displayName:'Isca',controlMode:'quantitative',countUnit:'un',locations:['giro','reserva']});await bal.set({unit:'un',reserve:30,rotation:10,total:40});
  const sessionId=randomUUID(),count={requestId:randomUUID(),sessionId,productId:id,location:'giro',quantity:24};
  assert.equal((await call(cook,'v3Count',count)).http,403);assert.equal((await call(other,'v3Count',count)).http,409);
@@ -22,5 +22,26 @@ test('conferência real: contagem parcial, rodada completa, lotes, idempotência
  assert.equal((await call(manager,'v3Count',{productId:prepared,requestId:randomUUID(),sessionId:randomUUID(),location:'giro',quantity:5})).http,200,'Conta preparação já revisada sem exigir recadastro');
  assert.equal((await call(cook,'availabilityCheck',{productId:prepared,requestId:randomUUID(),location:'giro',observation:'available'})).http,200);
  await root.collection('products').doc(id).update({lotTrackingMode:'per_lot',trackExpiry:true});assert.equal((await call(manager,'v3Count',{...count,requestId:randomUUID(),quantity:2})).http,409,'Não omitir lote obrigatório');
+ const {default:production}=await import('../api/production/manage.js');
+ const chicken='c'.repeat(40),recipeId='frango-passarinhos';
+ await root.collection('products').doc(chicken).set({name:'Frango a passarinho',status:'active',operationalCatalogVersion:'56-v1',unit:'kg'});
+ await root.collection('operationalProfiles').doc(chicken).set({controlMode:'quantitative',countUnit:'kg',locations:['reserva']});
+ const configuration={name:'Frango a passarinho',type:'portion',sourceProductId:chicken,outputProductId:chicken,
+  portionWeight:500,weightUnit:'g',resultUnit:'porcao',location:'reserva',countMode:'portions',batchYield:1,method:'',outputPerBatch:null,ingredients:[]};
+ const preparation=await call(manager,'savePreparation',{id:recipeId,configuration,activate:true},production);
+ assert.equal(preparation.http,200,JSON.stringify(preparation));
+ const mixedCount={requestId:randomUUID(),sessionId:randomUUID(),productId:chicken,location:'reserva',quantity:5,
+  portionCount:{recipeId,portionSize:.5,portions:6}};
+ assert.equal((await call(manager,'v3Count',{...mixedCount,portionCount:{...mixedCount.portionCount,portionSize:.25}})).http,409);
+ assert.equal((await call(manager,'v3Count',mixedCount)).http,200);
+ assert.equal((await call(manager,'v3Count',mixedCount)).http,200);
+ assert.equal((await call(manager,'v3Count',{...mixedCount,portionCount:{...mixedCount.portionCount,portions:5}})).http,409);
+ const portionStatus=await call(cook,'portionStatus',{recipeId},production);
+ assert.equal(portionStatus.ready,true,JSON.stringify(portionStatus));
+ assert.equal(portionStatus.portionedWeight,3);
+ assert.equal(portionStatus.unmarkedWeight,2);
+ assert.equal((await call(cook,'finishPortioning',{recipeId,requestId:randomUUID(),portions:5},production)).http,409);
+ assert.equal((await call(cook,'finishPortioning',{recipeId,requestId:randomUUID(),portions:4},production)).http,200);
+ assert.equal((await root.collection('physicalBalances').doc(chicken).get()).data().total,5);
  await db.doc('memberships/'+cook.uid).update({status:'inactive'});assert.equal((await call(cook,'availabilityCheck',{...availability,requestId:randomUUID()})).http,403);
 });
