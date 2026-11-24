@@ -23,8 +23,9 @@ export function evaluateCoverageMonth({plan,people,requirements,policy,leaves=[]
     (!row.window||item.start<row.window.end&&item.end>row.window.start));
    const recurring=day.recurring.filter(item=>item.sector===row.sector&&item.shift===row.shift);
    const impact=projectCoverage(row,matches,intervals,recurring);
+   const intervalGap=impact.remainingIntervals.reduce((max,item)=>Math.max(max,item.deficit||0),0);
    return {sector:row.sector,shift:row.shift,count:impact.count,minimum:row.minimum,headcountGap:impact.headcountGap,roleGap:impact.roleGap,skillGap:impact.skillGap,
-    attention:impact.open,uncertain:row.uncertain,confirmedDeficit:!row.uncertain&&Boolean(impact.headcountGap||impact.roleGap||impact.skillGap),extra:row.window&&!row.uncertain&&!row.missingHours?Math.max(impact.headcountGap,impact.roleGap,impact.skillGap):0};
+    attention:impact.open,uncertain:row.uncertain,intervalGap,confirmedDeficit:!row.uncertain&&Boolean(impact.headcountGap||impact.roleGap||impact.skillGap||intervalGap),extra:row.window&&!row.uncertain&&!row.missingHours?Math.max(impact.headcountGap,impact.roleGap,impact.skillGap,intervalGap):0};
   });
   return {date,sunday:sundays.has(date),holiday:day.holiday,attention:shifts.some(row=>row.attention),extra:shifts.reduce((n,row)=>n+row.extra,0),
    recurringFees:day.recurringFees,recurringPendingFees:day.recurringPendingFees,recurringUnknownFees:day.recurringUnknownFees,recurring:day.recurring,shifts};
