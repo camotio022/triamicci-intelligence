@@ -892,3 +892,41 @@
     min-height: 0;
   }
 }
+
+.roster-board .working-preview {
+  margin: 8px 0;
+  padding-block: 7px;
+  border-block: 1px solid var(--line);
+  font-size: .83rem;
+}
+
+.roster-board .working-preview-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.roster-board .working-preview :is(small, p, .working-preview-heading span) {
+  color: var(--muted);
+}
+
+.roster-board .working-preview ul {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 5px 0 0;
+  padding: 0;
+}
+
+.roster-board .working-preview li {
+  display: grid;
+  grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr);
+  gap: 3px 8px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .roster-board .working-preview li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -14,7 +14,12 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      base.blockedRecipes=[{id:'blocked',name:'Preparação bloqueada',errors:['Matéria-prima desativada no catálogo.']}];
     }
     if(b.action==='list'&&(route.request().url().includes('/api/products/manage')||b.includeProducts&&route.request().url().includes('/api/production/manage')))base.products.push({id:'e'.repeat(40),name:'Tilápia em kg',unit:'kg',physicalUnit:'kg',status:'active'},{id:'f'.repeat(40),name:'Isca pronta',unit:'un',physicalUnit:'un',status:'active',lotTrackingMode:'per_lot'});
-    if(b.action==='masterRegistryPreview'&&activeScreen==='Escalas')base.activated=true;
+    if(b.action==='masterRegistryPreview'&&activeScreen==='Escalas'){
+     base.activated=true;
+     base.registry[0].availability=[{day:'dom',start:'08:00',end:'16:20'}];
+     base.registry.push({id:'frente-noite',name:'Atendimento de teste',status:'active',sector:'frente',shift:'noite',
+      availability:[{day:'dom',start:'12:00',end:'20:20'}]});
+    }
     if(b.module==='schedules'){
      if(activeScreen==='Escalas'&&b.action==='list'&&rejectRosterLoad){
       rejectRosterLoad=false;
@@ -58,6 +63,10 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      }
      await board.getByLabel('Mês da escala',{exact:true}).selectOption('2027-01');
      await board.getByText('5 domingos',{exact:true}).waitFor();
+     const roster=board.getByRole('group',{name:'Quem trabalha',exact:true});
+     await roster.getByText('Manhã · Cozinha',{exact:true}).waitFor();
+     await roster.getByText('Noite · Frente',{exact:true}).waitFor();
+     await roster.getByText('12:00–20:20',{exact:true}).waitFor();
      const memberList=board.locator(width<=720?'.mobile-people':'.people');
      const memberCard=memberList.getByRole('button',{name:/Pessoa de teste/});
      const sundayCard=board.locator('[data-drop-sunday="2027-01-31"]');
@@ -74,6 +83,9 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       await page.mouse.up();
      }
      assert.equal(await board.getByRole('status').textContent(),'Pessoa de teste ficou com 31/01.');
+     assert.equal(await roster.getByText(/Pessoa de teste/).count(),0,'Quem ganhou folga sai da lista de trabalho');
+     await roster.getByText(/Atendimento de teste/).waitFor();
+     await roster.getByText('1 no rascunho',{exact:true}).waitFor();
      await board.getByRole('button',{name:'Semana 5×2',exact:true}).click();
      await board.getByLabel('Semana',{exact:true}).selectOption('2027-01-04');
      await memberList.getByRole('button',{name:/Pessoa de teste/}).click();
