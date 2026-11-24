@@ -15,7 +15,7 @@ export function evaluateCoverageMonth({plan,people,requirements,policy,leaves=[]
  }
  const days=monthDates(plan.period).map(date=>{
   const entries=grouped.get(date);
-  if(!entries?.length)return {date,sunday:sundays.has(date),unplanned:true,attention:false,extra:0,recurringFees:0,recurring:[],shifts:[]};
+  if(!entries?.length)return {date,sunday:sundays.has(date),unplanned:true,attention:false,extra:0,recurringFees:0,recurringPendingFees:0,recurringUnknownFees:0,recurring:[],shifts:[]};
   const day=evaluateOperationalDay({date,people,requirements,policy,entries});
   const shifts=day.shifts.map(row=>{
    const matches=proposals.filter(p=>p.operational&&p.date===date&&p.sector===row.sector&&p.shift===row.shift);
@@ -27,9 +27,9 @@ export function evaluateCoverageMonth({plan,people,requirements,policy,leaves=[]
     attention:impact.open,uncertain:row.uncertain,confirmedDeficit:!row.uncertain&&Boolean(impact.headcountGap||impact.roleGap||impact.skillGap),extra:row.window&&!row.uncertain&&!row.missingHours?Math.max(impact.headcountGap,impact.roleGap,impact.skillGap):0};
   });
   return {date,sunday:sundays.has(date),holiday:day.holiday,attention:shifts.some(row=>row.attention),extra:shifts.reduce((n,row)=>n+row.extra,0),
-   recurringFees:day.recurringFees,recurring:day.recurring,shifts};
+   recurringFees:day.recurringFees,recurringPendingFees:day.recurringPendingFees,recurringUnknownFees:day.recurringUnknownFees,recurring:day.recurring,shifts};
 
  });
  const sum=key=>days.reduce((total,day)=>total+day[key],0);
- return {period:plan.period,complete,days,attention:days.filter(day=>day.attention).length,recurringFees:sum('recurringFees'),extra:complete?sum('extra'):null};
+ return {period:plan.period,complete,days,attention:days.filter(day=>day.attention).length,recurringFees:sum('recurringFees'),recurringPendingFees:sum('recurringPendingFees'),recurringUnknownFees:sum('recurringUnknownFees'),extra:complete?sum('extra'):null};
 }
