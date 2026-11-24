@@ -27,15 +27,25 @@ export function getDb() {
 }
 export function getAuth() { getDb(); return admin.auth(); }
 export function send(res, status, message, extra = {}) { return res.status(status).json({ message, ...extra }); }
-export function checkRequest(req, res) {
+function isExplicitLocalDevEnv(env = process.env) {
+  const vercelEnv = env.VERCEL_ENV;
+  if (vercelEnv === 'production' || vercelEnv === 'preview') return false;
+  if (vercelEnv === 'development') return true;
+  return env.APP_ENV === 'development' || env.APP_ENV === 'local' || env.NODE_ENV === 'development';
+}
+function isLoopbackHostname(hostname) {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';
+}
+export function checkRequest(req, res, env = process.env) {
   if (req.method !== 'POST') { res.setHeader('Allow','POST'); send(res,405,'Método não permitido.'); return false; }
   if (!req.headers['content-type']?.startsWith('application/json')) { send(res,415,'Use JSON.'); return false; }
-  const configuredUrl = process.env.PUBLIC_APP_URL?.trim();
+  const configuredUrl = (env.PUBLIC_APP_URL || '').trim();
   if (!configuredUrl) { send(res,503,'PUBLIC_APP_URL não configurada.'); return false; }
   let allowedOrigin;
   try {
     const parsed = new URL(configuredUrl);
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error('Invalid app URL');
+    const allowInsecureLocal = parsed.protocol === 'http:' && isLoopbackHostname(parsed.hostname) && isExplicitLocalDevEnv(env);
+    if ((!allowInsecureLocal && parsed.protocol !== 'https:') || parsed.username || parsed.password) throw new Error('Invalid app URL');
     allowedOrigin = parsed.origin;
   } catch {
     send(res,503,'PUBLIC_APP_URL inválida. Configure uma URL HTTPS completa.');
