@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useId, useMemo, useRef, useState} from 'react';
 import {weekdayOf} from '../server/schedules/generator.js';
 import {coverageTimeline} from '../server/schedules/coverage-timeline.js';
 import {FIVE_TWO_PAIRS, fiveTwoPair, fiveTwoSundays, fiveTwoWeeks, shiftScheduleDate} from '../server/schedules/five-two.js';
@@ -17,27 +17,44 @@ const shifts = {manha:'Manhã', noite:'Noite', intermediario:'Intermediário', v
 const scheduleDays = ['dom','seg','ter','qua','qui','sex','sab'];
 const nameOrder = new Intl.Collator('pt-BR');
 
-function WorkingPreview({date, entries, people, published}){
+function WorkingPreview({date, entries, people}){
+ const [selectedShift,setSelectedShift]=useState(null);
+ const panelId=useId();
  const working=new Set(entries.filter(entry=>entry.type==='work').map(entry=>entry.uid));
  const groups=new Map();
+ const weekday=scheduleDays[weekdayOf(date)];
  for(const person of people.filter(item=>working.has(item.uid)).sort((a,b)=>nameOrder.compare(nameOf(a),nameOf(b)))){
   const profile=person.professional||{};
   const shift=Object.hasOwn(shifts,profile.shift)?profile.shift:'unknown';
   const sector=sectors[profile.sector]||'Setor a definir';
-  const slot=profile.availability?.find(item=>item.day===scheduleDays[weekdayOf(date)]);
-  const key=shift+'|'+sector;
-  if(!groups.has(key))groups.set(key,{shift,sector,workers:[]});
-  groups.get(key).workers.push({person,hours:slot?.start&&slot?.end?slot.start+'–'+slot.end:''});
+  const slot=profile.availability?.find(item=>item.day===weekday);
+  const hours=slot?.start&&slot?.end?slot.start+'–'+slot.end:'Horário pendente';
+  if(!groups.has(shift))groups.set(shift,{count:0,sectors:new Map()});
+  const group=groups.get(shift);
+  group.count++;
+  if(!group.sectors.has(sector))group.sectors.set(sector,new Map());
+  const times=group.sectors.get(sector);
+  if(!times.has(hours))times.set(hours,[]);
+  times.get(hours).push(nameOf(person));
  }
- const rows=[...groups.values()].sort((a,b)=>Object.keys(shifts).indexOf(a.shift)-Object.keys(shifts).indexOf(b.shift)||nameOrder.compare(a.sector,b.sector));
+ const active=groups.get(selectedShift);
  return <div className="working-preview" role="group" aria-label="Quem trabalha">
-  <div className="working-preview-heading"><strong>Quem trabalha</strong><span>{working.size} {published?'na escala':'no rascunho'}</span></div>
-  {rows.length?<ul>{rows.map(({shift,sector,workers})=><li key={shift+'|'+sector}>
-   <strong>{shifts[shift]} · {sector}</strong>
-   <span>{workers.map(({person,hours},index)=><React.Fragment key={person.uid}>
-    {index>0?' · ':''}{nameOf(person)}{hours?<small> {hours}</small>:<small> (horário pendente)</small>}
-   </React.Fragment>)}</span>
-  </li>)}</ul>:<p>{entries.length?'Ninguém previsto para trabalhar neste dia.':'Sem lançamentos para este dia.'}</p>}
+  <div className="working-preview-heading">
+   <strong>Quem trabalha</strong>
+   {groups.size?<div className="working-shifts">{Object.entries(shifts).filter(([shift])=>groups.has(shift)).map(([shift,label])=>
+    <button type="button" key={shift} aria-expanded={selectedShift===shift} aria-controls={panelId}
+     onClick={()=>setSelectedShift(current=>current===shift?null:shift)}>
+     {label} <span>{groups.get(shift).count}</span><span className="working-chevron" aria-hidden="true"/>
+    </button>)}</div>:<p>{entries.length?'Ninguém previsto':'Sem lançamentos'}</p>}
+  </div>
+  <div id={panelId} hidden={!active}>{active&&<ul>
+   {[...active.sectors].sort(([a],[b])=>nameOrder.compare(a,b)).map(([sector,times])=><li key={sector}>
+    <strong>{sector}</strong>
+    <span>{[...times].map(([hours,names])=><span className="working-times" key={hours}>
+     {names.join(', ')} <small>· {hours}</small>
+    </span>)}</span>
+   </li>)}
+  </ul>}</div>
  </div>;
 }
 
@@ -264,8 +281,8 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
      </div>
      {isSunday?<section className="panel detail">
       <div className="detail-intro"><div><h3>Domingo {shortDate(sunday)}</h3><p>Cobertura prevista com as folgas {editable?'deste rascunho':'desta escala'}.</p></div><Badge rows={coverage}/></div>
-      <WorkingPreview date={sunday} entries={entriesFor(sunday)} people={people} published={Boolean(status)}/>
-      <Coverage key={sunday} rows={coverage}/>
+      <WorkingPreview key={sunday} date={sunday} entries={entriesFor(sunday)} people={people}/>
+      <Coverage key={'coverage-'+sunday} rows={coverage}/>
       {editable&&<><div className="section-head"><h3>Quem pode folgar</h3>
        {person&&roster.sundays[personId]===sunday&&<button type="button" className="remove" onClick={removeSunday}>Remover {selectedName}</button>}
       </div>
@@ -282,7 +299,7 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
       const rows=rowsFor(date,override);
       return <section key={date} className="panel detail">
        <div className="detail-intro"><h3>{capitalize(formatDay.format(new Date(date+'T12:00:00Z')))} · {shortDate(date)}</h3><Badge rows={rows}/></div>
-       <WorkingPreview date={date} entries={entriesFor(date,override)} people={people} published={Boolean(status)}/>
+       <WorkingPreview date={date} entries={entriesFor(date,override)} people={people}/>
        <Coverage rows={rows}/>
       </section>;
      })}

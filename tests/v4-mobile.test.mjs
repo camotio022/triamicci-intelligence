@@ -64,9 +64,16 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      await board.getByLabel('Mês da escala',{exact:true}).selectOption('2027-01');
      await board.getByText('5 domingos',{exact:true}).waitFor();
      const roster=board.getByRole('group',{name:'Quem trabalha',exact:true});
-     await roster.getByText('Manhã · Cozinha',{exact:true}).waitFor();
-     await roster.getByText('Noite · Frente',{exact:true}).waitFor();
-     await roster.getByText('12:00–20:20',{exact:true}).waitFor();
+     const morning=roster.getByRole('button',{name:'Manhã 1',exact:true});
+     const night=roster.getByRole('button',{name:'Noite 1',exact:true});
+     await morning.waitFor();
+     assert.equal(await roster.getByText('Cozinha',{exact:true}).isVisible(),false);
+     await morning.click();
+     await roster.getByText('Cozinha',{exact:true}).waitFor();
+     await night.click();
+     assert.equal(await roster.getByText('Cozinha',{exact:true}).isVisible(),false);
+     await roster.getByText('Frente',{exact:true}).waitFor();
+     await roster.getByText('· 12:00–20:20',{exact:true}).waitFor();
      const memberList=board.locator(width<=720?'.mobile-people':'.people');
      const memberCard=memberList.getByRole('button',{name:/Pessoa de teste/});
      const sundayCard=board.locator('[data-drop-sunday="2027-01-31"]');
@@ -83,9 +90,10 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       await page.mouse.up();
      }
      assert.equal(await board.getByRole('status').textContent(),'Pessoa de teste ficou com 31/01.');
-     assert.equal(await roster.getByText(/Pessoa de teste/).count(),0,'Quem ganhou folga sai da lista de trabalho');
+     await board.getByRole('heading',{name:'Domingo 31/01',exact:true}).waitFor();
+     await morning.waitFor({state:'hidden'});
+     await night.click();
      await roster.getByText(/Atendimento de teste/).waitFor();
-     await roster.getByText('1 no rascunho',{exact:true}).waitFor();
      await board.getByRole('button',{name:'Semana 5×2',exact:true}).click();
      await board.getByLabel('Semana',{exact:true}).selectOption('2027-01-04');
      await memberList.getByRole('button',{name:/Pessoa de teste/}).click();
