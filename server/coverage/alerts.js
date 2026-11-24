@@ -15,16 +15,16 @@ export function writeCoverageAlerts({tx,db,unit,unitId,planId,dates,entries,peop
    if(affected&&(row.shift!==affected.shift||row.sector!==affected.sector))continue;
    const id=[planId,date,row.shift,row.sector].join('_');
    const previous=existing.get(id);
-   const matching=proposals.filter(p=>p.planId===planId&&p.date===date&&p.shift===row.shift&&p.sector===row.sector);
+   const matching=proposals.filter(p=>p.operational&&p.planId===planId&&p.date===date&&p.shift===row.shift&&p.sector===row.sector);
    const intervals=day.intervals.filter(item=>item.deficit&&(item.sector===row.sector||row.sector==='frente'&&['caixa','apoio','gestao'].includes(item.sector))&&
-    row.window&&item.start<row.window.end&&item.end>row.window.start);
+    (!row.window||item.start<row.window.end&&item.end>row.window.start));
    const recurring=day.recurring.filter(item=>item.sector===row.sector&&item.shift===row.shift);
    const impact=projectCoverage(row,matching,intervals,recurring);
    const reason=[impact.headcountGap?impact.headcountGap+' vaga(s)':'',
     impact.roleGap?(row.sector==='cozinha'?'Falta cozinheiro':'Falta gestão'):'',
-    impact.skillGap?'Montagem insuficiente':'',intervals.length?'Mínimo por horário em falta':'',
+    impact.skillGap?'Montagem insuficiente':'',impact.remainingIntervals.length?'Mínimo por horário em falta':'',
     recurring.some(item=>!item.available&&!matching.some(p=>p.staffId===item.uid&&['approved','completed','paid'].includes(p.status)))?'Cobertura fixa indisponível':''].filter(Boolean).join(' · ');
-   const open=(Boolean(row.window)&&Boolean(reason))||(!row.window&&previous?.status==='open');
+   const open=(Boolean(row.window)&&Boolean(reason))||(row.uncertain&&previous?.status==='open');
    if(!open&&previous?.status!=='open')continue;
    const state=open?'open':'resolved';
    const message=reason||previous?.reason||'';
