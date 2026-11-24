@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {coverageTimeline} from '../server/schedules/coverage-timeline.js';
 import {FIVE_TWO_PAIRS, fiveTwoPair, fiveTwoSundays, fiveTwoWeeks, shiftScheduleDate} from '../server/schedules/five-two.js';
+import PageHeading from './ui/PageHeading.jsx';
 import './roster-board.css';
 
 const shortDate = date => date.slice(8) + '/' + date.slice(5, 7);
@@ -44,7 +45,7 @@ function Badge({rows}){
  return rows.some(row=>row.deficit)?<span className="badge alert">Atenção</span>:<span className="badge">Cobertura OK</span>;
 }
 
-export default function RosterBoard({unit, period, changePeriod, roster, updateRoster, members, entries, requirements, editable, saving, canSave, onSave, saved, onUndo, canUndo, status}){
+export default function RosterBoard({period, changePeriod, roster, updateRoster, members, entries, requirements, editable, saving, canSave, onSave, saved, onUndo, canUndo, status, loadPending, loadError, retryLoad}){
  const [view,setView]=useState('sundays');
  const [sundaySelected,setSunday]=useState('');
  const [weekSelected,setWeek]=useState('');
@@ -177,13 +178,17 @@ export default function RosterBoard({unit, period, changePeriod, roster, updateR
  }
 
  return <section className="roster-board" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
-  <div className="top"><div className="top-inner"><div className="brand"><span aria-hidden="true" className="mark">T</span><span>Triamicci <small>Intelligence</small></span></div><small className="demo">{unit}</small></div></div>
-  <div className="main">
-   <section className="hero"><div><p className="eyebrow">GESTÃO DE EQUIPE</p><h1>Quadro de folgas</h1><p>Dois dias seguidos por semana e um domingo extra por mês.</p></div>
-    <div className="month"><label htmlFor="roster-month">Mês da escala</label><div className="select-wrap"><select id="roster-month" value={period} disabled={saving} onChange={event=>{setPerson(null);changePeriod(event.target.value);}}>
+  <PageHeading title="Quadro de folgas" className="roster-heading" actions={
+   <div className="month-control"><label htmlFor="roster-month">Mês da escala</label>
+    <select id="roster-month" value={period} disabled={saving} onChange={event=>{setPerson(null);changePeriod(event.target.value);}}>
      {monthOptions.map(month=><option key={month} value={month}>{capitalize(formatMonth.format(new Date(month+'-01T12:00:00Z')))}</option>)}
-    </select></div></div>
-   </section>
+    </select>
+   </div>
+  }/>
+  {loadPending?<div className="roster-load panel" role="status">Carregando equipe e escalas…</div>
+   :loadError?<div className="roster-load panel" role="alert"><div><strong>Não foi possível carregar a escala</strong><p>{loadError}</p></div>
+    <button type="button" className="action quiet" onClick={retryLoad}>Tentar novamente</button></div>
+   :<>
    <div className="toolbar">
     <nav className="tabs" aria-label="Visões da escala">
      <button type="button" className="tab" aria-pressed={isSunday} onClick={()=>{setView('sundays');setPerson(null);setMessage('');}}>Domingos do mês</button>
@@ -246,6 +251,6 @@ export default function RosterBoard({unit, period, changePeriod, roster, updateR
     </section>
    </div>
    <p className="live" role="status">{message}</p>
-  </div>
+  </>}
  </section>;
 }

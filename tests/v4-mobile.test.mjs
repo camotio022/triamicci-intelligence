@@ -6,7 +6,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
   for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:4179/qa/v4-mobile.html')).ok)break}catch{}await new Promise(r=>setTimeout(r,100));}
   browser=await chromium.launch({headless:true});
   for(const width of [320,390,768,1280]){
-   const page=await browser.newPage({viewport:{width,height:900}}),errors=[],counts=[],reads=[],finishes=[];let savedRoster, activeScreen;page.on('pageerror',e=>errors.push(e.message));
+   const page=await browser.newPage({viewport:{width,height:900}}),errors=[],counts=[],reads=[],finishes=[];let savedRoster, activeScreen, rejectRosterLoad=width===390;page.on('pageerror',e=>errors.push(e.message));
    await page.route('**/api/**',route=>{const b=route.request().postDataJSON()||{};reads.push({path:new URL(route.request().url()).pathname,action:b.action});const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());const a='c'.repeat(40),out='d'.repeat(40);const product={id:a,name:'Frango grelhado',status:'active',unit:'un',physicalUnit:'un',physicalBalance:{reserve:50,rotation:0,total:50,unit:'un',at:new Date().toISOString()}};
     const base={message:'Consulta de teste',shipments:[],people:[],accounts:[],claims:[],notifications:[],members:[],orders:[],signals:[],products:[product,{...product,id:out,name:'Parmegiana',physicalBalance:{reserve:0,rotation:0,total:0,unit:'un'}}],catalog:[],registry:[{id:'qa-user',accountUid:'qa-user',name:'Pessoa de teste',status:'active',sector:'cozinha',shift:'manha'}],schedules:[{id:'official',period:today.slice(0,7),status:'published',entries:[{uid:'qa-user',date:today,type:'work',name:'Pessoa de teste'}]}],presence:[],tasks:[{id:'abcdefghijklmnopqrst',recipeId:'parmegiana',recipeName:'Parmegiana de frango',day:previousProductionDay(today),plannedQuantity:30,status:'pending'}],recipes:[{id:'parmegiana',name:'Parmegiana de frango',yieldQuantity:1,outputProductId:out,version:1,lines:[{productId:a,quantity:1,substitutes:[]}]}],runs:[{id:'qa-today',recipeName:'Produção de hoje',portions:1,at:new Date().toISOString(),items:[]},{id:'qa-old',recipeName:'Produção da semana passada',portions:1,at:new Date(Date.now()-7*86400000).toISOString(),items:[]}],items:[{id:'notice',title:'Conferência das entregas',body:'Conferir itens e validade antes de encaminhar para aprovação.',priority:'important',publishedByName:'Gestão da unidade',publishedAt:new Date().toISOString()}],requests:[],closures:[],investigations:[],professional:{name:'Pessoa de teste',skills:[],certifications:[],availability:[]},personal:{},recognition:{},proposals:[],record:null,day:today,complete:true,entry:null,nextOff:null,pending:false,official:false,report:null};
     if(b.action==='list'&&route.request().url().includes('/api/production/manage')){
@@ -16,6 +16,10 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     if(b.action==='list'&&(route.request().url().includes('/api/products/manage')||b.includeProducts&&route.request().url().includes('/api/production/manage')))base.products.push({id:'e'.repeat(40),name:'Tilápia em kg',unit:'kg',physicalUnit:'kg',status:'active'},{id:'f'.repeat(40),name:'Isca pronta',unit:'un',physicalUnit:'un',status:'active',lotTrackingMode:'per_lot'});
     if(b.action==='masterRegistryPreview'&&activeScreen==='Escalas')base.activated=true;
     if(b.module==='schedules'){
+     if(activeScreen==='Escalas'&&b.action==='list'&&rejectRosterLoad){
+      rejectRosterLoad=false;
+      return route.fulfill({status:403,contentType:'application/json',body:JSON.stringify({message:'Origem não autorizada.'})});
+     }
      if(b.action==='saveDraft'){
       savedRoster={id:'roster-draft',revision:1,status:'draft',period:b.period,title:b.title,entries:b.entries,roster:b.roster};
       Object.assign(base,{id:savedRoster.id,revision:savedRoster.revision});
@@ -43,6 +47,15 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${screen} overflows at ${width}`);
     if(screen==='Escalas'){
      const board=page.locator('.roster-board');
+     await board.getByRole('heading',{name:'Quadro de folgas',exact:true}).waitFor();
+     assert.equal(await board.locator('.ti-page-heading h1').count(),1);
+     assert.equal(await board.locator(':is(.hero,.top-inner,.brand)').count(),0,'O planejador usa o cabeçalho padrão do app');
+     if(width===390){
+      const failure=board.getByRole('alert');
+      await failure.getByText('Origem não autorizada.').waitFor();
+      assert.equal(await board.getByRole('complementary',{name:'Equipe'}).count(),0,'Falha de consulta não exibe equipe vazia');
+      await failure.getByRole('button',{name:'Tentar novamente'}).click();
+     }
      await board.getByLabel('Mês da escala',{exact:true}).selectOption('2027-01');
      await board.getByText('5 domingos',{exact:true}).waitFor();
      const memberList=board.locator(width<=720?'.mobile-people':'.people');

@@ -44,11 +44,12 @@ export default function SchedulePlanner({membership}){
  const [scheduleView,setScheduleView]=useState('active');
  const [approvedLeaves,setApprovedLeaves]=useState([]);
  const [registryState,setRegistryState]=useState({activated:false,registeredCount:0});
+ const [loaded,setLoaded]=useState(false);
  const [today,setToday]=useState(()=>restaurantDay());
  useEffect(()=>{const interval=setInterval(()=>setToday(restaurantDay()),60000);return()=>clearInterval(interval)},[]);
  const [uid,setUid]=useState(''),[date,setDate]=useState(''),[type,setType]=useState('work'),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const allowed=MANAGEMENT_ROLES.includes(membership.role);
- const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,f,l,c]=await Promise.all([call('list'),membersApi(),call('fixedOffList'),call('leaveList'),coverageApi()]);setCoverageRules(c.requirements||[]);setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})})}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
+ const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,f,l,c]=await Promise.all([call('list'),membersApi(),call('fixedOffList'),call('leaveList'),coverageApi()]);setCoverageRules(c.requirements||[]);setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})});setLoaded(true)}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useUnitLive(membership?.unitId,initial=>refresh(!initial),{domains:['schedules','team','coverage'],refreshKey:membership.role});
 
  const chosen=plans.find(x=>x.id===selected);
@@ -134,14 +135,15 @@ export default function SchedulePlanner({membership}){
  const canPlan=(!chosen||chosen.status==='draft')&&!chosen?.archivedAt;
  return <section className={legacy?'ti-planning':'ti-roster-planner'}>
  {legacy&&<><p className="eyebrow">ADMINISTRAÇÃO · EQUIPE</p><h1>Planejamento de escalas</h1></>}
- {!legacy&&validMonth&&<RosterBoard key={period} unit={membership.unitName||membership.unitId} period={period}
+ {!legacy&&validMonth&&<RosterBoard key={period} period={period}
   roster={roster} updateRoster={updateRoster} members={people} entries={boardEntries} requirements={coverageRules}
   editable={canPlan&&!busy&&!loading} saving={busy||loading} onSave={save} canSave={people.length>0&&(!registryState.registeredCount||registryState.activated)}
   saved={Boolean(draftRevision)&&!hasUnsaved} status={chosen?.status&&chosen.status!=='draft'?labels[chosen.status]||chosen.status:null}
-  changePeriod={startNew} onUndo={undoRoster} canUndo={undoHistory.length>0}/>}
+  changePeriod={startNew} onUndo={undoRoster} canUndo={undoHistory.length>0}
+  loadPending={!loaded&&loading} loadError={!loaded?error:''} retryLoad={()=>refresh()}/>}
  {!registryState.activated&&registryState.registeredCount>0&&<aside className="ti-roster-attention" role="status"><strong>{registryState.registeredCount} fichas profissionais aguardam ativação.</strong><span>O planejador ainda está usando contas de acesso, que podem incluir contas de teste. Ative o Cadastro Mestre após conferir a equipe para planejar com os funcionários reais.</span><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent("ti-navigate",{detail:"master-registry"}))}>Abrir Cadastro Mestre</button></aside>}
  {legacyIds>0&&<aside className="ti-roster-attention" role="alert"><strong>Rascunho com {legacyIds} lançamento(s) de contas antigas.</strong><span>Após ativar o Cadastro Mestre, a nova escala usa IDs das fichas profissionais. Para preservar o histórico, rascunhos antigos não são convertidos automaticamente. Crie uma proposta nova e confira as folgas antes de salvar.</span></aside>}
- {loading&&<p role="status">Carregando escalas…</p>}
+ {legacy&&loading&&<p role="status">Carregando escalas…</p>}
  {!legacy&&chosen&&<section className="ti-planning-card ti-roster-record">
   <label>Título da escala<input maxLength={100} minLength={3} value={title} disabled={!canPlan||busy} onChange={e=>{setTitle(e.target.value);setTitleDirty(true);}}/></label>
   {workflow}
@@ -190,7 +192,7 @@ export default function SchedulePlanner({membership}){
  <div className="ti-calendar-block" aria-label="Calendário mensal da escala"><div className="ti-calendar-heading"><h3>Calendário de {period}</h3><span>Clique em um dia para selecionar a data</span></div><div className="ti-calendar-grid">{monthDates(period).map(date=>{const day=new Date(date+'T12:00:00Z').getUTCDay();const records=entries.filter(e=>e.date===date);const offs=records.filter(e=>e.type==='off'||e.type==='monthly_sunday').length;return <button type="button" key={date} aria-current={date===today?"date":undefined} className={'ti-calendar-day'+(date===dateSelected?' active':'')+(date===today?' ti-calendar-today':'')+(offs?' has-off':'')} onClick={()=>setDate(date)} title={date+' · '+offs+' folgas'}><strong>{date.slice(-2)}</strong><small>{['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][day]}</small><span>{records.length} registros</span>{offs>0&&<em>{offs} folga(s)</em>}</button>})}</div></div>
  <div className="ti-planning-entries">{entries.length?entries.map((e,i)=><div key={e.date+e.uid}><span>{e.date} · {people.find(x=>x.uid===e.uid)?.name||e.uid} · {labels[e.type]}</span>{(!chosen||chosen.status==='draft')&&<button type="button" aria-label="Retirar lançamento" onClick={()=>setEntries(old=>old.filter((_,j)=>j!==i))}>Retirar</button>}</div>):<p>Nenhum turno ou folga incluído.</p>}</div>
  {workflow}
- </section>}</div>{error&&<p role="alert" className="team-error">{error}</p>}
+ </section>}</div>{error&&(loaded||legacy)&&<p role="alert" className="team-error">{error}</p>}
   {confirmationSheet}
  </section>;
 }
