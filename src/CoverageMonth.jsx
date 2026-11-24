@@ -14,8 +14,8 @@ export default function CoverageMonth({plan,request,selected,choose,today,alerts
    .catch(e=>{if(active)setError(e.message);});
   return ()=>{active=false;};
  },[id,version,request,attempt,alerts,proposals]);
- const month=state?.id===id?state.month:null;
  if(!plan)return null;
+ const month=state&&state.id===id?state.month:null;
  const fixed=new Map();
  for(const day of month?.days||[])for(const item of day.recurring){
   const key=[item.uid,item.forUid,item.shift,item.sector].join(':');
