@@ -124,6 +124,43 @@ test('entrega: rotina e fronteiras dos cinco perfis, folgas, cobertura e revoga�
  const decision={id:proposed.id,decision:'approved',note:'TESTE revisão independente confirmada',legalChecked:true,consentVerified:true,consentEvidence:'Aceite fictício registrado no teste isolado'};
  await expect(coverage,manager,'decide',decision,403);
  await expect(coverage,sub,'decide',decision,200);
+ // Whole-shift assessment shares the draft conditions and observes tenant boundaries.
+ const coverDay=new Date(Date.parse(day+'T12:00:00Z')+10*86400000).toISOString().slice(0,10);
+ const coverWeekday=['dom','seg','ter','qua','qui','sex','sab'][new Date(coverDay+'T12:00:00Z').getUTCDay()];
+ const coverPlan=unit.collection('schedules').doc(randomUUID());
+ await Promise.all([
+  unit.collection('staffRegistry').doc(people.cook.uid).update({shift:'noite',availability:[{day:coverWeekday,start:'14:00',end:'20:00'}]}),
+  unit.collection('staffRegistry').doc(people.auxiliar.uid).update({shift:'manha',availability:[{day:coverWeekday,start:'08:00',end:'14:00'}]}),
+  coverPlan.set({title:'Escala de teste',period:coverDay.slice(0,7),status:'draft',revision:1,
+   entries:[{uid:people.cook.uid,type:'work',date:coverDay},{uid:people.auxiliar.uid,type:'off',date:coverDay}]})
+ ]);
+ const criteria={planId:coverPlan.id,date:coverDay,sector:'cozinha',shift:'noite'};
+ await expect(coverage,foreign,'assessShift',criteria,404);
+ await expect(coverage,people.cook,'assessShift',criteria,403);
+ const assessed=await expect(coverage,manager,'assessShift',criteria,200);
+ assert.deepEqual(assessed.evaluation.shifts.find(row=>row.sector==='cozinha'&&row.shift==='noite').window,{start:'14:00',end:'20:00'});
+ const proposedShift={...criteria,staffId:people.auxiliar.uid,reason:'Reforço de teste para o turno completo'};
+ const operational=await expect(coverage,manager,'inviteShift',proposedShift,201);
+ await expect(coverage,manager,'inviteShift',proposedShift,409);
+ const ownInvites=await expect(coverage,people.auxiliar,'myProposals',{},200);
+ assert.equal(ownInvites.proposals.find(p=>p.id===operational.id).practicePayment,null);
+ await expect(coverage,people.cook,'respond',{id:operational.id,decision:'accepted'},403);
+ await expect(coverage,people.auxiliar,'respond',{id:operational.id,decision:'accepted'},200);
+ await expect(coverage,sub,'decide',{...decision,id:operational.id},200);
+ await expect(coverage,sub,'completeCoverage',{id:operational.id,actualStart:'14:00',actualEnd:'20:00'},409);
+ await unit.collection('coverageProposals').doc(operational.id).update({date:yesterday});
+ await expect(coverage,manager,'rates',{rates:{manager:150,submanager:120,head_cook:150,cook:120,other:100,external:100},payroll:{daysAfter:7},
+  individualRates:{[people.auxiliar.uid]:{amount:110,daysAfter:1}}},200);
+ await expect(coverage,sub,'completeCoverage',{id:operational.id,actualStart:'14:00',actualEnd:'20:00'},200);
+ await expect(coverage,sub,'completeCoverage',{id:operational.id,actualStart:'14:00',actualEnd:'20:00'},409);
+ await expect(coverage,sub,'payCoverage',{id:operational.id,paidDate:day},200);
+ const personal=await expect(coverage,people.auxiliar,'myProposals',{},200);
+ const settled=personal.proposals.find(item=>item.id===operational.id);
+ assert.equal(settled.status,'paid');
+ assert.equal(settled.fee.amount,110);
+ assert.equal(settled.fee.dueDate,day);
+ assert.equal(settled.paidDate,day);
+ assert.equal(settled.consentEvidence,undefined);
  const expiredId=randomUUID();await unit.collection('coverageProposals').doc(expiredId).set({staffId:people.auxiliar.uid,date:'2020-01-01',status:'pending_acceptance',createdBy:manager.uid});
  await expect(coverage,people.auxiliar,'respond',{id:expiredId,decision:'accepted'},409);
  // Pendência antiga continua visível mesmo fora da primeira página do histórico.

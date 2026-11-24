@@ -8,35 +8,26 @@ import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {generateMonthlyRoster,weekdayOccurrences,weekdayOf,WEEKDAY_LABELS} from '../server/schedules/generator.js';
 import {sessionAuth as auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';import './roster-mobile-day.css';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
-import {fiveTwoEntries,fiveTwoWeeks,shiftScheduleDate} from '../server/schedules/five-two.js';
+import {carryFiveTwoRoster,fiveTwoEntries,fiveTwoWeeks,shiftScheduleDate} from '../server/schedules/five-two.js';
 import RosterBoard from './RosterBoard.jsx';
 
 const emptyRoster={weekly:{},sundays:{}};
 
-function newRoster(period, plans, people){
- const weeks=fiveTwoWeeks(period);
- const activeIds=new Set(people.map(person=>person.uid));
- const weekly={};
- for(const week of [weeks[0],weeks.at(-1)]){
-  const neighbor=plans.find(plan=>plan.period!==period&&plan.status==='published'&&!plan.archivedAt&&plan.roster?.weekly[week]);
-  if(neighbor)weekly[week]=Object.fromEntries(Object.entries(neighbor.roster.weekly[week]).filter(([uid])=>activeIds.has(uid)));
- }
- return {...emptyRoster,weekly};
-}
 async function call(action,extra={}){
  return requestJson('/api/members/manage',{module:'schedules',action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>[data.message,...(data.issues||[]).slice(0,5)].join(' · ')});
 }
 async function coverageApi(){
- return requestJson('/api/coverage/manage',{action:'dashboard'},{sessionMessage:'Faça login novamente.',formatError:data=>data.message});
+ return requestJson('/api/coverage/manage',{action:'planningRules'},{sessionMessage:'Faça login novamente.',formatError:data=>data.message});
 }
 async function membersApi(){
  const token=await auth.currentUser?.getIdToken();const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'profiles'})});const d=await r.json();if(!r.ok)throw Error(d.message);const staff=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryPreview'})});const sd=await staff.json();if(!staff.ok)throw Error(sd.message||'Cadastro Mestre indisponível.');return {activated:!!sd.activated,registeredCount:(sd.registry||[]).filter(p=>p.status==='active').length,people:sd.activated?(sd.registry||[]).filter(p=>p.status==='active').map(p=>({uid:p.id,accountUid:p.accountUid||null,name:p.name,status:p.status,professional:{sector:p.sector,shift:p.shift,availability:p.availability||[],jobTitle:p.jobTitle,skills:p.skills||[],certifications:p.certifications||[]},fixedWeekday:p.fixedWeekday,registry:true})):d.members||[]};
 }
 const labels={draft:'Rascunho',in_review:'Em análise',approved:'Aprovada',published:'Publicada',work:'Trabalho',off:'Folga',leave:'Ausência',monthly_sunday:'Domingo mensal adicional'};
-export default function SchedulePlanner({membership}){
+export default function SchedulePlanner({membership,onOpenCoverage}){
  const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const {notify}=useFeedback(),[plans,setPlans]=useState([]),[people,setPeople]=useState([]),[selected,setSelected]=useState(''),[title,setTitle]=useState('Escala da equipe'),[period,setPeriod]=useState(restaurantDay().slice(0,7)),[entries,setEntries]=useState([]);
  const [fixedOff,setFixedOff]=useState({}),[sundayOff,setSundayOff]=useState({}),[savingFixed,setSavingFixed]=useState(''),[selectedPerson,setSelectedPerson]=useState(''),[matrixSector,setMatrixSector]=useState('todos');
+ const [coveragePolicy,setCoveragePolicy]=useState({});
  const [coverageRules,setCoverageRules]=useState([]),[draftRevision,setDraftRevision]=useState(null);
  const [roster,setRoster]=useState(emptyRoster),[undoHistory,setUndoHistory]=useState([]),[rosterDirty,setRosterDirty]=useState(false);
  const [titleDirty,setTitleDirty]=useState(false);
@@ -49,9 +40,13 @@ export default function SchedulePlanner({membership}){
  useEffect(()=>{const interval=setInterval(()=>setToday(restaurantDay()),60000);return()=>clearInterval(interval)},[]);
  const [uid,setUid]=useState(''),[date,setDate]=useState(''),[type,setType]=useState('work'),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const allowed=MANAGEMENT_ROLES.includes(membership.role);
- const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,f,l,c]=await Promise.all([call('list'),membersApi(),call('fixedOffList'),call('leaveList'),coverageApi()]);setCoverageRules(c.requirements||[]);setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})});setLoaded(true)}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
+ const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,f,l,c]=await Promise.all([call('list'),membersApi(),call('fixedOffList'),call('leaveList'),coverageApi()]);setCoverageRules(c.requirements||[]);setCoveragePolicy(c.operationalPolicy||{});setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})});setLoaded(true)}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useUnitLive(membership?.unitId,initial=>refresh(!initial),{domains:['schedules','team','coverage'],refreshKey:membership.role});
 
+ const inherited=useMemo(()=>carryFiveTwoRoster(period,plans,people),[period,plans,people]);
+ const boardRoster=!selected&&!rosterDirty?inherited:roster;
+ const lockedWeeks=useMemo(()=>[...new Set(plans.filter(p=>p.period!==period&&p.status==='published'&&!p.archivedAt&&p.roster)
+  .flatMap(p=>Object.keys(p.roster.weekly).filter(week=>fiveTwoWeeks(period).includes(week))))],[plans,period]);
  const chosen=plans.find(x=>x.id===selected);
  const legacy=Boolean(chosen&&!chosen.roster);
  const validMonth=monthDates(period).length>0;
@@ -60,8 +55,8 @@ export default function SchedulePlanner({membership}){
   if(chosen?.roster&&chosen.status!=='draft')return entries;
   const weeks=fiveTwoWeeks(period);
   const extendedDates=weeks.flatMap(week=>Array.from({length:7},(_,index)=>shiftScheduleDate(week,index)));
-  return fiveTwoEntries({period,members:people,roster,approvedLeaves,dates:extendedDates});
- },[validMonth,period,people,roster,approvedLeaves,chosen,entries]);
+  return fiveTwoEntries({period,members:people,roster:boardRoster,approvedLeaves,dates:extendedDates});
+ },[validMonth,period,people,boardRoster,approvedLeaves,chosen,entries]);
  const legacyIds=useMemo(()=>registryState.activated?entries.filter(e=>!people.some(p=>p.uid===e.uid)).length:0,[entries,people,registryState.activated]);
  const dateSelected=monthDates(period).includes(date)?date:monthDates(period)[0]||'';
  const setBoard=(next=emptyRoster)=>{setRoster(next);setUndoHistory([]);setRosterDirty(false);setTitleDirty(false);};
@@ -73,14 +68,14 @@ export default function SchedulePlanner({membership}){
  };
  const reset=(nextPeriod=period)=>{
   setSelected('');setDraftRevision(null);setTitle('Escala da equipe');setEntries([]);setSundayOff({});setError('');
-  setPeriod(nextPeriod);setBoard(newRoster(nextPeriod,plans,people));
+  setPeriod(nextPeriod);setBoard(carryFiveTwoRoster(nextPeriod,plans,people));
  };
  const startNew=async(nextPeriod=period)=>{
   if(hasUnsaved&&!await askConfirmation('Descartar as alterações deste rascunho?'))return;
   reset(nextPeriod);
   setScheduleView('active');
  };
- const updateRoster=next=>{setUndoHistory(old=>[...old.slice(-29),{roster,dirty:rosterDirty}]);setRoster(next);setRosterDirty(true);};
+ const updateRoster=next=>{setUndoHistory(old=>[...old.slice(-29),{roster:boardRoster,dirty:rosterDirty}]);setRoster(next);setRosterDirty(true);};
  const undoRoster=()=>{
   const previous=undoHistory.at(-1);
   if(!previous)return;
@@ -108,8 +103,9 @@ export default function SchedulePlanner({membership}){
   setBusy(true);
   try{
    const payloadEntries=legacy?entries:boardEntries.filter(entry=>entry.date.startsWith(period));
-   const result=await call('saveDraft',{id:selected||undefined,expectedRevision:draftRevision,period,title,entries:payloadEntries,...(legacy?{}:{roster})});
+   const result=await call('saveDraft',{id:selected||undefined,expectedRevision:draftRevision,period,title,entries:payloadEntries,...(legacy?{}:{roster:boardRoster})});
    notify(result.message,'success');
+   if(!legacy)setRoster(boardRoster);
    setSelected(result.id);setDraftRevision(result.revision);setEntries(payloadEntries);
    setRosterDirty(false);setTitleDirty(false);setUndoHistory(old=>old.map(snapshot=>({...snapshot,dirty:true})));
    await refresh(true);
@@ -136,11 +132,11 @@ export default function SchedulePlanner({membership}){
  return <section className={legacy?'ti-planning':'ti-roster-planner'}>
  {legacy&&<><p className="eyebrow">ADMINISTRAÇÃO · EQUIPE</p><h1>Planejamento de escalas</h1></>}
  {!legacy&&validMonth&&<RosterBoard key={period} period={period}
-  roster={roster} updateRoster={updateRoster} members={people} entries={boardEntries} requirements={coverageRules}
+  roster={boardRoster} lockedWeeks={lockedWeeks} approvedLeaves={approvedLeaves} coveragePolicy={coveragePolicy} updateRoster={updateRoster} members={people} entries={boardEntries} requirements={coverageRules}
   editable={canPlan&&!busy&&!loading} saving={busy||loading} onSave={save} canSave={people.length>0&&(!registryState.registeredCount||registryState.activated)}
   saved={Boolean(draftRevision)&&!hasUnsaved} status={chosen?.status&&chosen.status!=='draft'?labels[chosen.status]||chosen.status:null}
   changePeriod={startNew} onUndo={undoRoster} canUndo={undoHistory.length>0}
-  loadPending={!loaded&&loading} loadError={!loaded?error:''} retryLoad={()=>refresh()}/>}
+  loadPending={!loaded&&loading} loadError={!loaded?error:''} retryLoad={()=>refresh()} onOpenCoverage={chosen&&!hasUnsaved&&!chosen.archivedAt&&onOpenCoverage?(date=>onOpenCoverage({date,planId:chosen.id})):null}/>}
  {!registryState.activated&&registryState.registeredCount>0&&<aside className="ti-roster-attention" role="status"><strong>{registryState.registeredCount} fichas profissionais aguardam ativação.</strong><span>O planejador ainda está usando contas de acesso, que podem incluir contas de teste. Ative o Cadastro Mestre após conferir a equipe para planejar com os funcionários reais.</span><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent("ti-navigate",{detail:"master-registry"}))}>Abrir Cadastro Mestre</button></aside>}
  {legacyIds>0&&<aside className="ti-roster-attention" role="alert"><strong>Rascunho com {legacyIds} lançamento(s) de contas antigas.</strong><span>Após ativar o Cadastro Mestre, a nova escala usa IDs das fichas profissionais. Para preservar o histórico, rascunhos antigos não são convertidos automaticamente. Crie uma proposta nova e confira as folgas antes de salvar.</span></aside>}
  {legacy&&loading&&<p role="status">Carregando escalas…</p>}

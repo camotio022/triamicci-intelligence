@@ -961,3 +961,10 @@
 .roster-board .working-times {
   display: block;
 }
+
+.roster-board .roster-impact{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;padding:10px 14px;margin:0 0 12px}
+.roster-board .roster-impact span{color:var(--muted,#64748b);padding:0 3px}
+.roster-board .roster-impact p,.roster-board .roster-operational p{margin:4px 0;color:var(--muted,#536378)}
+.roster-board .roster-operational{margin:8px 0;padding:8px 10px;border-radius:8px;background:#f5f7fa}
+.roster-board .roster-operational summary{cursor:pointer;font-weight:650}
+.roster-board .roster-operational section{margin-top:8px}

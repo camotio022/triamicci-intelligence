@@ -1,7 +1,7 @@
 import React, {useEffect, useId, useMemo, useRef, useState} from 'react';
 import {weekdayOf} from '../server/schedules/generator.js';
-import {coverageTimeline} from '../server/schedules/coverage-timeline.js';
-import {FIVE_TWO_PAIRS, fiveTwoPair, fiveTwoSundays, fiveTwoWeeks, shiftScheduleDate} from '../server/schedules/five-two.js';
+import {effectiveFiveTwoPair, FIVE_TWO_PAIRS, fiveTwoPair, fiveTwoSundays, fiveTwoWeeks, shiftScheduleDate} from '../server/schedules/five-two.js';
+import {evaluateOperationalDay,suggestSundayMove} from '../server/coverage/operational.js';
 import PageHeading from './ui/PageHeading.jsx';
 import './roster-board.css';
 
@@ -17,12 +17,12 @@ const shifts = {manha:'Manhã', noite:'Noite', intermediario:'Intermediário', v
 const scheduleDays = ['dom','seg','ter','qua','qui','sex','sab'];
 const nameOrder = new Intl.Collator('pt-BR');
 
-function WorkingPreview({date, entries, people}){
+function WorkingPreview({date, entries, people, holiday=false}){
  const [selectedShift,setSelectedShift]=useState(null);
  const panelId=useId();
  const working=new Set(entries.filter(entry=>entry.type==='work').map(entry=>entry.uid));
  const groups=new Map();
- const weekday=scheduleDays[weekdayOf(date)];
+ const weekday=scheduleDays[holiday?0:weekdayOf(date)];
  for(const person of people.filter(item=>working.has(item.uid)).sort((a,b)=>nameOrder.compare(nameOf(a),nameOf(b)))){
   const profile=person.professional||{};
   const shift=Object.hasOwn(shifts,profile.shift)?profile.shift:'unknown';
@@ -91,13 +91,14 @@ function Badge({rows}){
  return rows.some(row=>row.deficit)?<span className="badge alert">Atenção</span>:<span className="badge">Cobertura OK</span>;
 }
 
-export default function RosterBoard({period, changePeriod, roster, updateRoster, members, entries, requirements, editable, saving, canSave, onSave, saved, onUndo, canUndo, status, loadPending, loadError, retryLoad}){
+export default function RosterBoard({period, changePeriod, roster, updateRoster, members, entries, requirements, editable, saving, canSave, onSave, saved, onUndo, canUndo, status, loadPending, loadError, retryLoad, lockedWeeks=[], approvedLeaves=[], coveragePolicy={}, onOpenCoverage}){
  const [view,setView]=useState('sundays');
  const [sundaySelected,setSunday]=useState('');
  const [weekSelected,setWeek]=useState('');
  const [pair,setPair]=useState(0);
  const [personId,setPerson]=useState(null);
  const [message,setMessage]=useState('');
+ const [comparison,setComparison]=useState(null);
  const drag=useRef(null);
  const suppressClick=useRef(false);
  const weeks=useMemo(()=>fiveTwoWeeks(period),[period]);
@@ -115,6 +116,9 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
   }
   return grouped;
  },[entries]);
+ const evaluate=date=>evaluateOperationalDay({date,entries:days.get(date)||[],people,requirements,policy:coveragePolicy});
+ const monthly=useMemo(()=>[...days].filter(([date])=>date.startsWith(period)).map(([date,entries])=>
+  evaluateOperationalDay({date,entries,people,requirements,policy:coveragePolicy})),[days,period,people,requirements,coveragePolicy]);
  const monthOptions=useMemo(()=>{
   const date=new Date(period+'-01T12:00:00Z');
   return Array.from({length:25},(_,index)=>new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+index-12,1,12)).toISOString().slice(0,7));
@@ -135,12 +139,16 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
  }
 
  function rowsFor(date, override){
-  return coverageTimeline({date,entries:entriesFor(date,override),people,requirements})
+  return evaluateOperationalDay({date,entries:entriesFor(date,override),people,requirements,policy:coveragePolicy}).intervals
    .sort((a,b)=>b.deficit-a.deficit||a.start.localeCompare(b.start));
  }
 
  function assignSunday(uid,date){
+  setComparison(null);
   if(!editable||roster.sundays[uid]===date)return;
+  if(roster.lockedSundays?.includes(uid)){setMessage('Destrave o domingo antes de mover.');return;}
+  const target=people.find(p=>p.uid===uid);
+  if(approvedLeaves.some(l=>l.date===date&&(l.uid===uid||l.uid===target?.accountUid))){setMessage('A pessoa tem uma ausência aprovada nesta data.');return;}
   const risk=rowsFor(date,{uid,type:'monthly_sunday'}).find(row=>row.deficit);
   updateRoster({...roster,sundays:{...roster.sundays,[uid]:date}});
   setSunday(date);
@@ -149,17 +157,19 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
  }
 
  function assignWeek(uid,nextPair){
+  setComparison(null);
+  if(lockedWeeks.includes(week)){setMessage('Esta semana pertence também a uma escala publicada. Escolha uma semana seguinte para mudar o par fixo.');return;}
   if(!editable||fiveTwoPair(roster,week,uid)===nextPair)return;
-  updateRoster({...roster,weekly:{...roster.weekly,[week]:{...roster.weekly[week],[uid]:nextPair}}});
+  updateRoster(effectiveFiveTwoPair(roster,period,week,uid,nextPair,lockedWeeks));
   setPair(nextPair);
   setPerson(null);
-  setMessage(nameOf(people.find(item=>item.uid===uid))+' ficou com '+FIVE_TWO_PAIRS[nextPair]+' na semana de '+weekLabel(week)+'.');
+  setMessage(nameOf(people.find(item=>item.uid===uid))+' ficou com '+FIVE_TWO_PAIRS[nextPair]+' a partir da semana de '+weekLabel(week)+'.');
  }
 
  function removeSunday(){
   const next={...roster.sundays};
   delete next[personId];
-  updateRoster({...roster,sundays:next});
+  updateRoster({...roster,sundays:next,lockedSundays:(roster.lockedSundays||[]).filter(uid=>uid!==personId)});
   setPerson(null);
   setMessage(selectedName+' ficou sem domingo definido.');
  }
@@ -207,6 +217,7 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
  const isSunday=view==='sundays';
  const dates=isSunday?sundays:FIVE_TWO_PAIRS;
  const coverage=rowsFor(sunday);
+ const dayRisk=monthly.find(item=>item.date===sunday)||evaluate(sunday);
  const candidates=isSunday&&editable?people.filter(item=>roster.sundays[item.uid]!==sunday).map(item=>{
   const rows=rowsFor(sunday,{uid:item.uid,type:'monthly_sunday'});
   return {person:item,issue:rows.find(row=>row.deficit),evaluated:rows.length>0};
@@ -244,10 +255,21 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
      <button type="button" className="tab" aria-pressed={!isSunday} onClick={()=>{setView('week');setPerson(null);setMessage('');}}>Semana 5×2</button>
     </nav>
     <div className="actions"><span className="save-status">{status||(saved?'Rascunho salvo':'Rascunho')}</span>
-     {editable&&<><button type="button" className="action quiet" disabled={!canUndo||saving} onClick={()=>{onUndo();setPerson(null);setMessage('Última mudança desfeita.');}}>Desfazer</button>
+     {editable&&<><button type="button" className="action quiet" disabled={!canUndo||saving} onClick={()=>{setComparison(null);onUndo();setPerson(null);setMessage('Última mudança desfeita.');}}>Desfazer</button>
      <button type="button" className="action primary" disabled={!canSave||saving} onClick={onSave}><span className="full-label">Salvar rascunho</span><span className="compact-label">Salvar</span></button></>}
     </div>
    </div>
+   {people.length>0&&<section className="panel roster-impact" aria-label="Impacto previsto no mês">
+    <div><strong>{monthly.filter(day=>day.attention).length}</strong> dias em atenção <span>·</span> <strong>{monthly.reduce((n,day)=>n+day.recurringFees,0)}</strong> taxas recorrentes cadastradas <span>·</span> <strong>{monthly.reduce((n,day)=>n+day.extra,0)}</strong> possíveis reforços <small>· podem gerar taxa</small></div>
+    {editable&&isSunday&&<button type="button" className="action quiet" onClick={()=>setComparison(suggestSundayMove({period,roster,entries,people,requirements,policy:coveragePolicy})||false)}>Sugerir domingos</button>}
+   </section>}
+   {comparison!==null&&<section className="panel roster-impact" aria-label="Comparar domingos">
+    {comparison?<><div><strong>Mover {comparison.name} de {shortDate(comparison.from)} para {shortDate(comparison.to)}</strong>
+     <p>{comparison.before.map((result,i)=>shortDate(result.date)+': '+result.extra+' → '+comparison.after[i].extra+' reforços a avaliar').join(' · ')}</p></div>
+     <button type="button" className="action primary" disabled={!editable} onClick={()=>{assignSunday(comparison.uid,comparison.to);setComparison(null);}}>Aplicar no rascunho</button></>
+     :<p>Não encontrei uma troca que reduza o risco sem piorar o outro domingo.</p>}
+    <button type="button" className="action quiet" onClick={()=>setComparison(null)}>Fechar</button>
+   </section>}
    <div className="layout">
     <aside className="panel team" aria-label="Equipe"><div className="section-head"><h2>Equipe</h2><span className="count">{people.length}</span></div>
      {editable&&<p className="tip">{isSunday?'Arraste um nome ou selecione a pessoa e o domingo.':'Selecione ou arraste um nome para um par de dias.'}</p>}
@@ -256,7 +278,7 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
      {isSunday&&<p className="note">{people.filter(item=>roster.sundays[item.uid]).length} de {people.length} com domingo definido</p>}
     </aside>
     <section className={'boards'+(isSunday?'':' weekly')}>
-     <div className="board-heading"><div><h2>{isSunday?'Domingos do mês':'Semana 5×2'}</h2><p>{isSunday?'Uma folga extra por pessoa, em uma data deste mês.':'Os dois dias de folga são movidos juntos.'}</p></div>{isSunday&&<span className="count">{sundays.length} domingos</span>}</div>
+     <div className="board-heading"><div><h2>{isSunday?'Domingos do mês':'Semana 5×2'}</h2><p>{isSunday?'Uma folga extra por pessoa, em uma data deste mês.':'Alterar o par fixa a folga a partir da semana escolhida.'}</p></div>{isSunday&&<span className="count">{sundays.length} domingos</span>}</div>
      {!isSunday&&<div className="week-select"><label htmlFor="roster-week">Semana</label><select id="roster-week" value={week} onChange={event=>{setWeek(event.target.value);setPerson(null);}}>{weeks.map(date=><option key={date} value={date}>{weekLabel(date)}</option>)}</select></div>}
      <div className="date-strip" style={{'--cols':dates.length}}>{dates.map((date,index)=><button type="button" key={date} className="mobile-date" aria-pressed={isSunday?date===sunday:index===pair}
       aria-label={isSunday?'Domingo '+shortDate(date):date} onClick={()=>isSunday?setSunday(date):setPair(index)}>{isSunday?shortDate(date):date.replace(' + ','/')}</button>)}</div>
@@ -264,7 +286,7 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
       {dates.map((date,index)=>{
        const active=isSunday?date===sunday:index===pair;
        const assigned=people.filter(item=>isSunday?roster.sundays[item.uid]===date:fiveTwoPair(roster,week,item.uid)===index);
-       const issue=isSunday&&rowsFor(date).find(row=>row.deficit);
+       const issue=isSunday&&monthly.find(x=>x.date===date)?.attention;
        return <article className={'day'+(active?' active':'')} key={date}
         data-drop-sunday={isSunday?date:undefined} data-drop-pair={isSunday?undefined:index}>
         <button type="button" className="day-title" aria-pressed={active} onClick={()=>isSunday?setSunday(date):setPair(index)}>
@@ -282,9 +304,19 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
      {isSunday?<section className="panel detail">
       <div className="detail-intro"><div><h3>Domingo {shortDate(sunday)}</h3><p>Cobertura prevista com as folgas {editable?'deste rascunho':'desta escala'}.</p></div><Badge rows={coverage}/></div>
       <WorkingPreview key={sunday} date={sunday} entries={entriesFor(sunday)} people={people}/>
+      {dayRisk.attention&&<details className="roster-operational"><summary>Avaliar cobertura do rascunho</summary>
+       {dayRisk.shifts.filter(row=>row.shortage||row.uncertain).map(row=><section key={row.shift+row.sector}>
+        <strong>{shifts[row.shift]} · {sectors[row.sector]}</strong><p>{row.reasons.join(' ')}</p>
+       </section>)}
+       {dayRisk.recurring.map(item=><p key={item.uid+item.forUid}>{item.name} · {item.available?'cobertura habitual prevista':'cobertura habitual a confirmar'}</p>)}
+      </details>}
+      {onOpenCoverage&&<button type="button" className="action quiet" onClick={()=>onOpenCoverage(sunday)}>Abrir este dia na Cobertura</button>}
       <Coverage key={'coverage-'+sunday} rows={coverage}/>
       {editable&&<><div className="section-head"><h3>Quem pode folgar</h3>
-       {person&&roster.sundays[personId]===sunday&&<button type="button" className="remove" onClick={removeSunday}>Remover {selectedName}</button>}
+       {person&&roster.sundays[personId]===sunday&&<div>
+        <button type="button" className="remove" onClick={()=>{setComparison(null);const locked=roster.lockedSundays||[];updateRoster({...roster,lockedSundays:locked.includes(personId)?locked.filter(uid=>uid!==personId):[...locked,personId]});}}>{roster.lockedSundays?.includes(personId)?'Destravar':'Travar'} domingo</button>
+        <button type="button" className="remove" disabled={roster.lockedSundays?.includes(personId)} onClick={removeSunday}>Remover {selectedName}</button>
+       </div>}
       </div>
       <div className="suggestions">{suggestions.length?suggestions.map(({person:item,issue,evaluated})=><button type="button" key={item.uid}
        className={'suggestion'+(issue?' risk-suggestion':'')} onClick={()=>assignSunday(item.uid,sunday)}>
@@ -299,8 +331,11 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
       const rows=rowsFor(date,override);
       return <section key={date} className="panel detail">
        <div className="detail-intro"><h3>{capitalize(formatDay.format(new Date(date+'T12:00:00Z')))} · {shortDate(date)}</h3><Badge rows={rows}/></div>
-       <WorkingPreview date={date} entries={entriesFor(date,override)} people={people}/>
+       <WorkingPreview date={date} entries={entriesFor(date,override)} people={people} holiday={coveragePolicy.holidays?.includes(date)}/>
        <Coverage rows={rows}/>
+       {date.startsWith(period)&&monthly.find(item=>item.date===date)?.recurring.map(item=>
+        <p key={item.uid+item.forUid} className="weekly-label">{item.name} · {item.available?'cobertura habitual prevista':'cobertura habitual a confirmar'}</p>)}
+       {onOpenCoverage&&date.startsWith(period)&&<button type="button" className="action quiet" onClick={()=>onOpenCoverage(date)}>Abrir na Cobertura</button>}
       </section>;
      })}
     </section>
