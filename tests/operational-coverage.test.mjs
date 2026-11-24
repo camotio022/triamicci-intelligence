@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {carryFiveTwoRoster,effectiveFiveTwoPair,fiveTwoEntries,fiveTwoPair,fiveTwoWeeks} from '../server/schedules/five-two.js';
-import {evaluateOperationalDay,forecastPaymentDate,suggestSundayMove,validOperationalPolicy,wholeTurnAssignment} from '../server/coverage/operational.js';
+import {evaluateOperationalDay,forecastPaymentDate,reviewCoverageAssignment,suggestSundayMove,validOperationalPolicy,wholeTurnAssignment} from '../server/coverage/operational.js';
 
 const date='2026-12-13';
 const kitchen=(uid,certifications=[],extras={})=>({
@@ -56,13 +56,57 @@ test('Sunday move reduces shortage on the original Sunday and honors manual lock
 });
 
 test('coverage keeps normal hours apart from the extra period and leaves unconfigured pay pending',()=>{
- const row={window:{start:'12:00',end:'20:20'}};
+ const row={window:{start:'14:00',end:'22:20'},coverageWindow:{start:'16:20',end:'22:20'}};
  const regular={scheduled:true,hours:{start:'08:00',end:'16:20'}};
- assert.deepEqual(wholeTurnAssignment(row,regular),{first:{start:'08:00',end:'16:20'},second:{start:'16:20',end:'20:20'}});
- assert.deepEqual(wholeTurnAssignment(row,{scheduled:false}),{first:null,second:row.window});
+ assert.deepEqual(wholeTurnAssignment(row,regular),{first:{start:'08:00',end:'16:20'},second:{start:'16:20',end:'22:20'}});
+ assert.deepEqual(wholeTurnAssignment(row,{scheduled:false}),{first:null,second:row.coverageWindow});
  assert.equal(wholeTurnAssignment(row,{scheduled:true,hours:{start:'05:00',end:'10:00'}}),null);
+ assert.equal(wholeTurnAssignment({...row,coverageWindow:null},regular),null);
+ assert.equal(wholeTurnAssignment({...row,coverageWindow:{start:'12:00',end:'20:20'}},regular),null);
+ assert.equal(reviewCoverageAssignment(wholeTurnAssignment(row,regular)).state,'blocked');
  assert.equal(forecastPaymentDate(date,null),null);
  assert.equal(forecastPaymentDate('2026-12-29',{daysAfter:5}),'2027-01-03');
  assert.equal(validOperationalPolicy(policy),true);
  assert.equal(validOperationalPolicy({...policy,holidays:['2026-02-30']}),false);
+});
+
+test('when the night cook is off, rank a cook who works that day above kitchen assistants',()=>{
+ const day='2026-12-02';
+ const morning=(uid,jobTitle)=>kitchen(uid,[],{jobTitle,shift:'manha',availability:[{day:'qua',start:'08:00',end:'16:20'}]});
+ const night=(uid,jobTitle)=>kitchen(uid,[],{jobTitle,availability:[{day:'qua',start:'14:00',end:'22:20'}]});
+ const [aux, replacement, scheduledAux, cookOff]=[
+  morning('Francisco','Auxiliar de cozinha'),morning('Suberlânio','Cozinheiro'),night('Edileuza','Auxiliar de cozinha'),night('Rodolfo','Cozinheiro')
+ ];
+ const people=[aux,replacement,scheduledAux,cookOff];
+ const entries=[...work(people.slice(0,3),day),...work([cookOff],day,'off')];
+ const configured={...policy,peakPeriods:[{start:'2026-12-01',end:'2026-12-31'}]};
+ const result=evaluateOperationalDay({date:day,entries,people,policy:configured});
+ const row=result.shifts.find(item=>item.sector==='cozinha'&&item.shift==='noite');
+ assert.equal(row.minimum,4);
+ assert.equal(row.roleGap,1);
+ assert.deepEqual(row.people.map(person=>person.name),['Edileuza']);
+ assert.deepEqual(row.candidates.map(person=>person.name),['Suberlânio','Rodolfo','Francisco']);
+ assert.deepEqual(wholeTurnAssignment(row,row.candidates[0]).second,{start:'16:20',end:'22:20'});
+});
+
+test('management counterpart is visible when the alternate shift overlaps, with payment pending',()=>{
+ const day='2026-12-02';
+ const person=(uid,jobTitle,shift,start,end)=>kitchen(uid,[],{
+  jobTitle,sector:'gestao',shift,availability:[{day:'qua',start,end}]
+ });
+ const manager=person('Edielson','Gerente','manha','08:00','16:20');
+ const deputy=person('Judson','Subgerente','noite','14:00','22:20');
+ const people=[manager,deputy];
+ const evaluate=(working,away)=>evaluateOperationalDay({date:day,entries:[...work([working],day),...work([away],day,'off')],people,policy});
+ const a=evaluate(manager,deputy);
+ const b=evaluate(deputy,manager);
+ assert.equal(a.recurring[0].name,'Edielson');
+ assert.equal(a.recurring[0].paid,null);
+ assert.equal(a.recurringFees,0);
+ assert.deepEqual(wholeTurnAssignment(a.shifts.find(item=>item.sector==='frente'&&item.shift==='noite'),
+  a.shifts.find(item=>item.sector==='frente'&&item.shift==='noite').candidates[0]).second,{start:'16:20',end:'22:20'});
+ const morning=b.shifts.find(item=>item.sector==='frente'&&item.shift==='manha');
+ assert.equal(b.recurring[0].name,'Judson');
+ assert.equal(b.recurring[0].available,false);
+ assert.equal(wholeTurnAssignment(morning,morning.candidates.find(item=>item.uid==='Judson')),null);
 });

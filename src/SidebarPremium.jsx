@@ -50,7 +50,7 @@ export default function SidebarPremium({open,onClose,user,membership,avatar,logo
  const go=item=>{if(item.id==='mentor')onMentorReset?.();navigate(item.id)};
  const navItem=item=>{
   const Icon=item.icon;
-  const active=page===item.id||item.id==='people'&&['team','master-registry','skills','shifts','schedule-planning'].includes(page);
+  const active=page===item.id||item.id==='people'&&['team','master-registry','skills','shifts','schedule-planning','coverage','team-today','people-access'].includes(page);
   return <button key={item.id} type="button" data-mentor={item.mentor||undefined} className={'nav-item ti-sidebar-link'+(active?' active is-active':'')} aria-current={active?'page':undefined} onClick={()=>go(item)}><Icon aria-hidden="true" size={20} strokeWidth={1.9}/><span>{item.label}</span></button>;
  };
  return <aside className={'sidebar ti-sidebar-premium'+(open?' sidebar-open':'')} id="primary-sidebar" aria-label="Menu principal">

@@ -13,10 +13,10 @@ const blank=()=>({sector:'cozinha',jobTitle:'Auxiliar de cozinha',skills:[],cert
 async function api(action,extra={}){
  return requestJson('/api/members/manage',{action,...extra},{sessionMessage:'Sessão expirada.',formatError:data=>data.message||'Não foi possível carregar equipe.'});
 }
-export default function TeamProfiles({membership,initialTab='profiles'}){
+export default function TeamProfiles({membership,initialTab='profiles',standalone=false}){
  const {notify}=useFeedback();
  const dialogRef=useRef(null);
- const [requests,setRequests]=useState([]);const [members,setMembers]=useState([]),[tab,setTab]=useState(initialTab),[selected,setSelected]=useState(''),
+ const [requests,setRequests]=useState([]);const [members,setMembers]=useState([]),[activeTab,setTab]=useState(initialTab),[selected,setSelected]=useState(''),
  [form,setForm]=useState(blank()),[error,setError]=useState(''),[notice,setNotice]=useState(''),
  [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[search,setSearch]=useViewState('TeamProfiles.jsx:search',membership.unitId,'');
  const load=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');
@@ -27,6 +27,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
  useEffect(()=>{setTab(initialTab);setSelected('');setError('')},[initialTab]);
  const [sectorFilter,setSectorFilter]=useState('all');
  const filtered=useMemo(()=>members.filter(m=>m.status==='active'&&(sectorFilter==='all'||m.professional?.sector===sectorFilter)&&[m.name,m.email,m.professional?.jobTitle,m.professional?.sector].join(' ').toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR'))),[members,search,sectorFilter]);
+ const tab=standalone?initialTab:activeTab;
  const current=members.find(x=>x.uid===selected);
  const editable=current&&(current.registry||membership.role==='admin'||['cook','auxiliar'].includes(current.role));
  const select=m=>{setSelected(m.uid);setForm(m.professional?{...blank(),...structuredClone(m.professional)}:blank());setNotice('');setError('');setTab('profiles')};
@@ -42,17 +43,17 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
   try{const d=current?.registry?await api('masterRegistryUpdate',{id:selected,changes:{sector:form.sector,jobTitle:form.jobTitle,shift:form.shift,skills:form.skills,certifications:form.certifications,availability:form.availability,notes:form.notes}}):await api('profileSave',{uid:selected,profile:form});setNotice(d.message);notify('Ficha profissional salva com sucesso.','success');await load()}
   catch(e){setError(e.message);notify(e.message,'error')}finally{setSaving(false)}};
  return <section className="team-panel team-profiles">
-  <h2>Gestão operacional da equipe</h2>
-  <p>Perfis profissionais, competências e disponibilidade habitual. Permissões de acesso continuam independentes.</p>
+  <h2>{standalone?(tab==='matrix'?'Habilidades':'Jornadas'):'Gestão operacional da equipe'}</h2>
+  {!standalone&&<><p>Perfis profissionais, competências e disponibilidade habitual. Permissões de acesso continuam independentes.</p>
   <div className="team-delivery team-profiles-tabs" role="group" aria-label="Áreas da gestão de equipes">
    <button type="button" className={tab==='profiles'?'selected':''} onClick={()=>setTab('profiles')}>Ficha profissional</button>
    <button type="button" className={tab==='matrix'?'selected':''} onClick={()=>setTab('matrix')}>Matriz de habilidades</button>
    <button type="button" className={tab==='shifts'?'selected':''} onClick={()=>setTab('shifts')}>Turnos e disponibilidade</button>
-  </div>
+  </div></>}
   <div className="team-directory-heading team-profiles-search"><label>Buscar colaborador
    <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome, cargo ou e-mail"/>
   </label><label>Setor<select value={sectorFilter} onChange={e=>setSectorFilter(e.target.value)}><option value="all">Todos os setores</option>{Object.entries(sectors).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label><button type="button" onClick={load} disabled={loading}>Atualizar</button></div>
-  {requests.some(r=>r.status==='pending')&&<section className="team-review-requests" aria-label="Solicitações de revisão de habilidades">
+  {tab!=='shifts'&&requests.some(r=>r.status==='pending')&&<section className="team-review-requests" aria-label="Solicitações de revisão de habilidades">
    <h3>Solicitações de habilidades pendentes</h3><p>Analise os pedidos dos colaboradores e faça as alterações pela ficha profissional após confirmar a competência.</p>
    {requests.filter(r=>r.status==='pending').map(r=><article key={r.id}><strong>{members.find(m=>m.uid===r.uid)?.name||'Colaborador da unidade'}</strong>
     <span>Habilidade: {abilities[r.skill]||r.skill}</span><p>{r.reason}</p></article>)}
@@ -68,7 +69,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
    </article>)}
    {!loading&&!filtered.length&&<p>Nenhum colaborador encontrado.</p>}
   </div>}
-  {tab==='profiles'&&current&&<div className="ti-profile-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setSelected('')}}><div className="ti-profile-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="ti-profile-title"><header className="ti-profile-dialog-header"><div><span>GESTÃO · FICHA PROFISSIONAL</span><h3 id="ti-profile-title">{current.name||current.email}</h3></div><button type="button" className="ti-profile-close" onClick={()=>setSelected('')} aria-label="Fechar ficha">×</button></header><form className="team-edit-form team-profile-form" onSubmit={save}>
+  {current&&<div className="ti-profile-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setSelected('')}}><div className="ti-profile-dialog" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="ti-profile-title"><header className="ti-profile-dialog-header"><div><span>GESTÃO · FICHA PROFISSIONAL</span><h3 id="ti-profile-title">{current.name||current.email}</h3></div><button type="button" className="ti-profile-close" onClick={()=>setSelected('')} aria-label="Fechar ficha">×</button></header><form className="team-edit-form team-profile-form" onSubmit={save}>
     {!editable&&<p className="team-warning">Este perfil é protegido e não pode ser alterado pelo seu nível de acesso.</p>}
     <label>Setor</label><select disabled={!editable} value={form.sector} onChange={e=>update('sector',e.target.value)}>{Object.entries(sectors).map(([v,l])=><option value={v} key={v}>{l}</option>)}</select>
     <label>Cargo operacional (não altera permissões)</label><input disabled={!editable} required maxLength={80} minLength={2} value={form.jobTitle} onChange={e=>update('jobTitle',e.target.value)}/>
@@ -98,7 +99,7 @@ export default function TeamProfiles({membership,initialTab='profiles'}){
   {tab==='shifts'&&<div className="team-shift-list">{filtered.map(m=><article key={m.uid} className="team-shift-card">
   <div className="team-shift-card-head"><div><strong>{m.name||m.email}</strong><span>{m.professional?.jobTitle||'Função não informada'} · {sectors[m.professional?.sector]||'Setor pendente'}</span></div><span className="team-shift-pill">{shifts[m.professional?.shift]||'Turno não definido'}</span></div>
   {(m.professional?.availability||[]).length>0?<details className="team-shift-details"><summary>Consultar jornada e intervalos</summary><div className="team-shift-hours">{Object.entries(days).map(([key,day])=>{const slot=(m.professional?.availability||[]).find(d=>d.day===key);return <div className="team-shift-hour" key={key}><span>{day}</span><strong>{slot?slot.start+'–'+slot.end:'Folga / sem jornada'}</strong>{slot&&<small>Intervalo {slot.breakStart}–{slot.breakEnd}</small>}</div>})}</div></details>:<p className="team-shift-empty">Disponibilidade ainda não cadastrada.</p>}
-  <button className="team-member-edit" type="button" onClick={()=>{select(m);setTab('profiles')}}>Editar ficha</button>
+  <button className="team-member-edit" type="button" onClick={()=>select(m)}>Editar ficha</button>
  </article>)}</div>}
  </section>;
 }

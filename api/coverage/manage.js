@@ -1,5 +1,5 @@
 import {restaurantDay} from '../../shared/operation-day.js';
-import {evaluateOperationalDay,forecastPaymentDate,validOperationalPolicy,wholeTurnAssignment} from '../../server/coverage/operational.js';
+import {evaluateOperationalDay,forecastPaymentDate,validOperationalPolicy,wholeTurnAssignment,reviewCoverageAssignment} from '../../server/coverage/operational.js';
 import {readCoverageContext} from '../../server/coverage/operational-context.js';
 import {queuePush,tryDrainPush} from '../../server/push/delivery.js';
 import {MANAGEMENT_ROLES,isManagement} from '../../server/permissions/v31-policy.js';
@@ -194,16 +194,19 @@ export default async function handler(req,res){
     const candidate=row.candidates.find(item=>item.uid===staffId);
     const person=staff.docs.find(doc=>doc.id===staffId)?.data();
     const assignment=wholeTurnAssignment(row,candidate);
-    if(!assignment||!person?.accountUid||assignment.first&&req.body.coveredStart!==true)throw Error('STAFF_NOT_AVAILABLE');
+    if(!assignment||!person?.accountUid)throw Error('STAFF_NOT_AVAILABLE');
     if(existing.docs.some(doc=>doc.data().staffId===staffId&&!['rejected','declined','cancelled'].includes(doc.data().status)&&
      (!doc.data().shift||doc.data().shift===shift||minutes(doc.data().second?.end)>minutes(assignment.second.start)&&minutes(doc.data().second?.start)<minutes(assignment.second.end))))throw Error('CONFLICT');
-    const review=assignment.first?checkDoubleShift(assignment):{state:'review',reasons:['Conferir descanso, intervalos e disponibilidade para o turno inteiro.']};
+    const review=assignment.first?reviewCoverageAssignment(assignment):{state:'review',reasons:['Conferir descanso, intervalos e disponibilidade para o turno inteiro.']};
     if(review.state==='blocked')throw Error('SHIFT_REVIEW_BLOCKED');
     const rates=rateSnap.data()?.rates;
+    const fixed=evaluation.recurring.find(item=>item.uid===staffId&&item.sector===sector&&item.shift===shift);
     const rateRole=rateRoleFor(person),override=rateSnap.data()?.individualRates?.[staffId];
     tx.create(proposals.doc(id),{staffId,accountUid:person.accountUid,name:person.name||'',date,planId,planRevision:plan.data().revision||null,shift,sector,
-     window:row.window,...assignment,external:false,rateRole,reason:reason.trim(),practicePayment:override?.amount??(rates?paymentFor({paymentRole:rateRole},rates):null),
-     operational:true,coveredStart:req.body.coveredStart===true,payrollSnapshot:override?.daysAfter!=null?{daysAfter:override.daysAfter}:rateSnap.data()?.payroll||null,legalEstimate:null,legalValidated:false,reviewReasons:review.reasons,status:'pending_acceptance',consentPending:false,createdAt:now,updatedAt:now,createdBy:actor.uid,unitId:member.unitId});
+     window:assignment.second,...assignment,external:false,rateRole,reason:reason.trim(),
+     ...(fixed?{fixedFeePolicy:fixed.paid}:{}),
+     practicePayment:fixed?.paid===false?0:fixed?.paid===null?null:override?.amount??(rates?paymentFor({paymentRole:rateRole},rates):null),
+     operational:true,payrollSnapshot:override?.daysAfter!=null?{daysAfter:override.daysAfter}:rateSnap.data()?.payroll||null,legalEstimate:null,legalValidated:false,reviewReasons:review.reasons,status:'pending_acceptance',consentPending:false,createdAt:now,updatedAt:now,createdBy:actor.uid,unitId:member.unitId});
     signalUnitChange(tx,db,member.unitId,['coverage','notifications']);
     queuePush(tx,db,member.unitId,'coverage_invite_'+id,{uid:person.accountUid,title:'Você recebeu um convite de cobertura',page:'my-profile'});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.proposed',unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now});
@@ -221,15 +224,15 @@ export default async function handler(req,res){
     if(!hasRole(who,member))throw Error('FORBIDDEN');
     const p=proposal.data();
     if(!p?.operational||p.status!==(completing?'approved':'completed'))throw Error('CONFLICT');
-    if(p.date>restaurantDay(now)||!completing&&(paidDate<p.date||p.fee?.amount==null))throw Error('FEE_UNAVAILABLE');
+    if(p.date>restaurantDay(now)||!completing&&(paidDate<p.date||p.fee?.amount==null||p.fixedFeePolicy===false))throw Error('FEE_UNAVAILABLE');
     const override=rateSnap.data()?.individualRates?.[p.staffId];
     const rate=override?.amount??rateSnap.data()?.rates?.[p.rateRole];
-    const amount=p.practicePayment??(Number.isFinite(rate)?rate:null);
+    const amount=p.fixedFeePolicy===null?null:p.practicePayment??(Number.isFinite(rate)?rate:null);
     const payroll=p.payrollSnapshot??(override?.daysAfter!=null?{daysAfter:override.daysAfter}:rateSnap.data()?.payroll??null);
     if(completing){
-     if(actualStart<(p.first?.end||p.window.start))throw Error('SHIFT_REVIEW_BLOCKED');
+     if(actualStart<(p.second?.start||p.window.start))throw Error('SHIFT_REVIEW_BLOCKED');
      if(p.date===restaurantDay(now)&&actualEnd>new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit'}).format(now))throw Error('FEE_UNAVAILABLE');
-     const dueDate=amount===null?null:forecastPaymentDate(p.date,payroll);
+     const dueDate=amount===null||p.fixedFeePolicy===false?null:forecastPaymentDate(p.date,payroll);
      tx.update(ref,{status:'completed',actualStart,actualEnd,fee:{amount,dueDate,rateRole:p.rateRole,policy:payroll},completedAt:now,completedBy:actor.uid,updatedAt:now});
     }else{
      tx.update(ref,{status:'paid',paidDate,paidAt:now,paidBy:actor.uid,updatedAt:now});

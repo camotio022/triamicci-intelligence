@@ -1,5 +1,5 @@
 import React,{useState} from 'react';
-import {wholeTurnAssignment} from '../server/coverage/operational.js';
+import {reviewCoverageAssignment,wholeTurnAssignment} from '../server/coverage/operational.js';
 import {monthDates} from '../server/schedules/rules.js';
 import {restaurantDay} from '../shared/operation-day.js';
 
@@ -8,87 +8,128 @@ const shortDate=date=>date?.split('-').reverse().join('/')||'Data a definir';
 const shifts={manha:'Manhã',noite:'Noite'};
 const sectors={cozinha:'Cozinha',frente:'Frente'};
 
-export default function OperationalCoverage({data,request,run,busy,focus}){
- const [planId,setPlanId]=useState(focus?.planId||''),[chosenDate,setDate]=useState(focus?.date||''),[sector,setSector]=useState('cozinha'),[shift,setShift]=useState('noite');
+const hours=window=>window?window.start+'–'+window.end:'Horário a confirmar';
+const candidateName=person=>person.name+' · '+(person.jobTitle||'Função a confirmar');
+
+function coverageMessage(row, intervals, suggestion) {
+ const scheduled=row.people.map(person=>person.name+(person.hours?'':' (horário a confirmar)'));
+ const staffing=scheduled.length?'Na escala: '+scheduled.join(', ')+'.':'O turno está sem pessoas na escala.';
+ const deficit=row.headcountGap
+  ? (row.headcountGap===1?'Falta uma pessoa':'Faltam '+row.headcountGap+' pessoas')+' para chegar ao mínimo de '+row.minimum+'.'
+  : '';
+ const role=row.roleGap?(row.sector==='cozinha'?'Falta confirmar um cozinheiro.':'Falta confirmar gerente ou subgerente.'):'';
+ const firstGap=intervals[0];
+ const station=firstGap?'Das '+firstGap.start+' às '+firstGap.end+', '+(firstGap.skill||firstGap.sector)+' está abaixo do mínimo ('+firstGap.covered+' de '+firstGap.minimum+').':row.skillGap?'A montagem tem '+row.skillCount+' de 3 pessoas que podem atuar ao mesmo tempo.':'';
+ const next=suggestion
+  ? suggestion.name+(suggestion.scheduled?' já trabalha nesse dia.':' está fora da escala nesse dia.')+' Revise a cobertura de '+hours(row.coverageWindow)+'.'
+  : row.shortage||firstGap?'Revise os horários e as opções de cobertura.':'';
+ return [staffing,deficit,role,station,next].filter(Boolean).join(' ');
+}
+
+function CoverageCard({row, evaluation, data, date, plan, request, run, busy}) {
+ const [staffId,setStaffId]=useState('');
+ const [reason,setReason]=useState('');
+ const [more,setMore]=useState(false);
+ const recurring=evaluation.recurring.filter(item=>item.sector===row.sector&&item.shift===row.shift);
+ const intervals=evaluation.intervals.filter(item=>item.deficit&&(item.sector===row.sector||
+  row.sector==='frente'&&['caixa','apoio','gestao'].includes(item.sector)));
+ const needsHelp=Boolean(row.shortage||intervals.length||recurring.some(item=>!item.available));
+ const candidates=row.candidates.map(person=>({person,assignment:wholeTurnAssignment(row,person)}));
+ const suggestion=candidates.find(({person,assignment})=>assignment&&person.fitsRole)?.person;
+ const message=coverageMessage(row,intervals,needsHelp?suggestion:null);
+ const selected=candidates.find(({person})=>person.uid===staffId);
+ const choose=person=>{
+  setStaffId(person.uid===staffId?'':person.uid);
+  setReason(message.slice(0,500));
+ };
+ const canReview=date>=restaurantDay();
+ const fixed=selected&&recurring.find(item=>item.uid===selected.person.uid);
+ const estimate=selected&&(data.individualRates?.[staffId]?.amount??data.configuredRates?.[selected.person.rateRole]);
+ const review=selected?.assignment?.first&&reviewCoverageAssignment(selected.assignment);
+ const inspect=person=>person.scheduled?'Revisar dobra de '+person.name:'Revisar convite de '+person.name;
+ return <article className="ti-cov-card" data-attention={needsHelp||row.uncertain}>
+  <header className="ti-cov-row">
+   <div><h2>{sectors[row.sector]} · {shifts[row.shift]}</h2><small>Cobertura {hours(row.coverageWindow)}</small></div>
+   <strong className="ti-cov-count">{row.minimum==null?row.count+' com horário':row.count+' de '+row.minimum+' com horário'}</strong>
+  </header>
+  <p>{message}</p>
+  {row.people.length>0&&<ul className="ti-cov-team" aria-label="Quem está na escala">
+   {row.people.map(person=><li key={person.uid}><strong>{candidateName(person)}</strong><small>{hours(person.hours)}</small></li>)}
+  </ul>}
+  {recurring.map(item=><p className="ti-cov-fixed" key={item.uid+':'+item.forUid}><strong>{item.name}</strong> · {item.available?'Cobertura fixa prevista':'Cobertura habitual a confirmar'} · {item.paid==null?'Taxa a definir':item.paid?'Cobertura remunerada':'Sem taxa fixa'}</p>)}
+  {row.uncertain&&<p className="ti-cov-pending">Há horários ou regras pendentes de confirmação.</p>}
+  {needsHelp&&<>
+   {suggestion&&canReview&&<button type="button" onClick={()=>choose(suggestion)}>{staffId===suggestion.uid?'Fechar revisão':inspect(suggestion)}</button>}
+   {candidates.some(({person})=>person.uid!==suggestion?.uid)&&<button className="ti-cov-quiet" type="button" aria-expanded={more} onClick={()=>setMore(!more)}>{more?'Ocultar outras opções':'Outras opções'}</button>}
+   {more&&<ul className="ti-cov-team" aria-label="Outras opções de reforço">
+    {candidates.filter(({person})=>person.uid!==suggestion?.uid).map(({person,assignment})=><li key={person.uid}>
+     <span><strong>{candidateName(person)}</strong><small>{!assignment?'Jornada incompatível ou pendente':!person.fitsRole?'Apoio adicional, sem resolver a falta desse cargo':person.scheduled?'Já trabalha nesse dia':'Disponibilidade a confirmar'}</small></span>
+     {assignment&&canReview&&<button className="ti-cov-quiet" type="button" onClick={()=>choose(person)}>Revisar</button>}
+    </li>)}
+   </ul>}
+  </>}
+  {needsHelp&&selected?.assignment&&<div className="ti-cov-invite">
+   <strong>Convite para {selected.person.name}</strong>
+   <p>Cobertura integral {hours(selected.assignment.second)}.{selected.assignment.first?' Jornada habitual '+hours(selected.assignment.first)+'.':''}</p>
+   <p>{fixed?.paid===false?'Cobertura fixa sem taxa.':fixed&&fixed.paid==null?'Taxa fixa a definir.':'Estimativa da taxa · '+feeMoney(estimate)}</p>
+   {review?.state==='blocked'&&<p role="status">A jornada combinada precisa ser revista antes do convite. {review.reasons[0]}.</p>}
+   <label>Motivo para o convite<textarea maxLength={500} value={reason} onChange={event=>setReason(event.target.value)}/></label>
+   <button type="button" disabled={busy||review?.state==='blocked'||reason.trim().length<10} onClick={async()=>{
+    const response=await run(()=>request('inviteShift',{planId:plan.id,date,sector:row.sector,shift:row.shift,staffId,reason}));
+    if(response){setStaffId('');setReason('');}
+   }}>Enviar convite</button>
+  </div>}
+  {(row.reasons.length>0||intervals.length>0)&&<details>
+   <summary>Detalhes da avaliação</summary>
+   {row.reasons.map((line,index)=><p key={index}>{line}</p>)}
+   {intervals.map((item,index)=><p key={index}>{item.skill||item.sector} · {item.start}–{item.end} · {item.covered} de {item.minimum}</p>)}
+  </details>}
+ </article>;
+}
+
+export default function OperationalCoverage({data,request,run,busy,focus}) {
+ const [planId,setPlanId]=useState(focus?.planId||'');
+ const [chosenDate,setDate]=useState(focus?.date||'');
+ const [shift,setShift]=useState('noite');
  const [result,setResult]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
- const [coveredStart,setCoveredStart]=useState(false);
- const [staffId,setStaffId]=useState(''),[reason,setReason]=useState('');
  const plan=data?.plans.find(item=>item.id===planId)||data?.plans[0];
  const period=plan?.period;
- const date=chosenDate.startsWith(period+'-')?chosenDate:period===restaurantDay().slice(0,7)?restaurantDay():period?period+'-01':'';
+ const today=restaurantDay();
+ const date=chosenDate.startsWith(period+'-')?chosenDate:period===today.slice(0,7)?today:period?period+'-01':'';
  const current=result?.planId===plan?.id&&result?.date===date?result:null;
- const row=current?.evaluation.shifts.find(item=>item.sector===sector&&item.shift===shift);
- const context=current?.context;
- const clearCandidate=()=>{setReason('');setStaffId('');setCoveredStart(false);};
- const select=(setter,value)=>{setter(value);clearCandidate();setError('');};
  const evaluate=async event=>{
-  event.preventDefault();setLoading(true);setError('');clearCandidate();
-  try{setResult({...await request('assessShift',{planId:plan.id,date,sector,shift}),planId:plan.id,date});}
-  catch(e){setError(e.message);setResult(null);}
+  event.preventDefault();
+  setLoading(true);setError('');setResult(null);
+  try{setResult({...await request('assessShift',{planId:plan.id,date,sector:'cozinha',shift}),planId:plan.id,date});}
+  catch(e){setError(e.message);}
   finally{setLoading(false);}
  };
  return <section className="ti-cov-panel ti-cov-board">
-  <div><h2>Cobertura inteligente</h2><p>Veja quem está previsto para o turno e quais alternativas a gestão pode avaliar.</p></div>
+  <h1>Cobertura</h1>
   <form className="ti-cov-filter" onSubmit={evaluate}>
-   <label>Escala<select value={plan?.id||''} onChange={e=>select(setPlanId,e.target.value)}>
-    {!plan&&<option value="">Nenhuma escala disponível</option>}
+   <label>Escala<select value={plan?.id||''} onChange={event=>{setPlanId(event.target.value);setError('');}}>
+    {!plan&&<option value="">{data?'Nenhuma escala disponível':'Carregando escalas…'}</option>}
     {(data?.plans||[]).map(item=><option value={item.id} key={item.id}>{item.title} · {item.period} · {item.status==='published'?'Publicada':'Em preparação'}</option>)}
    </select></label>
-   <label>Data<input type="date" required value={date} min={period?period+'-01':undefined} max={period?monthDates(period).at(-1):undefined} onChange={e=>select(setDate,e.target.value)}/></label>
+   <label>Data<input type="date" required value={date} min={period?period+'-01':undefined} max={period?monthDates(period).at(-1):undefined} onChange={event=>{setDate(event.target.value);setError('');}}/></label>
+   <div className="ti-cov-segments" role="group" aria-label="Turno">
+    {Object.entries(shifts).map(([id,label])=><button type="button" key={id} aria-pressed={id===shift} onClick={()=>setShift(id)}>{label}</button>)}
+   </div>
    <button type="submit" disabled={!plan||!date||loading||busy}>{loading?'Avaliando…':'Avaliar situação'}</button>
   </form>
   {error&&<p className="team-error" role="alert">{error}</p>}
-  <div className="ti-cov-segments" role="group" aria-label="Turno">{Object.entries(shifts).map(([id,label])=><button key={id} type="button" aria-pressed={id===shift} onClick={()=>select(setShift,id)}>{label}</button>)}</div>
-  {row&&<>
-   <div className="ti-cov-cards">{Object.entries(sectors).map(([id,label])=>{
-    const item=current.evaluation.shifts.find(x=>x.sector===id&&x.shift===shift);
-    return <button key={id} type="button" aria-pressed={id===sector} onClick={()=>select(setSector,id)}>
-     <strong>{label}</strong><span>{item.minimum==null?item.count+' com horário cadastrado':item.count+' de '+item.minimum+' com horário cadastrado'}</span>
-    </button>;
-   })}</div>
-   <article className="ti-cov-explanation">
-    <div className="ti-cov-row"><h3>{sectors[sector]} · {shifts[shift]}</h3><small>{row.window?row.window.start+'–'+row.window.end:'Horário do turno a confirmar'}</small></div>
-    <p>{row.reasons.length?row.reasons.join(' '):'A projeção atende às regras verificadas para este turno.'}</p>
-    <details><summary>Quem está na escala</summary>
-     {row.people.length?row.people.map(person=><p key={person.uid}>{person.name} · {person.jobTitle||'Função a confirmar'} · {person.hours?person.hours.start+'–'+person.hours.end:'Horário pendente'}</p>):<p>Nenhuma pessoa prevista neste setor e turno.</p>}
-     {current.evaluation.recurring.filter(item=>item.sector===sector&&item.shift===shift).map(item=><p key={item.uid+item.forUid}>{item.name} · {item.available?'Cobertura fixa prevista':'Cobertura fixa a confirmar'}</p>)}
-    </details>
-    <details><summary>Dados usados na avaliação</summary>
-     <p>{current.evaluation.holiday?'Feriado cadastrado · jornada de domingo.':current.evaluation.busyDay?'Dia de movimento pelo calendário configurado.':'Dia comum no calendário configurado.'} {context.demand.note}</p>
-     <p>Produção · {context.production.tasks.length}{context.production.hasMore?'+':''} tarefas registradas. {context.production.note}</p>
-     <p>Estoque · {context.stock.low.length} itens abaixo do mínimo na amostra e {context.stock.unknown} sem contagem compatível.</p>
-     <p>Compras · {context.purchases.records.length}{context.purchases.partial?'+':''} registros consultados. {context.purchases.note}</p>
-     <p>Recebimento · {context.receiving.records.length}{context.receiving.partial?'+':''} conferências na amostra. {context.receiving.note}</p>
-     {current.evaluation.intervals.filter(item=>item.deficit&&(item.sector===sector||sector==='frente'&&['caixa','apoio','gestao'].includes(item.sector))).map((item,i)=><p key={i}>{item.skill||item.sector} · {item.start}–{item.end} · {item.covered}/{item.minimum} previstos pela regra cadastrada</p>)}
-    </details>
-   </article>
-   <section className="ti-cov-options">
-    <h3>O que dá para fazer</h3>
-    <details open>
-     <summary>Opções para revisar antes de gerar taxa</summary>
-     {sector==='frente'?<p>Na operação com caixa único, mantenha a pessoa do caixa nas comandas. Se chope e iFood coincidirem, confira se adiantar a reposição libera alguém para o balcão e deixa o apoio do meio revezar com a vitrine.</p>:<p>Confira se é possível preparar a bancada e adiantar a produção e a louça para liberar ajuda na montagem durante o pico, mantendo a chapa coberta.</p>}
-     {plan.status==='draft'&&<p>Para trocar um domingo, compare as duas datas no Quadro de folgas antes de alterar o rascunho.</p>}
-    </details>
-    {(row.shortage>0||current.evaluation.intervals.some(item=>item.sector===sector&&item.deficit))&&<>
-     <h3>Possíveis reforços para o turno inteiro</h3>
-     {!row.candidates.length&&<p>Sem indicação interna com os dados atuais. Revise os cadastros e a possibilidade de apoio externo.</p>}
-     {row.candidates.map(person=>{
-      const assignment=wholeTurnAssignment(row,person);
-      return <article className="ti-cov-candidate" key={person.uid}>
-       <div className="ti-cov-row"><div><strong>{person.name}</strong><p>{person.jobTitle} · {person.scheduled?'Já está na escala':'Fora da escala · disponibilidade a confirmar'}</p></div>
-       {assignment&&date>=restaurantDay()&&<button type="button" onClick={()=>{setStaffId(person.uid);setReason(row.reasons[0]||'Reforço para cumprir o mínimo cadastrado no turno.');}}>Revisar convite</button>}</div>
-       {staffId===person.uid&&assignment&&<div className="ti-cov-invite">
-        <p>Turno a cobrir {row.window.start}–{row.window.end}. {assignment.first&&<>Jornada normal {assignment.first.start}–{assignment.first.end}. Confira quem cobre o início até {assignment.second.start}. </>}Período de cobertura adicional {assignment.second.start}–{assignment.second.end}.</p>
-        <p>Estimativa da taxa · {feeMoney(data.individualRates?.[person.uid]?.amount??data.configuredRates?.[person.rateRole])}</p>
-        {assignment.first&&<label className="ti-cov-check"><input type="checkbox" checked={coveredStart} onChange={e=>setCoveredStart(e.target.checked)}/>Confirmei a cobertura do início do turno</label>}
-        <label>Motivo para o convite<textarea maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label>
-        <button type="button" disabled={busy||reason.trim().length<10||!!assignment.first&&!coveredStart} onClick={async()=>{const response=await run(()=>request('inviteShift',{planId:plan.id,date,sector,shift,staffId,reason,coveredStart}));if(response)clearCandidate();}}>Enviar convite</button>
-       </div>}
-      </article>;
-     })}
-    </>}
-   </section>
-  </>}
+  {current&&<div className="ti-cov-cards" aria-label="Cobertura por setor">
+   {current.evaluation.shifts.filter(row=>row.shift===shift).map(row=><CoverageCard key={plan.id+':'+date+':'+shift+':'+row.sector}
+    row={row} evaluation={current.evaluation} data={data} date={date} plan={plan} request={request} run={run} busy={busy}/>)}
+  </div>}
+  {current?.context&&<details className="ti-cov-data">
+   <summary>Dados consultados</summary>
+   <p>{current.evaluation.busyDay||current.evaluation.strongPeak?'Dia de movimento pelo calendário configurado.':'Dia comum no calendário configurado.'} {current.context.demand.note}</p>
+   <p>Produção · {current.context.production.tasks.length}{current.context.production.hasMore?'+':''} tarefas. {current.context.production.note}</p>
+   <p>Estoque · {current.context.stock.low.length} abaixo do mínimo na amostra e {current.context.stock.unknown} sem contagem compatível.</p>
+   <p>Compras · {current.context.purchases.records.length} registros. {current.context.purchases.note}</p>
+   <p>Recebimento · {current.context.receiving.records.length}{current.context.receiving.partial?'+':''} conferências na amostra. {current.context.receiving.note}</p>
+  </details>}
  </section>;
 }
 
@@ -131,6 +172,7 @@ export function CoverageSettlement({proposal,busy,run,request}){
  if(proposal.status==='paid')return <p>Pago em {shortDate(proposal.paidDate)} · {feeMoney(proposal.fee?.amount)}</p>;
  const completing=proposal.status==='approved';
  if(!completing&&proposal.status!=='completed')return null;
+ if(!completing&&proposal.fixedFeePolicy===false)return <p>Cobertura realizada sem taxa.</p>;
  return <details>
   <summary>{completing?'Registrar realização':'Registrar pagamento'}</summary>
   <form className="ti-cov-policy" onSubmit={e=>{e.preventDefault();run(()=>request(completing?'completeCoverage':'payCoverage',completing?{id:proposal.id,actualStart:start,actualEnd:end}:{id:proposal.id,paidDate}));}}>

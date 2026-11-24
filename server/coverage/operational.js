@@ -1,4 +1,4 @@
-import {minutes,rateRoleFor} from './engine.js';
+import {checkDoubleShift,minutes,rateRoleFor} from './engine.js';
 import {coverageTimeline} from '../schedules/coverage-timeline.js';
 import {fiveTwoSundays} from '../schedules/five-two.js';
 
@@ -17,6 +17,10 @@ const timed = slot => slot && minutes(slot.start) !== null && minutes(slot.end) 
 const covering = (slot,window) => timed(slot)&&window&&
  minutes(slot.start)<=minutes(window.start)&&minutes(slot.end)>=minutes(window.end);
 const offTypes = new Set(['off','monthly_sunday']);
+const regularCoverage = {
+ manha:{start:'08:00',end:'16:20'},
+ noite:{start:'16:20',end:'22:20'}
+};
 
 function assuredMontage(people,rules){
  const other=rules.filter(rule=>rule.skill!=='montagem');
@@ -72,6 +76,7 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
   const roster = cohort.filter(person=>scheduled.has(person.uid));
   const slots = [...new Map(cohort.map(person=>available(person,day)).filter(timed).map(slot=>[slot.start+'-'+slot.end,slot])).values()];
   const window = slots.length===1 ? {start:slots[0].start,end:slots[0].end} : null;
+  const coverageWindow = holiday || weekday===0 ? window : regularCoverage[shift];
   const confirmed = roster.filter(person=>timed(available(person,day)));
   const managers = confirmed.filter(management);
   const minimum = sector==='cozinha' ? busyDay||strongPeak?4:2 : busyDay?3:policy.frontWeekdayMinimum??null;
@@ -84,7 +89,6 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
   const skillGap = skill ? Math.max(0,3-skillCount) : 0;
   const roleGap = (sector==='cozinha'?!confirmed.some(kitchenLead):!managers.length) ? 1 : 0;
   const reasons = [];
-  if(headcountGap)reasons.push((confirmed.length===roster.length?'Estão previstos ':'Com horário confirmado há ')+count+' de '+minimum+' na '+sector+' para '+(busyDay?'um dia de movimento.':'este turno.'));
   if(sector==='frente'&&strongPeak&&count>=3)reasons.push('O mínimo pode ser suficiente se o apoio conseguir alternar entre iFood e vitrine. Se os dois precisarem de atendimento enquanto sai o chope, confira quem consegue assumir o balcão sem tirar a pessoa do caixa.');
   if(sector==='cozinha'&&!busyDay&&count===2)reasons.push('Duas pessoas podem dar conta num dia tranquilo. Uma terceira dá margem se a produção ou os pedidos aumentarem.');
   if(skillGap){
@@ -92,13 +96,12 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
    reasons.push((qualified.length?qualified.join(', ')+' têm montagem confirmada. ':'Ainda não há montagem confirmada na equipe. ')+
     'Considerando os outros postos cadastrados, '+skillCount+' conseguem ficar na montagem ao mesmo tempo. No pico, a bancada pode precisar de três sem tirar alguém da chapa ou da louça.');
   }
-  if(roleGap)reasons.push(sector==='cozinha'?'Nenhum cozinheiro com jornada confirmada neste turno.':'Nenhum gerente ou subgerente com jornada confirmada neste turno.');
   if(uncertain)reasons.push('Confira os horários e as regras pendentes antes de concluir a cobertura.');
   const candidates = active.filter(person=>inSector(person,sector)&&!roster.includes(person)&&
    (scheduled.has(person.uid)||offTypes.has(typeOf(person)))&&(!skillGap||certified(person,skill)))
-   .map(person=>({uid:person.uid,name:name(person),scheduled:scheduled.has(person.uid),hours:available(person,day)||null,jobTitle:profile(person).jobTitle||'',rateRole:rateRoleFor(person)}))
-   .sort((a,b)=>Number(b.scheduled)-Number(a.scheduled)||a.name.localeCompare(b.name,'pt-BR'));
-  return {shift,sector,window,minimum,count,uncertain,reasons,skill,skillCount,headcountGap,skillGap,roleGap,missingHours:roster.length-confirmed.length,shortage:Math.max(headcountGap,skillGap,roleGap),
+   .map(person=>({uid:person.uid,name:name(person),scheduled:scheduled.has(person.uid),hours:available(person,day)||null,jobTitle:profile(person).jobTitle||'',rateRole:rateRoleFor(person),
+    matchesRole:sector==='cozinha'?kitchenLead(person):management(person)}));
+  return {shift,sector,window,coverageWindow,minimum,count,uncertain,reasons,skill,skillCount,headcountGap,skillGap,roleGap,missingHours:roster.length-confirmed.length,shortage:Math.max(headcountGap,skillGap,roleGap),
    people:roster.map(person=>({uid:person.uid,name:name(person),jobTitle:profile(person).jobTitle||'',hours:available(person,day)||null})),candidates};
  }));
  const adjustedPeople=holiday ? active.map(person=>({...person,professional:{...profile(person),availability:(profile(person).availability||[]).filter(slot=>slot.day==='dom').map(slot=>({...slot,day:days[weekday]}))}})) : active;
@@ -106,23 +109,23 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
  const intervals=coverageTimeline({date,people:adjustedPeople,entries:adjustedEntries,requirements:weekdayRules.map(rule=>({...rule,weekday}))});
  const recurring = (policy.recurring || []).flatMap(rule=>{
   const absent=active.find(person=>person.uid===rule.absentId), cover=active.find(person=>person.uid===rule.coverId);
-  if(!absent||typeOf(absent)!=='off')return [];
-  return [{uid:rule.coverId,forUid:rule.absentId,paid:rule.paid===true,available:Boolean(cover&&typeOf(cover)==='work'&&inSector(cover,profile(absent).sector)&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector===profile(absent).sector)?.window)),name:cover?name(cover):'Pessoa indisponível',sector:profile(absent).sector,shift:profile(absent).shift}];
+  if(!absent||!offTypes.has(typeOf(absent)))return [];
+  return [{uid:rule.coverId,forUid:rule.absentId,paid:rule.paid===true,available:Boolean(cover&&typeOf(cover)==='work'&&inSector(cover,profile(absent).sector)&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector===profile(absent).sector)?.coverageWindow)),name:cover?name(cover):'Pessoa indisponível',sector:profile(absent).sector,shift:profile(absent).shift}];
  });
  const managers=active.filter(management);
  const manager=managers.filter(person=>title(person)==='manager'), deputy=managers.filter(person=>title(person)==='submanager');
  if(manager.length===1&&deputy.length===1){
   for(const [absent,cover] of [[manager[0],deputy[0]],[deputy[0],manager[0]]]){
-   if(!offTypes.has(typeOf(absent)))continue;
-   recurring.push({uid:cover.uid,forUid:absent.uid,paid:policy.managementPaid===true,
-    available:typeOf(cover)==='work'&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector==='frente')?.window),name:name(cover),sector:'frente',shift:profile(absent).shift});
+   if(!offTypes.has(typeOf(absent))||recurring.some(item=>item.forUid===absent.uid))continue;
+   recurring.push({uid:cover.uid,forUid:absent.uid,paid:policy.managementPaid??null,
+    available:typeOf(cover)==='work'&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector==='frente')?.coverageWindow),name:name(cover),sector:'frente',shift:profile(absent).shift});
   }
  }
  for(const replacement of recurring.filter(item=>item.available)){
   const row=shifts.find(item=>item.sector===replacement.sector&&item.shift===replacement.shift);
   const cover=active.find(person=>person.uid===replacement.uid);
-  const coversOtherShift=shifts.some(item=>item!==row&&item.people.some(person=>person.uid===replacement.uid)&&item.window&&row?.window&&
-   minutes(item.window.start)<minutes(row.window.end)&&minutes(row.window.start)<minutes(item.window.end));
+  const coversOtherShift=shifts.some(item=>item!==row&&row?.coverageWindow&&item.people.some(person=>person.uid===replacement.uid&&timed(person.hours)&&
+   minutes(person.hours.start)<minutes(row.coverageWindow.end)&&minutes(row.coverageWindow.start)<minutes(person.hours.end)));
   if(coversOtherShift)replacement.available=false;
   else if(row&&!row.people.some(person=>person.uid===cover.uid)){
    row.people.push({uid:cover.uid,name:name(cover),jobTitle:profile(cover).jobTitle||'',hours:available(cover,day)});
@@ -132,9 +135,19 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
    row.headcountGap=row.minimum===null?0:Math.max(0,row.minimum-row.count);
    row.shortage=Math.max(row.headcountGap,row.skillGap,row.roleGap);
    row.candidates=row.candidates.filter(candidate=>candidate.uid!==cover.uid);
-   row.reasons.unshift(name(cover)+' está previsto na cobertura fixa deste turno. Confira a passagem de posto e os intervalos.');
 
   }
+ }
+ for(const row of shifts){
+  if(row.roleGap)row.reasons.unshift(row.sector==='cozinha'?'Falta um cozinheiro com horário confirmado neste turno.':'Falta um gerente ou subgerente com horário confirmado neste turno.');
+  if(row.headcountGap)row.reasons.unshift('Há '+row.count+' de '+row.minimum+' pessoas com horário confirmado.');
+  for(const candidate of row.candidates)candidate.fitsRole=!row.roleGap||candidate.matchesRole;
+  const fixedIds=new Set(recurring.filter(item=>item.sector===row.sector&&item.shift===row.shift).map(item=>item.uid));
+  row.candidates.sort((a,b)=>
+   Number(Boolean(wholeTurnAssignment(row,b)))-Number(Boolean(wholeTurnAssignment(row,a)))||
+   Number(b.fitsRole)-Number(a.fitsRole)||
+   Number(fixedIds.has(b.uid))-Number(fixedIds.has(a.uid))||
+   Number(b.scheduled)-Number(a.scheduled)||a.name.localeCompare(b.name,'pt-BR'));
  }
  const recurringKeys=new Set(recurring.filter(r=>r.available&&r.paid).map(r=>r.uid+'|'+r.shift));
  return {date, holiday,busyDay,strongPeak,shifts,intervals,recurring,recurringFees:recurringKeys.size,
@@ -169,17 +182,22 @@ export function suggestSundayMove({period,entries,people,requirements,policy,ros
 }
 
 export function wholeTurnAssignment(row,candidate){
- if(!row?.window||!candidate)return null;
- const {start,end}=row.window;
+ const window=row?.coverageWindow===undefined?row?.window:row.coverageWindow;
+ if(!window||!candidate)return null;
+ const {start,end}=window;
  const a=minutes(start), b=minutes(end);
  // Dates across midnight require the full dated-jornada review.
  if(b<=a)return null;
  if(!candidate.scheduled)return {first:null,second:{start,end}};
  if(!timed(candidate.hours))return null;
  const first={start:candidate.hours.start,end:candidate.hours.end};
- const stop=minutes(first.end);
- if(stop<=minutes(first.start)||stop>=b||stop<a)return null;
- return {first,second:{start:first.end,end}};
+ const begin=minutes(first.start),stop=minutes(first.end);
+ if(stop<=begin||stop!==a&&begin!==b)return null;
+ return {first,second:{start,end}};
+}
+
+export function reviewCoverageAssignment({first,second}){
+ return first.start<second.start?checkDoubleShift({first,second}):checkDoubleShift({first:second,second:first});
 }
 
 export function validOperationalPolicy(policy){
