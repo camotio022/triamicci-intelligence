@@ -101,7 +101,7 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
   }
   if(uncertain)reasons.push('Confira os horários e as regras pendentes antes de concluir a cobertura.');
   const candidates = active.filter(person=>inSector(person,sector)&&!roster.includes(person)&&
-   (scheduled.has(person.uid)||offTypes.has(typeOf(person)))&&(!skillGap||certified(person,skill)))
+   (scheduled.has(person.uid)||offTypes.has(typeOf(person)))&&(!skillGap||certified(person,skill)|| (sector==='cozinha'?kitchenLead(person):management(person))))
    .map(person=>({uid:person.uid,name:name(person),scheduled:scheduled.has(person.uid),hours:available(person,day)||null,jobTitle:profile(person).jobTitle||'',rateRole:rateRoleFor(person),
     hasAccount:Boolean(person.accountUid),skillConfirmed:!skill||certified(person,skill),countsForMinimum:!(sector==='frente'&&policy.countManagement!==true&&management(person)),matchesRole:sector==='cozinha'?kitchenLead(person):management(person)}));
   return {shift,sector,window,coverageWindow,minimum,count,uncertain,reasons,skill,skillCount,headcountGap,skillGap,roleGap,missingHours:roster.length-confirmed.length,shortage:Math.max(headcountGap,skillGap,roleGap),
