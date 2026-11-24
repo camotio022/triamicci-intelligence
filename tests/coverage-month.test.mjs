@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {createServer} from 'vite';
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
 import {evaluateCoverageMonth} from '../server/coverage/month.js';
 
 test('monthly coverage exposes every Sunday and withholds extra counts on incomplete drafts',()=>{
@@ -16,4 +19,16 @@ test('monthly coverage exposes every Sunday and withholds extra counts on incomp
  const published=evaluateCoverageMonth({plan:{...plan,status:'published'},people:[person],requirements:[],policy:{},leaves:[{date,uid:'cook',type:'leave'}]});
  assert.equal(published.days.find(day=>day.date===date).shifts.find(row=>row.sector==='cozinha'&&row.shift==='noite').count,0);
  assert.equal(typeof published.extra,'number');
+});
+
+test('coverage month renders before the plan and the assessment arrive',async()=>{
+ const vite=await createServer({server:{middlewareMode:true,ws:false,hmr:false},appType:'custom'});
+ try{
+  const {default:CoverageMonth}=await vite.ssrLoadModule('/src/CoverageMonth.jsx');
+  assert.equal(renderToStaticMarkup(createElement(CoverageMonth,{plan:null})), '');
+  const html=renderToStaticMarkup(createElement(CoverageMonth,{
+   plan:{id:'nov',period:'2026-11',status:'published'},today:'2026-11-24'
+  }));
+  assert.match(html,/Conferindo os turnos do mês/);
+ }finally{await vite.close();}
 });
