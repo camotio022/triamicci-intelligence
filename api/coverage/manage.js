@@ -319,14 +319,25 @@ export default async function handler(req,res){
       if(!currentPerson.exists||currentPerson.data().accountUid!==p.data().accountUid)throw Error('STAFF_NOT_AVAILABLE');
       const plan=await tx.get(unit.collection('schedules').doc(p.data().planId));
       if(!plan.exists||plan.data().archivedAt||!['draft','in_review','approved','published'].includes(plan.data().status)||(plan.data().revision||null)!==p.data().planRevision)throw Error('PLAN_CHANGED');
-      if(plan.data().status==='published'){
+      {
        const {date,planId}=p.data();
        const [staff,policy,leaves,prior,sameDay]=await Promise.all([
         tx.get(unit.collection('staffRegistry').limit(201)),tx.get(policyRef),
         tx.get(unit.collection('leaveRequests').where('date','==',date).limit(201)),
         tx.get(unit.collection('coverageAlerts').where('planId','==',planId)),
         tx.get(proposals.where('date','==',date).limit(201))]);
-       if(staff.size<=200&&leaves.size<=200&&sameDay.size<=200)alertContext={tx,db,unit,unitId:member.unitId,planId,dates:[date],
+       if(staff.size>200||leaves.size>200||sameDay.size>200)throw Error('ASSESSMENT_LIMIT');
+       const evaluation=evaluateOperationalDay({date,entries:normalizePlanEntries(plan.data(),date,leaves),people:staff.docs.map(staffPerson),policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[]});
+       const target=evaluation.shifts.find(row=>row.shift===p.data().shift&&row.sector===p.data().sector);
+       const candidate=target?.candidates.find(item=>item.uid===p.data().staffId);
+       const fresh=wholeTurnAssignment(target,candidate);
+       const original=p.data();
+       if(!fresh||!candidate?.hasAccount||fresh.second.start!==original.second?.start||fresh.second.end!==original.second?.end||
+        (fresh.first?.start??null)!==(original.first?.start??null)||(fresh.first?.end??null)!==(original.first?.end??null)||
+        (fresh.first&&reviewCoverageAssignment(fresh).state==='blocked'))throw Error('STAFF_NOT_AVAILABLE');
+       if(sameDay.docs.some(doc=>doc.id!==id&&doc.data().staffId===original.staffId&&!['rejected','declined','cancelled'].includes(doc.data().status)&&
+        (!doc.data().shift||doc.data().shift===original.shift||minutes(doc.data().second?.end)>minutes(fresh.second.start)&&minutes(doc.data().second?.start)<minutes(fresh.second.end))))throw Error('CONFLICT');
+       if(plan.data().status==='published')alertContext={tx,db,unit,unitId:member.unitId,planId,dates:[date],
         entries:normalizePlanEntries(plan.data(),date,leaves),people:staff.docs.map(alertStaff),
         policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[],prior,now,notify:false,
         proposals:sameDay.docs.map(doc=>doc.id===id?{...doc.data(),status:'approved'}:doc.data())};
