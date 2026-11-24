@@ -6,10 +6,34 @@ import {unitDay,publicationWindow} from '../schedules/temporal-policy.js';
 import {signalUnitChange} from '../live-signal.js';
 import {getDb,getAuth,authenticate,membership,checkRequest,send} from '../_lib.js';
 import {validDate,validateRosterSchedule} from '../schedules/rules.js';
+import {fiveTwoBoundaryConflict,fiveTwoEntries,fiveTwoWeeks,shiftScheduleDate,validateFiveTwoRoster} from '../schedules/five-two.js';
 const idOk=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(x);
 const yyyyMm=x=>typeof x==='string'&&/^\d{4}-(0[1-9]|1[0-2])$/.test(x);
 const iso=x=>x?.toDate?.()?.toISOString?.()||null;
 const clean=d=>({id:d.id,...d.data(),createdAt:iso(d.data().createdAt),updatedAt:iso(d.data().updatedAt),publishedAt:iso(d.data().publishedAt),archivedAt:iso(d.data().archivedAt)});
+const outsidePlanner=({roster,...schedule})=>schedule;
+function planningIssues(plan,members,enforceCoverage){
+ if(plan.roster) return validateFiveTwoRoster({period:plan.period,roster:plan.roster,members,complete:true});
+ return validateRosterSchedule({entries:plan.entries||[],members,period:plan.period,complete:true,enforceCoverage});
+}
+
+function leavesForPeriod(unit,period){
+ return unit.collection('leaveRequests').where('date','>=',period+'-01').where('date','<=',period+'-31').limit(501);
+}
+
+async function checkPublishedBoundaries(tx,unit,plan,members){
+ const weeks=fiveTwoWeeks(plan.period);
+ const adjacent=new Map([[weeks[0],weeks[0].slice(0,7)],[weeks.at(-1),shiftScheduleDate(weeks.at(-1),6).slice(0,7)]]);
+ for(const [week,period] of adjacent){
+  if(period===plan.period)continue;
+  const lock=await tx.get(unit.collection('schedulePublicationState').doc(period));
+  const official=lock.data()?.activeId;
+  if(!official)continue;
+  const other=(await tx.get(unit.collection('schedules').doc(official))).data();
+  if(fiveTwoBoundaryConflict({roster:plan.roster,otherRoster:other?.roster,week,members}))throw Error('ROSTER_BOUNDARY');
+ }
+}
+
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
@@ -42,7 +66,7 @@ export default async function handler(req,res){
   if(action==='list'){
    const snap=await schedules.limit(120).get();
    const manager=MANAGEMENT_ROLES.includes(m.role);
-   const records=snap.docs.filter(x=>manager||x.data().status==='published').map(clean).sort((a,b)=>String(b.period).localeCompare(String(a.period)));
+   const records=snap.docs.filter(x=>manager||x.data().status==='published').map(d=>manager?clean(d):outsidePlanner(clean(d))).sort((a,b)=>String(b.period).localeCompare(String(a.period)));
    const assigned=[...new Set(records.flatMap(r=>(r.entries||[]).map(e=>e.uid)))].slice(0,200);
    const memberships=assigned.length?await db.getAll(...assigned.map(uid=>db.collection('memberships').doc(uid))):[];
    const byId=new Map(memberships.filter(x=>x.exists&&x.data().unitId===m.unitId).map(x=>[x.id,x.data().name||'']));
@@ -59,7 +83,7 @@ export default async function handler(req,res){
    const snap=await schedules.where('status','==','published').limit(100).get();
    const linked=masterActive?await unit.collection('staffRegistry').where('accountUid','==',actor.uid).limit(1).get():null;
    const myIds=new Set([actor.uid,...(linked?.docs.map(d=>d.id)||[])]);
-   return send(res,200,'Minha escala publicada.',{schedules:snap.docs.map(clean).map(s=>({...s,entries:(s.entries||[]).filter(e=>myIds.has(e.uid))})).filter(s=>s.entries.length)});
+   return send(res,200,'Minha escala publicada.',{schedules:snap.docs.map(clean).map(({roster,...s})=>({...s,entries:(s.entries||[]).filter(e=>myIds.has(e.uid))})).filter(s=>s.entries.length)});
   }
   if(action==='leaveContext'){
    const {date}=req.body||{};if(!validDate(date))return send(res,400,'Data inválida.');
@@ -151,7 +175,7 @@ export default async function handler(req,res){
    return send(res,200,action==='scheduleArchive'?'Escala movida para a lixeira.':'Escala restaurada.');
   }
   if(action==='saveDraft'){
-   const {period,entries,title,id,expectedRevision}=req.body||{};
+   const {period,entries,title,id,expectedRevision,roster}=req.body||{};
    if(!yyyyMm(period)||!Array.isArray(entries)||entries.length>1000||typeof title!=='string'||title.trim().length<3||title.length>100||id&&!idOk(id))
     return send(res,400,'Período, título ou escala inválidos.');
    if(!entries.every(e=>e&&idOk(e.uid)&&validDate(e.date)&&e.date.startsWith(period)&&['work','off','leave','monthly_sunday'].includes(e.type)))
@@ -160,7 +184,15 @@ export default async function handler(req,res){
    const membersSnap=await db.collection('memberships').where('unitId','==',m.unitId).limit(201).get();
    if(membersSnap.size>200)return send(res,409,'Equipe acima do limite de planejamento.');
    const staffSnap=await unit.collection('staffRegistry').limit(200).get();
-   const active=new Set(masterActive?staffSnap.docs.filter(d=>d.data().status==='active').map(d=>d.id):membersSnap.docs.filter(d=>d.data().status==='active').map(d=>d.id));
+   const activeMembers=(masterActive?staffSnap:membersSnap).docs.filter(d=>d.data().status==='active').map(d=>({
+    uid:d.id,name:d.data().name,accountUid:d.data().accountUid,
+   }));
+   const active=new Set(activeMembers.map(member=>member.uid));
+   if(roster!==undefined){
+    const issues=validateFiveTwoRoster({period,roster,members:activeMembers});
+    if(issues.length)return send(res,400,'Quadro 5×2 inválido.',{issues});
+    if(fiveTwoEntries({period,members:activeMembers,roster}).length>1000)return send(res,409,'Escala excede o limite de 1000 registros.');
+   }
    if(entries.some(e=>!active.has(e.uid)))return send(res,400,'A escala contém colaborador não ativo na unidade.');
    const now=new Date();let revision;
    await db.runTransaction(async tx=>{
@@ -168,8 +200,16 @@ export default async function handler(req,res){
     if(!actorSnap.exists||actorSnap.data().unitId!==m.unitId||actorSnap.data().status!=='active'||!MANAGEMENT_ROLES.includes(actorSnap.data().role))throw Error('FORBIDDEN');
     if(old.exists&&(old.data().status!=='draft'||old.data().archivedAt))throw Error('LOCKED');
     if(old.exists&&old.data().revision!==expectedRevision)throw Error('CONFLICT');
+    if(old.exists&&Boolean(old.data().roster)!==Boolean(roster))throw Error('ROSTER_FORMAT');
+    let storedEntries=entries.map(e=>({date:e.date,uid:e.uid,type:e.type}));
+    if(roster){
+     const requests=await tx.get(leavesForPeriod(unit,period));
+     if(requests.size>500)throw Error('HISTORY_LIMIT');
+     const approvedLeaves=requests.docs.map(doc=>doc.data()).filter(request=>request.status==='approved');
+     storedEntries=fiveTwoEntries({period,members:activeMembers,roster,approvedLeaves});
+    }
     revision=(old.data()?.revision||0)+1;
-    tx.set(ref,{title:title.trim(),period,entries:entries.map(e=>({date:e.date,uid:e.uid,type:e.type})),status:'draft',revision:(old.data()?.revision||0)+1,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
+    tx.set(ref,{title:title.trim(),period,entries:storedEntries,...(roster?{roster}:{}),status:'draft',revision,createdAt:old.data()?.createdAt||now,createdBy:old.data()?.createdBy||actor.uid,updatedAt:now,updatedBy:actor.uid,unitId:m.unitId});
     signalUnitChange(tx,db,m.unitId,['schedules', 'coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'schedule.draft_saved',unitId:m.unitId,actorUid:actor.uid,scheduleId:ref.id,at:now});
    });
@@ -192,7 +232,7 @@ export default async function handler(req,res){
    const profileRefs=memberList.map(x=>unit.collection('staffProfiles').doc(x.uid));
    const profiles=profileRefs.length?await db.getAll(...profileRefs):[];
    const members=memberList.map((x,i)=>({...x,professional:profiles[i]?.data()?.profile||null}));
-   const issues=validateRosterSchedule({entries:snap.data().entries||[],members:masterActive?registryList:members,period:snap.data().period,complete:true,enforceCoverage:!masterActive});
+   const issues=planningIssues(snap.data(),masterActive?registryList:members,!masterActive);
    if(issues.length)return send(res,409,'A escala contém conflitos de cobertura ou folgas.',{issues});
    const coveragePolicy=await unit.collection('configuration').doc('coverageRequirements').get();
    const requirements=coveragePolicy.data()?.requirements||[];
@@ -212,7 +252,7 @@ export default async function handler(req,res){
     if(livePeople.size>200)throw Error('CONFLICT');
     const latestRegistryConfig=await tx.get(config.ref);if((latestRegistryConfig.data()?.active===true)!==masterActive)throw Error('CONFLICT');
     const currentPeople=masterActive?livePeople.docs.map(d=>({uid:d.id,...d.data(),professional:{sector:d.data().sector,availability:d.data().availability||[],certifications:d.data().certifications||[]}})):members.map(p=>({...p,professional:livePeople.docs.find(d=>d.id===p.uid)?.data()?.profile||null}));
-    if(validateRosterSchedule({entries:current.data()?.entries||[],members:currentPeople.filter(p=>p.status==='active'),period:current.data()?.period,complete:true,enforceCoverage:!masterActive}).length)throw Error('CONFLICT');
+    if(planningIssues(current.data()||{},currentPeople.filter(p=>p.status==='active'),!masterActive).length)throw Error('CONFLICT');
     if([...new Set((current.data()?.entries||[]).map(e=>e.date))].some(date=>coverageTimeline({date,entries:current.data()?.entries||[],people:currentPeople,requirements}).some(r=>r.deficit>0)))throw Error('CONFLICT');
     if(!member.exists||member.data().status!=='active'||member.data().unitId!==m.unitId||!MANAGEMENT_ROLES.includes(member.data().role))throw Error('FORBIDDEN');
     if(['approve','publish'].includes(action)&&!isManagement(member.data().role))throw Error('FORBIDDEN');
@@ -221,7 +261,8 @@ export default async function handler(req,res){
     if(action==='approve'&&current.data().createdBy===actor.uid)throw Error('CONFLICT');
     if(action==='publish'){
      if(!publicationWindow(current.data().period).open)throw Error('PUBLICATION_WINDOW');
-     const requests=await tx.get(unit.collection('leaveRequests').where('date','>=',current.data().period+'-01').where('date','<=',current.data().period+'-31').limit(501));
+     if(current.data().roster)await checkPublishedBoundaries(tx,unit,current.data(),currentPeople.filter(p=>p.status==='active'));
+     const requests=await tx.get(leavesForPeriod(unit,current.data().period));
      if(requests.size>500)throw Error('HISTORY_LIMIT');
      if(requests.docs.some(d=>d.data().status==='pending'))throw Error('PENDING_LEAVE');
      for(const request of requests.docs.filter(d=>d.data().status==='approved')){const r=request.data();const uid=masterActive?registryList.find(x=>x.accountUid===r.uid||x.uid===r.uid)?.uid:r.uid;if(!uid||!(current.data().entries||[]).some(e=>e.uid===uid&&e.date===r.date&&['off','leave','monthly_sunday'].includes(e.type)))throw Error('APPROVED_LEAVE_CONFLICT');}
@@ -242,7 +283,7 @@ export default async function handler(req,res){
   }
   return send(res,400,'Ação inválida.');
  }catch(e){
-  const policyErrors={PAST_LEAVE:'A data solicitada já passou. Encerre o pedido sem aprovação e registre a justificativa.',APPROVED_LEAVE_CONFLICT:'A proposta deve respeitar as folgas aprovadas antes de publicar.',MONTH_PUBLISHED:'A escala deste mês já é oficial. Use troca, cobertura ou solicite revisão gerencial.',DUPLICATE_LEAVE:'Já existe um pedido em análise nesta data.',PUBLICATION_WINDOW:'A publicação abre vinte dias antes do início do mês. Meses encerrados não podem ser publicados.',ACTIVE_SCHEDULE:'A escala oficial em vigor está protegida e não pode ir para a lixeira.',PENDING_LEAVE:'Analise os pedidos de folga pendentes antes de publicar.',HISTORY_LIMIT:'Histórico acima do limite seguro. Refine a consulta.'};
+  const policyErrors={ROSTER_BOUNDARY:'O par de folgas da semana na virada do mês precisa coincidir com a escala vizinha já publicada.',ROSTER_FORMAT:'Crie um novo rascunho para trocar o modelo de escala.',PAST_LEAVE:'A data solicitada já passou. Encerre o pedido sem aprovação e registre a justificativa.',APPROVED_LEAVE_CONFLICT:'A proposta deve respeitar as folgas aprovadas antes de publicar.',MONTH_PUBLISHED:'A escala deste mês já é oficial. Use troca, cobertura ou solicite revisão gerencial.',DUPLICATE_LEAVE:'Já existe um pedido em análise nesta data.',PUBLICATION_WINDOW:'A publicação abre vinte dias antes do início do mês. Meses encerrados não podem ser publicados.',ACTIVE_SCHEDULE:'A escala oficial em vigor está protegida e não pode ir para a lixeira.',PENDING_LEAVE:'Analise os pedidos de folga pendentes antes de publicar.',HISTORY_LIMIT:'Histórico acima do limite seguro. Refine a consulta.'};
   if(policyErrors[e.message])return send(res,409,policyErrors[e.message]);
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login.');
   if(e.message==='FORBIDDEN')return send(res,403,'Permissão negada.');

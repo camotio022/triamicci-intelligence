@@ -6,7 +6,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
   for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:4179/qa/v4-mobile.html')).ok)break}catch{}await new Promise(r=>setTimeout(r,100));}
   browser=await chromium.launch({headless:true});
   for(const width of [320,390,768,1280]){
-   const page=await browser.newPage({viewport:{width,height:900}}),errors=[],counts=[],reads=[],finishes=[];page.on('pageerror',e=>errors.push(e.message));
+   const page=await browser.newPage({viewport:{width,height:900}}),errors=[],counts=[],reads=[],finishes=[];let savedRoster, activeScreen, rejectRosterLoad=width===390;page.on('pageerror',e=>errors.push(e.message));
    await page.route('**/api/**',route=>{const b=route.request().postDataJSON()||{};reads.push({path:new URL(route.request().url()).pathname,action:b.action});const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());const a='c'.repeat(40),out='d'.repeat(40);const product={id:a,name:'Frango grelhado',status:'active',unit:'un',physicalUnit:'un',physicalBalance:{reserve:50,rotation:0,total:50,unit:'un',at:new Date().toISOString()}};
     const base={message:'Consulta de teste',shipments:[],people:[],accounts:[],claims:[],notifications:[],members:[],orders:[],signals:[],products:[product,{...product,id:out,name:'Parmegiana',physicalBalance:{reserve:0,rotation:0,total:0,unit:'un'}}],catalog:[],registry:[{id:'qa-user',accountUid:'qa-user',name:'Pessoa de teste',status:'active',sector:'cozinha',shift:'manha'}],schedules:[{id:'official',period:today.slice(0,7),status:'published',entries:[{uid:'qa-user',date:today,type:'work',name:'Pessoa de teste'}]}],presence:[],tasks:[{id:'abcdefghijklmnopqrst',recipeId:'parmegiana',recipeName:'Parmegiana de frango',day:previousProductionDay(today),plannedQuantity:30,status:'pending'}],recipes:[{id:'parmegiana',name:'Parmegiana de frango',yieldQuantity:1,outputProductId:out,version:1,lines:[{productId:a,quantity:1,substitutes:[]}]}],runs:[{id:'qa-today',recipeName:'Produção de hoje',portions:1,at:new Date().toISOString(),items:[]},{id:'qa-old',recipeName:'Produção da semana passada',portions:1,at:new Date(Date.now()-7*86400000).toISOString(),items:[]}],items:[{id:'notice',title:'Conferência das entregas',body:'Conferir itens e validade antes de encaminhar para aprovação.',priority:'important',publishedByName:'Gestão da unidade',publishedAt:new Date().toISOString()}],requests:[],closures:[],investigations:[],professional:{name:'Pessoa de teste',skills:[],certifications:[],availability:[]},personal:{},recognition:{},proposals:[],record:null,day:today,complete:true,entry:null,nextOff:null,pending:false,official:false,report:null};
     if(b.action==='list'&&route.request().url().includes('/api/production/manage')){
@@ -14,6 +14,23 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      base.blockedRecipes=[{id:'blocked',name:'Preparação bloqueada',errors:['Matéria-prima desativada no catálogo.']}];
     }
     if(b.action==='list'&&(route.request().url().includes('/api/products/manage')||b.includeProducts&&route.request().url().includes('/api/production/manage')))base.products.push({id:'e'.repeat(40),name:'Tilápia em kg',unit:'kg',physicalUnit:'kg',status:'active'},{id:'f'.repeat(40),name:'Isca pronta',unit:'un',physicalUnit:'un',status:'active',lotTrackingMode:'per_lot'});
+    if(b.action==='masterRegistryPreview'&&activeScreen==='Escalas'){
+     base.activated=true;
+     base.registry[0].availability=[{day:'dom',start:'08:00',end:'16:20'}];
+     base.registry.push({id:'frente-noite',name:'Atendimento de teste',status:'active',sector:'frente',shift:'noite',
+      availability:[{day:'dom',start:'12:00',end:'20:20'}]});
+    }
+    if(b.module==='schedules'){
+     if(activeScreen==='Escalas'&&b.action==='list'&&rejectRosterLoad){
+      rejectRosterLoad=false;
+      return route.fulfill({status:403,contentType:'application/json',body:JSON.stringify({message:'Origem não autorizada.'})});
+     }
+     if(b.action==='saveDraft'){
+      savedRoster={id:'roster-draft',revision:1,status:'draft',period:b.period,title:b.title,entries:b.entries,roster:b.roster};
+      Object.assign(base,{id:savedRoster.id,revision:savedRoster.revision});
+     }
+     if(b.action==='list'&&savedRoster)base.schedules.push(savedRoster);
+    }
     if(b.action==='finish')finishes.push(b);
     if(b.module==='operationalCatalog'&&b.action==='status')base.items=[{id:'bacon',active:false,reason:'missing_profile',needsReconciliation:true,matches:[{id:'e'.repeat(40),name:'Bacon',configuration:{stockUnit:'un',operationalUnit:'un',receivingUnit:'kg',source:'supplier',trackExpiry:false,minStock:5,countFrequency:'daily',critical:true}}]}];
     if(b.action==='shipmentsList'){base.shipments=[{id:'closed',status:'approved',supplier:'Entrega recente',createdAt:new Date().toISOString(),lines:[{productName:'Tilápia',commercialQuantity:1,commercialUnit:'caixa',stockQuantity:12.5,stockUnit:'kg',location:'giro',lot:'LOTE-TILAPIA'}]}];base.pendingShipments=[{id:'pending-old',status:'pending',supplier:'Pendência antiga de teste',createdAt:'2020-01-01T12:00:00Z',lines:[{productName:'Óleo de soja',commercialQuantity:4,commercialUnit:'L',stockQuantity:4,stockUnit:'L',location:'reserva'}]}];base.pendingComplete=true;}
@@ -28,26 +45,69 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
    const signal=async(stock,attendance)=>{const response=await fetch('http://127.0.0.1:8080/v1/projects/demo-triamicci-v31/databases/(default)/documents/units/qa-unit/live/attendance',{method:'PATCH',headers:{Authorization:'Bearer owner','Content-Type':'application/json'},body:JSON.stringify({fields:{protocolVersion:{integerValue:'2'},revision:{stringValue:stock+attendance},domains:{mapValue:{fields:{stock:{stringValue:stock},attendance:{stringValue:attendance}}}}}})});assert.equal(response.ok,true)};
    await signal('stock-initial','attendance-initial');
    for(const screen of ['Escalas','Mural','Produção','Inventário','Folgas','Minha ficha','Cozinha','Recebimento','Recebimento pendente','Recebimento com lote','Contagem','Acessos','Cadastro','Navegação'].filter(s=>!process.env.QA_SCREEN||s===process.env.QA_SCREEN)){
+    activeScreen=screen;
     const beforeReads=reads.length;
     await page.getByRole('navigation',{name:'Telas de teste'}).getByRole('button',{name:screen,exact:true}).click();
     await page.waitForTimeout(120);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${screen} overflows at ${width}`);
     if(screen==='Escalas'){
-     await page.getByLabel('Mês de referência',{exact:true}).fill('2026-11');
-     const field=page.getByLabel('Mês de referência',{exact:true});
-     assert.equal(await field.evaluate(el=>el.getBoundingClientRect().right<=el.closest('.ti-planning-card').getBoundingClientRect().right),true,'Campo de mês cabe no cartão');
-     if(width<=760){
-      await page.getByText('Consultar escala por dia',{exact:true}).click();
-      const day=page.getByLabel('Dia para consultar',{exact:true});
-      assert.equal(await day.isVisible(),true,'Filtro diário disponível no celular');
-      await day.fill('2026-11-12');
-      assert.equal(await day.inputValue(),'2026-11-12');
-      assert.equal(await page.locator('.ti-schedule-matrix').isVisible(),false,'Matriz larga oculta no mobile');
-      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'Escala mobile não transborda a página');
-     }else{
-      await page.getByText('Ver grade mensal completa',{exact:true}).click();
-      assert.equal(await page.locator('.ti-schedule-matrix').isVisible(),true,'Matriz completa disponível no desktop');
+     const board=page.locator('.roster-board');
+     await board.getByRole('heading',{name:'Quadro de folgas',exact:true}).waitFor();
+     assert.equal(await board.locator('.ti-page-heading h1').count(),1);
+     assert.equal(await board.locator(':is(.hero,.top-inner,.brand)').count(),0,'O planejador usa o cabeçalho padrão do app');
+     if(width===390){
+      const failure=board.getByRole('alert');
+      await failure.getByText('Origem não autorizada.').waitFor();
+      assert.equal(await board.getByRole('complementary',{name:'Equipe'}).count(),0,'Falha de consulta não exibe equipe vazia');
+      await failure.getByRole('button',{name:'Tentar novamente'}).click();
      }
+     await board.getByLabel('Mês da escala',{exact:true}).selectOption('2027-01');
+     await board.getByText('5 domingos',{exact:true}).waitFor();
+     const roster=board.getByRole('group',{name:'Quem trabalha',exact:true});
+     const morning=roster.getByRole('button',{name:'Manhã 1',exact:true});
+     const night=roster.getByRole('button',{name:'Noite 1',exact:true});
+     await morning.waitFor();
+     assert.equal(await roster.getByText('Cozinha',{exact:true}).isVisible(),false);
+     await morning.click();
+     await roster.getByText('Cozinha',{exact:true}).waitFor();
+     await night.click();
+     assert.equal(await roster.getByText('Cozinha',{exact:true}).isVisible(),false);
+     await roster.getByText('Frente',{exact:true}).waitFor();
+     await roster.getByText('· 12:00–20:20',{exact:true}).waitFor();
+     const memberList=board.locator(width<=720?'.mobile-people':'.people');
+     const memberCard=memberList.getByRole('button',{name:/Pessoa de teste/});
+     const sundayCard=board.locator('[data-drop-sunday="2027-01-31"]');
+     if(width<=720){
+      await memberCard.click();
+      await board.getByRole('button',{name:'Domingo 31/01',exact:true}).click();
+      await sundayCard.getByRole('button',{name:'Colocar Pessoa de teste'}).click();
+     }else{
+      await memberCard.waitFor();
+      const source=await memberCard.boundingBox(),target=await sundayCard.locator('.day-title').boundingBox();
+      await page.mouse.move(source.x+source.width/2,source.y+source.height/2);
+      await page.mouse.down();
+      await page.mouse.move(target.x+target.width/2,target.y+target.height/2,{steps:12});
+      await page.mouse.up();
+     }
+     assert.equal(await board.getByRole('status').textContent(),'Pessoa de teste ficou com 31/01.');
+     await board.getByRole('heading',{name:'Domingo 31/01',exact:true}).waitFor();
+     await morning.waitFor({state:'hidden'});
+     await night.click();
+     await roster.getByText(/Atendimento de teste/).waitFor();
+     await board.getByRole('button',{name:'Semana 5×2',exact:true}).click();
+     await board.getByLabel('Semana',{exact:true}).selectOption('2027-01-04');
+     await memberList.getByRole('button',{name:/Pessoa de teste/}).click();
+     if(width<=720)await board.getByRole('button',{name:'Ter + Qua',exact:true}).click();
+     await board.locator('[data-drop-pair="1"]').getByRole('button',{name:'Colocar Pessoa de teste'}).click();
+     await board.getByRole('heading',{name:'Terça-feira · 05/01',exact:true}).waitFor();
+     await board.getByRole('heading',{name:'Quarta-feira · 06/01',exact:true}).waitFor();
+     const save=page.waitForResponse(response=>response.request().postDataJSON()?.action==='saveDraft');
+     await board.getByRole('button',{name:width<=720?'Salvar':'Salvar rascunho',exact:true}).click();
+     await save;
+     assert.equal(savedRoster.roster.sundays['qa-user'],'2027-01-31');
+     assert.equal(savedRoster.roster.weekly['2027-01-04']['qa-user'],1);
+     assert.deepEqual(savedRoster.entries.filter(entry=>entry.type==='off').map(entry=>entry.date),['2027-01-05','2027-01-06']);
+     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'Quadro de folgas cabe na tela');
     }
     if(screen==='Mural'){await page.getByText(/Planejada ontem/).waitFor();assert.equal(await page.getByText('Jornadas declaradas',{exact:true}).count(),1);assert.equal(await page.getByText('0 em trabalho ou intervalo declarado',{exact:true}).count(),1);await page.getByText('Publicar comunicado',{exact:true}).click();await page.getByLabel('Título',{exact:true}).fill('Comunicado de teste');}
     if(screen==='Produção'){await page.getByText(/Planejada ontem/).first().waitFor();if(width===390)await page.screenshot({path:'/tmp/triamicci-production-today-390.png',fullPage:true});await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Histórico',exact:true}).click();assert.equal(await page.getByText('Produção da semana passada',{exact:true}).isVisible(),false);await page.getByRole('region',{name:'Histórico de produção',exact:true}).getByRole('button',{name:'Todos',exact:true}).click();assert.equal(await page.getByText('Produção da semana passada',{exact:true}).isVisible(),true);const history=page.getByRole('region',{name:'Histórico de produção',exact:true});await history.getByRole('button',{name:'Personalizado',exact:true}).click();const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());await history.getByLabel('De',{exact:true}).fill(today);await history.getByLabel('Até',{exact:true}).fill(today);assert.equal(await page.getByText('Produção da semana passada',{exact:true}).count(),0);await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Hoje',exact:true}).click();await page.getByRole('button',{name:'Registrar produção',exact:true}).click();await page.getByLabel('Quantidade produzida (un)',{exact:true}).fill('10');

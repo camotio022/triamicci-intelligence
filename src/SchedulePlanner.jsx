@@ -8,6 +8,21 @@ import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import {generateMonthlyRoster,weekdayOccurrences,weekdayOf,WEEKDAY_LABELS} from '../server/schedules/generator.js';
 import {sessionAuth as auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';import './roster-mobile-day.css';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
+import {fiveTwoEntries,fiveTwoWeeks,shiftScheduleDate} from '../server/schedules/five-two.js';
+import RosterBoard from './RosterBoard.jsx';
+
+const emptyRoster={weekly:{},sundays:{}};
+
+function newRoster(period, plans, people){
+ const weeks=fiveTwoWeeks(period);
+ const activeIds=new Set(people.map(person=>person.uid));
+ const weekly={};
+ for(const week of [weeks[0],weeks.at(-1)]){
+  const neighbor=plans.find(plan=>plan.period!==period&&plan.status==='published'&&!plan.archivedAt&&plan.roster?.weekly[week]);
+  if(neighbor)weekly[week]=Object.fromEntries(Object.entries(neighbor.roster.weekly[week]).filter(([uid])=>activeIds.has(uid)));
+ }
+ return {...emptyRoster,weekly};
+}
 async function call(action,extra={}){
  return requestJson('/api/members/manage',{module:'schedules',action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>[data.message,...(data.issues||[]).slice(0,5)].join(' · ')});
 }
@@ -23,21 +38,54 @@ export default function SchedulePlanner({membership}){
  const {notify}=useFeedback(),[plans,setPlans]=useState([]),[people,setPeople]=useState([]),[selected,setSelected]=useState(''),[title,setTitle]=useState('Escala da equipe'),[period,setPeriod]=useState(restaurantDay().slice(0,7)),[entries,setEntries]=useState([]);
  const [fixedOff,setFixedOff]=useState({}),[sundayOff,setSundayOff]=useState({}),[savingFixed,setSavingFixed]=useState(''),[selectedPerson,setSelectedPerson]=useState(''),[matrixSector,setMatrixSector]=useState('todos');
  const [coverageRules,setCoverageRules]=useState([]),[draftRevision,setDraftRevision]=useState(null);
+ const [roster,setRoster]=useState(emptyRoster),[undoHistory,setUndoHistory]=useState([]),[rosterDirty,setRosterDirty]=useState(false);
+ const [titleDirty,setTitleDirty]=useState(false);
+ const hasUnsaved=rosterDirty||titleDirty;
  const [scheduleView,setScheduleView]=useState('active');
  const [approvedLeaves,setApprovedLeaves]=useState([]);
  const [registryState,setRegistryState]=useState({activated:false,registeredCount:0});
+ const [loaded,setLoaded]=useState(false);
  const [today,setToday]=useState(()=>restaurantDay());
  useEffect(()=>{const interval=setInterval(()=>setToday(restaurantDay()),60000);return()=>clearInterval(interval)},[]);
  const [uid,setUid]=useState(''),[date,setDate]=useState(''),[type,setType]=useState('work'),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const allowed=MANAGEMENT_ROLES.includes(membership.role);
- const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,f,l,c]=await Promise.all([call('list'),membersApi(),call('fixedOffList'),call('leaveList'),coverageApi()]);setCoverageRules(c.requirements||[]);setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})})}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
+ const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,f,l,c]=await Promise.all([call('list'),membersApi(),call('fixedOffList'),call('leaveList'),coverageApi()]);setCoverageRules(c.requirements||[]);setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})});setLoaded(true)}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useUnitLive(membership?.unitId,initial=>refresh(!initial),{domains:['schedules','team','coverage'],refreshKey:membership.role});
 
  const chosen=plans.find(x=>x.id===selected);
+ const legacy=Boolean(chosen&&!chosen.roster);
+ const validMonth=monthDates(period).length>0;
+ const boardEntries=useMemo(()=>{
+  if(!validMonth)return [];
+  if(chosen?.roster&&chosen.status!=='draft')return entries;
+  const weeks=fiveTwoWeeks(period);
+  const extendedDates=weeks.flatMap(week=>Array.from({length:7},(_,index)=>shiftScheduleDate(week,index)));
+  return fiveTwoEntries({period,members:people,roster,approvedLeaves,dates:extendedDates});
+ },[validMonth,period,people,roster,approvedLeaves,chosen,entries]);
  const legacyIds=useMemo(()=>registryState.activated?entries.filter(e=>!people.some(p=>p.uid===e.uid)).length:0,[entries,people,registryState.activated]);
  const dateSelected=monthDates(period).includes(date)?date:monthDates(period)[0]||'';
- const open=p=>{setSelected(p.id);setDraftRevision(p.revision);setTitle(p.title);setPeriod(p.period);setEntries(p.entries||[]);setError('')};
- const reset=()=>{setSelected('');setDraftRevision(null);setTitle('Escala da equipe');setEntries([]);setError('')};
+ const setBoard=(next=emptyRoster)=>{setRoster(next);setUndoHistory([]);setRosterDirty(false);setTitleDirty(false);};
+ const open=async p=>{
+  if(hasUnsaved&&!await askConfirmation('Abrir outra escala e descartar as alterações deste rascunho?'))return;
+  setSelected(p.id);setDraftRevision(p.revision);setTitle(p.title);setPeriod(p.period);setEntries(p.entries||[]);
+  setSundayOff(Object.fromEntries((p.entries||[]).filter(entry=>entry.type==='monthly_sunday').map(entry=>[entry.uid,entry.date])));
+  setBoard(p.roster);setError('');
+ };
+ const reset=(nextPeriod=period)=>{
+  setSelected('');setDraftRevision(null);setTitle('Escala da equipe');setEntries([]);setSundayOff({});setError('');
+  setPeriod(nextPeriod);setBoard(newRoster(nextPeriod,plans,people));
+ };
+ const startNew=async(nextPeriod=period)=>{
+  if(hasUnsaved&&!await askConfirmation('Descartar as alterações deste rascunho?'))return;
+  reset(nextPeriod);
+  setScheduleView('active');
+ };
+ const updateRoster=next=>{setUndoHistory(old=>[...old.slice(-29),{roster,dirty:rosterDirty}]);setRoster(next);setRosterDirty(true);};
+ const undoRoster=()=>{
+  const previous=undoHistory.at(-1);
+  if(!previous)return;
+  setRoster(previous.roster);setRosterDirty(previous.dirty);setUndoHistory(old=>old.slice(0,-1));
+ };
  const sundays=useMemo(()=>weekdayOccurrences(period,0),[period]);
  const filteredPeople=people.filter(p=>matrixSector==='todos'||p.professional?.sector===matrixSector);
  const saveFixed=async(person,value)=>{
@@ -55,7 +103,18 @@ export default function SchedulePlanner({membership}){
   }catch(e){setError(e.message);notify(e.message,'error')}
  };
  const add=e=>{e.preventDefault();if(!uid||!date||!date.startsWith(period))return setError('Selecione colaborador e data dentro do mês.');setError('');setEntries(old=>[...old.filter(x=>!(x.uid===uid&&x.date===date)),{uid,date,type}].sort((a,b)=>a.date.localeCompare(b.date)))};
- const save=async()=>{if(legacyIds)return setError('Este rascunho contém contas antigas; gere uma nova proposta com a equipe real.');setBusy(true);try{const d=await call('saveDraft',{id:selected||undefined,expectedRevision:draftRevision,period,title,entries});notify(d.message,'success');await refresh();setSelected(d.id);setDraftRevision(d.revision)}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
+ const save=async()=>{
+  if(legacyIds)return setError('Este rascunho contém contas antigas; gere uma nova proposta com a equipe real.');
+  setBusy(true);
+  try{
+   const payloadEntries=legacy?entries:boardEntries.filter(entry=>entry.date.startsWith(period));
+   const result=await call('saveDraft',{id:selected||undefined,expectedRevision:draftRevision,period,title,entries:payloadEntries,...(legacy?{}:{roster})});
+   notify(result.message,'success');
+   setSelected(result.id);setDraftRevision(result.revision);setEntries(payloadEntries);
+   setRosterDirty(false);setTitleDirty(false);setUndoHistory(old=>old.map(snapshot=>({...snapshot,dirty:true})));
+   await refresh(true);
+  }catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}
+ };
  const transition=async action=>{setBusy(true);try{const d=await call(action,{id:selected});notify(d.message,'success');await refresh()}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
  const archivedPlans=plans.filter(p=>!!p.archivedAt),activePlans=plans.filter(p=>!p.archivedAt);
  const changeArchive=async(p,action)=>{
@@ -66,17 +125,39 @@ export default function SchedulePlanner({membership}){
   catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  if(!allowed)return <section className="ti-planning"><h1>Escalas</h1><p>Consulte suas escalas publicadas no Mural.</p></section>;
- return <section className="ti-planning"><p className="eyebrow">ADMINISTRAÇÃO · EQUIPE</p><h1>Planejamento de escalas</h1><p>Crie o rascunho, revise conflitos, solicite aprovação e publique. Disponibilidade habitual não é escala oficial.</p>
+ const workflow=chosen?.archivedAt?null:<div className="ti-planning-actions">
+  {legacy&&chosen?.status==='draft'&&<button type="button" disabled={busy||entries.length===0} onClick={save}>Salvar rascunho</button>}
+  {chosen?.status==='draft'&&<button disabled={busy||hasUnsaved} type="button" onClick={()=>transition('submit')}>Enviar para análise</button>}
+  {chosen?.status==='in_review'&&<button disabled={busy} type="button" onClick={()=>transition('approve')}>Aprovar escala</button>}
+  {chosen?.status==='approved'&&<button disabled={busy} type="button" onClick={()=>transition('publish')}>Publicar no Mural</button>}
+  {chosen?.status==='published'&&<p role="status">Esta versão está publicada.</p>}
+ </div>;
+ const canPlan=(!chosen||chosen.status==='draft')&&!chosen?.archivedAt;
+ return <section className={legacy?'ti-planning':'ti-roster-planner'}>
+ {legacy&&<><p className="eyebrow">ADMINISTRAÇÃO · EQUIPE</p><h1>Planejamento de escalas</h1></>}
+ {!legacy&&validMonth&&<RosterBoard key={period} period={period}
+  roster={roster} updateRoster={updateRoster} members={people} entries={boardEntries} requirements={coverageRules}
+  editable={canPlan&&!busy&&!loading} saving={busy||loading} onSave={save} canSave={people.length>0&&(!registryState.registeredCount||registryState.activated)}
+  saved={Boolean(draftRevision)&&!hasUnsaved} status={chosen?.status&&chosen.status!=='draft'?labels[chosen.status]||chosen.status:null}
+  changePeriod={startNew} onUndo={undoRoster} canUndo={undoHistory.length>0}
+  loadPending={!loaded&&loading} loadError={!loaded?error:''} retryLoad={()=>refresh()}/>}
  {!registryState.activated&&registryState.registeredCount>0&&<aside className="ti-roster-attention" role="status"><strong>{registryState.registeredCount} fichas profissionais aguardam ativação.</strong><span>O planejador ainda está usando contas de acesso, que podem incluir contas de teste. Ative o Cadastro Mestre após conferir a equipe para planejar com os funcionários reais.</span><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent("ti-navigate",{detail:"master-registry"}))}>Abrir Cadastro Mestre</button></aside>}
  {legacyIds>0&&<aside className="ti-roster-attention" role="alert"><strong>Rascunho com {legacyIds} lançamento(s) de contas antigas.</strong><span>Após ativar o Cadastro Mestre, a nova escala usa IDs das fichas profissionais. Para preservar o histórico, rascunhos antigos não são convertidos automaticamente. Crie uma proposta nova e confira as folgas antes de salvar.</span></aside>}
- <div className="ti-planning-grid"><section className="ti-planning-card"><div className="ti-planning-heading"><h2>Escalas da unidade</h2><button type="button" onClick={()=>refresh()} disabled={busy||loading}>Atualizar</button></div>
+ {legacy&&loading&&<p role="status">Carregando escalas…</p>}
+ {!legacy&&chosen&&<section className="ti-planning-card ti-roster-record">
+  <label>Título da escala<input maxLength={100} minLength={3} value={title} disabled={!canPlan||busy} onChange={e=>{setTitle(e.target.value);setTitleDirty(true);}}/></label>
+  {workflow}
+ </section>}
+ <div className={legacy?'ti-planning-grid':'ti-roster-saved'}>
+ <details className="ti-planning-card ti-roster-record" open={legacy||undefined}><summary>Escalas da unidade</summary>
+ <div className="ti-planning-heading"><button type="button" onClick={()=>refresh()} disabled={busy||loading}>Atualizar</button><button type="button" disabled={busy} onClick={()=>startNew()}>Nova escala</button></div>
  <div className="ti-notification-tabs" role="group" aria-label="Lista de escalas"><button type="button" className={scheduleView==='active'?'selected':''} aria-pressed={scheduleView==='active'} onClick={()=>setScheduleView('active')}>Ativas ({activePlans.length})</button><button type="button" className={scheduleView==='trash'?'selected':''} aria-pressed={scheduleView==='trash'} onClick={()=>setScheduleView('trash')}>Lixeira ({archivedPlans.length})</button></div>
  {loading?<p>Carregando...</p>:(scheduleView==='active'?activePlans:archivedPlans).length?(scheduleView==='active'?activePlans:archivedPlans).map(x=><div key={x.id} className="ti-schedule-list-item">
   <button type="button" className={'ti-planning-row'+(selected===x.id?' selected':'')} onClick={()=>open(x)}><strong>{x.title}</strong><span>{x.period} · {labels[x.status]||x.status} · v{x.revision}</span></button>
   {scheduleView==='trash'?<button type="button" disabled={busy} className="ti-schedule-recycle-action" onClick={()=>changeArchive(x,'scheduleRestore')}>Restaurar</button>:<button type="button" disabled={busy||(x.status==='published'&&x.period>=today.slice(0,7))} className="ti-schedule-recycle-action" title={x.status==='published'&&x.period>=today.slice(0,7)?'Escala oficial protegida':'Mover para a lixeira'} onClick={()=>changeArchive(x,'scheduleArchive')}>Excluir</button>}
  </div>):<p>{scheduleView==='trash'?'Nenhuma escala na lixeira.':'Nenhuma escala cadastrada.'}</p>}
- <button type="button" onClick={()=>{reset();setScheduleView('active')}}>Nova escala</button></section>
- <section className="ti-planning-card"><h2>{selected?'Detalhes da escala':'Nova escala'}</h2><label>Título<input maxLength={100} minLength={3} required disabled={!!chosen&&chosen.status!=='draft'} value={title} onChange={e=>setTitle(e.target.value)}/></label><label>Mês de referência<input type="month" disabled={!!chosen&&chosen.status!=='draft'} value={period} onChange={e=>{setPeriod(e.target.value);setEntries([])}}/></label>
+ </details>
+ {legacy&&<section className="ti-planning-card"><h2>Detalhes da escala</h2><label>Título<input maxLength={100} minLength={3} required disabled={!!chosen&&chosen.status!=='draft'} value={title} onChange={e=>setTitle(e.target.value)}/></label><label>Mês de referência<input type="month" disabled={!!chosen&&chosen.status!=='draft'} value={period} onChange={e=>{setPeriod(e.target.value);setEntries([])}}/></label>
  {(!chosen||chosen.status==='draft')&&<form className="ti-planning-add" onSubmit={add}><label>Colaborador<select required value={uid} onChange={e=>setUid(e.target.value)}><option value="">Selecione</option>{people.map(p=><option key={p.uid} value={p.uid}>{p.name||p.email}</option>)}</select></label><label>Data<input required type="date" value={date} min={period+'-01'} max={monthDates(period).at(-1)} onChange={e=>setDate(e.target.value)}/></label><label>Atividade<select value={type} onChange={e=>setType(e.target.value)}><option value="work">Trabalho</option><option value="off">Folga</option><option value="leave">Ausência</option><option value="monthly_sunday">Domingo mensal adicional</option></select></label><button type="submit">Adicionar</button></form>}
  {(!chosen||chosen.status==='draft')&&<button type="button" disabled={busy||people.length===0||(!registryState.activated&&registryState.registeredCount>0)} onClick={generate}>Gerar mês com folgas fixas e domingos</button>}
  <section className="ti-planning-card ti-schedule-subcard">
@@ -110,8 +191,8 @@ export default function SchedulePlanner({membership}){
  </section>
  <div className="ti-calendar-block" aria-label="Calendário mensal da escala"><div className="ti-calendar-heading"><h3>Calendário de {period}</h3><span>Clique em um dia para selecionar a data</span></div><div className="ti-calendar-grid">{monthDates(period).map(date=>{const day=new Date(date+'T12:00:00Z').getUTCDay();const records=entries.filter(e=>e.date===date);const offs=records.filter(e=>e.type==='off'||e.type==='monthly_sunday').length;return <button type="button" key={date} aria-current={date===today?"date":undefined} className={'ti-calendar-day'+(date===dateSelected?' active':'')+(date===today?' ti-calendar-today':'')+(offs?' has-off':'')} onClick={()=>setDate(date)} title={date+' · '+offs+' folgas'}><strong>{date.slice(-2)}</strong><small>{['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][day]}</small><span>{records.length} registros</span>{offs>0&&<em>{offs} folga(s)</em>}</button>})}</div></div>
  <div className="ti-planning-entries">{entries.length?entries.map((e,i)=><div key={e.date+e.uid}><span>{e.date} · {people.find(x=>x.uid===e.uid)?.name||e.uid} · {labels[e.type]}</span>{(!chosen||chosen.status==='draft')&&<button type="button" aria-label="Retirar lançamento" onClick={()=>setEntries(old=>old.filter((_,j)=>j!==i))}>Retirar</button>}</div>):<p>Nenhum turno ou folga incluído.</p>}</div>
- <div className="ti-planning-actions">{(!chosen||chosen.status==='draft')&&<button type="button" disabled={busy||entries.length===0} onClick={save}>Salvar rascunho</button>}{chosen?.status==='draft'&&<button disabled={busy} type="button" onClick={()=>transition('submit')}>Enviar para análise</button>}{chosen?.status==='in_review'&&allowed&&<button disabled={busy} type="button" onClick={()=>transition('approve')}>Aprovar escala</button>}{chosen?.status==='approved'&&allowed&&<button disabled={busy} type="button" onClick={()=>transition('publish')}>Publicar no Mural</button>}{chosen?.status==='published'&&<p role="status">Esta versão está publicada e não pode ser alterada.</p>}</div>
- </section></div>{error&&<p role="alert" className="team-error">{error}</p>}
+ {workflow}
+ </section>}</div>{error&&(loaded||legacy)&&<p role="alert" className="team-error">{error}</p>}
   {confirmationSheet}
  </section>;
 }
