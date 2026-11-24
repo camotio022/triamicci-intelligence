@@ -62,7 +62,8 @@ test('coverage keeps normal hours apart from the extra period and leaves unconfi
  assert.deepEqual(wholeTurnAssignment(row,{scheduled:false}),{first:null,second:row.coverageWindow});
  assert.equal(wholeTurnAssignment(row,{scheduled:true,hours:{start:'05:00',end:'10:00'}}),null);
  assert.equal(wholeTurnAssignment({...row,coverageWindow:null},regular),null);
- assert.equal(wholeTurnAssignment({...row,coverageWindow:{start:'12:00',end:'20:20'}},regular),null);
+ assert.deepEqual(wholeTurnAssignment({...row,coverageWindow:{start:'12:00',end:'20:20'}},regular).second,{start:'16:20',end:'20:20'});
+ assert.deepEqual(wholeTurnAssignment({...row,coverageWindow:{start:'12:00',end:'20:20'}},{scheduled:false}).second,{start:'12:00',end:'20:20'});
  assert.equal(reviewCoverageAssignment(wholeTurnAssignment(row,regular)).state,'blocked');
  assert.equal(forecastPaymentDate(date,null),null);
  assert.equal(forecastPaymentDate('2026-12-29',{daysAfter:5}),'2027-01-03');
@@ -109,4 +110,13 @@ test('management counterpart is visible when the alternate shift overlaps, with 
  assert.equal(b.recurring[0].name,'Judson');
  assert.equal(b.recurring[0].available,false);
  assert.equal(wholeTurnAssignment(morning,morning.candidates.find(item=>item.uid==='Judson')),null);
+});
+
+test('a person absent from the Sunday roster cannot make a shared shift window look ambiguous',()=>{
+ const standard=kitchen('standard');
+ const different=kitchen('different',[],{availability:[{day:'dom',start:'15:00',end:'20:20'}]});
+ const result=evaluateOperationalDay({date,people:[standard,different],entries:[...work([standard],date),...work([different],date,'off')],policy});
+ const row=result.shifts.find(item=>item.sector==='cozinha'&&item.shift==='noite');
+ assert.deepEqual(row.window,{start:'12:00',end:'20:20'});
+ assert.deepEqual(wholeTurnAssignment(row,row.candidates[0]).second,row.window);
 });

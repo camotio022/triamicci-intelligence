@@ -17,11 +17,6 @@ const timed = slot => slot && minutes(slot.start) !== null && minutes(slot.end) 
 const covering = (slot,window) => timed(slot)&&window&&
  minutes(slot.start)<=minutes(window.start)&&minutes(slot.end)>=minutes(window.end);
 const offTypes = new Set(['off','monthly_sunday']);
-const regularCoverage = {
- manha:{start:'08:00',end:'16:20'},
- noite:{start:'16:20',end:'22:20'}
-};
-
 function assuredMontage(people,rules){
  const other=rules.filter(rule=>rule.skill!=='montagem');
  if(!other.length)return people.filter(person=>certified(person,'montagem')).length;
@@ -74,10 +69,11 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
  const shifts = ['manha','noite'].flatMap(shift=>['cozinha','frente'].map(sector=>{
   const cohort = active.filter(person=>inSector(person,sector)&&profile(person).shift===shift);
   const roster = cohort.filter(person=>scheduled.has(person.uid));
-  const slots = [...new Map(cohort.map(person=>available(person,day)).filter(timed).map(slot=>[slot.start+'-'+slot.end,slot])).values()];
-  const window = slots.length===1 ? {start:slots[0].start,end:slots[0].end} : null;
-  const coverageWindow = holiday || weekday===0 ? window : regularCoverage[shift];
+  const uniqueHours = group => [...new Map(group.map(person=>available(person,day)).filter(timed).map(slot=>[slot.start+'-'+slot.end,slot])).values()];
   const confirmed = roster.filter(person=>timed(available(person,day)));
+  const slots = uniqueHours(confirmed.length?confirmed:cohort);
+  const window = slots.length===1 ? {start:slots[0].start,end:slots[0].end} : null;
+  const coverageWindow = window;
   const managers = confirmed.filter(management);
   const minimum = sector==='cozinha' ? busyDay||strongPeak?4:2 : busyDay?3:policy.frontWeekdayMinimum??null;
   const count = sector==='frente'&&policy.countManagement===false ? confirmed.filter(person=>!management(person)).length : confirmed.length;
@@ -100,7 +96,7 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
   const candidates = active.filter(person=>inSector(person,sector)&&!roster.includes(person)&&
    (scheduled.has(person.uid)||offTypes.has(typeOf(person)))&&(!skillGap||certified(person,skill)))
    .map(person=>({uid:person.uid,name:name(person),scheduled:scheduled.has(person.uid),hours:available(person,day)||null,jobTitle:profile(person).jobTitle||'',rateRole:rateRoleFor(person),
-    matchesRole:sector==='cozinha'?kitchenLead(person):management(person)}));
+    hasAccount:Boolean(person.accountUid),skillConfirmed:!skill||certified(person,skill),countsForMinimum:!(sector==='frente'&&policy.countManagement!==true&&management(person)),matchesRole:sector==='cozinha'?kitchenLead(person):management(person)}));
   return {shift,sector,window,coverageWindow,minimum,count,uncertain,reasons,skill,skillCount,headcountGap,skillGap,roleGap,missingHours:roster.length-confirmed.length,shortage:Math.max(headcountGap,skillGap,roleGap),
    people:roster.map(person=>({uid:person.uid,name:name(person),jobTitle:profile(person).jobTitle||'',hours:available(person,day)||null})),candidates};
  }));
@@ -144,8 +140,8 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
   for(const candidate of row.candidates)candidate.fitsRole=!row.roleGap||candidate.matchesRole;
   const fixedIds=new Set(recurring.filter(item=>item.sector===row.sector&&item.shift===row.shift).map(item=>item.uid));
   row.candidates.sort((a,b)=>
-   Number(Boolean(wholeTurnAssignment(row,b)))-Number(Boolean(wholeTurnAssignment(row,a)))||
    Number(b.fitsRole)-Number(a.fitsRole)||
+   Number(Boolean(wholeTurnAssignment(row,b)))-Number(Boolean(wholeTurnAssignment(row,a)))||
    Number(fixedIds.has(b.uid))-Number(fixedIds.has(a.uid))||
    Number(b.scheduled)-Number(a.scheduled)||a.name.localeCompare(b.name,'pt-BR'));
  }
@@ -192,8 +188,10 @@ export function wholeTurnAssignment(row,candidate){
  if(!timed(candidate.hours))return null;
  const first={start:candidate.hours.start,end:candidate.hours.end};
  const begin=minutes(first.start),stop=minutes(first.end);
- if(stop<=begin||stop!==a&&begin!==b)return null;
- return {first,second:{start,end}};
+ if(stop<=begin)return null;
+ if(stop>=a&&stop<b&&begin<=a)return {first,second:{start:first.end,end}};
+ if(begin===b)return {first,second:{start,end}};
+ return null;
 }
 
 export function reviewCoverageAssignment({first,second}){

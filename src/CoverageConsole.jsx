@@ -10,10 +10,32 @@ const money=n=>n==null?'Valor a definir':Number(n).toLocaleString('pt-BR',{style
 async function request(action,extra={}){
  return requestJson('/api/coverage/manage',{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>[data.message,...(data.issues||[])].join(' · ')});
 }
-export default function CoverageConsole({membership,focus}){
+const proposalLabels={pending_acceptance:'Aguardando resposta',pending_approval:'Aguardando aprovação',approved:'Aprovada',completed:'Realizada',paid:'Paga',rejected:'Recusada',declined:'Convite recusado',cancelled:'Cancelada'};
+
+function BoardProposal({item,run,busy}){
+ const [note,setNote]=useState(''),[consentEvidence,setConsentEvidence]=useState(''),[legalChecked,setLegalChecked]=useState(false),[consentVerified,setConsentVerified]=useState(false);
+ const pending=['pending_approval','pending_acceptance'].includes(item.status);
+ return <section className="ti-cov-drawer-block">
+  <h3>{item.name} · {proposalLabels[item.status]||item.status}</h3>
+  <p>{item.second?.start}–{item.second?.end} · {money(item.fee?.amount??item.practicePayment)}</p>
+  {pending&&<div className="ti-cov-policy">
+   <label>Motivo da decisão<textarea maxLength={500} value={note} onChange={event=>setNote(event.target.value)}/></label>
+   {item.status==='pending_approval'&&<>
+    <label className="ti-cov-check"><input type="checkbox" checked={legalChecked} onChange={event=>setLegalChecked(event.target.checked)}/>Jornada e obrigações conferidas</label>
+    <label className="ti-cov-check"><input type="checkbox" checked={consentVerified} onChange={event=>setConsentVerified(event.target.checked)}/>Aceite conferido</label>
+    <label>Comprovação do aceite<textarea maxLength={500} value={consentEvidence} onChange={event=>setConsentEvidence(event.target.value)}/></label>
+   </>}
+   <div className="ti-cov-actions"><button type="button" className="ti-cov-quiet" disabled={busy||note.trim().length<10} onClick={()=>run(()=>request('decide',{id:item.id,decision:'rejected',note}))}>Recusar</button>
+    {item.status==='pending_approval'&&<button type="button" disabled={busy||note.trim().length<10||!legalChecked||!consentVerified||consentEvidence.trim().length<10}
+     onClick={()=>run(()=>request('decide',{id:item.id,decision:'approved',note,legalChecked,consentVerified,consentEvidence}))}>Aprovar cobertura</button>}</div>
+  </div>}
+  <CoverageSettlement proposal={item} busy={busy} run={run} request={request}/>
+ </section>;
+}
+export default function CoverageConsole({membership,focus,userId}){
  const [data,setData]=useState(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const [requestNotes,setRequestNotes]=useState({});
- const [note,setNote]=useState(''),[consentEvidence,setConsentEvidence]=useState(''),[legalChecked,setLegalChecked]=useState(false),[consentVerified,setConsentVerified]=useState(false);
+
  const [payrollDays,setPayrollDays]=useState('');
  const [individual,setIndividual]=useState({});
  const [individualId,setIndividualId]=useState('');
@@ -24,14 +46,13 @@ export default function CoverageConsole({membership,focus}){
  const run=async(fn)=>{setBusy(true);setError('');setNotice('');try{const d=await fn();setNotice(d.message);await load();return d}catch(e){setError(e.message)}finally{setBusy(false)}};
  if(!MANAGEMENT_ROLES.includes(membership.role))return <p>Somente a gerência consulta esta área.</p>;
  return <section className="ti-coverage">
- <OperationalCoverage focus={focus} data={data} request={request} run={run} busy={busy}/>
+ <OperationalCoverage focus={focus} data={data} request={request} run={run} busy={busy}
+  preferenceKey={'ti:coverage-board:'+userId+':'+membership.unitId} renderProposal={item=><BoardProposal key={item.id} item={item} run={run} busy={busy}/>}/>
  {error&&<p role="alert" className="team-error">{error}</p>}{notice&&<p role="status" className="team-notice">{notice}</p>}
  <details className="ti-cov-panel ti-cov-secondary"><summary>Pendências e histórico</summary>
  <details className="ti-cov-panel"><summary>Solicitações da equipe</summary><p>Aprovar a solicitação não altera automaticamente a escala publicada.</p>{!(data?.staffRequests||[]).some(x=>x.status==='pending')?<p>Nenhuma solicitação aguardando decisão.</p>:(data.staffRequests||[]).filter(x=>x.status==='pending').map(item=><article key={item.id} className="ti-cov-result"><strong>{item.name} · {item.date} · {item.kind==='swap'?'Troca de turno':'Cobertura'}</strong><p>{item.reason}</p><label>Justificativa da decisão<textarea minLength={8} maxLength={500} value={requestNotes[item.id]||''} onChange={e=>setRequestNotes(old=>({...old,[item.id]:e.target.value}))}/></label><button type="button" disabled={busy||(requestNotes[item.id]||'').trim().length<8} onClick={()=>run(()=>request('decideStaffRequest',{requestId:item.id,decision:'approved',note:requestNotes[item.id].trim()}))}>Aprovar solicitação</button><button type="button" disabled={busy||(requestNotes[item.id]||'').trim().length<8} onClick={()=>run(()=>request('decideStaffRequest',{requestId:item.id,decision:'rejected',note:requestNotes[item.id].trim()}))}>Recusar</button></article>)}</details>
- <details className="ti-cov-panel"><summary>Convites, aprovações e pagamentos ({data?.proposals?.length||0})</summary><p>Para aprovar, confira jornada, intervalos, descanso, pagamento legal e aceite efetivo. O sistema registra a confirmação, mas não substitui o responsável pela folha.</p>
- <div className="ti-cov-fields"><label>Justificativa da decisão<textarea value={note} minLength={10} maxLength={500} onChange={e=>setNote(e.target.value)} placeholder="Informe a verificação e o motivo"/></label><div><label className="ti-cov-check"><input type="checkbox" checked={legalChecked} onChange={e=>setLegalChecked(e.target.checked)}/>Jornada e obrigações trabalhistas conferidas</label><label className="ti-cov-check"><input type="checkbox" checked={consentVerified} onChange={e=>setConsentVerified(e.target.checked)}/>Aceite do colaborador verificado</label><label>Registro da comprovação do aceite<textarea minLength={10} maxLength={500} value={consentEvidence} onChange={e=>setConsentEvidence(e.target.value)} placeholder="Ex.: confirmação presencial em data e horário específicos"/></label></div></div>
- {(data?.proposals||[]).length===0&&<p>Nenhuma proposta registrada.</p>}
- {(data?.proposals||[]).map(p=><article className="ti-cov-proposal" key={p.id}><div><strong>{p.name}</strong><span>{p.date} · {p.window?p.window.start+'–'+p.window.end:[p.first,p.second].filter(Boolean).map(slot=>slot.start+'–'+slot.end).join(' + ')}</span><span>{money(p.fee?.amount??p.practicePayment)} · {({pending_acceptance:'Aguardando resposta',pending_approval:'Aguardando aprovação',approved:'Aprovada',completed:'Realizada',paid:'Paga',rejected:'Recusada',declined:'Convite recusado',cancelled:'Cancelada'})[p.status]||p.status}</span><small>{p.reason}</small><CoverageSettlement proposal={p} busy={busy} run={run} request={request}/></div><div className="ti-cov-actions">{['pending_approval','pending_acceptance'].includes(p.status)&&<button disabled={busy||note.trim().length<10} type="button" onClick={()=>run(()=>request('decide',{id:p.id,decision:'rejected',note}))}>Recusar</button>}{p.status==='pending_approval'&&<button type="button" disabled={busy||note.trim().length<10||!legalChecked||!consentVerified||consentEvidence.trim().length<10} onClick={()=>run(()=>request('decide',{id:p.id,decision:'approved',note,legalChecked,consentVerified,consentEvidence}))}>Aprovar após conferência</button>}</div></article>)}
+ <details className="ti-cov-panel"><summary>Histórico de convites</summary>
+ {(data?.proposals||[]).map(item=><article className="ti-cov-proposal" key={item.id}><div><strong>{item.name}</strong><span>{item.date} · {proposalLabels[item.status]||item.status}</span></div></article>)}
  </details>
  </details>
  <details className="ti-cov-panel ti-cov-secondary"><summary>Configurações da cobertura</summary>

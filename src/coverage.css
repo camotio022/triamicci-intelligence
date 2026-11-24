@@ -52,3 +52,36 @@
   .ti-cov-board .ti-cov-filter > button { grid-column: 1 / -1; }
   .ti-cov-cards { grid-template-columns: 1fr; }
 }
+
+.ti-cov-board-tools,.ti-cov-pool,.ti-cov-column-tabs{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ti-cov-board-tools{justify-content:space-between}
+.ti-cov-board-tools label{display:flex;align-items:center}
+.ti-cov-pool{align-items:baseline;padding:10px 12px;border:1px solid #e0e4eb;border-radius:10px}
+.ti-cov-pool div{display:flex;flex-wrap:wrap;gap:6px}
+.ti-cov-pool button,.ti-cov-column-tabs button,.ti-cov-board button.ti-cov-quiet,.ti-cov-board button.ti-cov-grip,.ti-cov-drawer button.ti-cov-quiet{background:#fff;color:#24354a;border:1px solid #e0e4eb}
+.ti-cov-pool button{cursor:grab}
+.ti-cov-pool button[aria-pressed=true],.ti-cov-column-tabs button[aria-pressed=true],.ti-cov-drawer button[aria-pressed=true]{background:#e6f3eb;border-color:#7aad90;color:#075a32}
+.ti-cov-kanban{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ti-cov-column{background:#f4f6f9;border:1px solid #e0e4eb;border-radius:12px;padding:10px;min-width:0}
+.ti-cov-column h2{font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px}
+.ti-cov-column h2 span{border-radius:6px;background:#fff;padding:2px 6px}
+.ti-cov-ticket{display:grid;gap:5px;padding:10px;background:#fff;border:1px solid #e0e4eb;border-radius:10px;margin-bottom:6px}
+.ti-cov-ticket[data-selected=true]{border-style:dashed;border-color:#69a789}
+.ti-cov-ticket h3{font-size:14px}
+.ti-cov-ticket button{justify-self:start}
+.ti-cov-ticket button.ti-cov-grip{padding:2px 7px;cursor:grab}
+.ti-cov-ticket .ti-cov-ticket-problem{font-weight:650}
+.ti-cov-empty{font-size:12px}
+.ti-cov-column[data-column=resolved] h2{color:#075a32}
+.ti-cov-column[data-column=needs] h2{color:#884d12}
+.ti-cov-column-tabs{display:none}
+.ti-cov-drawer{position:fixed;inset:0 0 0 auto;margin:0;width:min(100%,470px);max-width:none;height:100%;max-height:none;border:0;border-left:1px solid #e0e4eb;padding:18px;overflow-y:auto;box-shadow:-8px 0 32px #18223533;color:#182235}
+.ti-cov-drawer::backdrop{background:#18223566}
+.ti-cov-drawer h2,.ti-cov-drawer h3,.ti-cov-drawer p{margin:4px 0}
+.ti-cov-drawer-block{padding-block:12px;border-bottom:1px solid #e0e4eb}
+.ti-cov-drawer-block textarea{width:100%}
+@media(max-width:680px){
+ .ti-cov-column-tabs{display:flex}
+ .ti-cov-kanban{grid-template-columns:1fr}
+ .ti-cov-column[data-active=false]{display:none}
+}

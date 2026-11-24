@@ -105,7 +105,7 @@ export default async function handler(req,res){
     if(!old.exists||old.data().status!=='pending'||old.data().accountUid===actor.uid)throw Error('CONFLICT');
     tx.update(ref,{status:decision,note:note.trim(),decidedBy:actor.uid,decidedAt:now,updatedAt:now});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
-    queuePush(tx,db,member.unitId,'coverage_request_decision_'+requestId,{uid:old.data().accountUid,title:'Sua solicitação de troca ou cobertura foi analisada',page:'my-profile'});
+    queuePush(tx,db,member.unitId,'coverage_request_decision_'+requestId,{uid:old.data().accountUid,title:'Sua solicitação de troca ou cobertura foi analisada',page:'my-coverage'});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.change_'+decision,requestId,unitId:member.unitId,actorUid:actor.uid,at:now,note:note.trim()});
    });
    await tryDrainPush(member.unitId);
@@ -165,7 +165,7 @@ export default async function handler(req,res){
    return send(res,200,'Regras operacionais salvas.');
   }
   if(action==='assessShift'||action==='inviteShift'){
-   const {planId,date,sector,shift,staffId}=req.body||{};
+   const {planId,date,sector,shift,staffId,coveredStart}=req.body||{};
    const inviting=action==='inviteShift';
    if(!idOk(planId)||!validDate(date)||!['cozinha','frente'].includes(sector)||!['manha','noite'].includes(shift)||inviting&&!idOk(staffId))return send(res,400,'Selecione escala, data, turno e setor.');
    const planRef=unit.collection('schedules').doc(planId), directory=unit.collection('staffRegistry').limit(201), leaves=unit.collection('leaveRequests').where('date','==',date).limit(201);
@@ -194,7 +194,10 @@ export default async function handler(req,res){
     const candidate=row.candidates.find(item=>item.uid===staffId);
     const person=staff.docs.find(doc=>doc.id===staffId)?.data();
     const assignment=wholeTurnAssignment(row,candidate);
-    if(!assignment||!person?.accountUid)throw Error('STAFF_NOT_AVAILABLE');
+    if(!assignment||!person?.accountUid||!candidate.fitsRole&&!candidate.countsForMinimum)throw Error('STAFF_NOT_AVAILABLE');
+    const partial=assignment.second.start!==row.window.start;
+    if(partial&&coveredStart!==true)throw Error('SHIFT_START_REQUIRED');
+    if(!(row.roleGap&&candidate.matchesRole||row.headcountGap&&candidate.countsForMinimum||row.skillGap&&candidate.skillConfirmed))throw Error('STAFF_NOT_AVAILABLE');
     if(existing.docs.some(doc=>doc.data().staffId===staffId&&!['rejected','declined','cancelled'].includes(doc.data().status)&&
      (!doc.data().shift||doc.data().shift===shift||minutes(doc.data().second?.end)>minutes(assignment.second.start)&&minutes(doc.data().second?.start)<minutes(assignment.second.end))))throw Error('CONFLICT');
     const review=assignment.first?reviewCoverageAssignment(assignment):{state:'review',reasons:['Conferir descanso, intervalos e disponibilidade para o turno inteiro.']};
@@ -203,12 +206,12 @@ export default async function handler(req,res){
     const fixed=evaluation.recurring.find(item=>item.uid===staffId&&item.sector===sector&&item.shift===shift);
     const rateRole=rateRoleFor(person),override=rateSnap.data()?.individualRates?.[staffId];
     tx.create(proposals.doc(id),{staffId,accountUid:person.accountUid,name:person.name||'',date,planId,planRevision:plan.data().revision||null,shift,sector,
-     window:assignment.second,...assignment,external:false,rateRole,reason:reason.trim(),
+     window:row.window,...assignment,coveredStart:partial&&coveredStart===true,external:false,rateRole,reason:reason.trim(),
      ...(fixed?{fixedFeePolicy:fixed.paid}:{}),
      practicePayment:fixed?.paid===false?0:fixed?.paid===null?null:override?.amount??(rates?paymentFor({paymentRole:rateRole},rates):null),
      operational:true,payrollSnapshot:override?.daysAfter!=null?{daysAfter:override.daysAfter}:rateSnap.data()?.payroll||null,legalEstimate:null,legalValidated:false,reviewReasons:review.reasons,status:'pending_acceptance',consentPending:false,createdAt:now,updatedAt:now,createdBy:actor.uid,unitId:member.unitId});
     signalUnitChange(tx,db,member.unitId,['coverage','notifications']);
-    queuePush(tx,db,member.unitId,'coverage_invite_'+id,{uid:person.accountUid,title:'Você recebeu um convite de cobertura',page:'my-profile'});
+    queuePush(tx,db,member.unitId,'coverage_invite_'+id,{uid:person.accountUid,title:'Você recebeu um convite de cobertura',page:'my-coverage'});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.proposed',unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now});
    });
    await tryDrainPush(member.unitId);
@@ -276,7 +279,7 @@ export default async function handler(req,res){
       legalEstimate:null,legalValidated:false,reviewReasons:review.reasons,status:person.data().accountUid?'pending_acceptance':'pending_approval',consentPending:!person.data().accountUid,
       createdAt:now,updatedAt:now,createdBy:actor.uid,unitId:member.unitId});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
-    if(person.data().accountUid)queuePush(tx,db,member.unitId,'coverage_invite_'+id,{uid:person.data().accountUid,title:'Você recebeu um convite de cobertura ou dobra',page:'my-profile'});
+    if(person.data().accountUid)queuePush(tx,db,member.unitId,'coverage_invite_'+id,{uid:person.data().accountUid,title:'Você recebeu um convite de cobertura ou dobra',page:'my-coverage'});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.proposed',unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,practicePayment:payment});
    });
    await tryDrainPush(member.unitId);
@@ -305,7 +308,7 @@ export default async function handler(req,res){
      if(gate)throw Error(gate);
     }
     tx.update(ref,{status:decision,decisionNote:note.trim(),legalValidated:false,legalReviewConfirmed:decision==='approved',consentVerified:decision==='approved',consentEvidence:decision==='approved'?req.body.consentEvidence.trim():null,decidedBy:actor.uid,decidedAt:now,updatedAt:now});
-    if(currentPerson.data()?.accountUid)queuePush(tx,db,member.unitId,'coverage_decision_'+id,{uid:currentPerson.data().accountUid,title:'Sua proposta de cobertura ou dobra foi analisada',page:'my-profile'});
+    if(currentPerson.data()?.accountUid)queuePush(tx,db,member.unitId,'coverage_decision_'+id,{uid:currentPerson.data().accountUid,title:'Sua proposta de cobertura ou dobra foi analisada',page:'my-coverage'});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.'+decision,unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,note:note.trim()});
    });
@@ -318,6 +321,7 @@ export default async function handler(req,res){
   if(e.message==='FORBIDDEN')return send(res,403,'Operação não autorizada.');
   if(e.message==='EXPIRED')return send(res,409,'O turno desta proposta já passou. Consulte a gestão.');
   if(e.message==='PLAN_CHANGED')return send(res,409,'A escala mudou desde o convite. Reavalie o turno antes de convidar novamente.');
+  if(e.message==='SHIFT_START_REQUIRED')return send(res,409,'Confirme quem cobre o início do turno antes de enviar o convite.');
   if(e.message==='PLAN_NOT_FOUND')return send(res,404,'Escala não encontrada para a data.');
   if(e.message==='ASSESSMENT_LIMIT')return send(res,409,'A equipe ou o volume de ausências excede o limite da avaliação.');
   if(e.message==='STAFF_NOT_AVAILABLE')return send(res,409,'O turno ou a disponibilidade mudou, ou o colaborador ainda não vinculou sua conta.');
