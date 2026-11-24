@@ -116,7 +116,8 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
   const recurring=current.evaluation.recurring.filter(item=>item.sector===row.sector&&item.shift===row.shift);
   const intervals=current.evaluation.intervals.filter(item=>item.deficit&&(item.sector===row.sector||row.sector==='frente'&&['caixa','apoio','gestao'].includes(item.sector))&&
    (!row.window||item.start<row.window.end&&item.end>row.window.start));
-  return {row,matches,recurring,intervals,impact:projectCoverage(row,matches,intervals,recurring),id:coverageCardId(row)};
+  const impact=projectCoverage(row,matches,intervals,recurring);
+   return {row,matches,recurring,intervals:impact.remainingIntervals,impact,id:coverageCardId(row)};
  });
  const visible=cards.filter(card=>(shift==='todos'||card.row.shift===shift)&&(sector==='todos'||card.row.sector===sector)).sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
  const availablePeople=new Map();
