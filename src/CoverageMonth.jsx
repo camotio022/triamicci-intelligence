@@ -51,7 +51,7 @@ export default function CoverageMonth({plan,request,selected,choose,today,alerts
    !month?<p role="status" className="panel ti-cov-feedback">Conferindo os turnos do mês…</p>:<>
     <div className="panel roster-impact"><div><strong>{confirmed}</strong> dias com déficit confirmado a partir de hoje · <strong>{uncertain}</strong> com dados pendentes <span>·</span> <strong>{totalFees('recurringFees')}</strong> taxas fixas confirmadas na previsão futura · <strong>{totalFees('recurringPendingFees')}</strong> pendentes · <strong>{totalFees('recurringUnknownFees')}</strong> com remuneração a definir <span>·</span> {month.extra===null?'Extras a estimar após completar a escala':<><strong>{extra}</strong> vagas estimadas futuras (não são taxas)</>}</div></div>
     {alerts?.some(item=>item.planId===id&&matchesScope(item))&&<div className="panel ti-cov-month-alerts"><h3>Alertas da gestão</h3>
-     {alerts.filter(item=>item.planId===id&&matchesScope(item)).slice(0,5).map(item=><button key={item.id} className="action quiet" type="button" onClick={()=>onOpenAlert(item)}>
+     {alerts.filter(item=>item.planId===id&&matchesScope(item)).slice(0,5).map(item=><button key={item.id} className="action quiet" type="button" onClick={()=>onOpenAlert?.(item)}>
       {short(item.date)} · {labels[item.shift]} · {labels[item.sector]} · {item.reason}
      </button>)}
     </div>}
