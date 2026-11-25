@@ -106,7 +106,10 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      await save;
      assert.equal(savedRoster.roster.sundays['qa-user'],'2027-01-31');
      assert.equal(savedRoster.roster.weekly['2027-01-04']['qa-user'],1);
-     assert.deepEqual(savedRoster.entries.filter(entry=>entry.type==='off').map(entry=>entry.date),['2027-01-05','2027-01-06']);
+     assert.deepEqual(savedRoster.entries.filter(entry=>entry.type==='off').map(entry=>entry.date),[
+      '2027-01-05','2027-01-06','2027-01-12','2027-01-13',
+      '2027-01-19','2027-01-20','2027-01-26','2027-01-27',
+     ]);
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'Quadro de folgas cabe na tela');
     }
     if(screen==='Mural'){await page.getByText(/Planejada ontem/).waitFor();assert.equal(await page.getByText('Jornadas declaradas',{exact:true}).count(),1);assert.equal(await page.getByText('0 em trabalho ou intervalo declarado',{exact:true}).count(),1);await page.getByText('Publicar comunicado',{exact:true}).click();await page.getByLabel('Título',{exact:true}).fill('Comunicado de teste');}
