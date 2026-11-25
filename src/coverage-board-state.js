@@ -8,6 +8,7 @@ const approved = new Set(['approved','completed','paid']);
 export function remainingCoverageIntervals(row,matches,intervals){
  const candidates=new Map(row.candidates.map(person=>[person.uid,person]));
  const clock=value=>typeof value==='string'&&/^\d{2}:\d{2}$/.test(value);
+ const toM=value=>{const [h,m]=String(value).split(':').map(Number);return h*60+m;};
  return intervals.map(interval=>{
   if(!interval.deficit||!clock(interval.start)||!clock(interval.end)||interval.start>=interval.end||!Array.isArray(interval.uids))return interval;
   const workers=new Set(interval.uids);
@@ -16,12 +17,22 @@ export function remainingCoverageIntervals(row,matches,intervals){
    const person=candidates.get(proposal.staffId);
    if(!person||person.sector!==interval.sector||interval.skill&&!(person.certifications||[]).includes(interval.skill))continue;
    const start=proposal.actualStart||proposal.second?.start,end=proposal.actualEnd||proposal.second?.end;
-   if(!clock(start)||!clock(end)||start>interval.start||end<interval.end||start>=end)continue;
+   if(!clock(start)||!clock(end)||start===end)continue;
+   const overnight=toM(end)<=toM(start);
+   const startM=toM(start), endM=overnight?toM(end)+1440:toM(end);
+   let iStart=toM(interval.start), iEnd=toM(interval.end);
+   if(overnight && iEnd<=startM){iStart+=1440;iEnd+=1440;}
+   if(startM>iStart||endM<iEnd)continue;
    // A recorded break, or an explicit no-break declaration, is necessary for precise interval credit.
    const pause=proposal.second;
    const hasBreak=clock(pause?.breakStart)&&clock(pause?.breakEnd)&&pause.breakStart<pause.breakEnd;
    if(!hasBreak&&pause?.breakRequired!==false)continue;
-   if(hasBreak&&interval.start<pause.breakEnd&&interval.end>pause.breakStart)continue;
+   if(hasBreak){
+    let bStart=toM(pause.breakStart), bEnd=toM(pause.breakEnd);
+    if(bEnd<=bStart)bEnd+=1440;
+    if(overnight && bEnd<=startM){bStart+=1440;bEnd+=1440;}
+    if(iStart<bEnd&&iEnd>bStart)continue;
+   }
    // Without a station assignment, competing skill requirements cannot share this reinforcement.
    if(intervals.some(other=>other!==interval&&other.skill&&other.skill!==interval.skill&&other.start<interval.end&&other.end>interval.start))continue;
    workers.add(person.uid);

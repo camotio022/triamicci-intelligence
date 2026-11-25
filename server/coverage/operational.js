@@ -76,12 +76,15 @@ function simultaneousHeadcountDeficits({date,sector,shift,minimum,confirmed,coun
  return deficits;
 }
 
-export function evaluateOperationalDay({date, entries, people, requirements = [], policy = {}}){
+export function evaluateOperationalDay({date, entries, people, requirements = [], policy = {}, context}){
  const weekday = weekdayOf(date);
  const holiday = (policy.holidays || []).includes(date);
  const day = days[holiday ? 0 : weekday];
  const busyDay = holiday || weekday === 0 || weekday === 6 || (policy.peakPeriods || []).some(({start,end})=>date>=start&&date<=end);
  const strongPeak = (policy.strongPeaks || []).includes(date);
+ const provenProduction=(context?.production?.active||0)+(context?.production?.pending||0)>0?{active:context.production.active||0,pending:context.production.pending||0,total:context.production.total||((context.production.active||0)+(context.production.pending||0))}:null;
+ const provenReceiving=(context?.receiving?.records?.length||0)>0?{pending:context.receiving.records.length,partial:Boolean(context.receiving.partial)}:null;
+ const provenOperationalNeeds=(provenProduction||provenReceiving)?{production:provenProduction,receiving:provenReceiving}:null;
  const assignments = new Map(entries.filter(x=>x.date===date).map(x=>[x.uid,x.type]));
  const typeOf = person => {
   const staff=assignments.get(person.uid), account=assignments.get(person.accountUid);
@@ -141,7 +144,7 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
    (scheduled.has(person.uid)||offTypes.has(typeOf(person)))&&(!skillGap||certified(person,skill)|| (sector==='cozinha'?kitchenLead(person):management(person))))
    .map(person=>({uid:person.uid,name:name(person),scheduled:scheduled.has(person.uid),hours:available(person,day)||null,jobTitle:profile(person).jobTitle||'',rateRole:rateRoleFor(person),
     sector:profile(person).sector,certifications:profile(person).certifications||[],hasAccount:Boolean(person.accountUid),skillConfirmed:!skill||certified(person,skill),countsForMinimum:!(sector==='frente'&&policy.countManagement!==true&&management(person)),matchesRole:sector==='cozinha'?kitchenLead(person):management(person)}));
-  return {shift,sector,window,coverageWindow,minimum,count,uncertain,reasons,skill,skillCount,headcountGap,skillGap,roleGap,shortage,missingHours,simultaneousHeadcount,
+  return {shift,sector,window,coverageWindow,minimum,count,uncertain,reasons,skill,skillCount,headcountGap,skillGap,roleGap,shortage,missingHours,simultaneousHeadcount,confirmedPeople:confirmed,
    people:roster.map(person=>({uid:person.uid,name:name(person),jobTitle:profile(person).jobTitle||'',hours:available(person,day)||null})),candidates};
  }));
  const adjustedPeople=holiday ? active.map(person=>({...person,professional:{...profile(person),availability:(profile(person).availability||[]).filter(slot=>slot.day==='dom').map(slot=>({...slot,day:days[weekday]}))}})) : active;
@@ -151,7 +154,7 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
  const recurring = (policy.recurring || []).flatMap(rule=>{
   const absent=active.find(person=>person.uid===rule.absentId), cover=active.find(person=>person.uid===rule.coverId);
   if(!absent||!offTypes.has(typeOf(absent)))return [];
-  return [{uid:rule.coverId,forUid:rule.absentId,paid:rule.paid??null,available:Boolean(cover&&typeOf(cover)==='work'&&inSector(cover,front.has(profile(absent).sector)?'frente':profile(absent).sector)&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector===(front.has(profile(absent).sector)?'frente':profile(absent).sector))?.coverageWindow)),name:cover?name(cover):'Pessoa indisponível',sector:front.has(profile(absent).sector)?'frente':profile(absent).sector,shift:profile(absent).shift}];
+  const expectedSector = front.has(profile(absent).sector)?'frente':profile(absent).sector; const row = shifts.find(r=>r.shift===profile(absent).shift&&r.sector===expectedSector); const win = row?.coverageWindow||row?.window; const av = Boolean(cover&&typeOf(cover)==='work'&&inSector(cover,expectedSector)&&covering(available(cover,day),win)); return [{uid:rule.coverId,forUid:rule.absentId,paid:rule.paid??null,available:av,name:cover?name(cover):'Pessoa indisponível',sector:expectedSector,shift:profile(absent).shift}];
  });
  const managers=active.filter(management);
  const manager=managers.filter(person=>title(person)==='manager'), deputy=managers.filter(person=>title(person)==='submanager');
@@ -159,44 +162,74 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
   for(const [absent,cover] of [[manager[0],deputy[0]],[deputy[0],manager[0]]]){
    if(!offTypes.has(typeOf(absent))||recurring.some(item=>item.forUid===absent.uid))continue;
    recurring.push({uid:cover.uid,forUid:absent.uid,paid:policy.managementPaid??null,
-    available:typeOf(cover)==='work'&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector==='frente')?.coverageWindow),name:name(cover),sector:'frente',shift:profile(absent).shift});
+    available:typeOf(cover)==='work'&&covering(available(cover,day),(shifts.find(row=>row.shift===profile(absent).shift&&row.sector==='frente')?.coverageWindow)||(shifts.find(row=>row.shift===profile(absent).shift&&row.sector==='frente')?.window)),name:name(cover),sector:'frente',shift:profile(absent).shift});
   }
  }
- for(const replacement of recurring.filter(item=>item.available)){
+ const availableRecurring = recurring.filter(item=>item.available).sort((a,b)=>Number(a.paid===true)-Number(b.paid===true));
+ const appliedForAbsent = new Set();
+ for(const replacement of availableRecurring){
+  if(appliedForAbsent.has(replacement.forUid+'|'+replacement.sector+'|'+replacement.shift)) { replacement.applied=false; continue; }
   const row=shifts.find(item=>item.sector===replacement.sector&&item.shift===replacement.shift);
   const cover=active.find(person=>person.uid===replacement.uid);
   const coversOtherShift=shifts.some(item=>item!==row&&row?.coverageWindow&&item.people.some(person=>person.uid===replacement.uid&&timed(person.hours)&&
    minutes(person.hours.start)<minutes(row.coverageWindow.end)&&minutes(row.coverageWindow.start)<minutes(person.hours.end)));
-  if(coversOtherShift)replacement.available=false;
-  else if(row&&!row.people.some(person=>person.uid===cover.uid)){
+  if(coversOtherShift){ replacement.available=false; replacement.applied=false; continue; }
+  if(row&&!row.people.some(person=>person.uid===cover.uid)){
+   appliedForAbsent.add(replacement.forUid+'|'+replacement.sector+'|'+replacement.shift);
+   replacement.applied=true;
    row.people.push({uid:cover.uid,name:name(cover),jobTitle:profile(cover).jobTitle||'',hours:available(cover,day)});
-   const counts=!(row.sector==='frente'&&policy.countManagement===false&&management(cover));
-   if(counts)row.count++;
+   const countsP = person => !(row.sector==='frente'&&policy.countManagement===false&&management(person));
+   if(countsP(cover))row.count++;
    if(row.sector==='cozinha'?kitchenLead(cover):management(cover))row.roleGap=0;
-   row.headcountGap=row.minimum===null?0:Math.max(0,row.minimum-row.count);
+   const coverHours=available(cover,day);
+   if(timed(coverHours)) row.confirmedPeople=[...(row.confirmedPeople||[]),{...cover,_hours:coverHours}];
+   row.simultaneousHeadcount=(row.confirmedPeople.length>1||row.confirmedPeople.some(p=>normalizePresence(p._hours)&&row.window&&(minutes(p._hours.start)>minutes(row.window.start)||minutes(p._hours.end)<minutes(row.window.end))))&&!row.uncertain
+    ? simultaneousHeadcountDeficits({date,sector:row.sector,shift:row.shift,minimum:row.minimum,confirmed:row.confirmedPeople,countsPerson:countsP}) : [];
+   const simultaneousHeadcountGap=row.simultaneousHeadcount.reduce((max,item)=>Math.max(max,item.deficit),0);
+   row.headcountGap=row.minimum===null?0:Math.max(Math.max(0,row.minimum-row.count),simultaneousHeadcountGap);
    row.shortage=Math.max(row.headcountGap,row.skillGap,row.roleGap);
    row.candidates=row.candidates.filter(candidate=>candidate.uid!==cover.uid);
-
+  } else {
+   replacement.applied=row?.people.some(person=>person.uid===cover.uid) || false;
   }
  }
+ // recalculate intervals after recurring coverage credits (issue 6)
+ const recalculatedIntervals=[...requirementIntervals,...shifts.flatMap(row=>(row.simultaneousHeadcount||[]).map(item=>({date,sector:row.sector,skill:'',start:item.start,end:item.end,minimum:item.minimum,covered:item.covered,deficit:item.deficit,uids:[],kind:'headcount'})))];
+ intervals.length=0; intervals.push(...recalculatedIntervals);
+ const coversInterval=(person,start,end)=>{const h=person?._hours; if(!timed(h)) return false; const hs=minutes(h.start), he=minutes(h.end), s=minutes(start), e=minutes(end); if([hs,he,s,e].some(v=>v==null)||he<=hs||e<=s) return false; return hs<=s && he>=e;};
  for(const row of shifts){
-  if(row.roleGap)row.reasons.unshift(row.sector==='cozinha'?'Falta um cozinheiro com horário confirmado neste turno.':'Falta um gerente ou subgerente com horário confirmado neste turno.');
+  const rowIntervals=recalculatedIntervals.filter(item=>!row.window||(item.start<row.window.end&&item.end>row.window.start));
+  // issue 4: cook/management presence in effectively needed intervals (not only shift existence)
+  const neededRoleIntervals=rowIntervals.filter(item=>item.minimum>0&&(row.sector==='cozinha'?item.sector==='cozinha':item.sector==='gestao'));
+  const roleOk=person=>row.sector==='cozinha'?kitchenLead(person):management(person);
+  const roleIntervalGap=neededRoleIntervals.some(item=>!(row.confirmedPeople||[]).some(p=>roleOk(p)&&coversInterval(p,item.start,item.end)))?1:0;
+  if(roleIntervalGap){
+   row.roleIntervalGap=1; row.roleGap=Math.max(row.roleGap,1); row.shortage=Math.max(row.shortage,row.roleGap);
+  }
+  if(provenProduction&&row.sector==='cozinha')row.reasons.push('Há produção comprovada no dia; confirme se a equipe de cozinha consegue atender a demanda.');
+  if(provenReceiving&&row.sector==='frente')row.reasons.push('Há recebimentos pendentes comprovados no dia; garanta presença de gestão para conferência.');
+  if(row.roleGap)row.reasons.unshift(row.roleIntervalGap?(row.sector==='cozinha'?'Falta um cozinheiro presente em todos os intervalos necessários deste turno.':'Falta gestão presente em todos os intervalos necessários deste turno.'):(row.sector==='cozinha'?'Falta um cozinheiro com horário confirmado neste turno.':'Falta um gerente ou subgerente com horário confirmado neste turno.'));
   if(row.headcountGap)row.reasons.unshift('Há '+row.count+' de '+row.minimum+' pessoas com horário confirmado.');
+  const rowRecurring=recurring.filter(item=>item.sector===row.sector&&item.shift===row.shift);
+  const fixedIds=new Set(rowRecurring.map(item=>item.uid));
+  const noFeeIds=new Set(rowRecurring.filter(item=>item.available&&item.paid===false).map(item=>item.uid));
   for(const candidate of row.candidates)candidate.fitsRole=!row.roleGap||candidate.matchesRole;
-  const fixedIds=new Set(recurring.filter(item=>item.sector===row.sector&&item.shift===row.shift).map(item=>item.uid));
   row.candidates.sort((a,b)=>
    Number(b.fitsRole)-Number(a.fitsRole)||
    Number(Boolean(wholeTurnAssignment(row,b)))-Number(Boolean(wholeTurnAssignment(row,a)))||
+   Number(noFeeIds.has(b.uid))-Number(noFeeIds.has(a.uid))||
    Number(fixedIds.has(b.uid))-Number(fixedIds.has(a.uid))||
    Number(b.scheduled)-Number(a.scheduled)||a.name.localeCompare(b.name,'pt-BR'));
  }
- const recurringKeys=new Set(recurring.filter(r=>r.available&&r.paid).map(r=>r.uid+'|'+r.shift));
+ for(const row of shifts) delete row.confirmedPeople;
+ const recurringKeys=new Set(recurring.filter(r=>r.applied&&r.paid).map(r=>r.uid+'|'+r.shift));
  const recurringPendingFees=new Set(recurring.filter(r=>!r.available&&r.paid===true&&!recurringKeys.has(r.uid+'|'+r.shift)).map(r=>r.uid+'|'+r.shift)).size;
  const pendingKeys=new Set(recurring.filter(r=>!r.available&&r.paid===true).map(r=>r.uid+'|'+r.shift));
  const recurringUnknownFees=new Set(recurring.filter(r=>r.paid==null&&!recurringKeys.has(r.uid+'|'+r.shift)&&!pendingKeys.has(r.uid+'|'+r.shift)).map(r=>r.uid+'|'+r.shift)).size;
  return {date, holiday,busyDay,strongPeak,shifts,intervals,recurring,recurringFees:recurringKeys.size,recurringPendingFees,recurringUnknownFees,
- extra:shifts.reduce((total,row)=>total+(!row.uncertain?row.shortage:0),0),
- attention:shifts.some(row=>row.shortage||row.uncertain)||requirementIntervals.some(row=>row.deficit)||(shifts.some(row=>!row.uncertain&&row.simultaneousHeadcount?.length))||recurring.some(row=>!row.available)};
+  extra:shifts.reduce((total,row)=>total+(!row.uncertain?row.shortage:0),0),
+  ...(provenOperationalNeeds?{provenOperationalNeeds}:{}),
+  attention:shifts.some(row=>row.shortage||row.uncertain)||intervals.some(row=>row.deficit)||(shifts.some(row=>!row.uncertain&&row.simultaneousHeadcount?.length))||recurring.some(row=>!row.available)||Boolean(provenOperationalNeeds)};
 }
 
 const risk = result => result.shifts.map(row=>row.shortage)

@@ -3,6 +3,7 @@ import {evaluateCoverageMonth} from '../../server/coverage/month.js';
 import {restaurantDay} from '../../shared/operation-day.js';
 import {evaluateOperationalDay,forecastPaymentDate,validOperationalPolicy,wholeTurnAssignment,reviewCoverageAssignment} from '../../server/coverage/operational.js';
 import {readCoverageContext} from '../../server/coverage/operational-context.js';
+import {projectCoverage} from '../../src/coverage-board-state.js';
 import {queuePush,tryDrainPush} from '../../server/push/delivery.js';
 import {MANAGEMENT_ROLES,isManagement} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
@@ -243,23 +244,36 @@ export default async function handler(req,res){
   }
   if(action==='completeCoverage'||action==='payCoverage'){
    const {id,actualStart,actualEnd,paidDate}=req.body||{}, completing=action==='completeCoverage';
-   if(!idOk(id)||completing&&(!validTime(actualStart)||!validTime(actualEnd)||actualEnd<=actualStart)||
+   if(!idOk(id)||completing&&(!validTime(actualStart)||!validTime(actualEnd)||actualStart===actualEnd)||
     !completing&&(!validDate(paidDate)||paidDate>restaurantDay()))return send(res,400,'Informe horários efetivos ou a data real do pagamento.');
    const ref=proposals.doc(id), now=new Date();
    await db.runTransaction(async tx=>{
-    const [who,proposal,rateSnap]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref),tx.get(settings)]);
+    const [who,proposal]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
     if(!hasRole(who,member))throw Error('FORBIDDEN');
     const p=proposal.data();
     if(!p?.operational||p.status!==(completing?'approved':'completed'))throw Error('CONFLICT');
     if(p.date>restaurantDay(now)||!completing&&(paidDate<p.date||p.fee?.amount==null||p.fixedFeePolicy===false))throw Error('FEE_UNAVAILABLE');
-    const override=rateSnap.data()?.individualRates?.[p.staffId];
-    const rate=override?.amount??rateSnap.data()?.rates?.[p.rateRole];
-    const amount=p.fixedFeePolicy===null?null:p.practicePayment??(Number.isFinite(rate)?rate:null);
-    const payroll=p.payrollSnapshot??(override?.daysAfter!=null?{daysAfter:override.daysAfter}:rateSnap.data()?.payroll??null);
+    const hasSnapshot=Object.prototype.hasOwnProperty.call(p,'practicePayment')||Object.prototype.hasOwnProperty.call(p,'fixedFeePolicy');
+    const amount=p.fixedFeePolicy===false?0:(hasSnapshot?(p.practicePayment??(p.fixedFeePolicy===null?null:null)):null);
+    const payroll=Object.prototype.hasOwnProperty.call(p,'payrollSnapshot')?p.payrollSnapshot:null;
     if(completing){
-     if(actualStart<(p.second?.start||p.window.start))throw Error('SHIFT_REVIEW_BLOCKED');
-     if(p.date===restaurantDay(now)&&actualEnd>new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit'}).format(now))throw Error('FEE_UNAVAILABLE');
-     const dueDate=amount===null||p.fixedFeePolicy===false?null:forecastPaymentDate(p.date,payroll);
+     const windowStart=p.second?.start||p.window?.start, windowEnd=p.second?.end||p.window?.end;
+     const overnightWindow=windowStart&&windowEnd&&minutes(windowEnd)<=minutes(windowStart);
+     const startM=minutes(actualStart), endM=minutes(actualEnd);
+     const actualEndM=endM<=startM?endM+1440:endM;
+     const actualStartM=(overnightWindow&&startM<minutes(windowStart))?startM+1440:startM;
+     const windowStartM=minutes(windowStart), windowEndM=overnightWindow?minutes(windowEnd)+1440:minutes(windowEnd);
+     if(windowStartM!=null&&actualStartM<windowStartM)throw Error('SHIFT_REVIEW_BLOCKED');
+     if(windowEndM!=null&&actualEndM>windowEndM)throw Error('SHIFT_REVIEW_BLOCKED');
+     if(p.date===restaurantDay(now)){
+      const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
+      const ch=Number(parts.find(x=>x.type==='hour')?.value||0), cm=Number(parts.find(x=>x.type==='minute')?.value||0);
+      const nowM=ch*60+cm;
+      const actualNowEndM=(overnightWindow&&endM<=startM)?endM+1440:endM;
+      const nowComparable=(overnightWindow&&endM<=startM&&nowM<minutes(windowStart))?nowM+1440:nowM;
+      if(actualNowEndM>nowComparable)throw Error('FEE_UNAVAILABLE');
+     }
+     const dueDate=(amount==null||p.fixedFeePolicy===false)?null:forecastPaymentDate(p.date,payroll);
      tx.update(ref,{status:'completed',actualStart,actualEnd,fee:{amount,dueDate,rateRole:p.rateRole,policy:payroll},completedAt:now,completedBy:actor.uid,updatedAt:now});
     }else{
      tx.update(ref,{status:'paid',paidDate,paidAt:now,paidBy:actor.uid,updatedAt:now});
@@ -328,20 +342,30 @@ export default async function handler(req,res){
       if(!plan.exists||plan.data().archivedAt||!['draft','in_review','approved','published'].includes(plan.data().status)||(plan.data().revision||null)!==p.data().planRevision)throw Error('PLAN_CHANGED');
       {
        const {date,planId}=p.data();
-       const [staff,policy,leaves,prior,sameDay]=await Promise.all([
+       const [staff,policy,leaves,prior,sameDay,context]=await Promise.all([
         tx.get(unit.collection('staffRegistry').limit(201)),tx.get(policyRef),
         tx.get(unit.collection('leaveRequests').where('date','==',date).limit(201)),
         tx.get(unit.collection('coverageAlerts').where('planId','==',planId)),
-        tx.get(proposals.where('date','==',date).limit(201))]);
+        tx.get(proposals.where('date','==',date).limit(201)),
+        readCoverageContext(member.unitId,date)]);
        if(staff.size>200||leaves.size>200||sameDay.size>200)throw Error('ASSESSMENT_LIMIT');
        const entries=normalizePlanEntries(plan.data(),date,leaves);
-       const evaluation=evaluateOperationalDay({date,entries,people:staff.docs.map(staffPerson),policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[]});
+       const evaluation=evaluateOperationalDay({date,entries,people:staff.docs.map(staffPerson),policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[],context});
        const target=evaluation.shifts.find(row=>row.shift===p.data().shift&&row.sector===p.data().sector);
        const candidate=target?.candidates.find(item=>item.uid===p.data().staffId);
        const fresh=wholeTurnAssignment(target,candidate);
        const original=p.data();
        const onApprovedLeave=leaves.docs.some(doc=>doc.data().uid===original.staffId&&doc.data().status==='approved');
-       const effectiveNeed=Boolean(target)&&(target.roleGap?candidate?.matchesRole: (target.headcountGap?candidate?.countsForMinimum: (target.skillGap?candidate?.skillConfirmed: target.shortage>0||target.uncertain||evaluation.intervals.some(item=>item.sector===target.sector))));
+       const otherMatches=sameDay.docs.filter(doc=>doc.id!==id).map(doc=>doc.data()).filter(item=>item.operational&&item.planId===planId&&item.date===date&&item.shift===original.shift&&item.sector===original.sector);
+       const rowIntervals=target?evaluation.intervals.filter(item=>item.deficit&&(item.sector===target.sector||target.sector==='frente'&&['caixa','apoio','gestao'].includes(item.sector))&&(!target.window||item.start<target.window.end&&item.end>target.window.start)):[];
+       const rowRecurring=target?evaluation.recurring.filter(item=>item.sector===target.sector&&item.shift===target.shift):[];
+       const impact=target?projectCoverage(target,otherMatches,rowIntervals,rowRecurring):null;
+       const effectiveNeed=Boolean(target&&impact)&&(
+        original.roleGap ? (impact.roleGap>0 && candidate?.matchesRole) :
+        original.skillGap ? (impact.skillGap>0 && candidate?.skillConfirmed) :
+        original.headcountGap ? (impact.headcountGap>0 && candidate?.countsForMinimum) :
+        (impact.open || target.uncertain)
+       );
        if(!fresh||!candidate?.hasAccount||onApprovedLeave||!effectiveNeed||fresh.second.start!==original.second?.start||fresh.second.end!==original.second?.end||
         (fresh.first?.start??null)!==(original.first?.start??null)||(fresh.first?.end??null)!==(original.first?.end??null)||
         (fresh.first&&reviewCoverageAssignment(fresh).state==='blocked'))throw Error('STAFF_NOT_AVAILABLE');
