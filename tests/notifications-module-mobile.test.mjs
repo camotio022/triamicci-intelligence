@@ -5,7 +5,8 @@ import {chromium} from './helpers/browser.mjs';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-const root=new URL('../',import.meta.url).pathname;
+import {fileURLToPath} from 'node:url';
+const root=fileURLToPath(new URL('../',import.meta.url));
 const baseItems=()=>[
  {id:'access-one',title:'Acesso atualizado',message:'Perfil de acesso: admin → auxiliar',at:new Date().toISOString(),read:false,source:'Equipe',page:'my-profile'},
  {id:'long-message',title:'Ficha profissional atualizada com informações de jornada e disponibilidade da equipe',message:'Sua jornada habitual foi atualizada. '+('Observação importante para a operação. '.repeat(12)),at:new Date().toISOString(),read:false,source:'Equipe'},
@@ -69,7 +70,7 @@ test('notification module: mobile density, independent route, lifecycle and coll
    await page.locator('.ti-notify-device>summary').click();await page.getByRole('button',{name:'Ativar notificações',exact:true}).click();await page.getByRole('button',{name:'Testar aviso',exact:true}).click();await page.getByRole('button',{name:'Desativar aqui',exact:true}).click();await page.getByRole('button',{name:'Ativar notificações',exact:true}).waitFor();
    assert.ok(actions.includes('pushSubscribe')&&actions.includes('pushTest')&&actions.includes('pushUnsubscribe'));
    assert.deepEqual(errors,[],'Browser errors at '+width);
-   await page.locator('.ti-notify-device>summary').click();await page.screenshot({path:'/tmp/triamicci-notifications-'+width+'.png',fullPage:true});
+   await page.locator('.ti-notify-device>summary').click();await page.screenshot({path:join(tmpdir(),'triamicci-notifications-'+width+'.png'),fullPage:true});
    await context.close();
   }
  }finally{if(browser)await browser.close();await server.close();await rm(cacheDir,{recursive:true,force:true})}

@@ -5,9 +5,10 @@ import {chromium} from './helpers/browser.mjs';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 test('real live hook preserves storage UI and reuses production navigation reads',{timeout:60000},async()=>{
- const root=new URL('../',import.meta.url).pathname;
+ const root=fileURLToPath(new URL('../',import.meta.url));
  const cacheDir=await mkdtemp(join(tmpdir(),'ti-read-budget-'));
  const server=await createServer({root,configFile:false,cacheDir,server:{host:'127.0.0.1',port:0},plugins:[{
   name:'isolated-firestore-read-fixture',enforce:'pre',

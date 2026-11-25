@@ -1,6 +1,16 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {createServer} from 'vite';import {chromium} from './helpers/browser.mjs';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createServer} from 'vite';
+import {chromium} from './helpers/browser.mjs';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
 test('profile opens terminal settings as an accessible modal without displacing the workspace',{timeout:60000},async()=>{
- const server=await createServer({root:new URL('../',import.meta.url).pathname,configFile:false,server:{host:'127.0.0.1',port:0},plugins:[{name:'terminal-layout-fixture',enforce:'pre',
+ const root=fileURLToPath(new URL('../',import.meta.url));
+ const cacheDir=await mkdtemp(join(tmpdir(),'ti-terminal-layout-'));
+ const server=await createServer({root,configFile:false,cacheDir,server:{host:'127.0.0.1',port:0},plugins:[{name:'terminal-layout-fixture',enforce:'pre',
   configureServer(s){s.middlewares.use((req,res,next)=>{if(req.url!=='/terminal-layout.html')return next();res.setHeader('content-type','text/html');res.end('<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/@terminal-layout"></script>')})},
   resolveId(id){if(id==='/@terminal-layout')return '\0terminal-layout';if(id==='./firebase.js')return '\0terminal-firebase';if(id==='firebase/firestore')return '\0terminal-firestore'},
   load(id){if(id==='\0terminal-firestore')return 'export const doc=(...args)=>args;export function onSnapshot(_ref,_options,next){queueMicrotask(()=>next({data:()=>({protocolVersion:2,revision:"initial",domains:{stock:"0",catalog:"0",notifications:"0",production:"0"}}),metadata:{fromCache:false}}));return()=>{}}';if(id==='\0terminal-firebase')return 'export const auth={currentUser:{uid:"fixture",getIdToken:async()=>"fixture-token"}};export const sessionAuth=auth;export const db={};export const isIndependentSession=false;';if(id==='\0terminal-layout')return `import React from 'react';import {createRoot} from 'react-dom/client';import {TerminalManagement} from '/src/TerminalAccess.jsx';import {Workspace} from '/src/App.jsx';import {FeedbackProvider} from '/src/FeedbackProvider.jsx';import '/src/styles.css';import '/src/responsive-system.css';const h=React.createElement;createRoot(document.getElementById('root')).render(h(FeedbackProvider,null,h(TerminalManagement,{membership:{unitId:'barigui',role:'admin',status:'active'},onRegistered:()=>{}},show=>h(Workspace,{user:{uid:'fixture',displayName:'Mariana Costa',email:'mariana@example.test'},membership:{unitId:'barigui',role:'admin',status:'active'},logout:()=>{},openTerminals:show}))));`}
@@ -12,5 +22,5 @@ test('profile opens terminal settings as an accessible modal without displacing 
    await page.goto('http://127.0.0.1:'+port+'/terminal-layout.html');await page.locator('.kitchen-home h1').waitFor();assert.equal(await page.getByRole('button',{name:'Entrar pelo caixa',exact:true}).count(),0);await page.getByRole('button',{name:'Abrir meu perfil',exact:true}).click();const control=page.getByRole('button',{name:'Terminais e sessões',exact:true});await control.waitFor();
    await control.click();await page.getByRole('button',{name:'Configurar este navegador',exact:true}).click();await page.getByLabel('Nome do terminal').fill('Caixa teste');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'no horizontal overflow at '+width);assert.deepEqual(errors,[]);if(process.env.TERMINAL_SCREENSHOTS&&(width===1280||width===390))await page.screenshot({path:process.env.TERMINAL_SCREENSHOTS+'/terminal-settings-'+width+'.png'});await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});await page.close();
   }
- }finally{await browser?.close();await server.close()}
+ }finally{await browser?.close();await server.close();await rm(cacheDir,{recursive:true,force:true})}
 });

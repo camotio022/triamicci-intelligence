@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {chromium} from './helpers/browser.mjs';
 
 test('V3.1: layouts reais cabem em telas mobile sem overflow', {timeout:100000}, async()=>{
@@ -29,7 +31,7 @@ test('V3.1: layouts reais cabem em telas mobile sem overflow', {timeout:100000},
    assert.ok(dimensions.document<=dimensions.viewport+1,'Horizontal overflow '+width+': '+JSON.stringify(dimensions));
    assert.ok(dimensions.body<=dimensions.viewport+1,'Body horizontal overflow '+width+': '+JSON.stringify(dimensions));
    assert.deepEqual(errors,[],'Browser error '+width);
-   await page.screenshot({path:'/tmp/v31-mobile-'+width+'.png',fullPage:true});
+   await page.screenshot({path:join(tmpdir(),'v31-mobile-'+width+'.png'),fullPage:true});
    await page.close();
   }
  }finally{
