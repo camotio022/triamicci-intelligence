@@ -205,7 +205,17 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
   {!activeId&&<p className="panel ti-cov-feedback" role="status">{data?'Nenhuma escala disponível para avaliar.':'Carregando a escala…'}</p>}
   {loading&&<p className="panel ti-cov-feedback" role="status">Conferindo o turno…</p>}
   {error&&<p className="team-error" role="alert">{error} {activeId&&<button type="button" className="action quiet" onClick={()=>evaluate(activeId,date)}>Tentar novamente</button>}</p>}
-  {current&&<div className="layout">
+  {current&&<><details className="panel ti-cov-context">
+   <summary>Contexto operacional do dia</summary>
+   {current.context?<div className="ti-cov-context-grid">
+    <section><h3>Produção</h3><p>{current.context.production?.total||0} tarefa(s) interna(s){current.context.production?.late?` · ${current.context.production.late} atrasada(s)`:''}{current.context.production?.in_progress?` · ${current.context.production.in_progress} em andamento`:''}{current.context.production?.pending?` · ${current.context.production.pending} pendente(s)`:''}.</p>{current.context.production?.note&&<small>{current.context.production.note}</small>}</section>
+    <section><h3>Estoque</h3><p>{current.context.stock?.low?.length||0} item(ns) abaixo do mínimo{current.context.stock?.unknown?` · ${current.context.stock.unknown} sem saldo confirmado`:''}.</p>{Array.isArray(current.context.stock?.low)&&current.context.stock.low.length>0&&<ul>{current.context.stock.low.slice(0,5).map((item,i)=><li key={item.id||item.name||i}><strong>{item.name||item.id||'Item'}</strong>{item.quantity!=null?` · ${item.quantity}${item.unit?` ${item.unit}`:''}`:''}{item.minStock!=null?` / mín. ${item.minStock}`:''}</li>)}</ul>}{current.context.stock?.partial&&<small>Leitura parcial do estoque.</small>}</section>
+    <section><h3>Pedidos de compra</h3><p>{current.context.purchases?.records?.length||0} registro(s) consultado(s){current.context.purchases?.partial?' (parcial)':''}.</p>{current.context.purchases?.note&&<small>{current.context.purchases.note}</small>}</section>
+    <section><h3>Recebimentos</h3><p>{current.context.receiving?.records?.length||0} conferência(s) pendente(s){current.context.receiving?.partial?' (parcial)':''}.</p>{current.context.receiving?.note&&<small>{current.context.receiving.note}</small>}</section>
+    <section><h3>Demanda</h3><p>{current.context.demand?.status==='unknown'?'Não confirmada para o turno.':String(current.context.demand?.status||'Registrada.')}</p>{current.context.demand?.note&&<small>{current.context.demand.note}</small>}</section>
+   </div>:<p>Contexto operacional indisponível para este dia.</p>}
+  </details>
+  <div className="layout">
    <aside className="panel team ti-cov-team-side" aria-label="Pessoas para reforço">
     <div className="section-head"><h2>Equipe para reforço</h2><span className="count">{availablePeople.size}</span></div>
     <p className="tip">{availablePeople.size?'Arraste um nome para o turno ou selecione os dois.':'Abra um turno para ver os horários e as opções.'}</p>
@@ -244,7 +254,7 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
     </section>;
    })}</div>
    </div>
-  </div>}
+  </div></>}
   {openedCard&&<CoverageDrawer key={openedCard.id} card={openedCard} data={data} date={date} plan={plan} request={request} run={run} busy={busy} selected={selected} setSelected={setSelected} close={()=>setOpened(null)} renderProposal={renderProposal} onRecordAbsence={recordAbsence?async payload=>{const response=await recordAbsence(payload);if(response)await evaluate(activeId,date);return response;}:null}/>}
  </section>;
 }

@@ -126,3 +126,11 @@
 .ti-cov-month-alerts .action{margin:3px}
 .ti-cov-fixed-month summary{cursor:pointer;font-weight:650}
 @media(max-width:680px){.ti-cov-month-dates{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.ti-cov-context{margin:0 0 12px}
+.ti-cov-context summary{cursor:pointer;font-weight:650}
+.ti-cov-context-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px}
+.ti-cov-context-grid section{border:1px solid #e0e4eb;border-radius:10px;padding:10px;background:#fff}
+.ti-cov-context-grid h3{margin:0 0 4px;font-size:.95rem}
+.ti-cov-context-grid p,.ti-cov-context-grid small,.ti-cov-context-grid li{color:#536378;line-height:1.45}
+.ti-cov-context-grid ul{margin:6px 0 0;padding-left:18px;display:grid;gap:4px}
