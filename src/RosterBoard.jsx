@@ -91,7 +91,7 @@ function Badge({rows}){
  return rows.some(row=>row.deficit)?<span className="badge alert">Atenção</span>:<span className="badge">Cobertura OK</span>;
 }
 
-export default function RosterBoard({period, changePeriod, roster, updateRoster, members, entries, requirements, editable, saving, canSave, onSave, saved, onUndo, canUndo, status, loadPending, loadError, retryLoad, lockedWeeks=[], approvedLeaves=[], coveragePolicy={}, onOpenCoverage}){
+export default function RosterBoard({period, currentMonth, changePeriod, roster, updateRoster, members, entries, requirements, editable, saving, canSave, onSave, saved, onUndo, canUndo, status, loadPending, loadError, retryLoad, lockedWeeks=[], approvedLeaves=[], coveragePolicy={}, onOpenCoverage}){
  const [view,setView]=useState('sundays');
  const [sundaySelected,setSunday]=useState('');
  const [weekSelected,setWeek]=useState('');
@@ -120,9 +120,11 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
  const monthly=useMemo(()=>[...days].filter(([date])=>date.startsWith(period)).map(([date,entries])=>
   evaluateOperationalDay({date,entries,people,requirements,policy:coveragePolicy})),[days,period,people,requirements,coveragePolicy]);
  const monthOptions=useMemo(()=>{
-  const date=new Date(period+'-01T12:00:00Z');
-  return Array.from({length:25},(_,index)=>new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+index-12,1,12)).toISOString().slice(0,7));
- },[period]);
+  const date=new Date(currentMonth+'-01T12:00:00Z');
+  const options=Array.from({length:13},(_,index)=>new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+index,1,12)).toISOString().slice(0,7));
+  if(period>options.at(-1))options.push(period);
+  return options;
+ },[currentMonth,period]);
  useEffect(()=>()=>drag.current?.ghost?.remove(),[]);
 
  const selectPerson=uid=>{
@@ -240,7 +242,8 @@ export default function RosterBoard({period, changePeriod, roster, updateRoster,
  return <section className="roster-board" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
   <PageHeading title="Quadro de folgas" className="roster-heading" actions={
    <div className="month-control"><label htmlFor="roster-month">Mês da escala</label>
-    <select id="roster-month" value={period} disabled={saving} onChange={event=>{setPerson(null);changePeriod(event.target.value);}}>
+    <select id="roster-month" value={period>=currentMonth?period:''} disabled={saving} onChange={event=>{setPerson(null);changePeriod(event.target.value);}}>
+     {period<currentMonth&&<option value="" disabled>Escolher mês para planejar</option>}
      {monthOptions.map(month=><option key={month} value={month}>{capitalize(formatMonth.format(new Date(month+'-01T12:00:00Z')))}</option>)}
     </select>
    </div>
