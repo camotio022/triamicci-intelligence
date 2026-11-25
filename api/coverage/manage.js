@@ -327,18 +327,22 @@ export default async function handler(req,res){
         tx.get(unit.collection('coverageAlerts').where('planId','==',planId)),
         tx.get(proposals.where('date','==',date).limit(201))]);
        if(staff.size>200||leaves.size>200||sameDay.size>200)throw Error('ASSESSMENT_LIMIT');
-       const evaluation=evaluateOperationalDay({date,entries:normalizePlanEntries(plan.data(),date,leaves),people:staff.docs.map(staffPerson),policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[]});
+       const entries=normalizePlanEntries(plan.data(),date,leaves);
+       const evaluation=evaluateOperationalDay({date,entries,people:staff.docs.map(staffPerson),policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[]});
        const target=evaluation.shifts.find(row=>row.shift===p.data().shift&&row.sector===p.data().sector);
        const candidate=target?.candidates.find(item=>item.uid===p.data().staffId);
        const fresh=wholeTurnAssignment(target,candidate);
        const original=p.data();
-       if(!fresh||!candidate?.hasAccount||fresh.second.start!==original.second?.start||fresh.second.end!==original.second?.end||
+       const onApprovedLeave=leaves.docs.some(doc=>doc.data().uid===original.staffId&&doc.data().status==='approved');
+       const effectiveNeed=Boolean(target)&&(target.roleGap?candidate?.matchesRole: (target.headcountGap?candidate?.countsForMinimum: (target.skillGap?candidate?.skillConfirmed: target.shortage>0||target.uncertain||evaluation.intervals.some(item=>item.sector===target.sector))));
+       if(!fresh||!candidate?.hasAccount||onApprovedLeave||!effectiveNeed||fresh.second.start!==original.second?.start||fresh.second.end!==original.second?.end||
         (fresh.first?.start??null)!==(original.first?.start??null)||(fresh.first?.end??null)!==(original.first?.end??null)||
         (fresh.first&&reviewCoverageAssignment(fresh).state==='blocked'))throw Error('STAFF_NOT_AVAILABLE');
+       if((original.skillGap? !candidate.skillConfirmed:false)||(original.roleGap? !candidate.matchesRole:false))throw Error('STAFF_NOT_AVAILABLE');
        if(sameDay.docs.some(doc=>doc.id!==id&&doc.data().staffId===original.staffId&&!['rejected','declined','cancelled'].includes(doc.data().status)&&
-        (!doc.data().shift||doc.data().shift===original.shift||minutes(doc.data().second?.end)>minutes(fresh.second.start)&&minutes(doc.data().second?.start)<minutes(fresh.second.end))))throw Error('CONFLICT');
+        minutes(doc.data().second?.end)>minutes(fresh.second.start)&&minutes(doc.data().second?.start)<minutes(fresh.second.end)))throw Error('CONFLICT');
        if(plan.data().status==='published')alertContext={tx,db,unit,unitId:member.unitId,planId,dates:[date],
-        entries:normalizePlanEntries(plan.data(),date,leaves),people:staff.docs.map(alertStaff),
+        entries,people:staff.docs.map(alertStaff),
         policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[],prior,now,notify:false,
         proposals:sameDay.docs.map(doc=>doc.id===id?{...doc.data(),status:'approved'}:doc.data())};
       }

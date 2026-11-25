@@ -143,3 +143,17 @@ test('recurring front coverage is associated with the operational front sector',
  assert.equal(result.recurring[0].available,true);
  assert.equal(result.recurringFees,0);
 });
+
+test('different known schedules in the same shift are evaluated by intervals instead of marked uncertain',()=>{
+ const day='2026-12-02';
+ const kitchenShift=(uid,start,end)=>({uid,name:uid,status:'active',sector:'cozinha',shift:'noite',jobTitle:'Cozinheiro',certifications:[],availability:[{day:'qua',start,end}]});
+ const people=[kitchenShift('Ana','14:00','22:20'),kitchenShift('Bia','16:00','22:20')];
+ const entries=people.map(({uid})=>({uid,date:day,type:'work'}));
+ const result=evaluateOperationalDay({date:day,entries,people,policy,requirements:[]});
+ const row=result.shifts.find(item=>item.sector==='cozinha'&&item.shift==='noite');
+ assert.equal(row.uncertain,false);
+ assert.equal(row.minimum,2);
+ assert.equal(row.count,2);
+ assert.ok((row.simultaneousHeadcount||[]).some(item=>item.start==='14:00'&&item.end==='16:00'&&item.deficit===1));
+ assert.ok(result.intervals.some(item=>item.sector==='cozinha'&&item.start==='14:00'&&item.end==='16:00'&&item.deficit===1));
+});
