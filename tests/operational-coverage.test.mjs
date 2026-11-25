@@ -157,3 +157,61 @@ test('different known schedules in the same shift are evaluated by intervals ins
  assert.ok((row.simultaneousHeadcount||[]).some(item=>item.start==='14:00'&&item.end==='16:00'&&item.deficit===1));
  assert.ok(result.intervals.some(item=>item.sector==='cozinha'&&item.start==='14:00'&&item.end==='16:00'&&item.deficit===1));
 });
+
+test('absence of cook in kitchen shift creates a confirmed role deficit',()=>{
+ const day='2026-12-02';
+ const people=[
+  {uid:'a1',name:'A1',status:'active',sector:'cozinha',shift:'noite',jobTitle:'Auxiliar de cozinha',certifications:[],availability:[{day:'qua',start:'14:00',end:'22:20'}]},
+  {uid:'a2',name:'A2',status:'active',sector:'cozinha',shift:'noite',jobTitle:'Auxiliar de cozinha',certifications:[],availability:[{day:'qua',start:'14:00',end:'22:20'}]}
+ ];
+ const result=evaluateOperationalDay({date:day,entries:people.map(({uid})=>({uid,date:day,type:'work'})),people,policy,requirements:[]});
+ const row=result.shifts.find(item=>item.sector==='cozinha'&&item.shift==='noite');
+ assert.equal(row.uncertain,false);
+ assert.equal(row.roleGap,1);
+ assert.ok(row.shortage>=1);
+ assert.ok(row.reasons.some(reason=>/cozinheiro/i.test(reason)));
+});
+
+test('absence of manager or submanager in front shift creates a confirmed role deficit on busy days',()=>{
+ const day='2026-12-13'; // Sunday/busy day, minimum 3
+ const people=[
+  {uid:'f1',name:'F1',status:'active',sector:'frente',shift:'noite',jobTitle:'Atendente',certifications:[],availability:[{day:'dom',start:'12:00',end:'20:20'}]},
+  {uid:'f2',name:'F2',status:'active',sector:'caixa',shift:'noite',jobTitle:'Caixa',certifications:[],availability:[{day:'dom',start:'12:00',end:'20:20'}]},
+  {uid:'f3',name:'F3',status:'active',sector:'apoio',shift:'noite',jobTitle:'Apoio de balcão',certifications:[],availability:[{day:'dom',start:'12:00',end:'20:20'}]}
+ ];
+ const result=evaluateOperationalDay({date:day,entries:people.map(({uid})=>({uid,date:day,type:'work'})),people,policy,requirements:[]});
+ const row=result.shifts.find(item=>item.sector==='frente'&&item.shift==='noite');
+ assert.equal(row.uncertain,false);
+ assert.equal(row.minimum,3);
+ assert.equal(row.roleGap,1);
+ assert.ok(row.shortage>=1);
+ assert.ok(row.reasons.some(reason=>/gerente|subgerente/i.test(reason)));
+});
+
+test('quiet weekday with two kitchen collaborators is tolerable but carries an operational alert note',()=>{
+ const day='2026-12-02';
+ const people=[
+  {uid:'c1',name:'C1',status:'active',sector:'cozinha',shift:'noite',jobTitle:'Cozinheiro',certifications:[],availability:[{day:'qua',start:'14:00',end:'22:20'}]},
+  {uid:'c2',name:'C2',status:'active',sector:'cozinha',shift:'noite',jobTitle:'Auxiliar de cozinha',certifications:[],availability:[{day:'qua',start:'14:00',end:'22:20'}]}
+ ];
+ const result=evaluateOperationalDay({date:day,entries:people.map(({uid})=>({uid,date:day,type:'work'})),people,policy,requirements:[]});
+ const row=result.shifts.find(item=>item.sector==='cozinha'&&item.shift==='noite');
+ assert.equal(row.minimum,2);
+ assert.equal(row.count,2);
+ assert.equal(row.shortage,0);
+ assert.equal(row.uncertain,false);
+ assert.ok(row.reasons.some(reason=>/duas pessoas podem dar conta/i.test(reason)));
+ assert.equal(result.attention,false);
+});
+
+test('weekend with four kitchen collaborators meets the minimum when a cook is present',()=>{
+ const day='2026-12-13';
+ const people=['c1','c2','c3','c4'].map((uid,i)=>({uid,name:uid,status:'active',sector:'cozinha',shift:'noite',jobTitle:i===0?'Cozinheiro':'Auxiliar de cozinha',certifications:[],availability:[{day:'dom',start:'12:00','end':'20:20'}]}));
+ const result=evaluateOperationalDay({date:day,entries:people.map(({uid})=>({uid,date:day,type:'work'})),people,policy,requirements:[]});
+ const row=result.shifts.find(item=>item.sector==='cozinha'&&item.shift==='noite');
+ assert.equal(row.minimum,4);
+ assert.equal(row.count,4);
+ assert.equal(row.roleGap,0);
+ assert.equal(row.shortage,0);
+ assert.equal(row.uncertain,false);
+});
