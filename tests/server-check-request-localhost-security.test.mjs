@@ -113,3 +113,17 @@ test('preserves existing request guards (method, content-type, auth flow untouch
   assert.equal(missing.ok, false);
   assert.equal(missing.statusCode, 503);
 });
+
+test('preview accepts only the exact Vercel deployment and branch origins', () => {
+  const env = {
+    PUBLIC_APP_URL: 'https://app.example.com',
+    VERCEL_ENV: 'preview',
+    VERCEL_URL: 'exact-build.vercel.app',
+    VERCEL_BRANCH_URL: 'exact-branch.vercel.app',
+  };
+  assert.equal(run(jsonReq('https://exact-build.vercel.app'), env).ok, true);
+  assert.equal(run(jsonReq('https://exact-branch.vercel.app'), env).ok, true);
+  assert.equal(run(jsonReq('https://other.vercel.app'), env).statusCode, 403);
+  assert.equal(run(jsonReq('https://exact-build.vercel.app.evil.example'), env).statusCode, 403);
+  assert.equal(run(jsonReq('https://exact-build.vercel.app'), {...env, VERCEL_ENV:'production'}).statusCode, 403);
+});

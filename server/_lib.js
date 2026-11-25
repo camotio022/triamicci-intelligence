@@ -15,10 +15,14 @@ function emulatorHostsConfigured(env = process.env) {
   return Boolean(String(env.FIRESTORE_EMULATOR_HOST || '').trim() && String(env.FIREBASE_AUTH_EMULATOR_HOST || '').trim());
 }
 export function isFirebaseEmulatorMode(env = process.env) {
-  return emulatorHostsConfigured(env) && (env.APP_ENV === 'local' || env.APP_ENV === 'homologation') && String(env.FIREBASE_EXPECTED_PROJECT_ID || '').startsWith('demo-');
+  return emulatorHostsConfigured(env) && ['local','homologation','staging'].includes(env.APP_ENV) && !['production','preview'].includes(env.VERCEL_ENV) && String(env.FIREBASE_EXPECTED_PROJECT_ID || '').startsWith('demo-');
 }
 function assertSafeFirebaseProject(projectId, env = process.env) {
-  if (!projectId || projectId === PRODUCTION_FIREBASE_PROJECT_ID) {
+  const hostedPreview = env.VERCEL_ENV === 'preview';
+  const configuredPreviewProject = hostedPreview && env.FIREBASE_PREVIEW_PROJECT_ID === projectId;
+  const allowsLiveProject = env.APP_ENV !== 'staging' && (env.VERCEL_ENV === 'production' || configuredPreviewProject);
+  if (!projectId || (projectId === PRODUCTION_FIREBASE_PROJECT_ID &&
+      !allowsLiveProject)) {
     throw new Error('FIREBASE_PROJECT_UNSAFE');
   }
   if (isFirebaseEmulatorMode(env)) {
@@ -85,10 +89,18 @@ export function checkRequest(req, res, env = process.env) {
     send(res,503,'PUBLIC_APP_URL inválida. Configure uma URL HTTPS completa.');
     return false;
   }
+  const allowedOrigins = new Set([allowedOrigin]);
+  if (env.VERCEL_ENV === 'preview') {
+    for (const hostname of [env.VERCEL_URL, env.VERCEL_BRANCH_URL]) {
+      if (typeof hostname === 'string' && /^[a-z0-9-]+\.vercel\.app$/i.test(hostname)) {
+        allowedOrigins.add(new URL('https://' + hostname).origin);
+      }
+    }
+  }
   // O cabeçalho Origin é gerado pelo navegador. Exigir correspondência exata,
   // mas ignorar barras finais e caminhos na URL configurada.
   const origin = req.headers.origin;
-  if (typeof origin !== 'string' || origin !== allowedOrigin) {
+  if (typeof origin !== 'string' || !allowedOrigins.has(origin)) {
     send(res,403,'Origem não autorizada. Confirme o domínio e PUBLIC_APP_URL.');
     return false;
   }

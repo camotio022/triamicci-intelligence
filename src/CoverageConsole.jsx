@@ -53,7 +53,7 @@ export default function CoverageConsole({membership,focus,userId}){
   {[['board','Quadro'],['history','Pendências e histórico'],...(isManagement(membership.role)?[['settings','Configurações']]:[])].map(([id,label])=>
    <button type="button" key={id} aria-pressed={screen===id} onClick={()=>setScreen(id)}>{label}</button>)}
  </nav>}/>
- <div hidden={screen!=='board'}><OperationalCoverage focus={focus} data={data} request={request} run={run} busy={busy}
+ <div hidden={screen!=='board'}><OperationalCoverage focus={focus} data={data} dashboardUnavailable={!data&&!!error} request={request} run={run} busy={busy}
   recordAbsence={isManagement(membership.role)?payload=>run(()=>requestJson('/api/members/manage',{module:'schedules',action:'recordPublishedAbsence',...payload})):null}
   preferenceKey={'ti:coverage-board:'+userId+':'+membership.unitId} renderProposal={item=><BoardProposal key={item.id} item={item} run={run} busy={busy}/>}/></div>
  {error&&<p role="alert" className="team-error">{error}</p>}{notice&&<p role="status" className="team-notice">{notice}</p>}
