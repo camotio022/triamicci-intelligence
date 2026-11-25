@@ -34,6 +34,7 @@ export default function SchedulePlanner({membership,onOpenCoverage,initialPlanId
  const [registryState,setRegistryState]=useState({activated:false,registeredCount:0});
  const [loaded,setLoaded]=useState(false);
  const [today,setToday]=useState(()=>restaurantDay());
+ const currentMonth=today.slice(0,7);
  useEffect(()=>{const interval=setInterval(()=>setToday(restaurantDay()),60000);return()=>clearInterval(interval)},[]);
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const allowed=MANAGEMENT_ROLES.includes(membership.role);
@@ -71,7 +72,7 @@ export default function SchedulePlanner({membership,onOpenCoverage,initialPlanId
   setSelected('');setDraftRevision(null);setTitle('Escala da equipe');setEntries([]);setError('');
   setPeriod(nextPeriod);setBoard(carryFiveTwoRoster(nextPeriod,plans,people));
  };
- const startNew=async(nextPeriod=period)=>{
+ const startNew=async(nextPeriod=period<currentMonth?currentMonth:period)=>{
   if(hasUnsaved&&!await askConfirmation('Descartar as alterações deste rascunho?'))return;
   reset(nextPeriod);
   setScheduleView('active');
@@ -95,8 +96,9 @@ export default function SchedulePlanner({membership,onOpenCoverage,initialPlanId
   }catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const transition=async action=>{setBusy(true);try{const d=await call(action,{id:selected});notify(d.message,'success');await refresh()}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
- const archivedPlans=plans.filter(p=>p.roster&&p.archivedAt),activePlans=plans.filter(p=>p.roster&&!p.archivedAt&&!['withdrawn','superseded'].includes(p.status));
- const historical=plans.filter(p=>!p.archivedAt&&(p.status==='withdrawn'||p.status==='superseded'||!p.roster&&p.status==='published'));
+ const archivedPlans=plans.filter(p=>p.roster&&p.archivedAt);
+ const activePlans=plans.filter(p=>p.period>=currentMonth&&p.roster&&!p.archivedAt&&!['withdrawn','superseded'].includes(p.status));
+ const historical=plans.filter(p=>!p.archivedAt&&(p.status==='withdrawn'||p.status==='superseded'||!p.roster&&p.status==='published'||p.roster&&p.period<currentMonth));
  const changeArchive=async(p,action)=>{
   if(busy)return;
   if(action==='scheduleArchive'&&!await askConfirmation('Mover esta escala para a lixeira? O histórico será preservado e a escala poderá ser restaurada.'))return;
@@ -113,7 +115,7 @@ export default function SchedulePlanner({membership,onOpenCoverage,initialPlanId
  </div>;
  const canPlan=(!chosen||chosen.status==='draft')&&!chosen?.archivedAt;
  return <section className="ti-roster-planner">
- {validMonth&&<RosterBoard key={period} period={period}
+ {validMonth&&<RosterBoard key={period} period={period} currentMonth={currentMonth}
   roster={boardRoster} lockedWeeks={lockedWeeks} approvedLeaves={approvedLeaves} coveragePolicy={coveragePolicy} updateRoster={updateRoster} members={people} entries={boardEntries} requirements={coverageRules}
   editable={canPlan&&!busy&&!loading} saving={busy||loading} onSave={save} canSave={people.length>0&&(!registryState.registeredCount||registryState.activated)}
   saved={Boolean(draftRevision)&&!hasUnsaved} status={chosen?.status&&chosen.status!=='draft'?labels[chosen.status]||chosen.status:null}
@@ -130,11 +132,11 @@ export default function SchedulePlanner({membership,onOpenCoverage,initialPlanId
  <div className="ti-notification-tabs" role="group" aria-label="Lista de escalas"><button type="button" className={scheduleView==='active'?'selected':''} aria-pressed={scheduleView==='active'} onClick={()=>setScheduleView('active')}>Ativas ({activePlans.length})</button><button type="button" className={scheduleView==='trash'?'selected':''} aria-pressed={scheduleView==='trash'} onClick={()=>setScheduleView('trash')}>Lixeira ({archivedPlans.length})</button></div>
  {loading?<p>Carregando...</p>:(scheduleView==='active'?activePlans:archivedPlans).length?(scheduleView==='active'?activePlans:archivedPlans).map(x=><div key={x.id} className="ti-schedule-list-item">
   <button type="button" className={'ti-planning-row'+(selected===x.id?' selected':'')} onClick={()=>open(x)}><strong>{x.title}</strong><span>{x.period} · {labels[x.status]||x.status} · v{x.revision}</span></button>
-  {scheduleView==='trash'?<button type="button" disabled={busy} className="ti-schedule-recycle-action" onClick={()=>changeArchive(x,'scheduleRestore')}>Restaurar</button>:<button type="button" disabled={busy||(x.status==='published'&&x.period>=today.slice(0,7))} className="ti-schedule-recycle-action" title={x.status==='published'&&x.period>=today.slice(0,7)?'Escala oficial protegida':'Mover para a lixeira'} onClick={()=>changeArchive(x,'scheduleArchive')}>Excluir</button>}
+  {scheduleView==='trash'?<button type="button" disabled={busy} className="ti-schedule-recycle-action" onClick={()=>changeArchive(x,'scheduleRestore')}>Restaurar</button>:<button type="button" disabled={busy||x.status==='published'} className="ti-schedule-recycle-action" title={x.status==='published'?'Escala oficial protegida':'Mover para a lixeira'} onClick={()=>changeArchive(x,'scheduleArchive')}>Excluir</button>}
  </div>):<p>{scheduleView==='trash'?'Nenhuma escala na lixeira.':'Nenhuma escala cadastrada.'}</p>}
  </details>
  {historical.length>0&&<details className="ti-planning-card ti-roster-record"><summary>Histórico de escalas ({historical.length})</summary>
-  {historical.map(item=><p key={item.id}><strong>{item.title}</strong> · {item.period} · {item.status==='withdrawn'?'Retirada do Mural':item.status==='superseded'?'Substituída':'Publicada'}</p>)}
+  {historical.map(item=><p key={item.id}><strong>{item.title}</strong> · {item.period} · {item.status==='withdrawn'?'Retirada do Mural':item.status==='superseded'?'Substituída':labels[item.status]||item.status}</p>)}
  </details>}
  </div>{error&&loaded&&<p role="alert" className="team-error">{error}</p>}
   {confirmationSheet}

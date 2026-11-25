@@ -30,6 +30,10 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       Object.assign(base,{id:savedRoster.id,revision:savedRoster.revision});
      }
      if(b.action==='list'&&savedRoster)base.schedules.push(savedRoster);
+     if(b.action==='list'&&activeScreen==='Escalas')base.schedules.push({
+      id:'past-qa-roster',title:'Escala anterior de teste',period:'2026-10',status:'approved',revision:1,
+      roster:{weekly:{},sundays:{}},entries:[],
+     });
     }
     if(b.action==='finish')finishes.push(b);
     if(b.module==='operationalCatalog'&&b.action==='status')base.items=[{id:'bacon',active:false,reason:'missing_profile',needsReconciliation:true,matches:[{id:'e'.repeat(40),name:'Bacon',configuration:{stockUnit:'un',operationalUnit:'un',receivingUnit:'kg',source:'supplier',trackExpiry:false,minStock:5,countFrequency:'daily',critical:true}}]}];
@@ -47,6 +51,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
    for(const screen of ['Escalas','Mural','Produção','Inventário','Folgas','Minha ficha','Cozinha','Recebimento','Recebimento pendente','Recebimento com lote','Contagem','Acessos','Cadastro','Navegação'].filter(s=>!process.env.QA_SCREEN||s===process.env.QA_SCREEN)){
     activeScreen=screen;
     const beforeReads=reads.length;
+    if(screen==='Escalas')await page.clock.setFixedTime(new Date('2026-12-01T01:45:00Z'));
     await page.getByRole('navigation',{name:'Telas de teste'}).getByRole('button',{name:screen,exact:true}).click();
     await page.waitForTimeout(120);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,`${screen} overflows at ${width}`);
@@ -61,7 +66,19 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       assert.equal(await board.getByRole('complementary',{name:'Equipe'}).count(),0,'Falha de consulta não exibe equipe vazia');
       await failure.getByRole('button',{name:'Tentar novamente'}).click();
      }
-     await board.getByLabel('Mês da escala',{exact:true}).selectOption('2027-01');
+     const month=board.getByLabel('Mês da escala',{exact:true});
+     assert.equal(await month.inputValue(),'2026-11','O mês inicial segue a data da unidade, inclusive na virada UTC');
+     const availableMonths=()=>month.locator('option').evaluateAll(options=>options.map(option=>option.value));
+     const months=await availableMonths();
+     assert.equal(months[0],'2026-11');
+     assert.equal(months.at(-1),'2027-11');
+     assert.ok(months.every(value=>value>='2026-11'));
+     await month.selectOption('2027-01');
+     assert.deepEqual(await availableMonths(),months,'Selecionar um mês futuro não muda o início da lista');
+     await page.getByText(/Escalas da unidade ·/).click();
+     assert.equal(await page.getByRole('button',{name:/Escala anterior de teste/}).count(),0);
+     await page.getByText('Histórico de escalas (1)',{exact:true}).click();
+     await page.getByText('Escala anterior de teste',{exact:true}).waitFor();
      await board.getByText('5 domingos',{exact:true}).waitFor();
      const roster=board.getByRole('group',{name:'Quem trabalha',exact:true});
      const morning=roster.getByRole('button',{name:'Manhã 1',exact:true});
@@ -111,6 +128,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
       '2027-01-19','2027-01-20','2027-01-26','2027-01-27',
      ]);
      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'Quadro de folgas cabe na tela');
+     await page.clock.setFixedTime(new Date());
     }
     if(screen==='Mural'){await page.getByText(/Planejada ontem/).waitFor();assert.equal(await page.getByText('Jornadas declaradas',{exact:true}).count(),1);assert.equal(await page.getByText('0 em trabalho ou intervalo declarado',{exact:true}).count(),1);await page.getByText('Publicar comunicado',{exact:true}).click();await page.getByLabel('Título',{exact:true}).fill('Comunicado de teste');}
     if(screen==='Produção'){await page.getByText(/Planejada ontem/).first().waitFor();if(width===390)await page.screenshot({path:'/tmp/triamicci-production-today-390.png',fullPage:true});await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Histórico',exact:true}).click();assert.equal(await page.getByText('Produção da semana passada',{exact:true}).isVisible(),false);await page.getByRole('region',{name:'Histórico de produção',exact:true}).getByRole('button',{name:'Todos',exact:true}).click();assert.equal(await page.getByText('Produção da semana passada',{exact:true}).isVisible(),true);const history=page.getByRole('region',{name:'Histórico de produção',exact:true});await history.getByRole('button',{name:'Personalizado',exact:true}).click();const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date());await history.getByLabel('De',{exact:true}).fill(today);await history.getByLabel('Até',{exact:true}).fill(today);assert.equal(await page.getByText('Produção da semana passada',{exact:true}).count(),0);await page.getByRole('navigation',{name:'Seções da produção'}).getByRole('button',{name:'Hoje',exact:true}).click();await page.getByRole('button',{name:'Registrar produção',exact:true}).click();await page.getByLabel('Quantidade produzida (un)',{exact:true}).fill('10');
