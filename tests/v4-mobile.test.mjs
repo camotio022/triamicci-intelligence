@@ -77,7 +77,7 @@ test('V4 actual screens render and interact at mobile and desktop widths',{timeo
      assert.deepEqual(await availableMonths(),months,'Selecionar um mês futuro não muda o início da lista');
      await page.getByText(/Escalas da unidade ·/).click();
      assert.equal(await page.getByRole('button',{name:/Escala anterior de teste/}).count(),0);
-     await page.getByText('Histórico de escalas (1)',{exact:true}).click();
+     await page.getByText(/^Histórico de escalas/).click();
      await page.getByText('Escala anterior de teste',{exact:true}).waitFor();
      await board.getByText('5 domingos',{exact:true}).waitFor();
      const roster=board.getByRole('group',{name:'Quem trabalha',exact:true});
