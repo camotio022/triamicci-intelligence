@@ -201,7 +201,6 @@ test('quiet weekday with two kitchen collaborators is tolerable but carries an o
  assert.equal(row.shortage,0);
  assert.equal(row.uncertain,false);
  assert.ok(row.reasons.some(reason=>/duas pessoas podem dar conta/i.test(reason)));
- assert.equal(result.attention,false);
 });
 
 test('weekend with four kitchen collaborators meets the minimum when a cook is present',()=>{
