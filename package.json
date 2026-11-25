@@ -12,7 +12,14 @@
     "test:rules": "node scripts/test-business-rules.mjs",
     "test:push": "node --test tests/push-notifications.test.mjs",
     "test:browser": "node --test --test-concurrency=1 tests/v31-mobile-ux.test.mjs tests/notifications-module-mobile.test.mjs tests/firestore-read-mobile.test.mjs tests/terminal-controls-mobile.test.mjs",
-    "test:emulator": "node scripts/test-emulator.mjs"
+    "test:emulator": "node scripts/test-emulator.mjs",
+    "homolog:emulators": "firebase emulators:start --project demo-triamicci-v31 --only auth,firestore",
+    "homolog:api": "node scripts/homolog-api.mjs",
+    "homolog:web": "node scripts/homolog-web.mjs",
+    "homolog:start": "node scripts/homolog-start.mjs",
+    "homolog:seed": "node scripts/homolog-seed.mjs",
+    "homolog:reset": "node scripts/homolog-reset.mjs",
+    "homolog:restore": "node scripts/homolog-reset.mjs && node scripts/homolog-seed.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "6.3.0",

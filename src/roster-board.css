@@ -703,11 +703,11 @@
   .roster-board .month-grid,.roster-board .week-grid {
     display: block;
   }
-  .roster-board .day {
+  .roster-board .day:not(.ti-cov-ticket) {
     display: none;
     min-height: 0;
   }
-  .roster-board .day.active {
+  .roster-board .day.active:not(.ti-cov-ticket) {
     display: block;
   }
   .roster-board .day-title {

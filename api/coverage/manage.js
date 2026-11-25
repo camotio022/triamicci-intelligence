@@ -274,7 +274,7 @@ export default async function handler(req,res){
       if(actualNowEndM>nowComparable)throw Error('FEE_UNAVAILABLE');
      }
      const dueDate=(amount==null||p.fixedFeePolicy===false)?null:forecastPaymentDate(p.date,payroll);
-     tx.update(ref,{status:'completed',actualStart,actualEnd,fee:{amount,dueDate,rateRole:p.rateRole,policy:payroll},completedAt:now,completedBy:actor.uid,updatedAt:now});
+     tx.update(ref,{status:'completed',actualStart,actualEnd,fee:{amount,dueDate,rateRole:p.rateRole??p.fee?.rateRole??null,policy:payroll},completedAt:now,completedBy:actor.uid,updatedAt:now});
     }else{
      tx.update(ref,{status:'paid',paidDate,paidAt:now,paidBy:actor.uid,updatedAt:now});
     }
@@ -347,7 +347,7 @@ export default async function handler(req,res){
         tx.get(unit.collection('leaveRequests').where('date','==',date).limit(201)),
         tx.get(unit.collection('coverageAlerts').where('planId','==',planId)),
         tx.get(proposals.where('date','==',date).limit(201)),
-        readCoverageContext(member.unitId,date)]);
+        readCoverageContext(unit,date)]);
        if(staff.size>200||leaves.size>200||sameDay.size>200)throw Error('ASSESSMENT_LIMIT');
        const entries=normalizePlanEntries(plan.data(),date,leaves);
        const evaluation=evaluateOperationalDay({date,entries,people:staff.docs.map(staffPerson),policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[],context});

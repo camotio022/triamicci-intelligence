@@ -8,20 +8,54 @@ export const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const normalizeEmail = email => typeof email === 'string' ? email.trim().toLowerCase() : '';
 export const hashToken = token => createHash('sha256').update(token).digest('hex');
 export const newToken = () => randomBytes(32).toString('base64url');
+
+const PRODUCTION_FIREBASE_PROJECT_ID = 'triamicci-intelligence';
+
+function emulatorHostsConfigured(env = process.env) {
+  return Boolean(String(env.FIRESTORE_EMULATOR_HOST || '').trim() && String(env.FIREBASE_AUTH_EMULATOR_HOST || '').trim());
+}
+export function isFirebaseEmulatorMode(env = process.env) {
+  return emulatorHostsConfigured(env) && (env.APP_ENV === 'local' || env.APP_ENV === 'homologation') && String(env.FIREBASE_EXPECTED_PROJECT_ID || '').startsWith('demo-');
+}
+function assertSafeFirebaseProject(projectId, env = process.env) {
+  if (!projectId || projectId === PRODUCTION_FIREBASE_PROJECT_ID) {
+    throw new Error('FIREBASE_PROJECT_UNSAFE');
+  }
+  if (isFirebaseEmulatorMode(env)) {
+    if (!String(projectId).startsWith('demo-')) throw new Error('EMULATOR_PROJECT_REQUIRED');
+    return;
+  }
+  const staging = env.APP_ENV === 'staging';
+  const expected = env.FIREBASE_EXPECTED_PROJECT_ID;
+  if (staging && (!expected || expected === PRODUCTION_FIREBASE_PROJECT_ID)) {
+    throw new Error('STAGING_PROJECT_REQUIRED');
+  }
+  if (expected && projectId !== expected) {
+    throw new Error('FIREBASE_PROJECT_MISMATCH');
+  }
+}
+
 export function getDb() {
   if (!admin.apps.length) {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-    if (!raw) throw new Error('SERVER_NOT_CONFIGURED');
-    const credential = JSON.parse(raw);
-    const expected = process.env.FIREBASE_EXPECTED_PROJECT_ID;
-    const staging = process.env.APP_ENV === 'staging';
-    if (staging && (!expected || expected === 'triamicci-intelligence')) {
-      throw new Error('STAGING_PROJECT_REQUIRED');
+    const env = process.env;
+    if (isFirebaseEmulatorMode(env)) {
+      const projectId = String(env.FIREBASE_EXPECTED_PROJECT_ID || env.GCLOUD_PROJECT || env.GOOGLE_CLOUD_PROJECT || '').trim();
+      assertSafeFirebaseProject(projectId, env);
+      if (env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+        const credential = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
+        assertSafeFirebaseProject(credential.project_id, env);
+        admin.initializeApp({ credential: admin.credential.cert(credential), projectId });
+      } else {
+        admin.initializeApp({ projectId });
+      }
+    } else {
+      if (emulatorHostsConfigured(env)) throw new Error('EMULATOR_ENV_UNSAFE');
+      const raw = env.FIREBASE_SERVICE_ACCOUNT_JSON;
+      if (!raw) throw new Error('SERVER_NOT_CONFIGURED');
+      const credential = JSON.parse(raw);
+      assertSafeFirebaseProject(credential.project_id, env);
+      admin.initializeApp({ credential: admin.credential.cert(credential) });
     }
-    if (expected && credential.project_id !== expected) {
-      throw new Error('FIREBASE_PROJECT_MISMATCH');
-    }
-    admin.initializeApp({ credential: admin.credential.cert(credential) });
   }
   return admin.firestore();
 }
@@ -75,7 +109,7 @@ export async function authenticate(req) {
     await getDb().collection('auditLogs').add({event:'terminal.request_authorized',at:new Date(),unitId:member.unitId,actorUid:session.uid,terminalId:session.terminalId,sessionId:session.id,action:String(req.body?.action||'').slice(0,80),module:String(req.body?.module||'').slice(0,80),path:String(req.url||'').split('?')[0].slice(0,150)});
     return {uid:session.uid,email:member.email||'',terminalId:session.terminalId,terminalSessionId:session.id};
   }
-  try{return await getAuth().verifyIdToken(match[1], true)}catch(error){
+  try{return await getAuth().verifyIdToken(match[1], !isFirebaseEmulatorMode())}catch(error){
     if(['auth/argument-error','auth/invalid-id-token','auth/id-token-expired','auth/id-token-revoked','auth/user-disabled','auth/user-not-found'].includes(error.code))throw new Error('UNAUTHENTICATED');
     throw error;
   }

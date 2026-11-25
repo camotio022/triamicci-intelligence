@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { auth, db, isIndependentSession } from './firebase.js';
+import { auth, db, isIndependentSession, isLocalHomologation } from './firebase.js';
 import {clearViewCache} from './fastCache.js';
 import {setApiScope} from './api-fetch.js';
 import TriamicciLogo from './TriamicciLogo.jsx';
@@ -18,6 +18,8 @@ export default function AuthGate({ children, loginOptions }) {
   const [membershipUid, setMembershipUid] = useState(null);
   const [error, setError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [accessError, setAccessError] = useState('');
   const [accessReason, setAccessReason] = useState('');
   const [accessStatus, setAccessStatus] = useState('');
@@ -126,6 +128,24 @@ export default function AuthGate({ children, loginOptions }) {
       console.error('Firebase login:', e.code, e.message);
     } finally { setLoggingIn(false); }
   };
+  const loginWithEmail = async (event) => {
+    event?.preventDefault();
+    if (loggingIn) return;
+    setError('');setLoggingIn(true);
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+    } catch (e) {
+      const explanations = {
+        'auth/invalid-credential': 'E-mail ou senha inválidos.',
+        'auth/user-not-found': 'Usuário não encontrado no ambiente de homologação.',
+        'auth/wrong-password': 'Senha incorreta.',
+        'auth/invalid-email': 'E-mail inválido.',
+        'auth/too-many-requests': 'Muitas tentativas. Aguarde e tente novamente.',
+        'auth/network-request-failed': 'Falha de rede ao comunicar com o emulador de autenticação.',
+      };
+      setError(explanations[e.code] || `Não foi possível entrar (${e.code || 'erro desconhecido'}).`);
+    } finally { setLoggingIn(false); }
+  };
   const pending=user === undefined || (user && (membership === undefined || membershipUid !== user.uid));
   // Only the installed phone app gets a minimal branded launch while access is verified.
   // Never expose Workspace until a server-confirmed, active membership is available.
@@ -141,7 +161,11 @@ export default function AuthGate({ children, loginOptions }) {
         </section>
         <section className="ti-auth-content" aria-label="Acesso ao sistema">
           <div className="ti-auth-panel"><span className="ti-auth-section-tag">PORTAL DE ACESSO</span><h2>{title}</h2>{isIndependentSession&&<p className="ti-auth-security">Sessão independente nesta aba. O acesso da conta principal será preservado.</p>}
-          {pending?<p role="status">Estamos confirmando sua sessão e suas permissões.</p>:!user?<><p>Entre com sua conta Google para acessar seu ambiente de trabalho.</p><button type="button" className="ti-auth-primary" onClick={login} disabled={loggingIn}>{loggingIn?'Abrindo acesso...':'Entrar com Google'}<ArrowRight size={18} aria-hidden="true"/></button>{loginOptions}{error&&<div className="ti-auth-alert" role="alert"><AlertCircle size={19} aria-hidden="true"/><span>{error}</span></div>}<div className="ti-auth-security"><ShieldCheck size={20} aria-hidden="true"/><span>O acesso depende de vínculo ativo e das permissões da unidade.</span></div></>:<><p className="ti-auth-email">{user.email}</p><p>{accessError||accessReason||'Esta conta ainda não tem vínculo ativo com uma unidade. Solicite um convite ao responsável.'}</p>{invite&&accessStatus==='missing'&&<div className="ti-auth-invite"><p>Existe um convite neste link. Confirme que você entrou com o e-mail convidado.</p><button type="button" className="ti-auth-primary" onClick={acceptInvite} disabled={accepting}>{accepting?'Validando convite...':'Aceitar convite'}<ArrowRight size={18} aria-hidden="true"/></button>{inviteFeedback&&<div role="alert" className="ti-auth-alert">{inviteFeedback}</div>}</div>}<button type="button" className="ti-auth-secondary" onClick={logout}>Sair desta conta</button></>}
+          {pending?<p role="status">Estamos confirmando sua sessão e suas permissões.</p>:!user?<><p>{isLocalHomologation ? 'Ambiente local de homologação (emuladores). Entre com uma conta de teste simulada.' : 'Entre com sua conta Google para acessar seu ambiente de trabalho.'}</p>{isLocalHomologation && <form onSubmit={loginWithEmail} aria-label="Entrar no ambiente de homologação" style={{display:'grid',gap:8,margin:'12px 0'}}>
+            <label style={{display:'grid',gap:4}}>E-mail<input type="email" autoComplete="username" value={email} onChange={e=>setEmail(e.target.value)} required /></label>
+            <label style={{display:'grid',gap:4}}>Senha<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required /></label>
+            <button type="submit" className="ti-auth-primary" disabled={loggingIn}>{loggingIn?'Entrando...':'Entrar no ambiente local'}<ArrowRight size={18} aria-hidden="true"/></button>
+          </form>}<button type="button" className="ti-auth-primary" onClick={login} disabled={loggingIn} style={isLocalHomologation?{marginTop:4}:undefined}>{loggingIn?'Abrindo acesso...':'Entrar com Google'}<ArrowRight size={18} aria-hidden="true"/></button>{loginOptions}{error&&<div className="ti-auth-alert" role="alert"><AlertCircle size={19} aria-hidden="true"/><span>{error}</span></div>}<div className="ti-auth-security"><ShieldCheck size={20} aria-hidden="true"/><span>{isLocalHomologation ? 'Homologação local: Auth e Firestore em emuladores, sem dados reais.' : 'O acesso depende de vínculo ativo e das permissões da unidade.'}</span></div></>:<><p className="ti-auth-email">{user.email}</p><p>{accessError||accessReason||'Esta conta ainda não tem vínculo ativo com uma unidade. Solicite um convite ao responsável.'}</p>{invite&&accessStatus==='missing'&&<div className="ti-auth-invite"><p>Existe um convite neste link. Confirme que você entrou com o e-mail convidado.</p><button type="button" className="ti-auth-primary" onClick={acceptInvite} disabled={accepting}>{accepting?'Validando convite...':'Aceitar convite'}<ArrowRight size={18} aria-hidden="true"/></button>{inviteFeedback&&<div role="alert" className="ti-auth-alert">{inviteFeedback}</div>}</div>}<button type="button" className="ti-auth-secondary" onClick={logout}>Sair desta conta</button></>}
           </div>
         </section>
       </div>
