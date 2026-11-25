@@ -51,6 +51,31 @@ function assuredMontage(people,rules){
  return lowest;
 }
 
+function normalizePresence(slot){
+ if(!timed(slot))return null;
+ const start=minutes(slot.start), end=minutes(slot.end);
+ if(start===null||end===null||start===end)return null;
+ return {start,end:end<=start?end+1440:end};
+}
+
+function simultaneousHeadcountDeficits({date,sector,shift,minimum,confirmed,countsPerson}){
+ if(minimum===null||minimum<=0)return [];
+ const spans=confirmed.filter(countsPerson).map(person=>normalizePresence(person._hours)).filter(Boolean);
+ if(!spans.length)return [];
+ const points=[...new Set(spans.flatMap(s=>[s.start,s.end]))].sort((a,b)=>a-b);
+ const deficits=[];
+ for(let i=0;i<points.length-1;i++){
+  const start=points[i],end=points[i+1];
+  if(end<=start)continue;
+  const covered=spans.filter(s=>s.start<=start&&s.end>=end).length;
+  const deficit=Math.max(0,minimum-covered);
+  if(!deficit)continue;
+  const fmt=m=>`${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  deficits.push({date,sector,shift,skill:'',start:fmt(start%1440),end:fmt(end%1440),minimum,covered,deficit,uids:[],kind:'headcount'});
+ }
+ return deficits;
+}
+
 export function evaluateOperationalDay({date, entries, people, requirements = [], policy = {}}){
  const weekday = weekdayOf(date);
  const holiday = (policy.holidays || []).includes(date);
@@ -70,43 +95,63 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
   const cohort = active.filter(person=>inSector(person,sector)&&profile(person).shift===shift);
   const roster = cohort.filter(person=>scheduled.has(person.uid));
   const uniqueHours = group => [...new Map(group.map(person=>available(person,day)).filter(timed).map(slot=>[slot.start+'-'+slot.end,slot])).values()];
-  const confirmed = roster.filter(person=>timed(available(person,day)));
+  const confirmed = roster.filter(person=>timed(available(person,day))).map(person=>({...person,_hours:available(person,day)}));
   const slots = uniqueHours(confirmed.length?confirmed:cohort);
-  const window = slots.length===1 ? {start:slots[0].start,end:slots[0].end} : null;
-  const coverageWindow = window;
+  // A common envelope is safe for analysis only when the shifts are daytime and overlap.
+  // Mixed schedules remain subject to interval validation, not an inferred full-shift assignment.
+  const daytime=slots.every(slot=>minutes(slot.end)>minutes(slot.start));
+  const overlap=slots.length&&Math.max(...slots.map(slot=>minutes(slot.start)))<Math.min(...slots.map(slot=>minutes(slot.end)));
+  const window=slots.length===1?{start:slots[0].start,end:slots[0].end}:daytime&&overlap?{
+   start:slots.reduce((a,b)=>a.start<b.start?a:b).start,
+   end:slots.reduce((a,b)=>a.end>b.end?a:b).end
+  }:slots.length?{
+   start:slots.reduce((a,b)=>a.start<b.start?a:b).start,
+   end:slots.reduce((a,b)=>a.end>b.end?a:b).end
+  }:null;
+  const coverageWindow = slots.length===1?{start:slots[0].start,end:slots[0].end}:null;
   const managers = confirmed.filter(management);
   const minimum = sector==='cozinha' ? busyDay||strongPeak?4:2 : busyDay?3:policy.frontWeekdayMinimum??null;
-  const count = sector==='frente'&&policy.countManagement===false ? confirmed.filter(person=>!management(person)).length : confirmed.length;
-  const uncertain = !window || roster.length!==confirmed.length || (sector==='frente'&&(minimum===null||policy.countManagement==null&&managers.length>0));
+  const countsPerson = person => !(sector==='frente'&&policy.countManagement===false&&management(person));
+  const count = confirmed.filter(countsPerson).length;
+  const missingHours = roster.length-confirmed.length;
+  const policyUnknown = sector==='frente'&&(minimum===null||policy.countManagement==null&&managers.length>0);
+  const uncertain = missingHours>0 || policyUnknown;
   const skill = sector==='cozinha'&&strongPeak ? 'montagem' : '';
   const explicit = window?weekdayRules.filter(rule=>rule.skill&&rule.sector===sector&&minutes(rule.start)<minutes(window.end)&&minutes(rule.end)>minutes(window.start)):[];
   const skillCount = skill ? assuredMontage(confirmed,explicit) : null;
-  const headcountGap = minimum===null ? 0 : Math.max(0,minimum-count);
+  const simultaneousHeadcount = (slots.length>1 || confirmed.some(p=>normalizePresence(p._hours)&&window&& (minutes(p._hours.start)>minutes(window.start)||minutes(p._hours.end)<minutes(window.end)))) && !uncertain
+   ? simultaneousHeadcountDeficits({date,sector,shift,minimum,confirmed,countsPerson}) : [];
+  const simultaneousHeadcountGap = simultaneousHeadcount.reduce((max,item)=>Math.max(max,item.deficit),0);
+  const headcountGap = minimum===null ? 0 : Math.max(Math.max(0,minimum-count), simultaneousHeadcountGap);
   const skillGap = skill ? Math.max(0,3-skillCount) : 0;
   const roleGap = (sector==='cozinha'?!confirmed.some(kitchenLead):!managers.length) ? 1 : 0;
   const reasons = [];
   if(sector==='frente'&&strongPeak&&count>=3)reasons.push('O mínimo pode ser suficiente se o apoio conseguir alternar entre iFood e vitrine. Se os dois precisarem de atendimento enquanto sai o chope, confira quem consegue assumir o balcão sem tirar a pessoa do caixa.');
   if(sector==='cozinha'&&!busyDay&&count===2)reasons.push('Duas pessoas podem dar conta num dia tranquilo. Uma terceira dá margem se a produção ou os pedidos aumentarem.');
+  if(simultaneousHeadcountGap>0)reasons.push('Com os horários confirmados, há momentos com menos pessoas do que o mínimo esperado.');
   if(skillGap){
    const qualified=confirmed.filter(person=>certified(person,skill)).map(name);
    reasons.push((qualified.length?qualified.join(', ')+' têm montagem confirmada. ':'Ainda não há montagem confirmada na equipe. ')+
     'Considerando os outros postos cadastrados, '+skillCount+' conseguem ficar na montagem ao mesmo tempo. No pico, a bancada pode precisar de três sem tirar alguém da chapa ou da louça.');
   }
-  if(uncertain)reasons.push('Confira os horários e as regras pendentes antes de concluir a cobertura.');
+  if(missingHours>0)reasons.push('Confira os horários não informados antes de concluir a cobertura.');
+  if(policyUnknown)reasons.push('Confira as regras pendentes da Frente antes de concluir a cobertura.');
+  const shortage = Math.max(headcountGap,skillGap,roleGap);
   const candidates = active.filter(person=>inSector(person,sector)&&!roster.includes(person)&&
-   (scheduled.has(person.uid)||offTypes.has(typeOf(person)))&&(!skillGap||certified(person,skill)))
+   (scheduled.has(person.uid)||offTypes.has(typeOf(person)))&&(!skillGap||certified(person,skill)|| (sector==='cozinha'?kitchenLead(person):management(person))))
    .map(person=>({uid:person.uid,name:name(person),scheduled:scheduled.has(person.uid),hours:available(person,day)||null,jobTitle:profile(person).jobTitle||'',rateRole:rateRoleFor(person),
-    hasAccount:Boolean(person.accountUid),skillConfirmed:!skill||certified(person,skill),countsForMinimum:!(sector==='frente'&&policy.countManagement!==true&&management(person)),matchesRole:sector==='cozinha'?kitchenLead(person):management(person)}));
-  return {shift,sector,window,coverageWindow,minimum,count,uncertain,reasons,skill,skillCount,headcountGap,skillGap,roleGap,missingHours:roster.length-confirmed.length,shortage:Math.max(headcountGap,skillGap,roleGap),
+    sector:profile(person).sector,certifications:profile(person).certifications||[],hasAccount:Boolean(person.accountUid),skillConfirmed:!skill||certified(person,skill),countsForMinimum:!(sector==='frente'&&policy.countManagement!==true&&management(person)),matchesRole:sector==='cozinha'?kitchenLead(person):management(person)}));
+  return {shift,sector,window,coverageWindow,minimum,count,uncertain,reasons,skill,skillCount,headcountGap,skillGap,roleGap,shortage,missingHours,simultaneousHeadcount,
    people:roster.map(person=>({uid:person.uid,name:name(person),jobTitle:profile(person).jobTitle||'',hours:available(person,day)||null})),candidates};
  }));
  const adjustedPeople=holiday ? active.map(person=>({...person,professional:{...profile(person),availability:(profile(person).availability||[]).filter(slot=>slot.day==='dom').map(slot=>({...slot,day:days[weekday]}))}})) : active;
  const adjustedEntries=working.map(person=>({uid:person.uid,date,type:'work'}));
- const intervals=coverageTimeline({date,people:adjustedPeople,entries:adjustedEntries,requirements:weekdayRules.map(rule=>({...rule,weekday}))});
+ const requirementIntervals=coverageTimeline({date,people:adjustedPeople,entries:adjustedEntries,requirements:weekdayRules.map(rule=>({...rule,weekday}))});
+ const intervals=[...requirementIntervals,...shifts.flatMap(row=>(row.simultaneousHeadcount||[]).map(item=>({date,sector:row.sector,skill:'',start:item.start,end:item.end,minimum:item.minimum,covered:item.covered,deficit:item.deficit,uids:[],kind:'headcount'})))];
  const recurring = (policy.recurring || []).flatMap(rule=>{
   const absent=active.find(person=>person.uid===rule.absentId), cover=active.find(person=>person.uid===rule.coverId);
   if(!absent||!offTypes.has(typeOf(absent)))return [];
-  return [{uid:rule.coverId,forUid:rule.absentId,paid:rule.paid===true,available:Boolean(cover&&typeOf(cover)==='work'&&inSector(cover,profile(absent).sector)&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector===profile(absent).sector)?.coverageWindow)),name:cover?name(cover):'Pessoa indisponível',sector:profile(absent).sector,shift:profile(absent).shift}];
+  return [{uid:rule.coverId,forUid:rule.absentId,paid:rule.paid??null,available:Boolean(cover&&typeOf(cover)==='work'&&inSector(cover,front.has(profile(absent).sector)?'frente':profile(absent).sector)&&covering(available(cover,day),shifts.find(row=>row.shift===profile(absent).shift&&row.sector===(front.has(profile(absent).sector)?'frente':profile(absent).sector))?.coverageWindow)),name:cover?name(cover):'Pessoa indisponível',sector:front.has(profile(absent).sector)?'frente':profile(absent).sector,shift:profile(absent).shift}];
  });
  const managers=active.filter(management);
  const manager=managers.filter(person=>title(person)==='manager'), deputy=managers.filter(person=>title(person)==='submanager');
@@ -146,9 +191,12 @@ export function evaluateOperationalDay({date, entries, people, requirements = []
    Number(b.scheduled)-Number(a.scheduled)||a.name.localeCompare(b.name,'pt-BR'));
  }
  const recurringKeys=new Set(recurring.filter(r=>r.available&&r.paid).map(r=>r.uid+'|'+r.shift));
- return {date, holiday,busyDay,strongPeak,shifts,intervals,recurring,recurringFees:recurringKeys.size,
-  extra:shifts.reduce((total,row)=>total+(row.window&&!row.missingHours?row.shortage:0),0),
-  attention:shifts.some(row=>row.shortage||row.uncertain)||intervals.some(row=>row.deficit)||recurring.some(row=>!row.available)};
+ const recurringPendingFees=new Set(recurring.filter(r=>!r.available&&r.paid===true&&!recurringKeys.has(r.uid+'|'+r.shift)).map(r=>r.uid+'|'+r.shift)).size;
+ const pendingKeys=new Set(recurring.filter(r=>!r.available&&r.paid===true).map(r=>r.uid+'|'+r.shift));
+ const recurringUnknownFees=new Set(recurring.filter(r=>r.paid==null&&!recurringKeys.has(r.uid+'|'+r.shift)&&!pendingKeys.has(r.uid+'|'+r.shift)).map(r=>r.uid+'|'+r.shift)).size;
+ return {date, holiday,busyDay,strongPeak,shifts,intervals,recurring,recurringFees:recurringKeys.size,recurringPendingFees,recurringUnknownFees,
+ extra:shifts.reduce((total,row)=>total+(!row.uncertain?row.shortage:0),0),
+ attention:shifts.some(row=>row.shortage||row.uncertain)||requirementIntervals.some(row=>row.deficit)||(shifts.some(row=>!row.uncertain&&row.simultaneousHeadcount?.length))||recurring.some(row=>!row.available)};
 }
 
 const risk = result => result.shifts.map(row=>row.shortage)
@@ -206,7 +254,7 @@ export function validOperationalPolicy(policy){
   [null,true,false].includes(policy.countManagement)&&[null,true,false].includes(policy.managementPaid)&&
   (policy.frontWeekdayMinimum===null||Number.isInteger(policy.frontWeekdayMinimum)&&policy.frontWeekdayMinimum>=1&&policy.frontWeekdayMinimum<=30)&&
   Array.isArray(policy.recurring)&&policy.recurring.length<=60&&policy.recurring.every(item=>item&&
-   [item.absentId,item.coverId].every(id=>typeof id==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(id))&&item.absentId!==item.coverId&&typeof item.paid==='boolean');
+   [item.absentId,item.coverId].every(id=>typeof id==='string'&&/^[a-zA-Z0-9_-]{1,128}$/.test(id))&&item.absentId!==item.coverId&&[null,true,false].includes(item.paid));
 }
 
 export function forecastPaymentDate(date,payroll) {

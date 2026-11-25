@@ -82,7 +82,7 @@ async function shutdown(code = 0, reason = 'shutdown') {
   process.exit(exitCode);
 }
 
-backend = spawnManaged(process.execPath, [path.join('scripts', 'local-api-server.mjs')], 'backend', {
+backend = spawnManaged(process.execPath, ['--watch', path.join('scripts', 'local-api-server.mjs')], 'backend', {
   onError: () => { void shutdown(1, 'backend-start-error'); },
 });
 

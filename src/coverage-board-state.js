@@ -3,18 +3,50 @@ export const coverageCardId = row => row.sector+':'+row.shift;
 const pending = new Set(['pending_acceptance','pending_approval']);
 const approved = new Set(['approved','completed','paid']);
 
+// Only credit a documented, uninterrupted coverage interval in the matching sector.
+// A paid period alone is not proof of availability at every instant.
+export function remainingCoverageIntervals(row,matches,intervals){
+ const candidates=new Map(row.candidates.map(person=>[person.uid,person]));
+ const clock=value=>typeof value==='string'&&/^\d{2}:\d{2}$/.test(value);
+ return intervals.map(interval=>{
+  if(!interval.deficit||!clock(interval.start)||!clock(interval.end)||interval.start>=interval.end||!Array.isArray(interval.uids))return interval;
+  const workers=new Set(interval.uids);
+  for(const proposal of matches){
+   if(!approved.has(proposal.status)||workers.has(proposal.staffId))continue;
+   const person=candidates.get(proposal.staffId);
+   if(!person||person.sector!==interval.sector||interval.skill&&!(person.certifications||[]).includes(interval.skill))continue;
+   const start=proposal.actualStart||proposal.second?.start,end=proposal.actualEnd||proposal.second?.end;
+   if(!clock(start)||!clock(end)||start>interval.start||end<interval.end||start>=end)continue;
+   // A recorded break, or an explicit no-break declaration, is necessary for precise interval credit.
+   const pause=proposal.second;
+   const hasBreak=clock(pause?.breakStart)&&clock(pause?.breakEnd)&&pause.breakStart<pause.breakEnd;
+   if(!hasBreak&&pause?.breakRequired!==false)continue;
+   if(hasBreak&&interval.start<pause.breakEnd&&interval.end>pause.breakStart)continue;
+   // Without a station assignment, competing skill requirements cannot share this reinforcement.
+   if(intervals.some(other=>other!==interval&&other.skill&&other.skill!==interval.skill&&other.start<interval.end&&other.end>interval.start))continue;
+   workers.add(person.uid);
+  }
+  return {...interval,uids:[...workers],covered:workers.size,deficit:Math.max(0,interval.minimum-workers.size)};
+ }).filter(interval=>interval.deficit);
+}
+
 export function projectCoverage(row, matches, intervals, recurring, extraCandidate=null){
  const people=new Set();
  let added=0, roleGap=row.roleGap, skillGap=row.skillGap;
- for(const proposal of matches.filter(item=>approved.has(item.status))){
-  const person=row.candidates.find(candidate=>candidate.uid===proposal.staffId);
+ const credit=(proposal,person)=>{
   const start=proposal.actualStart||proposal.second?.start, end=proposal.actualEnd||proposal.second?.end;
   if(!person||people.has(person.uid)||!row.window||!start||!end||end<row.window.end||
-   (start>row.window.start&&(!proposal.coveredStart||proposal.actualStart&&proposal.actualStart>proposal.second?.start)))continue;
+   (start>row.window.start&&(!proposal.coveredStart||proposal.actualStart&&proposal.actualStart>proposal.second?.start)))return;
   people.add(person.uid);
-  if(person.countsForMinimum)added++;
-  if(person.matchesRole)roleGap=0;
-  if(row.skill&&person.skillConfirmed)skillGap=Math.max(0,skillGap-1);
+  const resolvesHeadcount=proposal.headcountGap===undefined?person.countsForMinimum:Boolean(proposal.headcountGap&&person.countsForMinimum);
+  const resolvesRole=proposal.roleGap===undefined?person.matchesRole:Boolean(proposal.roleGap&&person.matchesRole);
+  const resolvesSkill=proposal.skillGap===undefined?(row.skill&&person.skillConfirmed):Boolean(proposal.skillGap&&person.skillConfirmed&&(!proposal.skill||!row.skill||proposal.skill===row.skill));
+  if(resolvesHeadcount)added++;
+  if(resolvesRole)roleGap=0;
+  if(resolvesSkill)skillGap=Math.max(0,skillGap-1);
+ };
+ for(const proposal of matches.filter(item=>approved.has(item.status))){
+  credit(proposal,row.candidates.find(candidate=>candidate.uid===proposal.staffId));
  }
  if(extraCandidate&&!people.has(extraCandidate.uid)){
   if(extraCandidate.countsForMinimum)added++;
@@ -23,9 +55,10 @@ export function projectCoverage(row, matches, intervals, recurring, extraCandida
  }
  const count=row.count+added, headcountGap=row.minimum===null?0:Math.max(0,row.minimum-count);
  // Interval and station requirements remain open until backed by staffing evidence.
- const open=Boolean(headcountGap||roleGap||skillGap||row.uncertain||intervals.length||recurring.some(item=>!item.available&&!people.has(item.uid)));
+ const remainingIntervals=remainingCoverageIntervals(row,matches,intervals);
+ const open=Boolean(headcountGap||roleGap||skillGap||row.uncertain||remainingIntervals.length||recurring.some(item=>!item.available&&!people.has(item.uid)));
  const waiting=matches.filter(item=>pending.has(item.status));
- return {count,headcountGap,roleGap,skillGap,open,waiting,column:open?(waiting.length?'waiting':'needs'):'resolved'};
+ return {count,headcountGap,roleGap,skillGap,remainingIntervals,open,waiting,column:open?(waiting.length?'waiting':'needs'):'resolved'};
 }
 
 export function moveCoverageCard(order,from,to){

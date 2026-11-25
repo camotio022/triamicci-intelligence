@@ -34,3 +34,16 @@ test('card reordering preserves other cards and ignores invalid drop targets',()
  assert.equal(moveCoverageCard(order,'missing','front'),order);
  assert.deepEqual(order,['kitchen','front','second']);
 });
+
+test('approved coverage resolves only intervals with verified availability and skill',()=>{
+ const worker={...cook,sector:'cozinha',certifications:['montagem']};
+ const target={...row,count:3,candidates:[worker]};
+ const interval={sector:'cozinha',skill:'montagem',start:'17:00',end:'18:00',minimum:3,covered:2,deficit:1,uids:['a','b']};
+ const documented={...proposal,second:{...window,breakStart:'14:00',breakEnd:'15:00'}};
+ assert.equal(projectCoverage(target,[documented],[interval],[]).column,'resolved');
+ assert.equal(projectCoverage(target,[proposal],[interval],[]).column,'needs');
+ assert.equal(projectCoverage(target,[documented],[{...interval,start:'14:30',end:'15:30'}],[]).column,'needs');
+ assert.equal(projectCoverage(target,[documented],[{...interval,skill:'chapa'}],[]).column,'needs');
+ assert.equal(projectCoverage(target,[documented],[interval,{...interval,skill:'chapa'}],[]).column,'needs');
+ assert.equal(projectCoverage(target,[documented], [{...interval,uids:['a','b','cook'],minimum:4}],[]).column,'needs');
+});

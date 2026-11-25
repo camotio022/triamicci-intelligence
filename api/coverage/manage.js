@@ -222,9 +222,16 @@ export default async function handler(req,res){
     const rates=rateSnap.data()?.rates;
     const fixed=evaluation.recurring.find(item=>item.uid===staffId&&item.sector===sector&&item.shift===shift);
     const rateRole=rateRoleFor(person),override=rateSnap.data()?.individualRates?.[staffId];
+    const resolves={
+     roleGap: Boolean(row.roleGap&&candidate.matchesRole),
+     skillGap: Boolean(row.skillGap&&candidate.skillConfirmed),
+     headcountGap: Boolean(row.headcountGap&&candidate.countsForMinimum),
+     skill: row.skill||null
+    };
     tx.create(proposals.doc(id),{staffId,accountUid:person.accountUid,name:person.name||'',date,planId,planRevision:plan.data().revision||null,shift,sector,
      window:row.window,...assignment,coveredStart:partial&&coveredStart===true,external:false,rateRole,reason:reason.trim(),
      ...(fixed?{fixedFeePolicy:fixed.paid}:{}),
+     ...resolves,
      practicePayment:fixed?.paid===false?0:fixed?.paid===null?null:override?.amount??(rates?paymentFor({paymentRole:rateRole},rates):null),
      operational:true,payrollSnapshot:override?.daysAfter!=null?{daysAfter:override.daysAfter}:rateSnap.data()?.payroll||null,legalEstimate:null,legalValidated:false,reviewReasons:review.reasons,status:'pending_acceptance',consentPending:false,createdAt:now,updatedAt:now,createdBy:actor.uid,unitId:member.unitId});
     signalUnitChange(tx,db,member.unitId,['coverage','notifications']);
@@ -319,15 +326,30 @@ export default async function handler(req,res){
       if(!currentPerson.exists||currentPerson.data().accountUid!==p.data().accountUid)throw Error('STAFF_NOT_AVAILABLE');
       const plan=await tx.get(unit.collection('schedules').doc(p.data().planId));
       if(!plan.exists||plan.data().archivedAt||!['draft','in_review','approved','published'].includes(plan.data().status)||(plan.data().revision||null)!==p.data().planRevision)throw Error('PLAN_CHANGED');
-      if(plan.data().status==='published'){
+      {
        const {date,planId}=p.data();
        const [staff,policy,leaves,prior,sameDay]=await Promise.all([
         tx.get(unit.collection('staffRegistry').limit(201)),tx.get(policyRef),
         tx.get(unit.collection('leaveRequests').where('date','==',date).limit(201)),
         tx.get(unit.collection('coverageAlerts').where('planId','==',planId)),
         tx.get(proposals.where('date','==',date).limit(201))]);
-       if(staff.size<=200&&leaves.size<=200&&sameDay.size<=200)alertContext={tx,db,unit,unitId:member.unitId,planId,dates:[date],
-        entries:normalizePlanEntries(plan.data(),date,leaves),people:staff.docs.map(alertStaff),
+       if(staff.size>200||leaves.size>200||sameDay.size>200)throw Error('ASSESSMENT_LIMIT');
+       const entries=normalizePlanEntries(plan.data(),date,leaves);
+       const evaluation=evaluateOperationalDay({date,entries,people:staff.docs.map(staffPerson),policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[]});
+       const target=evaluation.shifts.find(row=>row.shift===p.data().shift&&row.sector===p.data().sector);
+       const candidate=target?.candidates.find(item=>item.uid===p.data().staffId);
+       const fresh=wholeTurnAssignment(target,candidate);
+       const original=p.data();
+       const onApprovedLeave=leaves.docs.some(doc=>doc.data().uid===original.staffId&&doc.data().status==='approved');
+       const effectiveNeed=Boolean(target)&&(target.roleGap?candidate?.matchesRole: (target.headcountGap?candidate?.countsForMinimum: (target.skillGap?candidate?.skillConfirmed: target.shortage>0||target.uncertain||evaluation.intervals.some(item=>item.sector===target.sector))));
+       if(!fresh||!candidate?.hasAccount||onApprovedLeave||!effectiveNeed||fresh.second.start!==original.second?.start||fresh.second.end!==original.second?.end||
+        (fresh.first?.start??null)!==(original.first?.start??null)||(fresh.first?.end??null)!==(original.first?.end??null)||
+        (fresh.first&&reviewCoverageAssignment(fresh).state==='blocked'))throw Error('STAFF_NOT_AVAILABLE');
+       if((original.skillGap? !candidate.skillConfirmed:false)||(original.roleGap? !candidate.matchesRole:false))throw Error('STAFF_NOT_AVAILABLE');
+       if(sameDay.docs.some(doc=>doc.id!==id&&doc.data().staffId===original.staffId&&!['rejected','declined','cancelled'].includes(doc.data().status)&&
+        minutes(doc.data().second?.end)>minutes(fresh.second.start)&&minutes(doc.data().second?.start)<minutes(fresh.second.end)))throw Error('CONFLICT');
+       if(plan.data().status==='published')alertContext={tx,db,unit,unitId:member.unitId,planId,dates:[date],
+        entries,people:staff.docs.map(alertStaff),
         policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[],prior,now,notify:false,
         proposals:sameDay.docs.map(doc=>doc.id===id?{...doc.data(),status:'approved'}:doc.data())};
       }
