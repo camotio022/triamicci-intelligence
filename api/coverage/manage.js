@@ -347,7 +347,7 @@ export default async function handler(req,res){
         tx.get(unit.collection('leaveRequests').where('date','==',date).limit(201)),
         tx.get(unit.collection('coverageAlerts').where('planId','==',planId)),
         tx.get(proposals.where('date','==',date).limit(201)),
-        readCoverageContext(member.unitId,date)]);
+        readCoverageContext(unit,date)]);
        if(staff.size>200||leaves.size>200||sameDay.size>200)throw Error('ASSESSMENT_LIMIT');
        const entries=normalizePlanEntries(plan.data(),date,leaves);
        const evaluation=evaluateOperationalDay({date,entries,people:staff.docs.map(staffPerson),policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[],context});
