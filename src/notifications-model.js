@@ -20,11 +20,12 @@ export function notificationCategory(item){
  if(title.includes('recebimento')||title.includes('estoque'))return 'Cozinha';
  return 'Equipe';
 }
-const destinations=new Set(['my-profile','leave-requests','people','kitchen-v3','mural','receiving']);
+const destinations=new Set(['my-profile','my-coverage','leave-requests','people','kitchen-v3','mural','receiving','coverage']);
 export function notificationDestination(item){
 
  const title=String(item.title||'').toLocaleLowerCase('pt-BR');
  if(title==='recebimento aguardando aprovação')return 'receiving';
+ if(item.page==='my-profile'&&title.includes('cobertura'))return 'my-coverage';
  if(destinations.has(item.page))return item.page;
  if(title.includes('folga'))return 'leave-requests';
  if(title.includes('escala publicada'))return 'mural';

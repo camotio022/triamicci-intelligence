@@ -29,3 +29,22 @@ test('decimal outputs retain recipe ratio and ingredient location',()=>{
  const result=transformationPreview({outputProductId:b,outputUnit:'kg',yieldQuantity:2.5,lines:[{productId:a,quantity:1.25,location:'giro'}]},1.5,{[a]:'kg'});
  assert.equal(result.valid,true);assert.equal(result.inputs[0].quantity,.75);assert.equal(result.inputs[0].location,'giro');
 });
+
+test('simultaneous kitchen stations do not count the same multi-skilled person twice',()=>{
+ const workers=[
+  {uid:'a',status:'active',professional:{sector:'cozinha',certifications:['chapa','louca','montagem'],availability:[{day:'dom',start:'14:00',end:'22:00'}]}},
+  {uid:'b',status:'active',professional:{sector:'cozinha',certifications:['montagem'],availability:[{day:'dom',start:'14:00',end:'22:00'}]}}
+ ];
+ const rows=coverageTimeline({date,entries,people:workers,requirements:[
+  {weekday:0,sector:'cozinha',skill:'chapa',start:'18:00',end:'19:00',minimum:1},
+  {weekday:0,sector:'cozinha',skill:'louca',start:'18:00',end:'19:00',minimum:1},
+  {weekday:0,sector:'cozinha',skill:'montagem',start:'18:00',end:'19:00',minimum:1}
+ ]});
+ const bySkill=Object.fromEntries(rows.map(row=>[row.skill,row]));
+ assert.deepEqual([bySkill.chapa?.covered,bySkill.chapa?.deficit],[1,0]);
+ assert.deepEqual([bySkill.montagem?.covered,bySkill.montagem?.deficit],[1,0]);
+ assert.deepEqual([bySkill.louca?.covered,bySkill.louca?.deficit],[0,1]);
+ assert.equal(bySkill.chapa.uids.includes('a')||bySkill.louca.uids.includes('a'),true);
+ assert.ok(!bySkill.chapa.uids.includes('a')||!bySkill.louca.uids.includes('a'));
+ assert.deepEqual(bySkill.montagem.uids,['b']);
+});

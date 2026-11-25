@@ -15,10 +15,10 @@ const blank={displayName:'',bio:'',developmentGoal:'',preferredShift:''};
 async function api(action,extra={}){
  return requestJson('/api/members/manage',{action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>data.message||'Não foi possível concluir.'});
 }
-export default function MyProfessionalProfile({membership,attendance=null}){
+export default function MyProfessionalProfile({membership,attendance=null,initialSection='overview'}){
  const {notify}=useFeedback(),[profile,setProfile]=useState(null),[personal,setPersonal]=useState(blank),[recognition,setRecognition]=useState(null);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[editing,setEditing]=useState(false);
- const [section,setSection]=useState('overview');
+ const [section,setSection]=useState(initialSection);
  const [photoMenu,setPhotoMenu]=useState(false);
  const editingRef=useRef(false);editingRef.current=editing;
  const [syncedAt,setSyncedAt]=useState(null);const [avatar,setAvatar]=useState(null);const [uploading,setUploading]=useState(false);
@@ -50,7 +50,7 @@ export default function MyProfessionalProfile({membership,attendance=null}){
       {photoMenu&&<div className="ti-profile-v5-photoactions"><label>Trocar foto<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={e=>{uploadAvatar(e);setPhotoMenu(false)}}/></label>{avatar&&<button type="button" onClick={()=>{removeAvatar();setPhotoMenu(false)}} disabled={uploading}>Remover foto</button>}</div>}
     </div>
     <div className="ti-premium-identity"><p>Meu perfil profissional</p><h1>{name}</h1><span>{profile?.jobTitle||'Perfil em construção'} · {profile?.sector||'Sua equipe'} · {shifts[profile?.shift]||'Turno a definir'}</span></div>
-    <div className="ti-profile-v5-hero-actions"><span className="ti-profile-v5-active"><CheckCircle2 size={13}/> Meu perfil</span><button type="button" onClick={()=>setSection('settings')}><Pencil size={14}/> Editar perfil</button></div>
+    <div className="ti-profile-v5-hero-actions"><span className="ti-profile-v5-active"><CheckCircle2 size={13}/> Meu perfil</span><button type="button" aria-pressed={section==='requests'} onClick={()=>setSection(section==='requests'?'overview':'requests')}>{section==='requests'?'Voltar ao perfil':'Convites e taxas'}</button><button type="button" onClick={()=>setSection('settings')}><Pencil size={14}/> Editar perfil</button></div>
    </div>
    <div className="ti-profile-v5-identity-meta"><span><ChefHat size={18}/><small>Cargo</small><strong>{profile?.jobTitle||'Não informado'}</strong></span><span><Building2 size={18}/><small>Unidade</small><strong>{membership?.unitId||'—'}</strong></span><span><Clock3 size={18}/><small>Turno</small><strong>{shifts[profile?.shift]||'—'}</strong></span></div>
   </div>

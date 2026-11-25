@@ -2,41 +2,29 @@ import useAppConfirmation from './useAppConfirmation.jsx';
 import {requestJson} from './api-client.js';
 import {MANAGEMENT_ROLES} from '../server/permissions/v31-policy.js';
 import {apiFetch} from './api-fetch.js';
-import {coverageTimeline} from '../server/schedules/coverage-timeline.js';
 import {useUnitLive} from './useUnitLive.js';
-import React,{useCallback,useEffect,useMemo,useState} from 'react';
-import {generateMonthlyRoster,weekdayOccurrences,weekdayOf,WEEKDAY_LABELS} from '../server/schedules/generator.js';
-import {sessionAuth as auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';import './roster-mobile-day.css';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {sessionAuth as auth} from './firebase.js';import {monthDates} from '../server/schedules/rules.js';import {useFeedback} from './FeedbackProvider.jsx';import './operations-planning.css';import './notifications.css';
 import {restaurantDay} from '../server/schedules/restaurant-today.js';
-import {fiveTwoEntries,fiveTwoWeeks,shiftScheduleDate} from '../server/schedules/five-two.js';
+import {carryFiveTwoRoster,fiveTwoEntries,fiveTwoWeeks,shiftScheduleDate} from '../server/schedules/five-two.js';
 import RosterBoard from './RosterBoard.jsx';
 
 const emptyRoster={weekly:{},sundays:{}};
 
-function newRoster(period, plans, people){
- const weeks=fiveTwoWeeks(period);
- const activeIds=new Set(people.map(person=>person.uid));
- const weekly={};
- for(const week of [weeks[0],weeks.at(-1)]){
-  const neighbor=plans.find(plan=>plan.period!==period&&plan.status==='published'&&!plan.archivedAt&&plan.roster?.weekly[week]);
-  if(neighbor)weekly[week]=Object.fromEntries(Object.entries(neighbor.roster.weekly[week]).filter(([uid])=>activeIds.has(uid)));
- }
- return {...emptyRoster,weekly};
-}
 async function call(action,extra={}){
  return requestJson('/api/members/manage',{module:'schedules',action,...extra},{sessionMessage:'Faça login novamente.',formatError:data=>[data.message,...(data.issues||[]).slice(0,5)].join(' · ')});
 }
 async function coverageApi(){
- return requestJson('/api/coverage/manage',{action:'dashboard'},{sessionMessage:'Faça login novamente.',formatError:data=>data.message});
+ return requestJson('/api/coverage/manage',{action:'planningRules'},{sessionMessage:'Faça login novamente.',formatError:data=>data.message});
 }
 async function membersApi(){
  const token=await auth.currentUser?.getIdToken();const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'profiles'})});const d=await r.json();if(!r.ok)throw Error(d.message);const staff=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryPreview'})});const sd=await staff.json();if(!staff.ok)throw Error(sd.message||'Cadastro Mestre indisponível.');return {activated:!!sd.activated,registeredCount:(sd.registry||[]).filter(p=>p.status==='active').length,people:sd.activated?(sd.registry||[]).filter(p=>p.status==='active').map(p=>({uid:p.id,accountUid:p.accountUid||null,name:p.name,status:p.status,professional:{sector:p.sector,shift:p.shift,availability:p.availability||[],jobTitle:p.jobTitle,skills:p.skills||[],certifications:p.certifications||[]},fixedWeekday:p.fixedWeekday,registry:true})):d.members||[]};
 }
 const labels={draft:'Rascunho',in_review:'Em análise',approved:'Aprovada',published:'Publicada',work:'Trabalho',off:'Folga',leave:'Ausência',monthly_sunday:'Domingo mensal adicional'};
-export default function SchedulePlanner({membership}){
+export default function SchedulePlanner({membership,onOpenCoverage,initialPlanId}){
  const {askConfirmation,confirmationSheet}=useAppConfirmation();
  const {notify}=useFeedback(),[plans,setPlans]=useState([]),[people,setPeople]=useState([]),[selected,setSelected]=useState(''),[title,setTitle]=useState('Escala da equipe'),[period,setPeriod]=useState(restaurantDay().slice(0,7)),[entries,setEntries]=useState([]);
- const [fixedOff,setFixedOff]=useState({}),[sundayOff,setSundayOff]=useState({}),[savingFixed,setSavingFixed]=useState(''),[selectedPerson,setSelectedPerson]=useState(''),[matrixSector,setMatrixSector]=useState('todos');
+ const [coveragePolicy,setCoveragePolicy]=useState({});
  const [coverageRules,setCoverageRules]=useState([]),[draftRevision,setDraftRevision]=useState(null);
  const [roster,setRoster]=useState(emptyRoster),[undoHistory,setUndoHistory]=useState([]),[rosterDirty,setRosterDirty]=useState(false);
  const [titleDirty,setTitleDirty]=useState(false);
@@ -47,76 +35,68 @@ export default function SchedulePlanner({membership}){
  const [loaded,setLoaded]=useState(false);
  const [today,setToday]=useState(()=>restaurantDay());
  useEffect(()=>{const interval=setInterval(()=>setToday(restaurantDay()),60000);return()=>clearInterval(interval)},[]);
- const [uid,setUid]=useState(''),[date,setDate]=useState(''),[type,setType]=useState('work'),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const allowed=MANAGEMENT_ROLES.includes(membership.role);
- const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,f,l,c]=await Promise.all([call('list'),membersApi(),call('fixedOffList'),call('leaveList'),coverageApi()]);setCoverageRules(c.requirements||[]);setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setFixedOff({...Object.fromEntries(m.people.filter(x=>x.registry&&x.fixedWeekday).map(x=>[x.uid,x.fixedWeekday])),...(f.fixedOffDays||{})});setLoaded(true)}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
+ const refresh=useCallback(async(silent=false)=>{if(!silent)setLoading(true);setError('');try{const [p,m,l,c]=await Promise.all([call('list'),membersApi(),call('leaveList'),coverageApi()]);setCoverageRules(c.requirements||[]);setCoveragePolicy(c.operationalPolicy||{});setApprovedLeaves((l.requests||[]).filter(x=>x.status==='approved'));setPlans(p.schedules||[]);setRegistryState({activated:m.activated,registeredCount:m.registeredCount});setPeople(m.people.filter(x=>x.status==='active'));setLoaded(true)}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useUnitLive(membership?.unitId,initial=>refresh(!initial),{domains:['schedules','team','coverage'],refreshKey:membership.role});
 
+ const inherited=useMemo(()=>carryFiveTwoRoster(period,plans,people),[period,plans,people]);
+ const boardRoster=!selected&&!rosterDirty?inherited:roster;
+ const lockedWeeks=useMemo(()=>[...new Set(plans.filter(p=>p.period!==period&&p.status==='published'&&!p.archivedAt&&p.roster)
+  .flatMap(p=>Object.keys(p.roster.weekly).filter(week=>fiveTwoWeeks(period).includes(week))))],[plans,period]);
  const chosen=plans.find(x=>x.id===selected);
- const legacy=Boolean(chosen&&!chosen.roster);
  const validMonth=monthDates(period).length>0;
  const boardEntries=useMemo(()=>{
   if(!validMonth)return [];
   if(chosen?.roster&&chosen.status!=='draft')return entries;
   const weeks=fiveTwoWeeks(period);
   const extendedDates=weeks.flatMap(week=>Array.from({length:7},(_,index)=>shiftScheduleDate(week,index)));
-  return fiveTwoEntries({period,members:people,roster,approvedLeaves,dates:extendedDates});
- },[validMonth,period,people,roster,approvedLeaves,chosen,entries]);
- const legacyIds=useMemo(()=>registryState.activated?entries.filter(e=>!people.some(p=>p.uid===e.uid)).length:0,[entries,people,registryState.activated]);
- const dateSelected=monthDates(period).includes(date)?date:monthDates(period)[0]||'';
+  return fiveTwoEntries({period,members:people,roster:boardRoster,approvedLeaves,dates:extendedDates});
+ },[validMonth,period,people,boardRoster,approvedLeaves,chosen,entries]);
  const setBoard=(next=emptyRoster)=>{setRoster(next);setUndoHistory([]);setRosterDirty(false);setTitleDirty(false);};
  const open=async p=>{
   if(hasUnsaved&&!await askConfirmation('Abrir outra escala e descartar as alterações deste rascunho?'))return;
   setSelected(p.id);setDraftRevision(p.revision);setTitle(p.title);setPeriod(p.period);setEntries(p.entries||[]);
-  setSundayOff(Object.fromEntries((p.entries||[]).filter(entry=>entry.type==='monthly_sunday').map(entry=>[entry.uid,entry.date])));
   setBoard(p.roster);setError('');
  };
+ const resumed=useRef(null);
+ useEffect(()=>{
+  if(!initialPlanId||!loaded||resumed.current===initialPlanId)return;
+  resumed.current=initialPlanId;
+  const draft=plans.find(item=>item.id===initialPlanId&&item.roster&&item.status==='draft'&&!item.archivedAt);
+  if(draft)void open(draft);
+  else setError('O rascunho selecionado não está mais disponível.');
+ },[initialPlanId,loaded,plans]);
  const reset=(nextPeriod=period)=>{
-  setSelected('');setDraftRevision(null);setTitle('Escala da equipe');setEntries([]);setSundayOff({});setError('');
-  setPeriod(nextPeriod);setBoard(newRoster(nextPeriod,plans,people));
+  setSelected('');setDraftRevision(null);setTitle('Escala da equipe');setEntries([]);setError('');
+  setPeriod(nextPeriod);setBoard(carryFiveTwoRoster(nextPeriod,plans,people));
  };
  const startNew=async(nextPeriod=period)=>{
   if(hasUnsaved&&!await askConfirmation('Descartar as alterações deste rascunho?'))return;
   reset(nextPeriod);
   setScheduleView('active');
  };
- const updateRoster=next=>{setUndoHistory(old=>[...old.slice(-29),{roster,dirty:rosterDirty}]);setRoster(next);setRosterDirty(true);};
+ const updateRoster=next=>{setUndoHistory(old=>[...old.slice(-29),{roster:boardRoster,dirty:rosterDirty}]);setRoster(next);setRosterDirty(true);};
  const undoRoster=()=>{
   const previous=undoHistory.at(-1);
   if(!previous)return;
   setRoster(previous.roster);setRosterDirty(previous.dirty);setUndoHistory(old=>old.slice(0,-1));
  };
- const sundays=useMemo(()=>weekdayOccurrences(period,0),[period]);
- const filteredPeople=people.filter(p=>matrixSector==='todos'||p.professional?.sector===matrixSector);
- const saveFixed=async(person,value)=>{
-  setSavingFixed(person.uid);try{
-   if(person.registry){const token=await auth.currentUser.getIdToken();const r=await apiFetch('/api/members/manage',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'masterRegistryUpdate',id:person.uid,changes:{fixedWeekday:Number(value)}})});const d=await r.json();if(!r.ok)throw Error(d.message)}else await call('fixedOffSet',{uid:person.uid,weekday:Number(value)});
-   setFixedOff(old=>({...old,[person.uid]:Number(value)}));
-   notify('Folga habitual de '+(person.name||person.email)+' atualizada.','success');
-  }catch(e){setError(e.message);notify(e.message,'error')}finally{setSavingFixed('')}
- };
- const generate=async()=>{
-  if(entries.length&&!await askConfirmation('Gerar uma nova proposta substituirá os lançamentos deste rascunho. Continuar?'))return;
-  try{
-   const generated=generateMonthlyRoster({period,members:people,fixedOffDays:fixedOff,sundayOffDays:sundayOff,approvedLeaves,autoSunday:true});
-   setEntries(generated);setSundayOff(Object.fromEntries(generated.filter(e=>e.type==='monthly_sunday').map(e=>[e.uid,e.date])));setError('Proposta gerada. Revise a cobertura por turno e setor antes de enviar para aprovação.');
-  }catch(e){setError(e.message);notify(e.message,'error')}
- };
- const add=e=>{e.preventDefault();if(!uid||!date||!date.startsWith(period))return setError('Selecione colaborador e data dentro do mês.');setError('');setEntries(old=>[...old.filter(x=>!(x.uid===uid&&x.date===date)),{uid,date,type}].sort((a,b)=>a.date.localeCompare(b.date)))};
  const save=async()=>{
-  if(legacyIds)return setError('Este rascunho contém contas antigas; gere uma nova proposta com a equipe real.');
   setBusy(true);
   try{
-   const payloadEntries=legacy?entries:boardEntries.filter(entry=>entry.date.startsWith(period));
-   const result=await call('saveDraft',{id:selected||undefined,expectedRevision:draftRevision,period,title,entries:payloadEntries,...(legacy?{}:{roster})});
+   const payloadEntries=boardEntries.filter(entry=>entry.date.startsWith(period));
+   const result=await call('saveDraft',{id:selected||undefined,expectedRevision:draftRevision,period,title,entries:payloadEntries,roster:boardRoster});
    notify(result.message,'success');
+   setRoster(boardRoster);
    setSelected(result.id);setDraftRevision(result.revision);setEntries(payloadEntries);
    setRosterDirty(false);setTitleDirty(false);setUndoHistory(old=>old.map(snapshot=>({...snapshot,dirty:true})));
    await refresh(true);
   }catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}
  };
  const transition=async action=>{setBusy(true);try{const d=await call(action,{id:selected});notify(d.message,'success');await refresh()}catch(e){setError(e.message);notify(e.message,'error')}finally{setBusy(false)}};
- const archivedPlans=plans.filter(p=>!!p.archivedAt),activePlans=plans.filter(p=>!p.archivedAt);
+ const archivedPlans=plans.filter(p=>p.roster&&p.archivedAt),activePlans=plans.filter(p=>p.roster&&!p.archivedAt&&!['withdrawn','superseded'].includes(p.status));
+ const historical=plans.filter(p=>!p.archivedAt&&(p.status==='withdrawn'||p.status==='superseded'||!p.roster&&p.status==='published'));
  const changeArchive=async(p,action)=>{
   if(busy)return;
   if(action==='scheduleArchive'&&!await askConfirmation('Mover esta escala para a lixeira? O histórico será preservado e a escala poderá ser restaurada.'))return;
@@ -126,30 +106,26 @@ export default function SchedulePlanner({membership}){
  };
  if(!allowed)return <section className="ti-planning"><h1>Escalas</h1><p>Consulte suas escalas publicadas no Mural.</p></section>;
  const workflow=chosen?.archivedAt?null:<div className="ti-planning-actions">
-  {legacy&&chosen?.status==='draft'&&<button type="button" disabled={busy||entries.length===0} onClick={save}>Salvar rascunho</button>}
   {chosen?.status==='draft'&&<button disabled={busy||hasUnsaved} type="button" onClick={()=>transition('submit')}>Enviar para análise</button>}
   {chosen?.status==='in_review'&&<button disabled={busy} type="button" onClick={()=>transition('approve')}>Aprovar escala</button>}
   {chosen?.status==='approved'&&<button disabled={busy} type="button" onClick={()=>transition('publish')}>Publicar no Mural</button>}
   {chosen?.status==='published'&&<p role="status">Esta versão está publicada.</p>}
  </div>;
  const canPlan=(!chosen||chosen.status==='draft')&&!chosen?.archivedAt;
- return <section className={legacy?'ti-planning':'ti-roster-planner'}>
- {legacy&&<><p className="eyebrow">ADMINISTRAÇÃO · EQUIPE</p><h1>Planejamento de escalas</h1></>}
- {!legacy&&validMonth&&<RosterBoard key={period} period={period}
-  roster={roster} updateRoster={updateRoster} members={people} entries={boardEntries} requirements={coverageRules}
+ return <section className="ti-roster-planner">
+ {validMonth&&<RosterBoard key={period} period={period}
+  roster={boardRoster} lockedWeeks={lockedWeeks} approvedLeaves={approvedLeaves} coveragePolicy={coveragePolicy} updateRoster={updateRoster} members={people} entries={boardEntries} requirements={coverageRules}
   editable={canPlan&&!busy&&!loading} saving={busy||loading} onSave={save} canSave={people.length>0&&(!registryState.registeredCount||registryState.activated)}
   saved={Boolean(draftRevision)&&!hasUnsaved} status={chosen?.status&&chosen.status!=='draft'?labels[chosen.status]||chosen.status:null}
   changePeriod={startNew} onUndo={undoRoster} canUndo={undoHistory.length>0}
-  loadPending={!loaded&&loading} loadError={!loaded?error:''} retryLoad={()=>refresh()}/>}
+  loadPending={!loaded&&loading} loadError={!loaded?error:''} retryLoad={()=>refresh()} onOpenCoverage={chosen&&!hasUnsaved&&!chosen.archivedAt&&onOpenCoverage?(date=>onOpenCoverage({date,planId:chosen.id})):null}/>}
  {!registryState.activated&&registryState.registeredCount>0&&<aside className="ti-roster-attention" role="status"><strong>{registryState.registeredCount} fichas profissionais aguardam ativação.</strong><span>O planejador ainda está usando contas de acesso, que podem incluir contas de teste. Ative o Cadastro Mestre após conferir a equipe para planejar com os funcionários reais.</span><button type="button" onClick={()=>window.dispatchEvent(new CustomEvent("ti-navigate",{detail:"master-registry"}))}>Abrir Cadastro Mestre</button></aside>}
- {legacyIds>0&&<aside className="ti-roster-attention" role="alert"><strong>Rascunho com {legacyIds} lançamento(s) de contas antigas.</strong><span>Após ativar o Cadastro Mestre, a nova escala usa IDs das fichas profissionais. Para preservar o histórico, rascunhos antigos não são convertidos automaticamente. Crie uma proposta nova e confira as folgas antes de salvar.</span></aside>}
- {legacy&&loading&&<p role="status">Carregando escalas…</p>}
- {!legacy&&chosen&&<section className="ti-planning-card ti-roster-record">
+ {chosen&&<section className="ti-planning-card ti-roster-record">
   <label>Título da escala<input maxLength={100} minLength={3} value={title} disabled={!canPlan||busy} onChange={e=>{setTitle(e.target.value);setTitleDirty(true);}}/></label>
   {workflow}
  </section>}
- <div className={legacy?'ti-planning-grid':'ti-roster-saved'}>
- <details className="ti-planning-card ti-roster-record" open={legacy||undefined}><summary>Escalas da unidade</summary>
+ <div className="ti-roster-saved">
+ <details className="ti-planning-card ti-roster-record"><summary>Escalas da unidade · {activePlans.filter(item=>item.status==='draft').length} rascunho(s)</summary>
  <div className="ti-planning-heading"><button type="button" onClick={()=>refresh()} disabled={busy||loading}>Atualizar</button><button type="button" disabled={busy} onClick={()=>startNew()}>Nova escala</button></div>
  <div className="ti-notification-tabs" role="group" aria-label="Lista de escalas"><button type="button" className={scheduleView==='active'?'selected':''} aria-pressed={scheduleView==='active'} onClick={()=>setScheduleView('active')}>Ativas ({activePlans.length})</button><button type="button" className={scheduleView==='trash'?'selected':''} aria-pressed={scheduleView==='trash'} onClick={()=>setScheduleView('trash')}>Lixeira ({archivedPlans.length})</button></div>
  {loading?<p>Carregando...</p>:(scheduleView==='active'?activePlans:archivedPlans).length?(scheduleView==='active'?activePlans:archivedPlans).map(x=><div key={x.id} className="ti-schedule-list-item">
@@ -157,42 +133,10 @@ export default function SchedulePlanner({membership}){
   {scheduleView==='trash'?<button type="button" disabled={busy} className="ti-schedule-recycle-action" onClick={()=>changeArchive(x,'scheduleRestore')}>Restaurar</button>:<button type="button" disabled={busy||(x.status==='published'&&x.period>=today.slice(0,7))} className="ti-schedule-recycle-action" title={x.status==='published'&&x.period>=today.slice(0,7)?'Escala oficial protegida':'Mover para a lixeira'} onClick={()=>changeArchive(x,'scheduleArchive')}>Excluir</button>}
  </div>):<p>{scheduleView==='trash'?'Nenhuma escala na lixeira.':'Nenhuma escala cadastrada.'}</p>}
  </details>
- {legacy&&<section className="ti-planning-card"><h2>Detalhes da escala</h2><label>Título<input maxLength={100} minLength={3} required disabled={!!chosen&&chosen.status!=='draft'} value={title} onChange={e=>setTitle(e.target.value)}/></label><label>Mês de referência<input type="month" disabled={!!chosen&&chosen.status!=='draft'} value={period} onChange={e=>{setPeriod(e.target.value);setEntries([])}}/></label>
- {(!chosen||chosen.status==='draft')&&<form className="ti-planning-add" onSubmit={add}><label>Colaborador<select required value={uid} onChange={e=>setUid(e.target.value)}><option value="">Selecione</option>{people.map(p=><option key={p.uid} value={p.uid}>{p.name||p.email}</option>)}</select></label><label>Data<input required type="date" value={date} min={period+'-01'} max={monthDates(period).at(-1)} onChange={e=>setDate(e.target.value)}/></label><label>Atividade<select value={type} onChange={e=>setType(e.target.value)}><option value="work">Trabalho</option><option value="off">Folga</option><option value="leave">Ausência</option><option value="monthly_sunday">Domingo mensal adicional</option></select></label><button type="submit">Adicionar</button></form>}
- {(!chosen||chosen.status==='draft')&&<button type="button" disabled={busy||people.length===0||(!registryState.activated&&registryState.registeredCount>0)} onClick={generate}>Gerar mês com folgas fixas e domingos</button>}
- <section className="ti-planning-card ti-schedule-subcard">
- <details><summary>Folgas habituais e domingo do mês · {people.length} colaboradores</summary>
- <p>Várias pessoas podem folgar no mesmo dia. O domingo é adicional à folga semanal. As configurações fixas são permanentes; os domingos desta proposta não alteram outros meses.</p>
- <div className="ti-schedule-people">
- {people.map(person=><div key={person.uid} className="ti-schedule-person">
- <strong className="ti-schedule-person-name">{person.name||person.email}</strong>
- <label>Folga fixa <select aria-label={'Folga fixa de '+(person.name||person.email)} value={fixedOff[person.uid]||''} disabled={!!savingFixed||busy} onChange={e=>saveFixed(person,e.target.value)}>
- <option value="">Não cadastrada</option>{[1,2,3,4].map(d=><option key={d} value={d}>{['','Segunda','Terça','Quarta','Quinta'][d]}</option>)}</select></label>
- <label>Domingo adicional <select aria-label={'Domingo adicional de '+(person.name||person.email)} value={sundayOff[person.uid]||''} disabled={!!chosen&&chosen.status!=='draft'} onChange={e=>setSundayOff(old=>({...old,[person.uid]:e.target.value}))}><option value="">Selecionar</option>{sundays.map(d=><option key={d} value={d}>{d.split('-').reverse().join('/')}</option>)}</select></label>
- </div>)}
- </div></details>
- </section>
- <section className="ti-planning-card" style={{marginTop:16}}>
- <h3>Domingos e cobertura</h3>{!coverageRules.length&&<p role="status">Defina mínimos por setor e horário em Coberturas antes de publicar. Horários e pausas vêm do cadastro; domingo usa sua própria jornada.</p>}{sundays.map(day=>{const intervals=coverageTimeline({date:day,entries,people,requirements:coverageRules});return <details key={day}><summary>{day.split('-').reverse().join('/')} · {entries.filter(e=>e.date===day&&e.type!=='work').length} folgas · {intervals.filter(r=>r.deficit).length} intervalos a revisar</summary>{intervals.map((r,i)=><p key={i} className={r.deficit?'team-error':''}>{r.sector} {r.skill?'· '+r.skill:''} · {r.start}–{r.end} · {r.covered}/{r.minimum} pessoas {r.deficit?'· déficit '+r.deficit:'· coberto'}</p>)}</details>})}<details><summary><span className="ti-roster-desktop-label">Ver grade mensal completa</span><span className="ti-roster-mobile-label">Consultar escala por dia</span></summary><h3>Visão mensal da equipe</h3>
- <p className="ti-roster-grid-instructions">F = folga fixa; DM = domingo adicional; A = ausência; · = trabalho. Role horizontalmente para ver todos os dias.</p>
- <label>Filtrar setor <select value={matrixSector} onChange={e=>setMatrixSector(e.target.value)}><option value="todos">Todos</option><option value="cozinha">Cozinha</option><option value="frente">Frente</option><option value="caixa">Caixa</option><option value="apoio">Apoio</option><option value="gestao">Gestão</option></select></label>
- <div className="ti-roster-mobile-day" aria-label="Escala por dia no celular">
- <label>Dia para consultar<input type="date" value={dateSelected} min={period+'-01'} max={monthDates(period).at(-1)} onChange={e=>setDate(e.target.value)}/></label>
- <div className="ti-roster-day-summary"><strong>{dateSelected?.split('-').reverse().join('/')||'Selecione uma data'}</strong><span>{filteredPeople.length} colaboradores</span></div>
- <div className="ti-roster-day-list">{filteredPeople.map(person=>{const kind=entries.find(e=>e.uid===person.uid&&e.date===dateSelected)?.type||(dateSelected===sundayOff[person.uid]?'monthly_sunday':weekdayOf(dateSelected)===fixedOff[person.uid]?'off':'work');return <article key={person.uid} className="ti-roster-day-person"><span>{person.name||person.email||'Colaborador'}</span><b data-kind={kind}>{labels[kind]||kind}</b></article>})}</div>
- {!filteredPeople.length&&<p className="ti-roster-day-empty">Nenhum colaborador disponível neste filtro de setor.</p>}
- </div>
- <div className="ti-schedule-matrix" role="region" aria-label="Matriz mensal de folgas" tabIndex={0}>
- <table className="ti-schedule-matrix-table" style={{minWidth:Math.max(860,monthDates(period).length*30+150)}}>
- <thead><tr><th style={{position:'sticky',left:0,background:'var(--surface,#fff)',minWidth:140,textAlign:'left'}}>Funcionário</th>{monthDates(period).map(d=><th key={d} title={d===today?d+" · HOJE":d} aria-current={d===today?"date":undefined} style={{minWidth:26,textAlign:'center'}}>{WEEKDAY_LABELS[weekdayOf(d)].slice(0,1)}<div>{Number(d.slice(-2))}</div></th>)}</tr></thead>
- <tbody>{filteredPeople.map(person=><tr key={person.uid}><th scope="row" style={{position:'sticky',left:0,textAlign:'left',background:'var(--surface,#fff)',maxWidth:145,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={person.name||person.email}>{person.name||person.email}</th>{monthDates(period).map(day=>{const kind=entries.find(e=>e.uid===person.uid&&e.date===day)?.type||(day===sundayOff[person.uid]?'monthly_sunday':weekdayOf(day)===fixedOff[person.uid]?'off':'work');const text=kind==='off'?'F':kind==='monthly_sunday'?'DM':kind==='leave'?'A':'·';return <td key={day} aria-current={day===today?"date":undefined} style={{textAlign:'center',padding:'7px 0',background:kind==='off'?'#F6D9CE':kind==='monthly_sunday'?'#D9EAFD':kind==='leave'?'#FDE68A':'transparent',color:['off','monthly_sunday'].includes(kind)?'#78350F':'inherit',fontWeight:text==='·'?400:700}} title={(person.name||person.email)+' · '+day+' · '+(labels[kind]||kind)}>{text}</td>})}</tr>)}</tbody>
- <tfoot><tr><th scope="row" style={{position:'sticky',left:0,background:'var(--surface,#fff)',textAlign:'left'}}>Total de folgas</th>{monthDates(period).map(day=><td key={day} style={{textAlign:'center',fontWeight:700}}>{filteredPeople.filter(person=>{const kind=entries.find(e=>e.uid===person.uid&&e.date===day)?.type||(day===sundayOff[person.uid]?'monthly_sunday':weekdayOf(day)===fixedOff[person.uid]?'off':'work');return kind==='off'||kind==='monthly_sunday'}).length}</td>)}</tr></tfoot>
- </table></div></details>
- </section>
- <div className="ti-calendar-block" aria-label="Calendário mensal da escala"><div className="ti-calendar-heading"><h3>Calendário de {period}</h3><span>Clique em um dia para selecionar a data</span></div><div className="ti-calendar-grid">{monthDates(period).map(date=>{const day=new Date(date+'T12:00:00Z').getUTCDay();const records=entries.filter(e=>e.date===date);const offs=records.filter(e=>e.type==='off'||e.type==='monthly_sunday').length;return <button type="button" key={date} aria-current={date===today?"date":undefined} className={'ti-calendar-day'+(date===dateSelected?' active':'')+(date===today?' ti-calendar-today':'')+(offs?' has-off':'')} onClick={()=>setDate(date)} title={date+' · '+offs+' folgas'}><strong>{date.slice(-2)}</strong><small>{['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][day]}</small><span>{records.length} registros</span>{offs>0&&<em>{offs} folga(s)</em>}</button>})}</div></div>
- <div className="ti-planning-entries">{entries.length?entries.map((e,i)=><div key={e.date+e.uid}><span>{e.date} · {people.find(x=>x.uid===e.uid)?.name||e.uid} · {labels[e.type]}</span>{(!chosen||chosen.status==='draft')&&<button type="button" aria-label="Retirar lançamento" onClick={()=>setEntries(old=>old.filter((_,j)=>j!==i))}>Retirar</button>}</div>):<p>Nenhum turno ou folga incluído.</p>}</div>
- {workflow}
- </section>}</div>{error&&(loaded||legacy)&&<p role="alert" className="team-error">{error}</p>}
+ {historical.length>0&&<details className="ti-planning-card ti-roster-record"><summary>Histórico de escalas ({historical.length})</summary>
+  {historical.map(item=><p key={item.id}><strong>{item.title}</strong> · {item.period} · {item.status==='withdrawn'?'Retirada do Mural':item.status==='superseded'?'Substituída':'Publicada'}</p>)}
+ </details>}
+ </div>{error&&loaded&&<p role="alert" className="team-error">{error}</p>}
   {confirmationSheet}
  </section>;
 }

@@ -1,3 +1,9 @@
+import {alertStaff,writeCoverageAlerts} from '../../server/coverage/alerts.js';
+import {evaluateCoverageMonth} from '../../server/coverage/month.js';
+import {restaurantDay} from '../../shared/operation-day.js';
+import {evaluateOperationalDay,forecastPaymentDate,validOperationalPolicy,wholeTurnAssignment,reviewCoverageAssignment} from '../../server/coverage/operational.js';
+import {readCoverageContext} from '../../server/coverage/operational-context.js';
+import {projectCoverage} from '../../src/coverage-board-state.js';
 import {queuePush,tryDrainPush} from '../../server/push/delivery.js';
 import {MANAGEMENT_ROLES,isManagement} from '../../server/permissions/v31-policy.js';
 import {sendQuotaError} from '../../server/quota-error.js';
@@ -6,13 +12,20 @@ import {coverageTimeline} from '../../server/schedules/coverage-timeline.js';
 import {signalUnitChange} from '../../server/live-signal.js';
 import {randomUUID} from 'node:crypto';
 import {getDb,authenticate,membership,checkRequest,send} from '../../server/_lib.js';
-import {evaluateCoverage,paymentFor,rateRoleFor,checkDoubleShift,approvalGate,DEFAULT_RATES} from '../../server/coverage/engine.js';
+import {evaluateCoverage,paymentFor,rateRoleFor,checkDoubleShift,approvalGate,minutes,DEFAULT_RATES} from '../../server/coverage/engine.js';
 import {validDate} from '../../server/schedules/rules.js';
+const cleanTime=value=>value?.toDate?.()?.toISOString?.()||null;
 const idOk=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(s);
 const roles=new Set(MANAGEMENT_ROLES);
 const validTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 const clean=d=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.()?.toISOString?.()||null,updatedAt:d.data().updatedAt?.toDate?.()?.toISOString?.()||null});
 const rateKeys=Object.keys(DEFAULT_RATES);
+const staffPerson=d=>({...d.data(),uid:d.id});
+const normalizePlanEntries=(plan,date,leaves)=>[
+ ...(plan.entries||[]).filter(entry=>entry.date===date),
+ ...leaves.docs.filter(d=>d.data().status==='approved').map(d=>({uid:d.data().uid,date,type:'leave'}))
+];
+const hasRole=(doc,member)=>doc.exists&&doc.data().status==='active'&&doc.data().unitId===member.unitId&&roles.has(doc.data().role);
 export default async function handler(req,res){
  if(!checkRequest(req,res))return;
  res.setHeader('Cache-Control','no-store');
@@ -21,25 +34,32 @@ export default async function handler(req,res){
   if(!member)return send(res,403,'Sem vínculo ativo.');
   const db=getDb(),unit=db.collection('units').doc(member.unitId),manager=roles.has(member.role),action=req.body?.action;
   const proposals=unit.collection('coverageProposals'),staffRequests=unit.collection('coverageRequestsV31'),settings=unit.collection('configuration').doc('coverageRates'),policyRef=unit.collection('configuration').doc('coverageRequirements');
+  if(action==='planningRules'){
+   if(!manager)return send(res,403,'Apenas gerência.');
+   const policy=await policyRef.get();
+   return send(res,200,'Regras carregadas.',{requirements:policy.data()?.requirements||[],operationalPolicy:policy.data()?.operationalPolicy||{}});
+  }
   if(action==='dashboard'){
    if(!manager)return send(res,403,'Apenas gerência.');
-   const [peopleSnap,plansSnap,rateSnap,proposalSnap,policySnap,requestSnap]=await Promise.all([
-    unit.collection('staffRegistry').limit(200).get(),unit.collection('schedules').limit(120).get(),settings.get(),proposals.limit(100).get(),policyRef.get(),staffRequests.limit(100).get()
+   const [peopleSnap,plansSnap,rateSnap,proposalSnap,policySnap,requestSnap,alerts]=await Promise.all([
+    unit.collection('staffRegistry').limit(200).get(),unit.collection('schedules').limit(120).get(),settings.get(),proposals.limit(100).get(),policyRef.get(),staffRequests.limit(100).get(),unit.collection('coverageAlerts').where('status','==','open').limit(250).get()
    ]);
    const people=peopleSnap.docs.map(d=>({uid:d.id,name:d.data().name||'',status:d.data().status||'inactive',jobTitle:d.data().jobTitle||'',professional:{sector:d.data().sector,jobTitle:d.data().jobTitle,shift:d.data().shift,availability:d.data().availability||[],skills:d.data().skills||[],certifications:d.data().certifications||[]}}));
    const plans=plansSnap.docs.map(d=>({id:d.id,...d.data()}));
-   return send(res,200,'Painel de cobertura carregado.',{people,plans:plans.map(p=>({id:p.id,title:p.title,period:p.period,status:p.status,entries:p.entries||[]})),
-    rates:{...DEFAULT_RATES,...(rateSnap.data()?.rates||{})},requirements:policySnap.data()?.requirements||[],
+   return send(res,200,'Painel de cobertura carregado.',{people,plans:plans.filter(p=>!p.archivedAt&&['draft','in_review','approved','published'].includes(p.status)).sort((a,b)=>b.period.localeCompare(a.period)).map(p=>({id:p.id,title:p.title,period:p.period,status:p.status,revision:p.revision,updatedAt:cleanTime(p.updatedAt)})),
+    rates:{...DEFAULT_RATES,...(rateSnap.data()?.rates||{})},requirements:policySnap.data()?.requirements||[],operationalPolicy:policySnap.data()?.operationalPolicy||{},payroll:rateSnap.data()?.payroll||null,configuredRates:rateSnap.data()?.rates||null,individualRates:rateSnap.data()?.individualRates||{},
+    alerts:alerts.docs.map(doc=>({id:doc.id,...doc.data(),updatedAt:cleanTime(doc.data().updatedAt)})).filter(item=>item.date>=restaurantDay()).sort((a,b)=>a.date.localeCompare(b.date)),
     proposals:proposalSnap.docs.map(clean).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))),
     staffRequests:requestSnap.docs.map(clean).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))),
     note:'Simulação não substitui validação de jornada e folha.'});
   }
   if(action==='myProposals'){
-   const snap=await proposals.limit(100).get();
-   const linked=await unit.collection('staffRegistry').where('accountUid','==',actor.uid).limit(1).get();
-   const ids=new Set([actor.uid,...linked.docs.map(d=>d.id)]);
-   const all=await staffRequests.where('accountUid','==',actor.uid).limit(100).get();
-   return send(res,200,'Propostas consultadas.',{proposals:snap.docs.filter(d=>ids.has(d.data().staffId)).map(clean),requests:all.docs.map(clean)});
+   const [linked,all]=await Promise.all([unit.collection('staffRegistry').where('accountUid','==',actor.uid).limit(1).get(),staffRequests.where('accountUid','==',actor.uid).limit(100).get()]);
+   const ids=[...new Set([actor.uid,...linked.docs.map(d=>d.id)])];
+   const snap=await proposals.where('staffId','in',ids).limit(100).get();
+   return send(res,200,'Propostas consultadas.',{proposals:snap.docs.filter(d=>!d.data().accountUid||d.data().accountUid===actor.uid).map(d=>{
+    const {consentEvidence,decisionNote,...record}=clean(d);return record;
+   }),requests:all.docs.map(clean)});
   }
 
   if(action==='requestChange'){
@@ -69,7 +89,7 @@ export default async function handler(req,res){
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!p.exists||p.data().status!=='pending_acceptance')throw Error('CONFLICT');
     if(pastProposal(p.data()))throw Error('EXPIRED');
     const person=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
-    if(!person.exists||person.data().status!=='active'||person.data().accountUid!==actor.uid)throw Error('FORBIDDEN');
+    if(!person.exists||person.data().status!=='active'||person.data().accountUid!==actor.uid||p.data().accountUid&&p.data().accountUid!==actor.uid)throw Error('FORBIDDEN');
     tx.update(ref,{status:decision==='accepted'?'pending_approval':'declined',...(decision==='accepted'?{acceptedAt:now}:{declinedAt:now}),updatedAt:now,respondedBy:actor.uid});
     queuePush(tx,db,member.unitId,'coverage_response_'+id,{audience:'managers',title:'Convite de cobertura respondido',page:'people'});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
@@ -90,7 +110,7 @@ export default async function handler(req,res){
     if(!old.exists||old.data().status!=='pending'||old.data().accountUid===actor.uid)throw Error('CONFLICT');
     tx.update(ref,{status:decision,note:note.trim(),decidedBy:actor.uid,decidedAt:now,updatedAt:now});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
-    queuePush(tx,db,member.unitId,'coverage_request_decision_'+requestId,{uid:old.data().accountUid,title:'Sua solicitação de troca ou cobertura foi analisada',page:'my-profile'});
+    queuePush(tx,db,member.unitId,'coverage_request_decision_'+requestId,{uid:old.data().accountUid,title:'Sua solicitação de troca ou cobertura foi analisada',page:'my-coverage'});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.change_'+decision,requestId,unitId:member.unitId,actorUid:actor.uid,at:now,note:note.trim()});
    });
    await tryDrainPush(member.unitId);
@@ -106,7 +126,7 @@ export default async function handler(req,res){
    await db.runTransaction(async tx=>{
     const m=await tx.get(db.collection('memberships').doc(actor.uid));
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!isManagement(m.data().role))throw Error('FORBIDDEN');
-    tx.set(policyRef,{requirements:clean,updatedAt:now,updatedBy:actor.uid});
+    tx.set(policyRef,{requirements:clean,updatedAt:now,updatedBy:actor.uid},{merge:true});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.requirements_updated',actorUid:actor.uid,unitId:member.unitId,count:clean.length,at:now});
    });
@@ -114,17 +134,154 @@ export default async function handler(req,res){
   }
   if(action==='rates'){
    if(!isManagement(member.role))return send(res,403,'Somente a gestão da unidade altera valores.');
-   const rates=req.body?.rates;
+   const rates=req.body?.rates,payroll=req.body?.payroll,individual=req.body?.individualRates;
+   const overrideEntries=individual&&typeof individual==='object'&&!Array.isArray(individual)?Object.entries(individual):null;
+   if(individual!==undefined&&(!overrideEntries||overrideEntries.length>200||overrideEntries.some(([id,item])=>!idOk(id)||!item||
+    item.amount!=null&&(!Number.isFinite(item.amount)||item.amount<0||item.amount>10000)||
+    item.daysAfter!=null&&(!Number.isInteger(item.daysAfter)||item.daysAfter<0||item.daysAfter>90))))return send(res,400,'Confira os valores e prazos individuais.');
+   if(payroll!==undefined&&payroll!==null&&(!Number.isInteger(payroll.daysAfter)||payroll.daysAfter<0||payroll.daysAfter>90))return send(res,400,'Prazo de pagamento inválido.');
    if(!rates||rateKeys.some(k=>!Number.isInteger(rates[k])||rates[k]<0||rates[k]>10000))return send(res,400,'Valores inválidos.');
    const updated=Object.fromEntries(rateKeys.map(k=>[k,rates[k]]));const now=new Date();
    await db.runTransaction(async tx=>{
     const m=await tx.get(db.collection('memberships').doc(actor.uid));
     if(!m.exists||m.data().status!=='active'||!isManagement(m.data().role)||m.data().unitId!==member.unitId)throw Error('FORBIDDEN');
-    tx.set(settings,{rates:updated,updatedAt:now,updatedBy:actor.uid});
+    const individualRates=overrideEntries?Object.fromEntries(overrideEntries.filter(([,item])=>item.amount!=null||item.daysAfter!=null)
+     .map(([id,item])=>[id,{amount:item.amount??null,daysAfter:item.daysAfter??null}])):undefined;
+    const previous=await tx.get(settings);
+    tx.set(settings,{...previous.data(),rates:updated,...(payroll===undefined?{}:{payroll:payroll===null?null:{daysAfter:payroll.daysAfter}}),
+     ...(individualRates===undefined?{}:{individualRates}),updatedAt:now,updatedBy:actor.uid});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.rates_updated',unitId:member.unitId,actorUid:actor.uid,rates:updated,at:now});
    });
    return send(res,200,'Tabela operacional atualizada; históricos preservados.');
+  }
+  if(action==='operationalPolicy'){
+   if(!isManagement(member.role))return send(res,403,'Somente a gestão da unidade configura a operação.');
+   const policy=req.body?.policy;
+   if(!validOperationalPolicy(policy))return send(res,400,'Confira datas, mínimos e coberturas recorrentes.');
+   const {holidays,strongPeaks,peakPeriods,countManagement,frontWeekdayMinimum,managementPaid,recurring}=policy;
+   await db.runTransaction(async tx=>{
+    const who=await tx.get(db.doc('memberships/'+actor.uid));
+    if(!hasRole(who,member)||!isManagement(who.data().role))throw Error('FORBIDDEN');
+    tx.set(policyRef,{operationalPolicy:{holidays,strongPeaks,peakPeriods:peakPeriods.map(({start,end})=>({start,end})),countManagement,frontWeekdayMinimum,managementPaid,recurring:recurring.map(({absentId,coverId,paid})=>({absentId,coverId,paid}))},updatedAt:new Date(),updatedBy:actor.uid},{merge:true});
+    signalUnitChange(tx,db,member.unitId,['coverage','schedules']);
+    tx.create(db.collection('auditLogs').doc(),{event:'coverage.operational_policy_updated',unitId:member.unitId,actorUid:actor.uid,at:new Date()});
+   });
+   return send(res,200,'Regras operacionais salvas.');
+  }
+  if(action==='assessMonth'){
+   const {planId}=req.body||{};
+   if(!idOk(planId))return send(res,400,'Selecione uma escala.');
+   const plan=await unit.collection('schedules').doc(planId).get();
+   if(!plan.exists||plan.data().archivedAt||!['draft','in_review','approved','published'].includes(plan.data().status))throw Error('PLAN_NOT_FOUND');
+   const record=plan.data(),period=record.period;
+   const [staff,policy,requests,monthlyProposals]=await Promise.all([unit.collection('staffRegistry').limit(201).get(),policyRef.get(),
+    unit.collection('leaveRequests').where('date','>=',period+'-01').where('date','<=',period+'-31').limit(501).get(),proposals.where('planId','==',planId).limit(301).get()]);
+   if(staff.size>200||requests.size>500||monthlyProposals.size>300)throw Error('ASSESSMENT_LIMIT');
+   const leaves=requests.docs.filter(doc=>doc.data().status==='approved').map(doc=>({uid:doc.data().uid,date:doc.data().date,type:'leave'}));
+   const month=evaluateCoverageMonth({plan:record,people:staff.docs.map(staffPerson),requirements:policy.data()?.requirements||[],policy:policy.data()?.operationalPolicy||{},leaves,proposals:monthlyProposals.docs.map(doc=>doc.data())});
+   return send(res,200,'Mês avaliado.',{month});
+  }
+  if(action==='assessShift'||action==='inviteShift'){
+   const {planId,date,sector,shift,staffId,coveredStart}=req.body||{};
+   const inviting=action==='inviteShift';
+   if(!idOk(planId)||!validDate(date)||!['cozinha','frente'].includes(sector)||!['manha','noite'].includes(shift)||inviting&&!idOk(staffId))return send(res,400,'Selecione escala, data, turno e setor.');
+   const planRef=unit.collection('schedules').doc(planId), directory=unit.collection('staffRegistry').limit(201), leaves=unit.collection('leaveRequests').where('date','==',date).limit(201);
+   const assess=(plan,staff,policy,leavesSnap)=>{
+    if(!plan.exists||plan.data().archivedAt||!['draft','in_review','approved','published'].includes(plan.data().status)||plan.data().period!==date.slice(0,7))throw Error('PLAN_NOT_FOUND');
+    if(staff.size>200||leavesSnap.size>200)throw Error('ASSESSMENT_LIMIT');
+    return evaluateOperationalDay({date,entries:normalizePlanEntries(plan.data(),date,leavesSnap),people:staff.docs.map(staffPerson),requirements:policy.data()?.requirements||[],policy:policy.data()?.operationalPolicy||{}});
+   };
+   if(!inviting){
+    const [plan,staff,policy,leavesSnap]=await Promise.all([planRef.get(),directory.get(),policyRef.get(),leaves.get()]);
+    const evaluation=assess(plan,staff,policy,leavesSnap);
+    const context=await readCoverageContext(unit,date);
+    return send(res,200,'Turno avaliado.',{evaluation,context});
+   }
+   if(pastProposal({date}))return send(res,400,'Selecione um turno de hoje em diante.');
+   const {reason}=req.body;
+   if(typeof reason!=='string'||reason.trim().length<10||reason.length>500)return send(res,400,'Informe o motivo da cobertura.');
+   const now=new Date(), id=randomUUID();
+   await db.runTransaction(async tx=>{
+    const [who,plan,staff,policy,leavesSnap,rateSnap,existing]=await Promise.all([
+     tx.get(db.doc('memberships/'+actor.uid)),tx.get(planRef),tx.get(directory),tx.get(policyRef),tx.get(leaves),tx.get(settings),tx.get(proposals.where('date','==',date))
+    ]);
+    if(!hasRole(who,member))throw Error('FORBIDDEN');
+    const evaluation=assess(plan,staff,policy,leavesSnap);
+    const row=evaluation.shifts.find(item=>item.sector===sector&&item.shift===shift);
+    const candidate=row.candidates.find(item=>item.uid===staffId);
+    const person=staff.docs.find(doc=>doc.id===staffId)?.data();
+    const assignment=wholeTurnAssignment(row,candidate);
+    if(!assignment||!person?.accountUid||!candidate.fitsRole&&!candidate.countsForMinimum)throw Error('STAFF_NOT_AVAILABLE');
+    const partial=assignment.second.start!==row.window.start;
+    if(partial&&coveredStart!==true)throw Error('SHIFT_START_REQUIRED');
+    if(!(row.roleGap&&candidate.matchesRole||row.headcountGap&&candidate.countsForMinimum||row.skillGap&&candidate.skillConfirmed))throw Error('STAFF_NOT_AVAILABLE');
+    if(existing.docs.some(doc=>doc.data().staffId===staffId&&!['rejected','declined','cancelled'].includes(doc.data().status)&&
+     (!doc.data().shift||doc.data().shift===shift||minutes(doc.data().second?.end)>minutes(assignment.second.start)&&minutes(doc.data().second?.start)<minutes(assignment.second.end))))throw Error('CONFLICT');
+    const review=assignment.first?reviewCoverageAssignment(assignment):{state:'review',reasons:['Conferir descanso, intervalos e disponibilidade para o turno inteiro.']};
+    if(review.state==='blocked')throw Error('SHIFT_REVIEW_BLOCKED');
+    const rates=rateSnap.data()?.rates;
+    const fixed=evaluation.recurring.find(item=>item.uid===staffId&&item.sector===sector&&item.shift===shift);
+    const rateRole=rateRoleFor(person),override=rateSnap.data()?.individualRates?.[staffId];
+    const resolves={
+     roleGap: Boolean(row.roleGap&&candidate.matchesRole),
+     skillGap: Boolean(row.skillGap&&candidate.skillConfirmed),
+     headcountGap: Boolean(row.headcountGap&&candidate.countsForMinimum),
+     skill: row.skill||null
+    };
+    tx.create(proposals.doc(id),{staffId,accountUid:person.accountUid,name:person.name||'',date,planId,planRevision:plan.data().revision||null,shift,sector,
+     window:row.window,...assignment,coveredStart:partial&&coveredStart===true,external:false,rateRole,reason:reason.trim(),
+     ...(fixed?{fixedFeePolicy:fixed.paid}:{}),
+     ...resolves,
+     practicePayment:fixed?.paid===false?0:fixed?.paid===null?null:override?.amount??(rates?paymentFor({paymentRole:rateRole},rates):null),
+     operational:true,payrollSnapshot:override?.daysAfter!=null?{daysAfter:override.daysAfter}:rateSnap.data()?.payroll||null,legalEstimate:null,legalValidated:false,reviewReasons:review.reasons,status:'pending_acceptance',consentPending:false,createdAt:now,updatedAt:now,createdBy:actor.uid,unitId:member.unitId});
+    signalUnitChange(tx,db,member.unitId,['coverage','notifications']);
+    queuePush(tx,db,member.unitId,'coverage_invite_'+id,{uid:person.accountUid,title:'Você recebeu um convite de cobertura',page:'my-coverage'});
+    tx.create(db.collection('auditLogs').doc(),{event:'coverage.proposed',unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now});
+   });
+   await tryDrainPush(member.unitId);
+   return send(res,201,'Convite encaminhado à Minha Ficha.',{id});
+  }
+  if(action==='completeCoverage'||action==='payCoverage'){
+   const {id,actualStart,actualEnd,paidDate}=req.body||{}, completing=action==='completeCoverage';
+   if(!idOk(id)||completing&&(!validTime(actualStart)||!validTime(actualEnd)||actualStart===actualEnd)||
+    !completing&&(!validDate(paidDate)||paidDate>restaurantDay()))return send(res,400,'Informe horários efetivos ou a data real do pagamento.');
+   const ref=proposals.doc(id), now=new Date();
+   await db.runTransaction(async tx=>{
+    const [who,proposal]=await Promise.all([tx.get(db.doc('memberships/'+actor.uid)),tx.get(ref)]);
+    if(!hasRole(who,member))throw Error('FORBIDDEN');
+    const p=proposal.data();
+    if(!p?.operational||p.status!==(completing?'approved':'completed'))throw Error('CONFLICT');
+    if(p.date>restaurantDay(now)||!completing&&(paidDate<p.date||p.fee?.amount==null||p.fixedFeePolicy===false))throw Error('FEE_UNAVAILABLE');
+    const hasSnapshot=Object.prototype.hasOwnProperty.call(p,'practicePayment')||Object.prototype.hasOwnProperty.call(p,'fixedFeePolicy');
+    const amount=p.fixedFeePolicy===false?0:(hasSnapshot?(p.practicePayment??(p.fixedFeePolicy===null?null:null)):null);
+    const payroll=Object.prototype.hasOwnProperty.call(p,'payrollSnapshot')?p.payrollSnapshot:null;
+    if(completing){
+     const windowStart=p.second?.start||p.window?.start, windowEnd=p.second?.end||p.window?.end;
+     const overnightWindow=windowStart&&windowEnd&&minutes(windowEnd)<=minutes(windowStart);
+     const startM=minutes(actualStart), endM=minutes(actualEnd);
+     const actualEndM=endM<=startM?endM+1440:endM;
+     const actualStartM=(overnightWindow&&startM<minutes(windowStart))?startM+1440:startM;
+     const windowStartM=minutes(windowStart), windowEndM=overnightWindow?minutes(windowEnd)+1440:minutes(windowEnd);
+     if(windowStartM!=null&&actualStartM<windowStartM)throw Error('SHIFT_REVIEW_BLOCKED');
+     if(windowEndM!=null&&actualEndM>windowEndM)throw Error('SHIFT_REVIEW_BLOCKED');
+     if(p.date===restaurantDay(now)){
+      const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
+      const ch=Number(parts.find(x=>x.type==='hour')?.value||0), cm=Number(parts.find(x=>x.type==='minute')?.value||0);
+      const nowM=ch*60+cm;
+      const actualNowEndM=(overnightWindow&&endM<=startM)?endM+1440:endM;
+      const nowComparable=(overnightWindow&&endM<=startM&&nowM<minutes(windowStart))?nowM+1440:nowM;
+      if(actualNowEndM>nowComparable)throw Error('FEE_UNAVAILABLE');
+     }
+     const dueDate=(amount==null||p.fixedFeePolicy===false)?null:forecastPaymentDate(p.date,payroll);
+     tx.update(ref,{status:'completed',actualStart,actualEnd,fee:{amount,dueDate,rateRole:p.rateRole,policy:payroll},completedAt:now,completedBy:actor.uid,updatedAt:now});
+    }else{
+     tx.update(ref,{status:'paid',paidDate,paidAt:now,paidBy:actor.uid,updatedAt:now});
+    }
+    signalUnitChange(tx,db,member.unitId,['coverage']);
+    tx.create(db.collection('auditLogs').doc(),{event:completing?'coverage.completed':'coverage.paid',unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now});
+   });
+   return send(res,200,completing?'Cobertura realizada registrada.':'Pagamento registrado.');
   }
   if(action==='simulate'){
    const {planId,date,sector,requiredSkill,required,windowStart='',windowEnd=''}=req.body||{};
@@ -153,13 +310,14 @@ export default async function handler(req,res){
    const payment=paymentFor({paymentRole:rateRole,external},rates);
    const now=new Date(),id=randomUUID(),proposal=proposals.doc(id);
    await db.runTransaction(async tx=>{
-    const m=await tx.get(db.collection('memberships').doc(actor.uid));
-    if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!roles.has(m.data().role))throw Error('FORBIDDEN');
+    const [m,existing]=await Promise.all([tx.get(db.collection('memberships').doc(actor.uid)),tx.get(proposals.where('date','==',date))]);
+    if(!hasRole(m,member))throw Error('FORBIDDEN');
+    if(existing.docs.some(doc=>doc.data().staffId===staffId&&!['rejected','declined','cancelled'].includes(doc.data().status)))throw Error('CONFLICT');
     tx.create(proposal,{staffId,name:person.data().name||'',date,first,second,external,rateRole,reason:reason.trim(),practicePayment:payment,
       legalEstimate:null,legalValidated:false,reviewReasons:review.reasons,status:person.data().accountUid?'pending_acceptance':'pending_approval',consentPending:!person.data().accountUid,
       createdAt:now,updatedAt:now,createdBy:actor.uid,unitId:member.unitId});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
-    if(person.data().accountUid)queuePush(tx,db,member.unitId,'coverage_invite_'+id,{uid:person.data().accountUid,title:'Você recebeu um convite de cobertura ou dobra',page:'my-profile'});
+    if(person.data().accountUid)queuePush(tx,db,member.unitId,'coverage_invite_'+id,{uid:person.data().accountUid,title:'Você recebeu um convite de cobertura ou dobra',page:'my-coverage'});
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.proposed',unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,practicePayment:payment});
    });
    await tryDrainPush(member.unitId);
@@ -175,15 +333,59 @@ export default async function handler(req,res){
     if(!m.exists||m.data().status!=='active'||m.data().unitId!==member.unitId||!roles.has(m.data().role))throw Error('FORBIDDEN');
     if(!p.exists||!['pending_approval','pending_acceptance'].includes(p.data().status)||decision==='approved'&&p.data().status!=='pending_approval')throw Error('CONFLICT');
     const currentPerson=await tx.get(unit.collection('staffRegistry').doc(p.data().staffId));
+    let alertContext;
     if(decision==='approved'){
      if(pastProposal(p.data()))throw Error('EXPIRED');
+     if(p.data().operational){
+      if(!currentPerson.exists||currentPerson.data().accountUid!==p.data().accountUid)throw Error('STAFF_NOT_AVAILABLE');
+      const plan=await tx.get(unit.collection('schedules').doc(p.data().planId));
+      if(!plan.exists||plan.data().archivedAt||!['draft','in_review','approved','published'].includes(plan.data().status)||(plan.data().revision||null)!==p.data().planRevision)throw Error('PLAN_CHANGED');
+      {
+       const {date,planId}=p.data();
+       const [staff,policy,leaves,prior,sameDay,context]=await Promise.all([
+        tx.get(unit.collection('staffRegistry').limit(201)),tx.get(policyRef),
+        tx.get(unit.collection('leaveRequests').where('date','==',date).limit(201)),
+        tx.get(unit.collection('coverageAlerts').where('planId','==',planId)),
+        tx.get(proposals.where('date','==',date).limit(201)),
+        readCoverageContext(unit,date)]);
+       if(staff.size>200||leaves.size>200||sameDay.size>200)throw Error('ASSESSMENT_LIMIT');
+       const entries=normalizePlanEntries(plan.data(),date,leaves);
+       const evaluation=evaluateOperationalDay({date,entries,people:staff.docs.map(staffPerson),policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[],context});
+       const target=evaluation.shifts.find(row=>row.shift===p.data().shift&&row.sector===p.data().sector);
+       const candidate=target?.candidates.find(item=>item.uid===p.data().staffId);
+       const fresh=wholeTurnAssignment(target,candidate);
+       const original=p.data();
+       const onApprovedLeave=leaves.docs.some(doc=>doc.data().uid===original.staffId&&doc.data().status==='approved');
+       const otherMatches=sameDay.docs.filter(doc=>doc.id!==id).map(doc=>doc.data()).filter(item=>item.operational&&item.planId===planId&&item.date===date&&item.shift===original.shift&&item.sector===original.sector);
+       const rowIntervals=target?evaluation.intervals.filter(item=>item.deficit&&(item.sector===target.sector||target.sector==='frente'&&['caixa','apoio','gestao'].includes(item.sector))&&(!target.window||item.start<target.window.end&&item.end>target.window.start)):[];
+       const rowRecurring=target?evaluation.recurring.filter(item=>item.sector===target.sector&&item.shift===target.shift):[];
+       const impact=target?projectCoverage(target,otherMatches,rowIntervals,rowRecurring):null;
+       const effectiveNeed=Boolean(target&&impact)&&(
+        original.roleGap ? (impact.roleGap>0 && candidate?.matchesRole) :
+        original.skillGap ? (impact.skillGap>0 && candidate?.skillConfirmed) :
+        original.headcountGap ? (impact.headcountGap>0 && candidate?.countsForMinimum) :
+        (impact.open || target.uncertain)
+       );
+       if(!fresh||!candidate?.hasAccount||onApprovedLeave||!effectiveNeed||fresh.second.start!==original.second?.start||fresh.second.end!==original.second?.end||
+        (fresh.first?.start??null)!==(original.first?.start??null)||(fresh.first?.end??null)!==(original.first?.end??null)||
+        (fresh.first&&reviewCoverageAssignment(fresh).state==='blocked'))throw Error('STAFF_NOT_AVAILABLE');
+       if((original.skillGap? !candidate.skillConfirmed:false)||(original.roleGap? !candidate.matchesRole:false))throw Error('STAFF_NOT_AVAILABLE');
+       if(sameDay.docs.some(doc=>doc.id!==id&&doc.data().staffId===original.staffId&&!['rejected','declined','cancelled'].includes(doc.data().status)&&
+        minutes(doc.data().second?.end)>minutes(fresh.second.start)&&minutes(doc.data().second?.start)<minutes(fresh.second.end)))throw Error('CONFLICT');
+       if(plan.data().status==='published')alertContext={tx,db,unit,unitId:member.unitId,planId,dates:[date],
+        entries,people:staff.docs.map(alertStaff),
+        policy:policy.data()?.operationalPolicy||{},requirements:policy.data()?.requirements||[],prior,now,notify:false,
+        proposals:sameDay.docs.map(doc=>doc.id===id?{...doc.data(),status:'approved'}:doc.data())};
+      }
+     }
      const gate=approvalGate({status:p.data().status,createdBy:p.data().createdBy,actorUid:actor.uid,
       consentPending:p.data().consentPending,acceptedAt:p.data().acceptedAt,staffActive:currentPerson.exists&&currentPerson.data().status==='active',
       legalChecked,consentVerified});
      if(gate)throw Error(gate);
     }
+    if(alertContext)writeCoverageAlerts(alertContext);
     tx.update(ref,{status:decision,decisionNote:note.trim(),legalValidated:false,legalReviewConfirmed:decision==='approved',consentVerified:decision==='approved',consentEvidence:decision==='approved'?req.body.consentEvidence.trim():null,decidedBy:actor.uid,decidedAt:now,updatedAt:now});
-    if(currentPerson.data()?.accountUid)queuePush(tx,db,member.unitId,'coverage_decision_'+id,{uid:currentPerson.data().accountUid,title:'Sua proposta de cobertura ou dobra foi analisada',page:'my-profile'});
+    if(currentPerson.data()?.accountUid)queuePush(tx,db,member.unitId,'coverage_decision_'+id,{uid:currentPerson.data().accountUid,title:'Sua proposta de cobertura ou dobra foi analisada',page:'my-coverage'});
     signalUnitChange(tx,db,member.unitId,['coverage', 'notifications']);
     tx.create(db.collection('auditLogs').doc(),{event:'coverage.'+decision,unitId:member.unitId,proposalId:id,actorUid:actor.uid,at:now,note:note.trim()});
    });
@@ -195,6 +397,13 @@ export default async function handler(req,res){
   if(e.message==='UNAUTHENTICATED')return send(res,401,'Faça login novamente.');
   if(e.message==='FORBIDDEN')return send(res,403,'Operação não autorizada.');
   if(e.message==='EXPIRED')return send(res,409,'O turno desta proposta já passou. Consulte a gestão.');
+  if(e.message==='PLAN_CHANGED')return send(res,409,'A escala mudou desde o convite. Reavalie o turno antes de convidar novamente.');
+  if(e.message==='SHIFT_START_REQUIRED')return send(res,409,'Confirme quem cobre o início do turno antes de enviar o convite.');
+  if(e.message==='PLAN_NOT_FOUND')return send(res,404,'Escala não encontrada para a data.');
+  if(e.message==='ASSESSMENT_LIMIT')return send(res,409,'A equipe ou o volume de ausências excede o limite da avaliação.');
+  if(e.message==='STAFF_NOT_AVAILABLE')return send(res,409,'O turno ou a disponibilidade mudou, ou o colaborador ainda não vinculou sua conta.');
+  if(e.message==='SHIFT_REVIEW_BLOCKED')return send(res,409,'Os horários informados precisam de revisão de jornada antes de prosseguir.');
+  if(e.message==='FEE_UNAVAILABLE')return send(res,409,'Confira a data de realização e se a taxa já foi apurada.');
   if(e.message==='CONFLICT')return send(res,409,'A proposta foi alterada ou está indisponível.');
   if(e.message==='SELF_APPROVAL')return send(res,403,'Quem criou a proposta não pode aprová-la.');
   if(e.message==='INACTIVE_STAFF')return send(res,409,'Colaborador não está ativo.');

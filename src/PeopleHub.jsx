@@ -1,33 +1,28 @@
+import React from 'react';
+import {CalendarDays, ChevronRight, Clock3, KeyRound, ShieldCheck, Users, UserRoundCheck, Workflow} from 'lucide-react';
 import PageHeading from './ui/PageHeading.jsx';
-import {useViewState} from './useViewState.js';
-import React,{useState} from 'react';
-import MasterRegistry from './MasterRegistry.jsx';
-import TeamProfiles from './TeamProfiles.jsx';
-import TeamManagement from './TeamManagement.jsx';
-import SchedulePlanner from './SchedulePlanner.jsx';
-import CoverageConsole from './CoverageConsole.jsx';
 import './people-hub.css';
-import TeamTodayV31 from './TeamTodayV31.jsx';
-import {isManagement} from '../server/permissions/v31-policy.js';
 
-const sections=[
- {id:'today',title:'Equipe de hoje',subtitle:'Situação ao vivo e presenças',icon:'01'},
- {id:'staff',title:'Colaboradores',subtitle:'Fichas reais e vínculos',icon:'02'},
- {id:'skills',title:'Habilidades',subtitle:'Competências por pessoa',icon:'03'},
- {id:'shifts',title:'Jornadas',subtitle:'Turnos e intervalos',icon:'04'},
- {id:'schedule',title:'Escalas',subtitle:'Folgas e publicação',icon:'05'},
- {id:'access',title:'Acessos',subtitle:'Convites e permissões',icon:'06'},
- {id:'coverage',title:'Cobertura',subtitle:'Dobras e custos',icon:'07'}
+const actions = [
+ {page:'master-registry', title:'Colaboradores', description:'Fichas e vínculos da equipe', icon:Users},
+ {page:'schedule-planning', title:'Escalas', description:'Folgas e publicação', icon:CalendarDays},
+ {page:'coverage', title:'Cobertura', description:'Equipe por turno e reforços', icon:Workflow},
+ {page:'team-today', title:'Equipe de hoje', description:'Presenças e turnos do dia', icon:UserRoundCheck},
+ {page:'skills', title:'Habilidades', description:'Competências por pessoa', icon:ShieldCheck},
+ {page:'shifts', title:'Jornadas', description:'Turnos e intervalos', icon:Clock3},
+ {page:'people-access', title:'Acessos', description:'Convites e permissões', icon:KeyRound}
 ];
-export default function PeopleHub({user,membership}){
- const [section,setSection]=useViewState('PeopleHub.jsx:section',membership.unitId,'staff');
- if(!isManagement(membership.role))return <p>Esta área é reservada à gerência.</p>;
- return <section className={"ti-people-hub"+(section==='access'?' ti-people-access':'')}>
-  <PageHeading className="ti-people-hero" eyebrow="TRIAMICCI · GESTÃO" title="Gestão de pessoas" description="Equipe real, competências, jornadas e acessos em um único lugar. Contas de teste não representam automaticamente funcionários."/>
-  <nav className="ti-people-nav" aria-label="Áreas de gestão de pessoas">{sections.map(item=><button key={item.id} type="button" aria-current={section===item.id?'page':undefined} className={section===item.id?'active':''} onClick={()=>setSection(item.id)}><small aria-hidden="true">{item.icon}</small><strong>{item.title}</strong><span>{item.subtitle}</span></button>)}</nav>
-  <div className="ti-people-selected" aria-live="polite"><strong>{sections.find(item=>item.id===section)?.title||'Colaboradores'}</strong><span>{sections.find(item=>item.id===section)?.subtitle||''}</span></div>
-  <div className="ti-people-content">
-   {section==='today'?<TeamTodayV31 unitId={membership.unitId}/>:section==='staff'?<MasterRegistry membership={membership}/>:section==='skills'?<TeamProfiles membership={membership} initialTab="matrix"/>:section==='shifts'?<TeamProfiles membership={membership} initialTab="shifts"/>:section==='schedule'?<SchedulePlanner membership={membership}/>:section==='coverage'?<CoverageConsole membership={membership}/>:<TeamManagement user={user} membership={membership} accessOnly/>}
-  </div>
+
+export default function PeopleHub({onNavigate}) {
+ return <section className="ti-people-hub">
+  <PageHeading title="Gestão de pessoas"/>
+  <nav className="ti-people-actions" aria-label="Áreas de gestão de pessoas">
+   {actions.map(({page,title,description,icon:Icon})=>
+    <button key={page} type="button" onClick={()=>onNavigate(page)}>
+     <Icon size={20} aria-hidden="true"/>
+     <span><strong>{title}</strong><small>{description}</small></span>
+     <ChevronRight size={16} aria-hidden="true"/>
+    </button>)}
+  </nav>
  </section>;
 }

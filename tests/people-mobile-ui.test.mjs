@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const member=readFileSync(new URL('../src/MemberDirectory.jsx',import.meta.url),'utf8');
 const hub=readFileSync(new URL('../src/PeopleHub.jsx',import.meta.url),'utf8');
+const app=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
 const css=readFileSync(new URL('../src/people-hub.css',import.meta.url),'utf8');
 
 test('people: role or status update requires an explicit review before invoking server',()=>{
@@ -13,10 +14,14 @@ test('people: role or status update requires an explicit review before invoking 
  assert.match(member,/request\('update',\{uid:editing\.uid,role,status\}\)/);
  assert.match(member,/setConfirmAccess\(false\)/);
 });
-test('people: all management sections share the same compact mobile navigation',()=>{
+test('people: the compact entry point links to independent management routes',()=>{
  assert.match(hub,/aria-label="Áreas de gestão de pessoas"/);
- assert.match(hub,/className="ti-people-selected"/);
- assert.match(css,/@media\(max-width:760px\)/);
- assert.match(css,/\.ti-people-nav\{display:flex;flex-wrap:nowrap/);
- assert.doesNotMatch(css,/\.ti-people-hub:has\(\.ti-master\)/);
+ assert.doesNotMatch(hub,/CoverageConsole|SchedulePlanner|MasterRegistry|ti-people-selected/);
+ for(const page of ['master-registry','schedule-planning','coverage','team-today','skills','shifts','people-access']){
+  assert.ok(hub.includes("page:'"+page+"'"));
+  assert.ok(app.includes('page === "'+page+'"'));
+ }
+ assert.match(app,/navigate\('coverage',null,null,\{coverage\}\)/);
+ assert.match(app,/url\.searchParams\.set\('date',coverage\.date\)/);
+ assert.match(css,/\.ti-people-actions\s*\{\s*display: grid/);
 });

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "node scripts/local-api-server.mjs",
+    "dev:full": "node scripts/dev-full.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test:rules": "node scripts/test-business-rules.mjs",

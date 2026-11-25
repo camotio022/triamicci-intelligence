@@ -36,7 +36,8 @@ export function createApiFetch(fetcher,{now=()=>Date.now(),cooldownMs=60000,cach
   let body;try{body=JSON.parse(init.body)}catch{return fetcher(input,init)}
   const headers=new Headers(init.headers),actor=headers.get('authorization');
   if(!actor||init.method!=='POST'||typeof input!=='string'||!input.startsWith('/api/'))return fetcher(input,init);
-  const read=readActions.has(body.action),domains=readDomains(input,body.action);
+  const coverageRead=input==='/api/coverage/manage'&&['assessMonth','assessShift','planningRules'].includes(body.action);
+  const read=coverageRead||readActions.has(body.action),domains=readDomains(input,body.action);
   const key=scope()+'|'+input+'|'+actor+'|'+init.body+(domains?'|'+restaurantDay(new Date(now())):'');
   if(!read){
    // A read completed during a write must never become the post-write snapshot.
