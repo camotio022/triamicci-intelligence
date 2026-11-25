@@ -222,9 +222,16 @@ export default async function handler(req,res){
     const rates=rateSnap.data()?.rates;
     const fixed=evaluation.recurring.find(item=>item.uid===staffId&&item.sector===sector&&item.shift===shift);
     const rateRole=rateRoleFor(person),override=rateSnap.data()?.individualRates?.[staffId];
+    const resolves={
+     roleGap: Boolean(row.roleGap&&candidate.matchesRole),
+     skillGap: Boolean(row.skillGap&&candidate.skillConfirmed),
+     headcountGap: Boolean(row.headcountGap&&candidate.countsForMinimum),
+     skill: row.skill||null
+    };
     tx.create(proposals.doc(id),{staffId,accountUid:person.accountUid,name:person.name||'',date,planId,planRevision:plan.data().revision||null,shift,sector,
      window:row.window,...assignment,coveredStart:partial&&coveredStart===true,external:false,rateRole,reason:reason.trim(),
      ...(fixed?{fixedFeePolicy:fixed.paid}:{}),
+     ...resolves,
      practicePayment:fixed?.paid===false?0:fixed?.paid===null?null:override?.amount??(rates?paymentFor({paymentRole:rateRole},rates):null),
      operational:true,payrollSnapshot:override?.daysAfter!=null?{daysAfter:override.daysAfter}:rateSnap.data()?.payroll||null,legalEstimate:null,legalValidated:false,reviewReasons:review.reasons,status:'pending_acceptance',consentPending:false,createdAt:now,updatedAt:now,createdBy:actor.uid,unitId:member.unitId});
     signalUnitChange(tx,db,member.unitId,['coverage','notifications']);

@@ -33,15 +33,20 @@ export function remainingCoverageIntervals(row,matches,intervals){
 export function projectCoverage(row, matches, intervals, recurring, extraCandidate=null){
  const people=new Set();
  let added=0, roleGap=row.roleGap, skillGap=row.skillGap;
- for(const proposal of matches.filter(item=>approved.has(item.status))){
-  const person=row.candidates.find(candidate=>candidate.uid===proposal.staffId);
+ const credit=(proposal,person)=>{
   const start=proposal.actualStart||proposal.second?.start, end=proposal.actualEnd||proposal.second?.end;
   if(!person||people.has(person.uid)||!row.window||!start||!end||end<row.window.end||
-   (start>row.window.start&&(!proposal.coveredStart||proposal.actualStart&&proposal.actualStart>proposal.second?.start)))continue;
+   (start>row.window.start&&(!proposal.coveredStart||proposal.actualStart&&proposal.actualStart>proposal.second?.start)))return;
   people.add(person.uid);
-  if(person.countsForMinimum)added++;
-  if(person.matchesRole)roleGap=0;
-  if(row.skill&&person.skillConfirmed)skillGap=Math.max(0,skillGap-1);
+  const resolvesHeadcount=proposal.headcountGap===undefined?person.countsForMinimum:Boolean(proposal.headcountGap&&person.countsForMinimum);
+  const resolvesRole=proposal.roleGap===undefined?person.matchesRole:Boolean(proposal.roleGap&&person.matchesRole);
+  const resolvesSkill=proposal.skillGap===undefined?(row.skill&&person.skillConfirmed):Boolean(proposal.skillGap&&person.skillConfirmed&&(!proposal.skill||!row.skill||proposal.skill===row.skill));
+  if(resolvesHeadcount)added++;
+  if(resolvesRole)roleGap=0;
+  if(resolvesSkill)skillGap=Math.max(0,skillGap-1);
+ };
+ for(const proposal of matches.filter(item=>approved.has(item.status))){
+  credit(proposal,row.candidates.find(candidate=>candidate.uid===proposal.staffId));
  }
  if(extraCandidate&&!people.has(extraCandidate.uid)){
   if(extraCandidate.countsForMinimum)added++;
