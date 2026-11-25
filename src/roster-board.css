@@ -703,11 +703,11 @@
   .roster-board .month-grid,.roster-board .week-grid {
     display: block;
   }
-  .roster-board .day {
+  .roster-board :is(.month-grid,.week-grid) > .day {
     display: none;
     min-height: 0;
   }
-  .roster-board .day.active {
+  .roster-board :is(.month-grid,.week-grid) > .day.active {
     display: block;
   }
   .roster-board .day-title {

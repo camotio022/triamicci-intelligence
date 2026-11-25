@@ -29,11 +29,30 @@ const problems=(row,impact)=>[
  impact.skillGap?'Montagem em atenção':'',
 ].filter(Boolean).join(' · ') || (impact.open?'Cobertura a confirmar':'Equipe suficiente');
 
-function CoverageDrawer({card,data,date,plan,request,run,busy,selected,setSelected,close,renderProposal,onRecordAbsence}){
+function explainTurn(row,impact,intervals){
+ const team=row.minimum==null
+  ? `Há ${impact.count} ${impact.count===1?'pessoa com horário confirmado':'pessoas com horário confirmado'}.`
+  : `O turno tem ${impact.count} de ${row.minimum} ${row.uncertain?'com horário confirmado':'pessoas previstas'}.`;
+ const role=impact.roleGap
+  ? (row.sector==='cozinha'?'Falta confirmar um cozinheiro para assumir o turno.':'Falta confirmar um gerente ou subgerente para assumir o turno.')
+  : '';
+ const skill=impact.skillGap&&row.skill==='montagem'&&Number.isInteger(row.skillCount)
+  ? `No pico, ${row.skillCount+row.skillGap-impact.skillGap} de ${row.skillCount+row.skillGap} conseguem ficar na montagem ao mesmo tempo.`
+  : '';
+ const worst=intervals.reduce((current,item)=>!current||item.deficit>current.deficit?item:current,null);
+ const interval=worst
+  ? `Das ${worst.start} às ${worst.end}, ${worst.covered} de ${worst.minimum}${worst.skill?' na atividade de '+worst.skill:' no posto avaliado'}.`
+  : '';
+ return [team,role,skill,interval].filter(Boolean).join(' ');
+}
+
+function CoverageDrawer({card,data,context,date,plan,request,run,busy,selected,setSelected,close,renderProposal,onRecordAbsence}){
  const {row,matches,impact,intervals,recurring}=card;
  const panel=useRef(null);
  const [failure,setFailure]=useState(false);
- const [note,setNote]=useState(problems(row,impact).length>=10?problems(row,impact):'Reforço para o turno');
+ const explanation=explainTurn(row,impact,intervals);
+ const [editedNote,setNote]=useState(null);
+ const note=editedNote??explanation;
  const [coveredStart,setCoveredStart]=useState(false);
  const [absent,setAbsent]=useState(''),[absenceReason,setAbsenceReason]=useState('');
  const person=row.candidates.find(candidate=>candidate.uid===selected);
@@ -42,14 +61,31 @@ function CoverageDrawer({card,data,date,plan,request,run,busy,selected,setSelect
  const fixed=recurring.find(item=>item.uid===selected);
  const estimate=fixed?.paid===false?0:fixed?.paid===null?null:data.individualRates?.[selected]?.amount??data.configuredRates?.[person?.rateRole];
  const partial=assignment&&assignment.second.start!==row.window.start;
+ const includedWithoutFee=recurring.filter(item=>item.applied&&item.available&&item.paid===false);
+ const check=(!row.window&&'Qual é o horário deste turno? Confira a jornada cadastrada.')||
+  (row.missingHours>0&&'Quais são os horários das pessoas sem jornada confirmada? Confira antes de decidir.')||
+  (row.minimum==null&&'Quantas pessoas a Frente precisa neste turno? Confira o mínimo nas configurações.')||
+  (row.uncertain&&'A gestão conta no mínimo da Frente? Confira as regras da unidade.');
+ const timingQuestion=row.sector==='cozinha'&&context?.production?.pending>0
+  ? 'Há produção pendente no dia. Alguma tarefa coincide com este turno?'
+  : row.sector==='frente'&&context?.receiving?.records?.length>0
+   ? 'Há recebimentos pendentes. Alguma conferência está prevista para este turno?'
+   : '';
  useEffect(()=>{const dialog=panel.current;dialog.showModal();return ()=>{if(dialog.open)dialog.close();};},[]);
  return <dialog ref={panel} className="ti-cov-drawer" aria-labelledby="coverage-drawer-title" onCancel={event=>{event.preventDefault();close();}}>
   <header className="ti-cov-row"><div><h2 id="coverage-drawer-title">{sectors[row.sector]} · {shifts[row.shift]}</h2><p>{problems(row,impact)}</p></div><button type="button" className="ti-cov-quiet" onClick={close}>Fechar</button></header>
+  <section className="ti-cov-drawer-block ti-cov-turn-summary">
+   <h3>Situação do turno</h3>
+   <p>{explanation}</p>
+   {check&&<p className="ti-cov-coverage-why">{check}</p>}
+   {timingQuestion&&<p className="ti-cov-coverage-why">{timingQuestion}</p>}
+   {includedWithoutFee.map(item=><p key={item.uid+':'+item.forUid}>{item.name} já está na previsão como cobertura fixa sem taxa.</p>)}
+   {impact.open&&!includedWithoutFee.length&&<p className="ti-cov-coverage-why">Nenhum remanejamento sem taxa foi confirmado para este turno.</p>}
+  </section>
   <section className="ti-cov-drawer-block">
    <h3>Quem está no turno</h3><p>Turno da loja · {hours(row.window)}</p>
    <ul className="ti-cov-team">{row.people.map(item=><li key={item.uid}><strong>{candidateName(item)}</strong><small>{hours(item.hours)}</small></li>)}</ul>
    {!row.people.length&&<p>Ninguém confirmado na escala.</p>}
-   {row.uncertain&&<p className="ti-cov-coverage-why">{!row.window?'Confira a jornada cadastrada para este turno.':row.minimum==null?'Defina o mínimo da frente nas configurações.':'Confira os horários da equipe e se a gestão conta no mínimo da frente.'}</p>}
    {onRecordAbsence&&date>=restaurantDay()&&plan.status==='published'&&row.people.length>0&&<details>
     <summary>Registrar indisponibilidade</summary>
     <form className="ti-cov-policy" onSubmit={async event=>{event.preventDefault();const result=await onRecordAbsence({planId:plan.id,date,staffId:absent,reason:absenceReason.trim()});setFailure(!result);}}>
@@ -60,8 +96,9 @@ function CoverageDrawer({card,data,date,plan,request,run,busy,selected,setSelect
      <button type="submit" disabled={busy||!absent||absenceReason.trim().length<8}>Registrar e reavaliar</button>
     </form>
    </details>}
-   {recurring.filter(item=>item.available&&item.paid===false).map(item=><p key={item.uid+item.forUid}>{item.name} · cobertura fixa sem taxa</p>)}
-   {intervals.map((item,i)=><p key={i}>{item.skill||item.sector} · {item.start}–{item.end} · {item.covered}/{item.minimum}</p>)}
+   {intervals.length>1&&<details className="ti-cov-reasons"><summary>Horários que precisam de atenção</summary>
+    {intervals.map((item,i)=><p key={i}>{item.skill||sectors[item.sector]||item.sector} · {item.start}–{item.end} · {item.covered}/{item.minimum}</p>)}
+   </details>}
   </section>
   {matches.filter(item=>!['declined','rejected','cancelled'].includes(item.status)).map(item=>renderProposal?.(item))}
   {impact.open&&date>=restaurantDay()&&<section className="ti-cov-drawer-block">
@@ -75,9 +112,12 @@ function CoverageDrawer({card,data,date,plan,request,run,busy,selected,setSelect
    </details>}
    {assignment&&preview&&<div className="ti-cov-invite">
     <strong>Prévia · {person.name}</strong>
-    <p>{row.minimum!==null?impact.count+' → '+preview.count+' de '+row.minimum:preview.count+' pessoas previstas'}. {impact.roleGap&&!preview.roleGap?'A pessoa cobre a função que faltava. ':''}{preview.headcountGap?preview.headcountGap+' vagas seguem abertas.':''}</p>
+    <p>{row.minimum!==null?impact.count+' → '+preview.count+' de '+row.minimum:preview.count+' pessoas previstas'} se o convite for aprovado.
+     {impact.roleGap&&!preview.roleGap?(row.sector==='cozinha'?' Cobre a função de cozinheiro.':' Garante presença de gestão.'):''}
+     {impact.skillGap>preview.skillGap?' Reforça a montagem.':''}
+     {preview.headcountGap===1?' Ainda fica 1 vaga.':preview.headcountGap>1?` Ainda ficam ${preview.headcountGap} vagas.`:''}</p>
     {assignment.first&&<p>Jornada habitual · {hours(assignment.first)}</p>}
-    <p>Reforço · {hours(assignment.second)} · {estimate===0?'Sem taxa':feeMoney(estimate)}</p>
+    <p>{assignment.first&&estimate!==0?'Período previsto da taxa':'Horário do reforço'} · {hours(assignment.second)} · {estimate===0?'Sem taxa':feeMoney(estimate)}</p>
     {partial&&<label className="ti-cov-check"><input type="checkbox" checked={coveredStart} onChange={event=>setCoveredStart(event.target.checked)}/>Confirmei quem cobre {row.window.start}–{assignment.second.start}</label>}
     <label>Motivo do convite<textarea maxLength={500} value={note} onChange={event=>setNote(event.target.value)}/></label>
     <button type="button" disabled={busy||note.trim().length<10||partial&&!coveredStart} onClick={async()=>{
@@ -150,8 +190,17 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
   if(turn||area)prefer({...turn&&{shift:turn},...area&&{sector:area}});
  };
  const alertFocus=useRef(focus?.sector&&focus?.shift?focus.sector+':'+focus.shift:null);
+ const dayFocus=useRef('');
+ const dayHeading=useRef(null);
+ const chooseFromMonth=(day,turn,area)=>{
+  choose(day,turn,area);
+  if(!window.matchMedia('(max-width: 720px)').matches)return;
+  if(current?.date===day)dayHeading.current?.focus();
+  else dayFocus.current=day;
+ };
  useEffect(()=>{
   if(current&&alertFocus.current){setOpened(alertFocus.current);alertFocus.current=null;}
+  if(current&&dayFocus.current===current.date){dayHeading.current?.focus();dayFocus.current='';}
  },[current]);
  useEffect(()=>{
   if(activeId&&date)void evaluate(activeId,date);
@@ -200,7 +249,7 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
      {activePlans.map(item=><option value={item.id} key={item.id}>{item.title} · {item.period}</option>)}</select></label>}
    </div>
   </div>
-  <CoverageMonth shift={shift} sector={sector} plan={plan} request={request} today={today} selected={date} choose={choose}
+  <CoverageMonth shift={shift} sector={sector} plan={plan} request={request} today={today} selected={date} choose={chooseFromMonth}
    alerts={data?.alerts} proposals={data?.proposals} onOpenAlert={item=>{alertFocus.current=item.sector+':'+item.shift;choose(item.date,item.shift,item.sector);if(current?.date===item.date){setOpened(alertFocus.current);alertFocus.current=null;}}}/>
   {!activeId&&<p className="panel ti-cov-feedback" role="status">{data?'Nenhuma escala disponível para avaliar.':'Carregando a escala…'}</p>}
   {loading&&<p className="panel ti-cov-feedback" role="status">Conferindo o turno…</p>}
@@ -228,7 +277,7 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
     {personId&&<small role="status">Selecione um turno para ver a prévia.</small>}
    </aside>
    <div className="boards">
-    <div className="board-heading"><div><h2>Turnos de {shortDate(date)}</h2><p>{visible.filter(card=>card.impact.open).length} em atenção</p></div>
+    <div className="board-heading"><div><h2 ref={dayHeading} tabIndex={-1}>Turnos de {shortDate(date)}</h2><p>{visible.filter(card=>card.impact.open).length} em atenção</p></div>
     <label>Setor <select value={sector} onChange={event=>{prefer({sector:event.target.value});setPerson('');}}>
      {Object.entries({todos:'Todos',...sectors}).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
     </div>
@@ -255,7 +304,7 @@ export default function OperationalCoverage({data,request,run,busy,focus,prefere
    })}</div>
    </div>
   </div></>}
-  {openedCard&&<CoverageDrawer key={openedCard.id} card={openedCard} data={data} date={date} plan={plan} request={request} run={run} busy={busy} selected={selected} setSelected={setSelected} close={()=>setOpened(null)} renderProposal={renderProposal} onRecordAbsence={recordAbsence?async payload=>{const response=await recordAbsence(payload);if(response)await evaluate(activeId,date);return response;}:null}/>}
+  {openedCard&&<CoverageDrawer key={openedCard.id} card={openedCard} data={data} context={current.context} date={date} plan={plan} request={request} run={run} busy={busy} selected={selected} setSelected={setSelected} close={()=>setOpened(null)} renderProposal={renderProposal} onRecordAbsence={recordAbsence?async payload=>{const response=await recordAbsence(payload);if(response)await evaluate(activeId,date);return response;}:null}/>}
  </section>;
 }
 export function CoveragePolicyForm({initial,people,save,busy}){
