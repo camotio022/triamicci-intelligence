@@ -65,7 +65,12 @@ function Conference({membership,initialProductId=null}){
  useEffect(()=>{if(tab==='history')historyLoad();},[tab]);
  const save=async e=>{e.preventDefault();if(lock.current||!valid||!manager||!item?.compatible||!item.quantitative)return;lock.current=true;setBusy(true);setError('');
   try{const id=requestId.current||crypto.randomUUID();requestId.current=id;
-   await request('v3Count',{requestId:id,sessionId,productId:selected,location:area,quantity:count,notes:notes.trim(),lotCounts:lots.map((l,i)=>({id:l.id,quantity:usingPortions?convertedLots[i]:Number(lotValues[l.id].replace(',','.'))})),initialLot:tracked&&!lots.length&&count>0?{lot:lotName.trim(),expiryDate:expiry}:null});
+   const portionCount=usingPortions?{
+    recipeId:guide.id,
+    portionSize:guide.portionSize,
+    portions:tracked&&lots.length?lots.reduce((sum,lot)=>sum+Number(lotPortions[lot.id].portions),0):Number(portionQuantity),
+   }:null;
+   await request('v3Count',{requestId:id,sessionId,productId:selected,location:area,quantity:count,portionCount,notes:notes.trim(),lotCounts:lots.map((l,i)=>({id:l.id,quantity:usingPortions?convertedLots[i]:Number(lotValues[l.id].replace(',','.'))})),initialLot:tracked&&!lots.length&&count>0?{lot:lotName.trim(),expiryDate:expiry}:null});
    if(!mounted.current)return;requestId.current=null;
    const next=visible.find(i=>i.product.id!==selected&&!i.checked);setSelected(next?.product.id||'');setMessage(next?'Contagem salva. Próximo produto.':'Contagem salva. Você pode continuar na outra área.');await load();
   }catch(e){if(mounted.current){setError(e.message);notify(e.message,'error');}}finally{lock.current=false;if(mounted.current)setBusy(false);}
